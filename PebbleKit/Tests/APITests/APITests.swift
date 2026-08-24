@@ -171,4 +171,24 @@ struct APITests {
 
         #expect(Array(frame.payload[1...4]) == [0x00, 0x00, 0x00, 0x02])
     }
+
+    @Test
+    func pingPongCodecRoundTripsCookie() throws {
+        let ping = PingPongMessage.ping(cookie: 0x1234_ABCD)
+        let frame = PingPongCodec.frame(for: ping)
+
+        #expect(frame.endpoint == 2_001)
+        #expect(frame.payload == [0x00, 0x12, 0x34, 0xAB, 0xCD])
+        #expect(try PingPongCodec.decode(frame) == ping)
+    }
+
+    @Test
+    func pingPongCodecDecodesPong() throws {
+        let frame = PebbleProtocolFrame(
+            endpoint: 2_001,
+            payload: [0x01, 0x00, 0x00, 0x00, 0x2A]
+        )
+
+        #expect(try PingPongCodec.decode(frame) == .pong(cookie: 42))
+    }
 }

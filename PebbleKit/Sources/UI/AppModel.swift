@@ -69,6 +69,8 @@ public final class AppModel {
                 switch event {
                 case .deviceUpdated(let device):
                     self?.connectionState = .connected(device)
+                case .reconnecting(let deviceID):
+                    self?.connectionState = .reconnecting(deviceID: deviceID)
                 case .disconnected(let error):
                     self?.connectionState = .failed(error)
                     return

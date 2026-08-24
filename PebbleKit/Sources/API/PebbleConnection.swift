@@ -10,6 +10,7 @@ public enum PebbleConnectionState: Equatable, Sendable {
 
 public enum PebbleClientEvent: Equatable, Sendable {
     case deviceUpdated(PebbleDevice)
+    case reconnecting(deviceID: String)
     case disconnected(PebbleConnectionError)
 }
 

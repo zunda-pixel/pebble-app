@@ -42,6 +42,13 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var scanTimeoutTask: Task<Void, Never>?
     private var connectionTimeoutTask: Task<Void, Never>?
     private var acknowledgementTimeoutTask: Task<Void, Never>?
+    private var healthCheckTask: Task<Void, Never>?
+    private var pongTimeoutTask: Task<Void, Never>?
+    private var reconnectTask: Task<Void, Never>?
+    private var reconnectDevice: DiscoveredPebble?
+    private var pendingPingCookie: UInt32?
+    private var nextPingCookie: UInt32 = 1
+    private var isAutomaticReconnect = false
 
     public override init() {
         super.init()
@@ -113,6 +120,8 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             return
         }
         intentionalDisconnectIdentifiers.insert(device.id)
+        reconnectDevice = nil
+        stopHealthChecks()
         centralManager.cancelPeripheralConnection(peripheral)
     }
 
@@ -203,10 +212,17 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             serialNumber: information.serialNumber
         )
         self.connectedDevice = connectedDevice
-        connectionContinuation?.resume(returning: connectedDevice)
+        let initialConnectionContinuation = connectionContinuation
+        initialConnectionContinuation?.resume(returning: connectedDevice)
         connectionContinuation = nil
         pendingDevice = nil
         connectedPeripheral = peripheral
+        reconnectDevice = device
+        isAutomaticReconnect = false
+        if initialConnectionContinuation == nil {
+            eventContinuation?.yield(.deviceUpdated(connectedDevice))
+        }
+        startHealthChecks(on: peripheral)
     }
 
     private func failConnection(_ error: PebbleConnectionError) {
@@ -224,6 +240,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         pendingGattWrites.removeAll()
         acknowledgementTimeoutTask?.cancel()
         acknowledgementTimeoutTask = nil
+        stopHealthChecks()
     }
 
     private func model(from advertisementData: [String: Any]) -> PebbleWatchModel? {
@@ -329,14 +346,116 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         _ frame: PebbleProtocolFrame,
         peripheral: CBPeripheral
     ) throws {
+        if frame.endpoint == PingPongCodec.endpoint {
+            try processPingPong(frame, peripheral: peripheral)
+            return
+        }
+
         guard frame.endpoint == WatchVersionCodec.endpoint,
               pendingDevice != nil else {
             return
         }
-
         let information = try WatchVersionCodec.decode(frame)
         try sendFrame(TimeSynchronizationCodec.frame(), to: peripheral)
         finishConnection(peripheral: peripheral, information: information)
+    }
+
+    private func processPingPong(
+        _ frame: PebbleProtocolFrame,
+        peripheral: CBPeripheral
+    ) throws {
+        switch try PingPongCodec.decode(frame) {
+        case .ping(let cookie):
+            try sendFrame(PingPongCodec.frame(for: .pong(cookie: cookie)), to: peripheral)
+        case .pong(let cookie):
+            guard pendingPingCookie == cookie else {
+                return
+            }
+            pendingPingCookie = nil
+            pongTimeoutTask?.cancel()
+            pongTimeoutTask = nil
+        }
+    }
+
+    private func startHealthChecks(on peripheral: CBPeripheral) {
+        stopHealthChecks()
+        healthCheckTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                guard !Task.isCancelled else {
+                    return
+                }
+                self?.sendHealthCheck(on: peripheral)
+            }
+        }
+    }
+
+    private func sendHealthCheck(on peripheral: CBPeripheral) {
+        guard pendingPingCookie == nil else {
+            return
+        }
+        let cookie = nextPingCookie
+        nextPingCookie &+= 1
+        do {
+            try sendFrame(PingPongCodec.frame(for: .ping(cookie: cookie)), to: peripheral)
+            pendingPingCookie = cookie
+            pongTimeoutTask = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(15))
+                guard !Task.isCancelled, self?.pendingPingCookie == cookie else {
+                    return
+                }
+                self?.centralManager.cancelPeripheralConnection(peripheral)
+            }
+        } catch {
+            centralManager.cancelPeripheralConnection(peripheral)
+        }
+    }
+
+    private func stopHealthChecks() {
+        healthCheckTask?.cancel()
+        healthCheckTask = nil
+        pongTimeoutTask?.cancel()
+        pongTimeoutTask = nil
+        pendingPingCookie = nil
+    }
+
+    private func clearTransportState() {
+        activeWriteCharacteristic = nil
+        activeBatteryCharacteristic = nil
+        connectedPeripheral = nil
+        connectedDevice = nil
+        latestBatteryLevel = nil
+        ppogSession = nil
+        frameDecoder = PebbleProtocolFrameDecoder()
+        pendingGattWrites.removeAll()
+        acknowledgementTimeoutTask?.cancel()
+        acknowledgementTimeoutTask = nil
+        stopHealthChecks()
+    }
+
+    private func reconnect(to device: DiscoveredPebble, using peripheral: CBPeripheral) {
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        guard centralManager.state == .poweredOn else {
+            eventContinuation?.yield(.disconnected(.bluetoothUnavailable))
+            return
+        }
+        pendingDevice = device
+        isAutomaticReconnect = true
+        peripheral.delegate = self
+        eventContinuation?.yield(.reconnecting(deviceID: device.id))
+        centralManager.connect(peripheral)
+    }
+
+    private func scheduleReconnect(to device: DiscoveredPebble, using peripheral: CBPeripheral) {
+        reconnectTask?.cancel()
+        reconnectTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled else {
+                return
+            }
+            self?.reconnect(to: device, using: peripheral)
+        }
     }
 
     private func updateBatteryLevel(from bytes: [UInt8]) {
@@ -464,6 +583,11 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
         didFailToConnect peripheral: CBPeripheral,
         error: (any Error)?
     ) {
+        if isAutomaticReconnect, let device = reconnectDevice {
+            pendingDevice = nil
+            scheduleReconnect(to: device, using: peripheral)
+            return
+        }
         failConnection(.connectionFailed)
     }
 
@@ -477,18 +601,21 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
         let identifier = peripheral.identifier.uuidString
         let wasConnected = connectedDevice != nil
         let wasIntentional = intentionalDisconnectIdentifiers.remove(identifier) != nil
-        if pendingDevice?.id == peripheral.identifier.uuidString {
+        let deviceToReconnect = reconnectDevice
+        if pendingDevice?.id == peripheral.identifier.uuidString, !isAutomaticReconnect {
             failConnection(.disconnected)
         }
-        activeWriteCharacteristic = nil
-        activeBatteryCharacteristic = nil
-        connectedPeripheral = nil
-        connectedDevice = nil
-        latestBatteryLevel = nil
-        ppogSession = nil
-        pendingGattWrites.removeAll()
-        acknowledgementTimeoutTask?.cancel()
-        acknowledgementTimeoutTask = nil
+        pendingDevice = nil
+        clearTransportState()
+        if wasIntentional {
+            reconnectDevice = nil
+            isAutomaticReconnect = false
+            return
+        }
+        if (wasConnected || isAutomaticReconnect), let deviceToReconnect {
+            reconnect(to: deviceToReconnect, using: peripheral)
+            return
+        }
         if wasConnected && !wasIntentional {
             eventContinuation?.yield(.disconnected(.disconnected))
         }
