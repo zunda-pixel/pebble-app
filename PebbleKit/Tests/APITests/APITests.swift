@@ -783,3 +783,48 @@ struct PebbleWatchLibraryTests {
         #expect(try await reloaded.remove(watchID: device.id).isEmpty)
     }
 }
+
+@Suite
+struct CompanionDataTests {
+    @Test func firmwareUsesSystemPutBytesAndSystemMessages() throws {
+        var session = PutBytesTransferSession(bytes: [1, 2, 3], objectType: .firmware, appBankID: 1)
+        guard case .send(let initialization) = try session.start() else {
+            Issue.record("Expected firmware initialization frame")
+            return
+        }
+        #expect(initialization.payload == [0x01, 0, 0, 0, 3, PutBytesObjectType.firmware.rawValue, 1])
+        #expect(SystemMessageCodec.firmwareUpdateStartFrame(bytesToSend: 3).payload == [0, 1, 0, 0, 0, 0, 3, 0, 0, 0])
+        #expect(SystemMessageCodec.firmwareUpdateCompleteFrame().payload == [0, 2])
+    }
+
+    @Test func healthSyncUsesOfficialEndpointAndLittleEndianTimestamp() {
+        let frame = HealthSyncCodec.requestFrame(since: Date(timeIntervalSince1970: 0x12345678))
+        #expect(frame.endpoint == 911)
+        #expect(frame.payload == [0x01, 0x78, 0x56, 0x34, 0x12])
+    }
+
+    @Test func timelinePinEncodesPinTypeAndGenericLayout() throws {
+        let pin = PebbleTimelinePin(
+            id: UUID(),
+            parentApplicationID: UUID(),
+            timestamp: Date(timeIntervalSince1970: 100),
+            title: "Meeting",
+            subtitle: nil,
+            body: nil
+        )
+        let bytes = try pin.encoded()
+        #expect(bytes[38] == 0x02)
+        #expect(bytes[41] == 0x01)
+        #expect(TimelinePinCodec.insertFrame(pin, token: 1).endpoint == BlobDBCodec.endpoint)
+    }
+
+    @Test func healthLibraryPersistsSamples() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let url = directory.appending(path: "health.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let library = PebbleHealthLibrary(fileURL: url)
+        let sample = PebbleHealthSample(date: Date(timeIntervalSince1970: 10), steps: 1234, sleepMinutes: 420)
+        try await library.save([sample])
+        #expect(try await library.samples() == [sample])
+    }
+}

@@ -33,15 +33,28 @@ public final class AppModel {
     public private(set) var notificationStatusMessage: String?
     public private(set) var savedWatches: [SavedPebbleWatch] = []
     public private(set) var watchManagementErrorMessage: String?
+    public private(set) var timelinePins: [PebbleTimelinePin] = []
+    public private(set) var healthSamples: [PebbleHealthSample] = []
+    public private(set) var catalogApplications: [PebbleCatalogApplication] = []
+    public private(set) var firmwareUpdateStatusMessage: String?
+    public private(set) var dataSyncStatusMessage: String?
 
     private let client: any PebbleClient
     private let applicationLibrary: PebbleApplicationLibrary
     private let watchLibrary: PebbleWatchLibrary
+    private let timelineLibrary = TimelinePinLibrary()
+    private let healthLibrary = PebbleHealthLibrary()
+    private let appCatalog = PebbleAppCatalog()
+    private let pendingNotificationLibrary = PendingNotificationLibrary()
+    #if os(iOS)
+    private let healthKitBridge = HealthKitBridge()
+    #endif
     @ObservationIgnored private var connectionEventsTask: Task<Void, Never>?
     @ObservationIgnored private var appFetchTask: Task<Void, Never>?
     @ObservationIgnored private var hasLoadedApplications = false
     @ObservationIgnored private var pendingImportSnapshots: [UUID: PebbleApplicationLibrarySnapshot] = [:]
     @ObservationIgnored private var needsApplicationSynchronization = false
+    @ObservationIgnored private var hasStarted = false
     @ObservationIgnored private var recentNotificationFingerprints: [String: Date] = [:]
     @ObservationIgnored private var pendingNotifications: [PebbleTimelineNotification] = []
     @ObservationIgnored private lazy var companionRuntime = PebbleCompanionRuntime(
@@ -103,6 +116,19 @@ public final class AppModel {
         applicationManagementOperation != nil || isHandlingAppFetch
     }
 
+    public func start() async {
+        guard !hasStarted else { return }
+        hasStarted = true
+        await loadSavedWatches()
+        await restorePendingNotifications()
+        await loadTimeline()
+        await loadHealth()
+        await loadCatalog()
+        if savedWatches.contains(where: \.automaticallyConnects) {
+            await scan()
+        }
+    }
+
     public func scan() async {
         connectionState = .scanning
 
@@ -131,16 +157,132 @@ public final class AppModel {
             let connectedDevice = try await client.connect(to: device)
             connectionState = .connected(connectedDevice)
             await recordConnectedWatch(connectedDevice)
+            await restorePendingNotifications()
             await PebbleDiagnostics.shared.record(category: "connection", message: "Watch connected")
             observeConnectionEvents()
             await synchronizeApplications(with: connectedDevice)
             await flushPendingNotifications()
+            await synchronizeTimeline()
+            await requestHealthSync()
         } catch let error as PebbleConnectionError {
             connectionState = .failed(error)
             await PebbleDiagnostics.shared.record(.error, category: "connection", message: error.message)
         } catch {
             connectionState = .failed(.protocolNegotiationFailed)
         }
+    }
+
+    public func installFirmware(from url: URL) async {
+        guard let device = connectedDevice else {
+            firmwareUpdateStatusMessage = "Connect the target Pebble before selecting firmware."
+            return
+        }
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+        do {
+            firmwareUpdateStatusMessage = "Validating firmware…"
+            let package = try await Task.detached {
+                try PBZFirmwareImporter.load(from: url, for: device.model)
+            }.value
+            firmwareUpdateStatusMessage = "Transferring and installing firmware…"
+            try await client.installFirmware(package)
+            firmwareUpdateStatusMessage = "Firmware installed. Waiting for the watch to restart."
+        } catch {
+            firmwareUpdateStatusMessage = "Firmware update stopped safely: \(error.localizedDescription)"
+        }
+    }
+
+    public func loadTimeline() async {
+        do { timelinePins = try await timelineLibrary.pins() }
+        catch { dataSyncStatusMessage = "Timeline could not be loaded." }
+    }
+
+    public func addTimelinePin(title: String, date: Date) async {
+        let pin = PebbleTimelinePin(
+            parentApplicationID: UUID(), timestamp: date, title: title, subtitle: nil, body: nil
+        )
+        timelinePins.append(pin)
+        do {
+            try await timelineLibrary.save(timelinePins)
+            if connectedDevice != nil { try await client.upsertTimelinePin(pin) }
+            dataSyncStatusMessage = "Timeline pin saved."
+        } catch { dataSyncStatusMessage = "Timeline pin queued for the next connection." }
+    }
+
+    public func removeTimelinePins(at offsets: IndexSet) async {
+        let removed = offsets.compactMap { timelinePins.indices.contains($0) ? timelinePins[$0] : nil }
+        timelinePins.remove(atOffsets: offsets)
+        try? await timelineLibrary.save(timelinePins)
+        guard connectedDevice != nil else { return }
+        for pin in removed { try? await client.deleteTimelinePin(id: pin.id) }
+    }
+
+    public func synchronizeTimeline() async {
+        await loadTimeline()
+        guard connectedDevice != nil else { return }
+        for pin in timelinePins { try? await client.upsertTimelinePin(pin) }
+    }
+
+    public func loadHealth() async {
+        do { healthSamples = try await healthLibrary.samples() }
+        catch { dataSyncStatusMessage = "Health data could not be loaded." }
+    }
+
+    public func requestHealthSync() async {
+        guard connectedDevice != nil else { return }
+        do {
+            try await client.send(HealthSyncCodec.requestFrame(since: healthSamples.map(\.date).max()))
+            dataSyncStatusMessage = "Health synchronization requested."
+        } catch { dataSyncStatusMessage = "Health synchronization will retry after reconnection." }
+    }
+
+    #if os(iOS)
+    public func synchronizeWithHealthKit() async {
+        do {
+            try await healthKitBridge.synchronize(healthSamples)
+            dataSyncStatusMessage = "Health data synchronized with HealthKit."
+        } catch { dataSyncStatusMessage = "HealthKit access or synchronization failed." }
+    }
+    #endif
+
+    public func loadCatalog() async {
+        do { catalogApplications = try await appCatalog.cachedApplications() }
+        catch { dataSyncStatusMessage = "The app catalog cache could not be loaded." }
+    }
+
+    public func updateCatalog(source: String) async {
+        guard let url = URL(string: source), ["https", "http"].contains(url.scheme?.lowercased()) else {
+            dataSyncStatusMessage = "Enter a valid HTTPS catalog URL."
+            return
+        }
+        do {
+            catalogApplications = try await appCatalog.update(from: url)
+            UserDefaults.standard.set(source, forKey: "appCatalogSource")
+            dataSyncStatusMessage = "App catalog updated."
+        } catch { dataSyncStatusMessage = "The app catalog could not be updated." }
+    }
+
+    public func installCatalogApplication(_ application: PebbleCatalogApplication) async {
+        guard ["https", "http"].contains(application.downloadURL.scheme?.lowercased()) else {
+            dataSyncStatusMessage = "The catalog provided an unsafe download URL."
+            return
+        }
+        do {
+            dataSyncStatusMessage = "Downloading \(application.name)…"
+            let (temporaryURL, response) = try await URLSession.shared.download(from: application.downloadURL)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                throw AppCatalogError.invalidResponse
+            }
+            let packageURL = FileManager.default.temporaryDirectory
+                .appending(path: "\(application.id.uuidString).pbw")
+            try? FileManager.default.removeItem(at: packageURL)
+            try FileManager.default.moveItem(at: temporaryURL, to: packageURL)
+            await importApplication(from: packageURL)
+            try? FileManager.default.removeItem(at: packageURL)
+            dataSyncStatusMessage = applicationLibraryErrorMessage == nil
+                ? "\(application.name) installed."
+                : applicationLibraryErrorMessage
+        } catch { dataSyncStatusMessage = "The catalog app could not be downloaded." }
     }
 
     public func loadSavedWatches() async {
@@ -304,6 +446,7 @@ public final class AppModel {
                 if pendingNotifications.count > 20 {
                     pendingNotifications.removeFirst(pendingNotifications.count - 20)
                 }
+                try? await pendingNotificationLibrary.save(pendingNotifications)
                 await PebbleDiagnostics.shared.record(
                     category: "notification",
                     message: "Watch app notification queued until reconnection"
@@ -642,6 +785,8 @@ public final class AppModel {
                         await self?.recordConnectedWatch(device)
                         await self?.synchronizeApplications(with: device)
                         await self?.flushPendingNotifications()
+                        await self?.synchronizeTimeline()
+                        await self?.requestHealthSync()
                     }
                 case .appFetchRequested(let request):
                     self?.beginHandlingAppFetchRequest(request)
@@ -717,11 +862,18 @@ public final class AppModel {
             }
         }
         pendingNotifications = remaining
+        try? await pendingNotificationLibrary.save(remaining)
         if remaining.isEmpty {
             await PebbleDiagnostics.shared.record(
                 category: "notification",
                 message: "Queued watch app notifications delivered"
             )
+        }
+    }
+
+    private func restorePendingNotifications() async {
+        if let saved = try? await pendingNotificationLibrary.notifications() {
+            pendingNotifications = saved
         }
     }
 

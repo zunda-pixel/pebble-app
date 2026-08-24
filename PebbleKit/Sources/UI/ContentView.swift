@@ -23,13 +23,16 @@ public struct ContentView: View {
 
     public var body: some View {
         AppRootView(model: model)
+            .task { await model.start() }
     }
 }
 
 private enum AppSection: String, CaseIterable, Identifiable {
     case devices
     case apps
+    case timeline
     case health
+    case catalog
     case settings
 
     var id: Self { self }
@@ -40,8 +43,12 @@ private enum AppSection: String, CaseIterable, Identifiable {
             "Devices"
         case .apps:
             "Apps"
+        case .timeline:
+            "Timeline"
         case .health:
             "Health"
+        case .catalog:
+            "Catalog"
         case .settings:
             "Settings"
         }
@@ -53,8 +60,12 @@ private enum AppSection: String, CaseIterable, Identifiable {
             "applewatch"
         case .apps:
             "square.grid.2x2"
+        case .timeline:
+            "calendar"
         case .health:
             "heart"
+        case .catalog:
+            "bag"
         case .settings:
             "gearshape"
         }
@@ -120,14 +131,100 @@ private struct SectionContent: View {
             DevicesView(model: model)
         case .apps:
             ApplicationsView(model: model)
+        case .timeline:
+            TimelineView(model: model)
         case .health:
-            PlaceholderView(
-                title: "Health",
-                description: "Health synchronization will be available after the local sync foundation is complete.",
-                systemImage: "heart"
-            )
+            HealthView(model: model)
+        case .catalog:
+            CatalogView(model: model)
         case .settings:
             SettingsView(model: model)
+        }
+    }
+}
+
+private struct TimelineView: View {
+    var model: AppModel
+    @State private var title = ""
+    @State private var date = Date()
+
+    var body: some View {
+        List {
+            Section("New Pin") {
+                TextField("Title", text: $title)
+                DatePicker("Date", selection: $date)
+                Button("Add to Timeline", systemImage: "plus") {
+                    let value = title
+                    title = ""
+                    Task { await model.addTimelinePin(title: value, date: date) }
+                }
+                .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            Section("Pins") {
+                ForEach(model.timelinePins) { pin in
+                    LabeledContent(pin.title) { Text(pin.timestamp, format: .dateTime) }
+                }
+                .onDelete { offsets in Task { await model.removeTimelinePins(at: offsets) } }
+            }
+        }
+        .navigationTitle("Timeline")
+        .task { await model.loadTimeline() }
+    }
+}
+
+private struct HealthView: View {
+    var model: AppModel
+
+    var body: some View {
+        List {
+            Section("Today") {
+                LabeledContent("Steps", value: "\(model.healthSamples.last?.steps ?? 0)")
+                LabeledContent("Sleep", value: "\(model.healthSamples.last?.sleepMinutes ?? 0) min")
+            }
+            Button("Sync Health Data", systemImage: "arrow.triangle.2.circlepath") {
+                Task { await model.requestHealthSync() }
+            }
+            .disabled(model.connectedDevice == nil)
+            #if os(iOS)
+            Button("Sync with Apple Health", systemImage: "heart.fill") {
+                Task { await model.synchronizeWithHealthKit() }
+            }
+            #endif
+            if let message = model.dataSyncStatusMessage { Text(message).foregroundStyle(.secondary) }
+        }
+        .navigationTitle("Health")
+        .task { await model.loadHealth() }
+    }
+}
+
+private struct CatalogView: View {
+    var model: AppModel
+    @State private var query = ""
+
+    var body: some View {
+        List(filteredApplications) { application in
+            LabeledContent {
+                Button("Install") { Task { await model.installCatalogApplication(application) } }
+            } label: {
+                VStack(alignment: .leading) {
+                    Text(application.name).font(.headline)
+                    Text("\(application.developer) · \(application.version)").foregroundStyle(.secondary)
+                }
+            }
+        }
+        .searchable(text: $query)
+        .navigationTitle("Catalog")
+        .overlay {
+            if filteredApplications.isEmpty {
+                ContentUnavailableView("No Catalog Apps", systemImage: "bag", description: Text("Catalog sources can be added in Settings."))
+            }
+        }
+        .task { await model.loadCatalog() }
+    }
+
+    private var filteredApplications: [PebbleCatalogApplication] {
+        query.isEmpty ? model.catalogApplications : model.catalogApplications.filter {
+            $0.name.localizedCaseInsensitiveContains(query) || $0.developer.localizedCaseInsensitiveContains(query)
         }
     }
 }
@@ -625,6 +722,8 @@ private struct PlaceholderView: View {
 
 private struct SettingsView: View {
     var model: AppModel
+    @State private var isChoosingFirmware = false
+    @State private var catalogSource = UserDefaults.standard.string(forKey: "appCatalogSource") ?? ""
 
     var body: some View {
         Form {
@@ -660,9 +759,30 @@ private struct SettingsView: View {
                     }
                 }
             }
+            Section("Firmware") {
+                Button("Choose PBZ Firmware", systemImage: "externaldrive.badge.timemachine") {
+                    isChoosingFirmware = true
+                }
+                .disabled(model.connectedDevice == nil)
+                if let message = model.firmwareUpdateStatusMessage { Text(message).foregroundStyle(.secondary) }
+            }
+            Section("App Catalog") {
+                TextField("Catalog JSON URL", text: $catalogSource)
+                Button("Update Catalog", systemImage: "arrow.clockwise") {
+                    Task { await model.updateCatalog(source: catalogSource) }
+                }
+            }
         }
         .navigationTitle("Settings")
+        .fileImporter(isPresented: $isChoosingFirmware, allowedContentTypes: [.pebbleFirmware]) { result in
+            guard case .success(let url) = result else { return }
+            Task { await model.installFirmware(from: url) }
+        }
     }
+}
+
+private extension UTType {
+    static var pebbleFirmware: UTType { UTType(filenameExtension: "pbz") ?? .data }
 }
 
 private struct ConfigurationNavigationDecider: WebPage.NavigationDeciding {

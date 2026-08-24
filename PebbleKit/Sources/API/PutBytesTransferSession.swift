@@ -20,6 +20,9 @@ public struct PutBytesTransferSession: Sendable {
 
     private var state: State = .ready
     private var crc: UInt32
+    private var usesApplicationInitialization: Bool
+    private var sendsInstall: Bool
+    public private(set) var completedCookie: UInt32?
 
     public init(
         bytes: [UInt8],
@@ -32,6 +35,8 @@ public struct PutBytesTransferSession: Sendable {
         self.appBankID = appBankID
         self.chunkSize = chunkSize
         self.crc = PebbleCRC32.calculate(bytes)
+        self.usesApplicationInitialization = [.appResource, .appExecutable, .worker].contains(objectType)
+        self.sendsInstall = self.usesApplicationInitialization
     }
 
     public mutating func start() throws -> PutBytesTransferAction {
@@ -42,11 +47,9 @@ public struct PutBytesTransferSession: Sendable {
             throw PutBytesTransferError.invalidConfiguration
         }
         state = .awaitingInitialization
-        return .send(PutBytesCodec.appInitializationFrame(
-            objectSize: size,
-            objectType: objectType,
-            appBankID: appBankID
-        ))
+        return .send(usesApplicationInitialization
+            ? PutBytesCodec.appInitializationFrame(objectSize: size, objectType: objectType, appBankID: appBankID)
+            : PutBytesCodec.systemInitializationFrame(objectSize: size, objectType: objectType, bank: UInt8(truncatingIfNeeded: appBankID)))
     }
 
     public mutating func receive(_ response: PutBytesResponse) throws -> [PutBytesTransferAction] {
@@ -79,13 +82,19 @@ public struct PutBytesTransferSession: Sendable {
             guard response.cookie == cookie else {
                 throw PutBytesTransferError.unexpectedCookie
             }
-            state = .awaitingInstall(cookie: cookie)
-            return [.send(PutBytesCodec.installFrame(cookie: cookie))]
+            if sendsInstall {
+                state = .awaitingInstall(cookie: cookie)
+                return [.send(PutBytesCodec.installFrame(cookie: cookie))]
+            }
+            state = .finished
+            completedCookie = cookie
+            return [.finished]
         case .awaitingInstall(let cookie):
             guard response.cookie == cookie else {
                 throw PutBytesTransferError.unexpectedCookie
             }
             state = .finished
+            completedCookie = cookie
             return [.finished]
         case .ready, .finished, .failed:
             throw PutBytesTransferError.invalidState

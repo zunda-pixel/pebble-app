@@ -7,6 +7,7 @@ public final class MockPebbleClient: PebbleClient {
     public private(set) var appMessageResponses: [(transactionID: UInt8, acknowledged: Bool)] = []
     public private(set) var reorderedApplicationIDs: [[UUID]] = []
     public private(set) var sentNotifications: [PebbleTimelineNotification] = []
+    public private(set) var timelinePins: [PebbleTimelinePin] = []
     private var nextTransactionID: UInt8 = 0
     private var frameContinuation: AsyncStream<PebbleProtocolFrame>.Continuation?
     private var eventContinuation: AsyncStream<PebbleClientEvent>.Continuation?
@@ -96,6 +97,15 @@ public final class MockPebbleClient: PebbleClient {
         sentNotifications.append(notification)
     }
 
+    public func upsertTimelinePin(_ pin: PebbleTimelinePin) async throws {
+        timelinePins.removeAll { $0.id == pin.id }
+        timelinePins.append(pin)
+    }
+
+    public func deleteTimelinePin(id: UUID) async throws {
+        timelinePins.removeAll { $0.id == id }
+    }
+
     public func emit(_ frame: PebbleProtocolFrame) {
         frameContinuation?.yield(frame)
     }
@@ -109,6 +119,8 @@ public final class MockPebbleClient: PebbleClient {
         objectType: PutBytesObjectType,
         appBankID: UInt32
     ) async throws {}
+
+    public func installFirmware(_ package: PBZFirmwarePackage) async throws {}
 
     public func registerApplication(_ metadata: PebbleAppMetadata) async throws {}
 

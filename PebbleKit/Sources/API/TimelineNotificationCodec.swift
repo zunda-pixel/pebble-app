@@ -2,7 +2,7 @@ public import Foundation
 import MemberwiseInit
 
 @MemberwiseInit(.public)
-public struct PebbleTimelineNotification: Equatable, Sendable {
+public struct PebbleTimelineNotification: Codable, Equatable, Sendable {
     public var id: UUID = UUID()
     public var parentApplicationID: UUID
     public var timestamp: Date = Date()

@@ -104,6 +104,13 @@ public enum BlobDBCodec {
         return PebbleProtocolFrame(endpoint: endpoint, payload: payload)
     }
 
+    public static func deleteFrame(databaseID: UInt8, key: [UInt8], token: UInt16) -> PebbleProtocolFrame {
+        var payload = commonHeader(command: 0x04, token: token, databaseID: databaseID)
+        payload.append(UInt8(key.count))
+        payload.append(contentsOf: key)
+        return PebbleProtocolFrame(endpoint: endpoint, payload: payload)
+    }
+
     public static func decodeResponse(_ frame: PebbleProtocolFrame) throws -> BlobDBResponse {
         guard frame.endpoint == endpoint else {
             throw BlobDBCodecError.unexpectedEndpoint

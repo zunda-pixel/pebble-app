@@ -20,6 +20,7 @@ public final class QEMUPebbleClient: PebbleClient {
     private var expectedBlobStatuses: [BlobDBStatus] = []
     private var waitingForReorder = false
     private var transferSession: PutBytesTransferSession?
+    private var completedTransferCookie: UInt32?
     private var nextAppMessageTransactionID: UInt8 = 0
     private var pendingAppMessageTransactionID: UInt8?
     private var reconnectDevice: DiscoveredPebble?
@@ -165,11 +166,22 @@ public final class QEMUPebbleClient: PebbleClient {
         }
     }
 
+    public func upsertTimelinePin(_ pin: PebbleTimelinePin) async throws {
+        try await performBlobOperation { token in try TimelinePinCodec.insertFrame(pin, token: token) }
+    }
+
+    public func deleteTimelinePin(id: UUID) async throws {
+        try await performBlobOperation(acceptedStatuses: [.success, .keyDoesNotExist]) { token in
+            TimelinePinCodec.deleteFrame(id: id, token: token)
+        }
+    }
+
     public func installApplicationObject(
         _ bytes: [UInt8],
         objectType: PutBytesObjectType,
         appBankID: UInt32
     ) async throws {
+        completedTransferCookie = nil
         guard operationContinuation == nil else { throw PutBytesClientError.transferAlreadyInProgress }
         var session = PutBytesTransferSession(
             bytes: bytes,
@@ -180,6 +192,22 @@ public final class QEMUPebbleClient: PebbleClient {
         transferSession = session
         guard case .send(let frame) = first else { throw PutBytesTransferError.invalidState }
         try await performOperation(frame: frame, timeout: .seconds(20))
+    }
+
+    public func installFirmware(_ package: PBZFirmwarePackage) async throws {
+        let total = package.firmware.count + (package.resources?.count ?? 0)
+        guard let byteCount = UInt32(exactly: total) else { throw PutBytesTransferError.invalidConfiguration }
+        try await send(SystemMessageCodec.firmwareUpdateStartFrame(bytesToSend: byteCount))
+        try await installApplicationObject([UInt8](package.firmware), objectType: package.manifest.firmware.type == "recovery" ? .recovery : .firmware, appBankID: UInt32(package.manifest.firmware.slot ?? 0))
+        guard let firmwareCookie = completedTransferCookie else { throw PutBytesTransferError.invalidState }
+        var cookies = [firmwareCookie]
+        if let resources = package.resources {
+            try await installApplicationObject([UInt8](resources), objectType: .systemResource, appBankID: 0)
+            guard let resourceCookie = completedTransferCookie else { throw PutBytesTransferError.invalidState }
+            cookies.append(resourceCookie)
+        }
+        for cookie in cookies { try await send(PutBytesCodec.installFrame(cookie: cookie)) }
+        try await send(SystemMessageCodec.firmwareUpdateCompleteFrame())
     }
 
     public func registerApplication(_ metadata: PebbleAppMetadata) async throws {
@@ -360,6 +388,7 @@ public final class QEMUPebbleClient: PebbleClient {
                 case .send(let nextFrame): Task { try? await send(nextFrame) }
                 case .progress(let progress): eventContinuation?.yield(.transferProgress(progress))
                 case .finished:
+                    completedTransferCookie = session.completedCookie
                     transferSession = nil
                     finishOperation()
                 }

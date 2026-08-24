@@ -59,6 +59,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var nextPingCookie: UInt32 = 1
     private var isAutomaticReconnect = false
     private var activeTransferSession: PutBytesTransferSession?
+    private var completedTransferCookie: UInt32?
     private var transferContinuation: CheckedContinuation<Void, any Error>?
     private var nextBlobDBToken: UInt16 = 1
     private var pendingBlobDBToken: UInt16?
@@ -234,11 +235,24 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
     }
 
+    public func upsertTimelinePin(_ pin: PebbleTimelinePin) async throws {
+        try await performBlobDBOperation(acceptedStatuses: [.success]) { token in
+            try TimelinePinCodec.insertFrame(pin, token: token)
+        }
+    }
+
+    public func deleteTimelinePin(id: UUID) async throws {
+        try await performBlobDBOperation(acceptedStatuses: [.success, .keyDoesNotExist]) { token in
+            TimelinePinCodec.deleteFrame(id: id, token: token)
+        }
+    }
+
     public func installApplicationObject(
         _ bytes: [UInt8],
         objectType: PutBytesObjectType,
         appBankID: UInt32
     ) async throws {
+        completedTransferCookie = nil
         guard let peripheral = connectedPeripheral,
               ppogSession != nil else {
             throw PebbleConnectionError.disconnected
@@ -264,6 +278,22 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
                 failTransfer(error)
             }
         }
+    }
+
+    public func installFirmware(_ package: PBZFirmwarePackage) async throws {
+        let total = package.firmware.count + (package.resources?.count ?? 0)
+        guard let byteCount = UInt32(exactly: total) else { throw PutBytesTransferError.invalidConfiguration }
+        try await send(SystemMessageCodec.firmwareUpdateStartFrame(bytesToSend: byteCount))
+        try await installApplicationObject([UInt8](package.firmware), objectType: package.manifest.firmware.type == "recovery" ? .recovery : .firmware, appBankID: UInt32(package.manifest.firmware.slot ?? 0))
+        guard let firmwareCookie = completedTransferCookie else { throw PutBytesTransferError.invalidState }
+        var cookies = [firmwareCookie]
+        if let resources = package.resources {
+            try await installApplicationObject([UInt8](resources), objectType: .systemResource, appBankID: 0)
+            guard let resourceCookie = completedTransferCookie else { throw PutBytesTransferError.invalidState }
+            cookies.append(resourceCookie)
+        }
+        for cookie in cookies { try await send(PutBytesCodec.installFrame(cookie: cookie)) }
+        try await send(SystemMessageCodec.firmwareUpdateCompleteFrame())
     }
 
     public func registerApplication(_ metadata: PebbleAppMetadata) async throws {
@@ -755,6 +785,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             case .progress(let progress):
                 eventContinuation?.yield(.transferProgress(progress))
             case .finished:
+                completedTransferCookie = activeTransferSession?.completedCookie
                 transferTimeoutTask?.cancel()
                 transferTimeoutTask = nil
                 activeTransferSession = nil

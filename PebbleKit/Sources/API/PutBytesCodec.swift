@@ -38,6 +38,17 @@ public enum PutBytesCodec {
         )
     }
 
+    public static func systemInitializationFrame(
+        objectSize: UInt32,
+        objectType: PutBytesObjectType,
+        bank: UInt8
+    ) -> PebbleProtocolFrame {
+        PebbleProtocolFrame(
+            endpoint: endpoint,
+            payload: [0x01] + bigEndianBytes(of: objectSize) + [objectType.rawValue, bank]
+        )
+    }
+
     public static func putFrame(cookie: UInt32, bytes: [UInt8]) throws -> PebbleProtocolFrame {
         guard let payloadSize = UInt32(exactly: bytes.count) else {
             throw PutBytesCodecError.payloadTooLarge

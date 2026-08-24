@@ -281,6 +281,7 @@
 		000000000000000111000000 /* Debug configuration for PBXNativeTarget "Pebble" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Pebble/Pebble.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = PU5HXZ4FZ2;
@@ -299,7 +300,9 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Pebble/Info.plist;
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Using Bluetooth";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Pebble uses Bluetooth to find, connect to, and synchronize with your watch.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Pebble reads steps and sleep data to keep your watch health history synchronized.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Pebble saves watch steps and sleep data to your Health data when you choose to synchronize.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -331,6 +334,7 @@
 		000000000000000112000000 /* Release configuration for PBXNativeTarget "Pebble" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Pebble/Pebble.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = PU5HXZ4FZ2;
@@ -349,7 +353,9 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Pebble/Info.plist;
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Using Bluetooth";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Pebble uses Bluetooth to find, connect to, and synchronize with your watch.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Pebble reads steps and sleep data to keep your watch health history synchronized.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Pebble saves watch steps and sleep data to your Health data when you choose to synchronize.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;

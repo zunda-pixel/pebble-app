@@ -46,11 +46,14 @@ public protocol PebbleClient: Sendable {
     func sendAppMessage(applicationID: UUID, tuples: [AppMessageTuple]) async throws
     func respondToAppMessage(transactionID: UInt8, acknowledged: Bool) async throws
     func sendNotification(_ notification: PebbleTimelineNotification) async throws
+    func upsertTimelinePin(_ pin: PebbleTimelinePin) async throws
+    func deleteTimelinePin(id: UUID) async throws
     func installApplicationObject(
         _ bytes: [UInt8],
         objectType: PutBytesObjectType,
         appBankID: UInt32
     ) async throws
+    func installFirmware(_ package: PBZFirmwarePackage) async throws
     func registerApplication(_ metadata: PebbleAppMetadata) async throws
     func unregisterApplication(applicationID: UUID) async throws
 }
