@@ -94,6 +94,9 @@ public final class AppModel {
 
     public func removeApplication(id: UUID) async {
         do {
+            if connectedDevice != nil {
+                try await client.unregisterApplication(applicationID: id)
+            }
             updateApplications(try await applicationLibrary.remove(applicationID: id))
             applicationLibraryErrorMessage = nil
         } catch {

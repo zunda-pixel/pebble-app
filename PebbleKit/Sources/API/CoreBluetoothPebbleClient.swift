@@ -54,6 +54,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var transferContinuation: CheckedContinuation<Void, any Error>?
     private var nextBlobDBToken: UInt16 = 1
     private var pendingBlobDBToken: UInt16?
+    private var acceptedBlobDBStatuses: [BlobDBStatus] = []
     private var blobDBContinuation: CheckedContinuation<Void, any Error>?
     private var blobDBTimeoutTask: Task<Void, Never>?
 
@@ -209,6 +210,21 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     }
 
     public func registerApplication(_ metadata: PebbleAppMetadata) async throws {
+        try await performBlobDBOperation(acceptedStatuses: [.success]) { token in
+            BlobDBCodec.insertApplicationFrame(metadata: metadata, token: token)
+        }
+    }
+
+    public func unregisterApplication(applicationID: UUID) async throws {
+        try await performBlobDBOperation(acceptedStatuses: [.success, .keyDoesNotExist]) { token in
+            BlobDBCodec.deleteApplicationFrame(applicationID: applicationID, token: token)
+        }
+    }
+
+    private func performBlobDBOperation(
+        acceptedStatuses: [BlobDBStatus],
+        frame: (UInt16) -> PebbleProtocolFrame
+    ) async throws {
         guard let peripheral = connectedPeripheral,
               ppogSession != nil else {
             throw PebbleConnectionError.disconnected
@@ -221,12 +237,10 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         nextBlobDBToken &+= 1
         try await withCheckedThrowingContinuation { continuation in
             pendingBlobDBToken = token
+            acceptedBlobDBStatuses = acceptedStatuses
             blobDBContinuation = continuation
             do {
-                try sendFrame(
-                    BlobDBCodec.insertApplicationFrame(metadata: metadata, token: token),
-                    to: peripheral
-                )
+                try sendFrame(frame(token), to: peripheral)
                 blobDBTimeoutTask = Task { [weak self] in
                     try? await Task.sleep(for: .seconds(20))
                     guard !Task.isCancelled else { return }
@@ -544,13 +558,14 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         do {
             let response = try BlobDBCodec.decodeResponse(frame)
             guard response.token == pendingBlobDBToken else { return }
-            guard response.status == .success else {
+            guard acceptedBlobDBStatuses.contains(response.status) else {
                 failBlobDBOperation(BlobDBClientError.rejected(response.status))
                 return
             }
             blobDBTimeoutTask?.cancel()
             blobDBTimeoutTask = nil
             pendingBlobDBToken = nil
+            acceptedBlobDBStatuses.removeAll()
             blobDBContinuation?.resume()
             blobDBContinuation = nil
         } catch {
@@ -562,6 +577,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         blobDBTimeoutTask?.cancel()
         blobDBTimeoutTask = nil
         pendingBlobDBToken = nil
+        acceptedBlobDBStatuses.removeAll()
         blobDBContinuation?.resume(throwing: error)
         blobDBContinuation = nil
     }

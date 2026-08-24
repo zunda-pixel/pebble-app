@@ -48,6 +48,7 @@ public protocol PebbleClient: Sendable {
         appBankID: UInt32
     ) async throws
     func registerApplication(_ metadata: PebbleAppMetadata) async throws
+    func unregisterApplication(applicationID: UUID) async throws
 }
 
 public enum BlobDBClientError: Error, Equatable, Sendable {

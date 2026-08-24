@@ -73,4 +73,6 @@ public final class MockPebbleClient: PebbleClient {
     ) async throws {}
 
     public func registerApplication(_ metadata: PebbleAppMetadata) async throws {}
+
+    public func unregisterApplication(applicationID: UUID) async throws {}
 }
