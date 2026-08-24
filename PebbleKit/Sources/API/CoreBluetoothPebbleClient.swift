@@ -45,10 +45,13 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var healthCheckTask: Task<Void, Never>?
     private var pongTimeoutTask: Task<Void, Never>?
     private var reconnectTask: Task<Void, Never>?
+    private var transferTimeoutTask: Task<Void, Never>?
     private var reconnectDevice: DiscoveredPebble?
     private var pendingPingCookie: UInt32?
     private var nextPingCookie: UInt32 = 1
     private var isAutomaticReconnect = false
+    private var activeTransferSession: PutBytesTransferSession?
+    private var transferContinuation: CheckedContinuation<Void, any Error>?
 
     public override init() {
         super.init()
@@ -169,6 +172,38 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         try sendFrame(AppFetchCodec.responseFrame(status: status), to: peripheral)
     }
 
+    public func installApplicationObject(
+        _ bytes: [UInt8],
+        objectType: PutBytesObjectType,
+        appBankID: UInt32
+    ) async throws {
+        guard let peripheral = connectedPeripheral,
+              ppogSession != nil else {
+            throw PebbleConnectionError.disconnected
+        }
+        guard activeTransferSession == nil else {
+            throw PutBytesClientError.transferAlreadyInProgress
+        }
+
+        var session = PutBytesTransferSession(
+            bytes: bytes,
+            objectType: objectType,
+            appBankID: appBankID
+        )
+        let firstAction = try session.start()
+        activeTransferSession = session
+
+        try await withCheckedThrowingContinuation { continuation in
+            transferContinuation = continuation
+            do {
+                try handleTransferActions([firstAction], peripheral: peripheral)
+                updateTransferTimeout()
+            } catch {
+                failTransfer(error)
+            }
+        }
+    }
+
     private func waitForBluetooth() async throws {
         switch centralManager.state {
         case .poweredOn:
@@ -257,6 +292,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         acknowledgementTimeoutTask?.cancel()
         acknowledgementTimeoutTask = nil
         stopHealthChecks()
+        failTransfer(error)
     }
 
     private func model(from advertisementData: [String: Any]) -> PebbleWatchModel? {
@@ -372,6 +408,11 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             return
         }
 
+        if frame.endpoint == PutBytesCodec.endpoint, activeTransferSession != nil {
+            try processPutBytesResponse(frame, peripheral: peripheral)
+            return
+        }
+
         guard frame.endpoint == WatchVersionCodec.endpoint,
               pendingDevice != nil else {
             return
@@ -440,6 +481,68 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         pendingPingCookie = nil
     }
 
+    private func processPutBytesResponse(
+        _ frame: PebbleProtocolFrame,
+        peripheral: CBPeripheral
+    ) throws {
+        guard var session = activeTransferSession else {
+            return
+        }
+        let response = try PutBytesCodec.decodeResponse(frame)
+        do {
+            let actions = try session.receive(response)
+            activeTransferSession = session
+            try handleTransferActions(actions, peripheral: peripheral)
+            updateTransferTimeout()
+        } catch {
+            try? sendFrame(PutBytesCodec.abortFrame(cookie: response.cookie), to: peripheral)
+            failTransfer(error)
+        }
+    }
+
+    private func handleTransferActions(
+        _ actions: [PutBytesTransferAction],
+        peripheral: CBPeripheral
+    ) throws {
+        for action in actions {
+            switch action {
+            case .send(let frame):
+                try sendFrame(frame, to: peripheral)
+            case .progress(let progress):
+                eventContinuation?.yield(.transferProgress(progress))
+            case .finished:
+                transferTimeoutTask?.cancel()
+                transferTimeoutTask = nil
+                activeTransferSession = nil
+                transferContinuation?.resume()
+                transferContinuation = nil
+            }
+        }
+    }
+
+    private func updateTransferTimeout() {
+        transferTimeoutTask?.cancel()
+        transferTimeoutTask = nil
+        guard activeTransferSession != nil else {
+            return
+        }
+        transferTimeoutTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(20))
+            guard !Task.isCancelled else {
+                return
+            }
+            self?.failTransfer(PebbleConnectionError.connectionTimedOut)
+        }
+    }
+
+    private func failTransfer(_ error: any Error) {
+        transferTimeoutTask?.cancel()
+        transferTimeoutTask = nil
+        activeTransferSession = nil
+        transferContinuation?.resume(throwing: error)
+        transferContinuation = nil
+    }
+
     private func clearTransportState() {
         activeWriteCharacteristic = nil
         activeBatteryCharacteristic = nil
@@ -452,6 +555,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         acknowledgementTimeoutTask?.cancel()
         acknowledgementTimeoutTask = nil
         stopHealthChecks()
+        failTransfer(PebbleConnectionError.disconnected)
     }
 
     private func reconnect(to device: DiscoveredPebble, using peripheral: CBPeripheral) {
@@ -545,6 +649,10 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             failConnection(.connectionTimedOut)
         }
     }
+}
+
+public enum PutBytesClientError: Error, Equatable, Sendable {
+    case transferAlreadyInProgress
 }
 
 extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {

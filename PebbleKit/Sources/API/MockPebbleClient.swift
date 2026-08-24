@@ -65,4 +65,10 @@ public final class MockPebbleClient: PebbleClient {
     public func reorderApplications(_ applicationIDs: [UUID]) async throws {}
 
     public func respondToAppFetch(with status: AppFetchResponseStatus) async throws {}
+
+    public func installApplicationObject(
+        _ bytes: [UInt8],
+        objectType: PutBytesObjectType,
+        appBankID: UInt32
+    ) async throws {}
 }

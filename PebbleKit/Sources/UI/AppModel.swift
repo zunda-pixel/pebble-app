@@ -71,6 +71,8 @@ public final class AppModel {
                     self?.connectionState = .connected(device)
                 case .appFetchRequested:
                     try? await client.respondToAppFetch(with: .noData)
+                case .transferProgress:
+                    break
                 case .reconnecting(let deviceID):
                     self?.connectionState = .reconnecting(deviceID: deviceID)
                 case .disconnected(let error):

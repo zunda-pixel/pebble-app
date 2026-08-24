@@ -13,6 +13,7 @@ public enum PebbleConnectionState: Equatable, Sendable {
 public enum PebbleClientEvent: Equatable, Sendable {
     case deviceUpdated(PebbleDevice)
     case appFetchRequested(AppFetchRequest)
+    case transferProgress(PutBytesTransferProgress)
     case reconnecting(deviceID: String)
     case disconnected(PebbleConnectionError)
 }
@@ -41,6 +42,11 @@ public protocol PebbleClient: Sendable {
     func synchronizeTime() async throws
     func reorderApplications(_ applicationIDs: [UUID]) async throws
     func respondToAppFetch(with status: AppFetchResponseStatus) async throws
+    func installApplicationObject(
+        _ bytes: [UInt8],
+        objectType: PutBytesObjectType,
+        appBankID: UInt32
+    ) async throws
 }
 
 public extension PebbleConnectionError {
