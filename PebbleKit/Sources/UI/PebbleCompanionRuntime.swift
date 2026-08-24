@@ -9,16 +9,20 @@ final class PebbleCompanionRuntime: NSObject, @preconcurrency WKScriptMessageHan
     private var openURLHandler: (URL) -> Void
     private var appMessageHandler: (UUID, [AppMessageTuple]) async throws -> Void
     private var notificationHandler: (PebbleApplication, String, String) async throws -> Void
+    private var activeWatchHandler: () -> PebbleDevice?
     private var loadContinuation: CheckedContinuation<Void, any Error>?
+    private var loadedApplicationID: UUID?
 
     init(
         openURLHandler: @escaping (URL) -> Void,
         appMessageHandler: @escaping (UUID, [AppMessageTuple]) async throws -> Void,
-        notificationHandler: @escaping (PebbleApplication, String, String) async throws -> Void
+        notificationHandler: @escaping (PebbleApplication, String, String) async throws -> Void,
+        activeWatchHandler: @escaping () -> PebbleDevice?
     ) {
         self.openURLHandler = openURLHandler
         self.appMessageHandler = appMessageHandler
         self.notificationHandler = notificationHandler
+        self.activeWatchHandler = activeWatchHandler
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
         webView = WKWebView(frame: .zero, configuration: configuration)
@@ -28,9 +32,16 @@ final class PebbleCompanionRuntime: NSObject, @preconcurrency WKScriptMessageHan
     }
 
     func load(source: String, application: PebbleApplication) async throws {
+        if loadedApplicationID == application.id { return }
         self.application = application
+        let watch = activeWatchHandler()
         let sourceLiteral = try javaScriptLiteral(source)
         let identifierLiteral = try javaScriptLiteral(application.id.uuidString)
+        let platformLiteral = try javaScriptLiteral(watch?.model.platformName ?? "unknown")
+        let modelLiteral = try javaScriptLiteral(watch?.model.rawValue ?? "unknown")
+        let firmwareLiteral = try javaScriptLiteral(watch?.firmwareVersion ?? "unknown")
+        let accountTokenLiteral = try javaScriptLiteral(stableToken(key: "pebbleAccountToken"))
+        let watchTokenLiteral = try javaScriptLiteral(stableToken(key: "pebbleWatchToken.\(watch?.id ?? "unknown")"))
         let html = """
         <!doctype html><meta charset="utf-8"><script>
         const listeners = {};
@@ -43,8 +54,12 @@ final class PebbleCompanionRuntime: NSObject, @preconcurrency WKScriptMessageHan
             const id = ++callbackID; callbacks[id] = {success, failure};
             webkit.messageHandlers.pebble.postMessage({type:'sendAppMessage', id, message});
           },
-          getActiveWatchInfo: () => ({platform:'unknown', model:'unknown', language:'en'}),
-          getAccountToken: () => '', getWatchToken: () => '',
+          getActiveWatchInfo: () => ({
+            platform: (platformLiteral), model: (modelLiteral), language: navigator.language,
+            firmware: {major: 0, minor: 0, patch: 0, suffix: (firmwareLiteral)}
+          }),
+          getAccountToken: () => (accountTokenLiteral),
+          getWatchToken: () => (watchTokenLiteral),
           showSimpleNotificationOnPebble: (title, body) =>
             webkit.messageHandlers.pebble.postMessage({type:'notification', title, body})
         };
@@ -59,7 +74,11 @@ final class PebbleCompanionRuntime: NSObject, @preconcurrency WKScriptMessageHan
         try await withCheckedThrowingContinuation { continuation in
             loadContinuation?.resume(throwing: CancellationError())
             loadContinuation = continuation
-            webView.loadHTMLString(html, baseURL: nil)
+        loadedApplicationID = application.id
+        webView.loadHTMLString(
+            html,
+            baseURL: URL(string: "https://\(application.id.uuidString.lowercased()).pebble.local/")
+        )
         }
     }
 
@@ -139,6 +158,7 @@ final class PebbleCompanionRuntime: NSObject, @preconcurrency WKScriptMessageHan
         didFail navigation: WKNavigation?,
         withError error: any Error
     ) {
+        loadedApplicationID = nil
         loadContinuation?.resume(throwing: error)
         loadContinuation = nil
     }
@@ -148,6 +168,7 @@ final class PebbleCompanionRuntime: NSObject, @preconcurrency WKScriptMessageHan
         didFailProvisionalNavigation navigation: WKNavigation?,
         withError error: any Error
     ) {
+        loadedApplicationID = nil
         loadContinuation?.resume(throwing: error)
         loadContinuation = nil
     }
@@ -186,5 +207,22 @@ final class PebbleCompanionRuntime: NSObject, @preconcurrency WKScriptMessageHan
             throw CocoaError(.fileReadInapplicableStringEncoding)
         }
         return literal
+    }
+
+    private func stableToken(key: String) -> String {
+        if let token = UserDefaults.standard.string(forKey: key) { return token }
+        let token = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+        UserDefaults.standard.set(token, forKey: key)
+        return token
+    }
+}
+
+private extension PebbleWatchModel {
+    var platformName: String {
+        switch self {
+        case .pebble2Duo: "flint"
+        case .pebbleTime2: "emery"
+        case .pebbleRound2: "gabbro"
+        }
     }
 }

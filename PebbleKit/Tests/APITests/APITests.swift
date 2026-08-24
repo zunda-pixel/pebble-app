@@ -752,3 +752,34 @@ struct APITests {
         #expect(client.sentNotifications == [notification])
     }
 }
+
+@Suite
+struct PebbleWatchLibraryTests {
+    @Test func recordsUpdatesPreferencesAndForgetsWatches() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let fileURL = directory.appending(path: "watches.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let library = PebbleWatchLibrary(fileURL: fileURL)
+        let device = PebbleDevice(
+            id: "watch-1",
+            name: "Pebble QEMU",
+            model: .pebbleTime2,
+            firmwareVersion: "v1",
+            batteryLevel: 75,
+            serialNumber: "SERIAL"
+        )
+
+        var watches = try await library.record(device)
+        #expect(watches.count == 1)
+        #expect(watches[0].automaticallyConnects)
+        #expect(watches[0].lastBatteryLevel == 75)
+
+        watches = try await library.setAutomaticallyConnects(false, watchID: device.id)
+        #expect(!watches[0].automaticallyConnects)
+
+        let reloaded = PebbleWatchLibrary(fileURL: fileURL)
+        #expect(try await reloaded.allWatches()[0].firmwareVersion == "v1")
+        #expect(try await reloaded.remove(watchID: device.id).isEmpty)
+    }
+}

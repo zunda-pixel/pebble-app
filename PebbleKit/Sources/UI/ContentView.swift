@@ -3,6 +3,13 @@ public import API
 import UniformTypeIdentifiers
 import WebKit
 
+#if os(macOS)
+@MainActor
+public func makeQEMUPebbleClient() -> any PebbleClient {
+    QEMUPebbleClient()
+}
+#endif
+
 public struct ContentView: View {
     @State private var model: AppModel
 
@@ -439,8 +446,32 @@ private struct DevicesView: View {
                     }
                 }
             }
+
+            if !model.savedWatches.isEmpty {
+                Section("My Watches") {
+                    ForEach(model.savedWatches) { watch in
+                        SavedWatchRow(
+                            watch: watch,
+                            setAutomaticallyConnects: { enabled in
+                                Task {
+                                    await model.setAutomaticallyConnects(enabled, watchID: watch.id)
+                                }
+                            },
+                            forget: {
+                                Task { await model.forgetWatch(id: watch.id) }
+                            }
+                        )
+                    }
+                }
+            }
+
+            if let errorMessage = model.watchManagementErrorMessage {
+                Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red)
+            }
         }
         .navigationTitle("Devices")
+        .task { await model.loadSavedWatches() }
         .toolbar {
             ToolbarItem {
                 Button("Scan", systemImage: "arrow.clockwise") {
@@ -482,6 +513,38 @@ private struct DevicesView: View {
         default:
             "Working…"
         }
+    }
+}
+
+private struct SavedWatchRow: View {
+    var watch: SavedPebbleWatch
+    var setAutomaticallyConnects: (Bool) -> Void
+    var forget: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            LabeledContent {
+                Text(watch.lastConnectedAt, format: .relative(presentation: .named))
+                    .foregroundStyle(.secondary)
+            } label: {
+                VStack(alignment: .leading) {
+                    Text(watch.name)
+                    Text(watch.model.displayName)
+                        .foregroundStyle(.secondary)
+                    if let firmwareVersion = watch.firmwareVersion {
+                        Text(firmwareVersion)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            Toggle("Connect Automatically", isOn: Binding(
+                get: { watch.automaticallyConnects },
+                set: setAutomaticallyConnects
+            ))
+            Button("Forget Watch", role: .destructive, action: forget)
+        }
+        .padding(.vertical, 4)
     }
 }
 
@@ -623,6 +686,7 @@ private struct ConfigurationWebView: View {
     var url: URL
     var closeHandler: @MainActor @Sendable (String?) -> Void
     @State private var page: WebPage
+    @State private var loadErrorMessage: String?
 
     init(url: URL, closeHandler: @escaping @MainActor @Sendable (String?) -> Void) {
         self.url = url
@@ -633,15 +697,30 @@ private struct ConfigurationWebView: View {
     }
 
     var body: some View {
-        WebView(page)
-            .webViewBackForwardNavigationGestures(.enabled)
-            .task(id: url) {
-                do {
-                    for try await _ in page.load(url) {}
-                } catch {
-                    // The containing screen retains native dismissal controls on load failure.
+        Group {
+            if let loadErrorMessage {
+                ContentUnavailableView(
+                    "Settings Unavailable",
+                    systemImage: "wifi.exclamationmark",
+                    description: Text(loadErrorMessage)
+                )
+            } else {
+                WebView(page)
+                    .webViewBackForwardNavigationGestures(.enabled)
+            }
+        }
+        .task(id: url) {
+            loadErrorMessage = nil
+            do {
+                for try await _ in page.load(url) {}
+            } catch {
+                if let urlError = error as? URLError, urlError.code == .cannotFindHost {
+                    loadErrorMessage = "The watch app's settings service could not be found."
+                } else {
+                    loadErrorMessage = "The watch app's settings page could not be loaded."
                 }
             }
+        }
     }
 }
 

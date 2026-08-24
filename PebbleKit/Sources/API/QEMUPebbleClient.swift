@@ -1,0 +1,412 @@
+#if os(macOS)
+public import Foundation
+import Network
+
+@MainActor
+public final class QEMUPebbleClient: PebbleClient {
+    private var host: NWEndpoint.Host
+    private var port: NWEndpoint.Port
+    private var connection: NWConnection?
+    private var receiveBuffer: [UInt8] = []
+    private var frameDecoder = PebbleProtocolFrameDecoder()
+    private var frameContinuation: AsyncStream<PebbleProtocolFrame>.Continuation?
+    private var eventContinuation: AsyncStream<PebbleClientEvent>.Continuation?
+    private var openContinuation: CheckedContinuation<Void, any Error>?
+    private var versionContinuation: CheckedContinuation<WatchVersionInformation, any Error>?
+    private var operationContinuation: CheckedContinuation<Void, any Error>?
+    private var operationTimeoutTask: Task<Void, Never>?
+    private var pendingBlobToken: UInt16?
+    private var nextBlobToken: UInt16 = 1
+    private var expectedBlobStatuses: [BlobDBStatus] = []
+    private var waitingForReorder = false
+    private var transferSession: PutBytesTransferSession?
+    private var nextAppMessageTransactionID: UInt8 = 0
+    private var pendingAppMessageTransactionID: UInt8?
+    private var reconnectDevice: DiscoveredPebble?
+    private var connectedDevice: PebbleDevice?
+    private var reconnectTask: Task<Void, Never>?
+    private var isManualDisconnect = false
+
+    public init(host: String = "127.0.0.1", port: UInt16 = 12_344) {
+        self.host = NWEndpoint.Host(host)
+        self.port = NWEndpoint.Port(rawValue: port) ?? 12_344
+    }
+
+    public func scan() async throws -> [DiscoveredPebble] {
+        [DiscoveredPebble(
+            id: "qemu-emery",
+            name: "Pebble QEMU",
+            model: .pebbleTime2,
+            signalStrength: 0
+        )]
+    }
+
+    public func connect(to device: DiscoveredPebble) async throws -> PebbleDevice {
+        reconnectDevice = device
+        isManualDisconnect = false
+        return try await establishConnection(to: device)
+    }
+
+    private func establishConnection(to device: DiscoveredPebble) async throws -> PebbleDevice {
+        guard connection == nil else { throw PebbleConnectionError.connectionAlreadyInProgress }
+        let connection = NWConnection(host: host, port: port, using: .tcp)
+        self.connection = connection
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+            openContinuation = continuation
+            connection.stateUpdateHandler = { [weak self] state in
+                Task { @MainActor in self?.handleConnectionState(state) }
+            }
+            connection.start(queue: .global(qos: .userInitiated))
+        }
+        receiveNextMessage()
+        let information = try await withCheckedThrowingContinuation { continuation in
+            versionContinuation = continuation
+            Task {
+                do {
+                    try await send(WatchVersionCodec.requestFrame())
+                } catch {
+                    finishVersion(throwing: error)
+                }
+            }
+            operationTimeoutTask = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(10))
+                guard !Task.isCancelled else { return }
+                self?.finishVersion(throwing: PebbleConnectionError.connectionTimedOut)
+            }
+        }
+        try await synchronizeTime()
+        let device = PebbleDevice(
+            id: device.id,
+            name: device.name,
+            model: PebbleWatchModel(hardwarePlatform: information.hardwarePlatform) ?? device.model,
+            firmwareVersion: information.firmwareVersion,
+            batteryLevel: nil,
+            serialNumber: information.serialNumber
+        )
+        connectedDevice = device
+        return device
+    }
+
+    public func disconnect(from device: PebbleDevice) async {
+        isManualDisconnect = true
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        connection?.cancel()
+        connection = nil
+        connectedDevice = nil
+        reconnectDevice = nil
+        failOperation(PebbleConnectionError.disconnected)
+    }
+
+    public func send(_ frame: PebbleProtocolFrame) async throws {
+        guard let connection else { throw PebbleConnectionError.disconnected }
+        let frameBytes = try frame.encoded()
+        guard frameBytes.count <= 2_048 else { throw QEMUTransportError.messageTooLarge }
+        var bytes: [UInt8] = [0xFE, 0xED, 0x00, 0x01]
+        bytes.append(UInt8(frameBytes.count >> 8))
+        bytes.append(UInt8(frameBytes.count & 0xFF))
+        bytes.append(contentsOf: frameBytes)
+        bytes.append(contentsOf: [0xBE, 0xEF])
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+            connection.send(content: Data(bytes), completion: .contentProcessed { error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume()
+                }
+            })
+        }
+    }
+
+    public func frames() -> AsyncStream<PebbleProtocolFrame> {
+        AsyncStream { continuation in frameContinuation = continuation }
+    }
+
+    public func events() -> AsyncStream<PebbleClientEvent> {
+        AsyncStream { continuation in eventContinuation = continuation }
+    }
+
+    public func synchronizeTime() async throws {
+        try await send(TimeSynchronizationCodec.frame())
+    }
+
+    public func reorderApplications(_ applicationIDs: [UUID]) async throws {
+        guard operationContinuation == nil else { throw AppReorderClientError.operationAlreadyInProgress }
+        waitingForReorder = true
+        try await performOperation(frame: AppReorderCodec.frame(applicationIDs: applicationIDs))
+    }
+
+    public func respondToAppFetch(with status: AppFetchResponseStatus) async throws {
+        try await send(AppFetchCodec.responseFrame(status: status))
+    }
+
+    public func sendAppMessage(applicationID: UUID, tuples: [AppMessageTuple]) async throws {
+        guard operationContinuation == nil else { throw AppReorderClientError.operationAlreadyInProgress }
+        let transactionID = nextAppMessageTransactionID
+        nextAppMessageTransactionID &+= 1
+        pendingAppMessageTransactionID = transactionID
+        try await performOperation(frame: try AppMessageCodec.pushFrame(AppMessageData(
+            transactionID: transactionID,
+            applicationID: applicationID,
+            tuples: tuples
+        )), timeout: .seconds(10))
+    }
+
+    public func respondToAppMessage(transactionID: UInt8, acknowledged: Bool) async throws {
+        try await send(AppMessageCodec.resultFrame(
+            transactionID: transactionID,
+            acknowledged: acknowledged
+        ))
+    }
+
+    public func sendNotification(_ notification: PebbleTimelineNotification) async throws {
+        try await performBlobOperation { token in
+            try TimelineNotificationCodec.insertFrame(notification, token: token)
+        }
+    }
+
+    public func installApplicationObject(
+        _ bytes: [UInt8],
+        objectType: PutBytesObjectType,
+        appBankID: UInt32
+    ) async throws {
+        guard operationContinuation == nil else { throw PutBytesClientError.transferAlreadyInProgress }
+        var session = PutBytesTransferSession(
+            bytes: bytes,
+            objectType: objectType,
+            appBankID: appBankID
+        )
+        let first = try session.start()
+        transferSession = session
+        guard case .send(let frame) = first else { throw PutBytesTransferError.invalidState }
+        try await performOperation(frame: frame, timeout: .seconds(20))
+    }
+
+    public func registerApplication(_ metadata: PebbleAppMetadata) async throws {
+        try await performBlobOperation { token in
+            BlobDBCodec.insertApplicationFrame(metadata: metadata, token: token)
+        }
+    }
+
+    public func unregisterApplication(applicationID: UUID) async throws {
+        try await performBlobOperation(acceptedStatuses: [.success, .keyDoesNotExist]) { token in
+            BlobDBCodec.deleteApplicationFrame(applicationID: applicationID, token: token)
+        }
+    }
+
+    private func performBlobOperation(
+        acceptedStatuses: [BlobDBStatus] = [.success],
+        frame: (UInt16) throws -> PebbleProtocolFrame
+    ) async throws {
+        guard operationContinuation == nil else { throw BlobDBClientError.operationAlreadyInProgress }
+        let token = nextBlobToken
+        nextBlobToken &+= 1
+        pendingBlobToken = token
+        expectedBlobStatuses = acceptedStatuses
+        try await performOperation(frame: try frame(token))
+    }
+
+    private func performOperation(
+        frame: PebbleProtocolFrame,
+        timeout: Duration = .seconds(20)
+    ) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            operationContinuation = continuation
+            Task {
+                do { try await send(frame) } catch { failOperation(error) }
+            }
+            operationTimeoutTask = Task { [weak self] in
+                try? await Task.sleep(for: timeout)
+                guard !Task.isCancelled else { return }
+                self?.failOperation(PebbleConnectionError.connectionTimedOut)
+            }
+        }
+    }
+
+    private func handleConnectionState(_ state: NWConnection.State) {
+        switch state {
+        case .ready:
+            openContinuation?.resume()
+            openContinuation = nil
+        case .failed(let error):
+            let shouldReconnect = (connectedDevice != nil || reconnectTask != nil) && !isManualDisconnect
+            openContinuation?.resume(throwing: error)
+            openContinuation = nil
+            finishVersion(throwing: error)
+            failOperation(error)
+            connection = nil
+            connectedDevice = nil
+            if shouldReconnect {
+                scheduleReconnect()
+            } else {
+                eventContinuation?.yield(.disconnected(.disconnected))
+            }
+        case .cancelled:
+            openContinuation?.resume(throwing: PebbleConnectionError.disconnected)
+            openContinuation = nil
+        default:
+            break
+        }
+    }
+
+    private func scheduleReconnect() {
+        guard reconnectTask == nil, let reconnectDevice else { return }
+        eventContinuation?.yield(.reconnecting(deviceID: reconnectDevice.id))
+        reconnectTask = Task { [weak self] in
+            guard let self else { return }
+            for delay in [1, 2, 4] {
+                try? await Task.sleep(for: .seconds(delay))
+                guard !Task.isCancelled, !self.isManualDisconnect else { return }
+                do {
+                    let device = try await self.establishConnection(to: reconnectDevice)
+                    self.reconnectTask = nil
+                    self.eventContinuation?.yield(.deviceUpdated(device))
+                    return
+                } catch {
+                    self.connection?.cancel()
+                    self.connection = nil
+                }
+            }
+            self.reconnectTask = nil
+            self.eventContinuation?.yield(.disconnected(.connectionFailed))
+        }
+    }
+
+    private func receiveNextMessage() {
+        connection?.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { [weak self] data, _, complete, error in
+            Task { @MainActor in
+                guard let self else { return }
+                if let data { self.consume([UInt8](data)) }
+                if let error {
+                    self.handleConnectionState(.failed(error))
+                } else if complete {
+                    self.handleConnectionState(.failed(NWError.posix(.ECONNRESET)))
+                } else {
+                    self.receiveNextMessage()
+                }
+            }
+        }
+    }
+
+    private func consume(_ bytes: [UInt8]) {
+        receiveBuffer.append(contentsOf: bytes)
+        while receiveBuffer.count >= 8 {
+            guard let signature = receiveBuffer.indices.dropLast().first(where: {
+                receiveBuffer[$0] == 0xFE && receiveBuffer[$0 + 1] == 0xED
+            }) else {
+                receiveBuffer.removeAll(keepingCapacity: true)
+                return
+            }
+            if signature > 0 { receiveBuffer.removeFirst(signature) }
+            guard receiveBuffer.count >= 8 else { return }
+            let protocolID = UInt16(receiveBuffer[2]) << 8 | UInt16(receiveBuffer[3])
+            let length = Int(receiveBuffer[4]) << 8 | Int(receiveBuffer[5])
+            guard length <= 2_048 else {
+                receiveBuffer.removeFirst(2)
+                continue
+            }
+            let packetLength = 6 + length + 2
+            guard receiveBuffer.count >= packetLength else { return }
+            guard receiveBuffer[packetLength - 2] == 0xBE,
+                  receiveBuffer[packetLength - 1] == 0xEF else {
+                receiveBuffer.removeFirst(2)
+                continue
+            }
+            let payload = Array(receiveBuffer[6..<(6 + length)])
+            receiveBuffer.removeFirst(packetLength)
+            if protocolID == 1 { consumePebbleProtocol(payload) }
+        }
+    }
+
+    private func consumePebbleProtocol(_ bytes: [UInt8]) {
+        do {
+            for frame in try frameDecoder.append(bytes) {
+                try process(frame)
+                frameContinuation?.yield(frame)
+            }
+        } catch {
+            failOperation(error)
+        }
+    }
+
+    private func process(_ frame: PebbleProtocolFrame) throws {
+        if frame.endpoint == WatchVersionCodec.endpoint, versionContinuation != nil {
+            finishVersion(returning: try WatchVersionCodec.decode(frame))
+        } else if frame.endpoint == PingPongCodec.endpoint {
+            if case .ping(let cookie) = try PingPongCodec.decode(frame) {
+                Task { try? await send(PingPongCodec.frame(for: .pong(cookie: cookie))) }
+            }
+        } else if frame.endpoint == AppFetchCodec.endpoint {
+            eventContinuation?.yield(.appFetchRequested(try AppFetchCodec.decodeRequest(frame)))
+        } else if frame.endpoint == BlobDBCodec.endpoint, let token = pendingBlobToken {
+            let response = try BlobDBCodec.decodeResponse(frame)
+            guard response.token == token else { return }
+            guard expectedBlobStatuses.contains(response.status) else {
+                failOperation(BlobDBClientError.rejected(response.status))
+                return
+            }
+            pendingBlobToken = nil
+            expectedBlobStatuses = []
+            finishOperation()
+        } else if frame.endpoint == AppReorderCodec.endpoint, waitingForReorder {
+            let result = try AppReorderCodec.decodeResult(frame)
+            waitingForReorder = false
+            result == .success ? finishOperation() : failOperation(AppReorderClientError.rejected(result))
+        } else if frame.endpoint == PutBytesCodec.endpoint, var session = transferSession {
+            let actions = try session.receive(try PutBytesCodec.decodeResponse(frame))
+            transferSession = session
+            for action in actions {
+                switch action {
+                case .send(let nextFrame): Task { try? await send(nextFrame) }
+                case .progress(let progress): eventContinuation?.yield(.transferProgress(progress))
+                case .finished:
+                    transferSession = nil
+                    finishOperation()
+                }
+            }
+        } else if frame.endpoint == AppMessageCodec.endpoint {
+            switch try AppMessageCodec.decode(frame) {
+            case .push(let message): eventContinuation?.yield(.appMessageReceived(message))
+            case .acknowledgement(let transactionID) where transactionID == pendingAppMessageTransactionID:
+                pendingAppMessageTransactionID = nil
+                finishOperation()
+            case .negativeAcknowledgement(let transactionID) where transactionID == pendingAppMessageTransactionID:
+                pendingAppMessageTransactionID = nil
+                failOperation(AppMessageClientError.negativeAcknowledgement)
+            default: break
+            }
+        }
+    }
+
+    private func finishVersion(returning information: WatchVersionInformation? = nil, throwing error: (any Error)? = nil) {
+        operationTimeoutTask?.cancel()
+        operationTimeoutTask = nil
+        if let error { versionContinuation?.resume(throwing: error) }
+        else if let information { versionContinuation?.resume(returning: information) }
+        versionContinuation = nil
+    }
+
+    private func finishOperation() {
+        operationTimeoutTask?.cancel()
+        operationTimeoutTask = nil
+        operationContinuation?.resume()
+        operationContinuation = nil
+    }
+
+    private func failOperation(_ error: any Error) {
+        operationTimeoutTask?.cancel()
+        operationTimeoutTask = nil
+        pendingBlobToken = nil
+        expectedBlobStatuses = []
+        waitingForReorder = false
+        transferSession = nil
+        pendingAppMessageTransactionID = nil
+        operationContinuation?.resume(throwing: error)
+        operationContinuation = nil
+    }
+}
+
+public enum QEMUTransportError: Error, Equatable, Sendable {
+    case messageTooLarge
+}
+#endif

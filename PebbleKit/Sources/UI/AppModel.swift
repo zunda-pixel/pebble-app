@@ -31,9 +31,12 @@ public final class AppModel {
     public private(set) var diagnosticReportURL: URL?
     public private(set) var companionNotificationsEnabled = true
     public private(set) var notificationStatusMessage: String?
+    public private(set) var savedWatches: [SavedPebbleWatch] = []
+    public private(set) var watchManagementErrorMessage: String?
 
     private let client: any PebbleClient
     private let applicationLibrary: PebbleApplicationLibrary
+    private let watchLibrary: PebbleWatchLibrary
     @ObservationIgnored private var connectionEventsTask: Task<Void, Never>?
     @ObservationIgnored private var appFetchTask: Task<Void, Never>?
     @ObservationIgnored private var hasLoadedApplications = false
@@ -54,7 +57,8 @@ public final class AppModel {
                 title: title,
                 body: body
             )
-        }
+        },
+        activeWatchHandler: { [weak self] in self?.connectedDevice }
     )
 
     private func openConfigurationURL(_ url: URL) {
@@ -77,10 +81,12 @@ public final class AppModel {
 
     public init(
         client: any PebbleClient,
-        applicationLibrary: PebbleApplicationLibrary = PebbleApplicationLibrary()
+        applicationLibrary: PebbleApplicationLibrary = PebbleApplicationLibrary(),
+        watchLibrary: PebbleWatchLibrary = PebbleWatchLibrary()
     ) {
         self.client = client
         self.applicationLibrary = applicationLibrary
+        self.watchLibrary = watchLibrary
         companionNotificationsEnabled = UserDefaults.standard.object(
             forKey: "companionNotificationsEnabled"
         ) as? Bool ?? true
@@ -103,6 +109,14 @@ public final class AppModel {
         do {
             discoveredDevices = try await client.scan()
             connectionState = .idle
+            await loadSavedWatches()
+            if let device = discoveredDevices.first(where: { discovered in
+                savedWatches.contains {
+                    $0.id == discovered.id && $0.automaticallyConnects
+                }
+            }) {
+                await connect(to: device)
+            }
         } catch let error as PebbleConnectionError {
             connectionState = .failed(error)
         } catch {
@@ -116,6 +130,7 @@ public final class AppModel {
         do {
             let connectedDevice = try await client.connect(to: device)
             connectionState = .connected(connectedDevice)
+            await recordConnectedWatch(connectedDevice)
             await PebbleDiagnostics.shared.record(category: "connection", message: "Watch connected")
             observeConnectionEvents()
             await synchronizeApplications(with: connectedDevice)
@@ -125,6 +140,36 @@ public final class AppModel {
             await PebbleDiagnostics.shared.record(.error, category: "connection", message: error.message)
         } catch {
             connectionState = .failed(.protocolNegotiationFailed)
+        }
+    }
+
+    public func loadSavedWatches() async {
+        do {
+            savedWatches = try await watchLibrary.allWatches()
+            watchManagementErrorMessage = nil
+        } catch {
+            watchManagementErrorMessage = "Saved watches could not be loaded."
+        }
+    }
+
+    public func setAutomaticallyConnects(_ enabled: Bool, watchID: String) async {
+        do {
+            savedWatches = try await watchLibrary.setAutomaticallyConnects(enabled, watchID: watchID)
+            watchManagementErrorMessage = nil
+        } catch {
+            watchManagementErrorMessage = "The automatic connection preference could not be saved."
+        }
+    }
+
+    public func forgetWatch(id: String) async {
+        if connectedDevice?.id == id {
+            await disconnect()
+        }
+        do {
+            savedWatches = try await watchLibrary.remove(watchID: id)
+            watchManagementErrorMessage = nil
+        } catch {
+            watchManagementErrorMessage = "The watch could not be forgotten."
         }
     }
 
@@ -594,6 +639,7 @@ public final class AppModel {
                 case .deviceUpdated(let device):
                     self?.connectionState = .connected(device)
                     Task { [weak self] in
+                        await self?.recordConnectedWatch(device)
                         await self?.synchronizeApplications(with: device)
                         await self?.flushPendingNotifications()
                     }
@@ -615,6 +661,15 @@ public final class AppModel {
                     return
                 }
             }
+        }
+    }
+
+    private func recordConnectedWatch(_ device: PebbleDevice) async {
+        do {
+            savedWatches = try await watchLibrary.record(device)
+            watchManagementErrorMessage = nil
+        } catch {
+            watchManagementErrorMessage = "The watch connection history could not be saved."
         }
     }
 
