@@ -5,6 +5,49 @@ import Testing
 @Suite
 @MainActor
 struct APITests {
+    @Test func pbwManifestSelectsBestVariantAndTransferOrder() throws {
+        let basalt = Data(#"""
+        {
+          "application": { "name": "app.bin", "size": 12 },
+          "resources": { "name": "app.pbpack", "size": 8 }
+        }
+        """#.utf8)
+        let emery = Data(#"""
+        {
+          "application": {
+            "crc": 305419896,
+            "name": "app.bin",
+            "sdk_version": { "major": 4, "minor": 0 },
+            "size": 24
+          },
+          "resources": { "name": "app.pbpack", "size": 16 },
+          "worker": { "name": "worker.bin", "size": 4 }
+        }
+        """#.utf8)
+
+        let plan = try PBWManifestDecoder.installationPlan(
+            for: .pebbleTime2,
+            manifestsByVariant: ["basalt": basalt, "emery": emery]
+        )
+
+        #expect(plan.variant == "emery")
+        #expect(plan.objects.map(\.objectType) == [.appExecutable, .appResource, .worker])
+        #expect(plan.objects.map(\.blob.name) == ["app.bin", "app.pbpack", "worker.bin"])
+    }
+
+    @Test func pbwManifestRejectsUnsupportedWatchVariant() {
+        let chalk = Data(#"""
+        { "application": { "name": "app.bin", "size": 12 } }
+        """#.utf8)
+
+        #expect(throws: PBWManifestError.noCompatibleVariant) {
+            try PBWManifestDecoder.installationPlan(
+                for: .pebble2Duo,
+                manifestsByVariant: ["chalk": chalk]
+            )
+        }
+    }
+
     @Test func applicationLibraryPersistsUpdatesAndOrder() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
