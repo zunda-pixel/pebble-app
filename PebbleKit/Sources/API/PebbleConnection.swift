@@ -34,6 +34,7 @@ public protocol PebbleClient: Sendable {
     func send(_ frame: PebbleProtocolFrame) async throws
     func frames() -> AsyncStream<PebbleProtocolFrame>
     func events() -> AsyncStream<PebbleClientEvent>
+    func synchronizeTime() async throws
 }
 
 public extension PebbleConnectionError {

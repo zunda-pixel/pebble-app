@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import API
 
@@ -143,5 +144,31 @@ struct APITests {
         #expect(BatteryLevelCodec.decode([100]) == 100)
         #expect(BatteryLevelCodec.decode([]) == nil)
         #expect(BatteryLevelCodec.decode([101]) == nil)
+    }
+
+    @Test
+    func timeSynchronizationEncodesUTCAndTimeZone() throws {
+        let timeZone = try #require(TimeZone(identifier: "Asia/Tokyo"))
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+
+        let frame = try TimeSynchronizationCodec.frame(date: date, timeZone: timeZone)
+
+        #expect(frame.endpoint == 11)
+        #expect(frame.payload == [
+            0x03,
+            0x65, 0x53, 0xF1, 0x00,
+            0x02, 0x1C,
+            0x0A,
+        ] + Array("Asia/Tokyo".utf8))
+    }
+
+    @Test
+    func timeSynchronizationRoundsToNearestSecond() throws {
+        let timeZone = try #require(TimeZone(secondsFromGMT: 0))
+        let date = Date(timeIntervalSince1970: 1.6)
+
+        let frame = try TimeSynchronizationCodec.frame(date: date, timeZone: timeZone)
+
+        #expect(Array(frame.payload[1...4]) == [0x00, 0x00, 0x00, 0x02])
     }
 }

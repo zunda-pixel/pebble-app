@@ -57,4 +57,6 @@ public final class MockPebbleClient: PebbleClient {
             continuation.finish()
         }
     }
+
+    public func synchronizeTime() async throws {}
 }

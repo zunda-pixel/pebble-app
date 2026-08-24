@@ -1,6 +1,16 @@
 public import CoreBluetooth
 public import Foundation
 
+private final class NotificationObserverStorage: @unchecked Sendable {
+    var observers: [any NSObjectProtocol] = []
+
+    deinit {
+        for observer in observers {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+}
+
 @MainActor
 public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private static var ppogService = CBUUID(string: "40000000-328E-0FBB-C642-1AA6699BDADA")
@@ -28,6 +38,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var eventContinuation: AsyncStream<PebbleClientEvent>.Continuation?
     private var pendingGattWrites: [Data] = []
     private var intentionalDisconnectIdentifiers: Set<String> = []
+    private var timeChangeObservers = NotificationObserverStorage()
     private var scanTimeoutTask: Task<Void, Never>?
     private var connectionTimeoutTask: Task<Void, Never>?
     private var acknowledgementTimeoutTask: Task<Void, Never>?
@@ -39,6 +50,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             queue: .main,
             options: [CBCentralManagerOptionRestoreIdentifierKey: "dev.pebble.central"]
         )
+        observeSystemTimeChanges()
     }
 
     public func scan() async throws -> [DiscoveredPebble] {
@@ -122,6 +134,14 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         AsyncStream { continuation in
             eventContinuation = continuation
         }
+    }
+
+    public func synchronizeTime() async throws {
+        guard let peripheral = connectedPeripheral,
+              ppogSession != nil else {
+            throw PebbleConnectionError.disconnected
+        }
+        try sendFrame(TimeSynchronizationCodec.frame(), to: peripheral)
     }
 
     private func waitForBluetooth() async throws {
@@ -315,6 +335,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
 
         let information = try WatchVersionCodec.decode(frame)
+        try sendFrame(TimeSynchronizationCodec.frame(), to: peripheral)
         finishConnection(peripheral: peripheral, information: information)
     }
 
@@ -330,6 +351,26 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         device.batteryLevel = batteryLevel
         connectedDevice = device
         eventContinuation?.yield(.deviceUpdated(device))
+    }
+
+    private func observeSystemTimeChanges() {
+        let notificationCenter = NotificationCenter.default
+        let names: [Notification.Name] = [
+            .NSSystemClockDidChange,
+            .NSSystemTimeZoneDidChange,
+        ]
+
+        timeChangeObservers.observers = names.map { name in
+            notificationCenter.addObserver(
+                forName: name,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    try? await self?.synchronizeTime()
+                }
+            }
+        }
     }
 
     private func updateAcknowledgementTimeout(for peripheral: CBPeripheral) {
