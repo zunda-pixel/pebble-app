@@ -12,10 +12,13 @@ public final class AppModel {
     public private(set) var isLoadingApplications = false
     public private(set) var isImportingApplication = false
     public private(set) var applicationLibraryErrorMessage: String?
+    public private(set) var installingApplicationID: UUID?
+    public private(set) var installationProgress: PutBytesTransferProgress?
 
     private let client: any PebbleClient
     private let applicationLibrary: PebbleApplicationLibrary
     @ObservationIgnored private var connectionEventsTask: Task<Void, Never>?
+    @ObservationIgnored private var appFetchTask: Task<Void, Never>?
     @ObservationIgnored private var hasLoadedApplications = false
 
     public init(
@@ -68,6 +71,8 @@ public final class AppModel {
         await client.disconnect(from: device)
         connectionEventsTask?.cancel()
         connectionEventsTask = nil
+        appFetchTask?.cancel()
+        appFetchTask = nil
         connectionState = .idle
     }
 
@@ -175,10 +180,10 @@ public final class AppModel {
                 switch event {
                 case .deviceUpdated(let device):
                     self?.connectionState = .connected(device)
-                case .appFetchRequested:
-                    try? await client.respondToAppFetch(with: .noData)
-                case .transferProgress:
-                    break
+                case .appFetchRequested(let request):
+                    self?.beginHandlingAppFetchRequest(request)
+                case .transferProgress(let progress):
+                    self?.installationProgress = progress
                 case .reconnecting(let deviceID):
                     self?.connectionState = .reconnecting(deviceID: deviceID)
                 case .disconnected(let error):
@@ -186,6 +191,61 @@ public final class AppModel {
                     return
                 }
             }
+        }
+    }
+
+    private func beginHandlingAppFetchRequest(_ request: AppFetchRequest) {
+        guard appFetchTask == nil else {
+            Task { try? await client.respondToAppFetch(with: .busy) }
+            return
+        }
+        appFetchTask = Task { [weak self] in
+            guard let self else {
+                return
+            }
+            await self.handleAppFetchRequest(request)
+            self.appFetchTask = nil
+        }
+    }
+
+    private func handleAppFetchRequest(_ request: AppFetchRequest) async {
+        guard let connectedDevice,
+              let packageURL = await applicationLibrary.storedPackageURL(
+                applicationID: request.applicationID
+              ) else {
+            try? await client.respondToAppFetch(with: .noData)
+            return
+        }
+
+        installingApplicationID = request.applicationID
+        installationProgress = PutBytesTransferProgress(bytesSent: 0, totalBytes: 0)
+        defer {
+            installingApplicationID = nil
+            installationProgress = nil
+        }
+
+        do {
+            let model = connectedDevice.model
+            let package = try await Task.detached(priority: .userInitiated) {
+                try PBWPackageImporter.load(from: packageURL, for: model)
+            }.value
+            guard package.application.id == request.applicationID else {
+                try await client.respondToAppFetch(with: .invalidApplicationID)
+                return
+            }
+
+            try await client.respondToAppFetch(with: .start)
+            for object in package.objects {
+                try await client.installApplicationObject(
+                    [UInt8](object.data),
+                    objectType: object.installationObject.objectType,
+                    appBankID: request.appBankID
+                )
+            }
+            applicationLibraryErrorMessage = nil
+        } catch {
+            applicationLibraryErrorMessage = error.localizedDescription
+            try? await client.respondToAppFetch(with: .noData)
         }
     }
 }
