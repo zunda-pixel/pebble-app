@@ -1,5 +1,13 @@
 public import CoreBluetooth
 public import Foundation
+import MemberwiseInit
+
+@MemberwiseInit(.fileprivate)
+fileprivate struct PendingAppMessage {
+    var applicationID: UUID
+    var tuples: [AppMessageTuple]
+    var continuation: CheckedContinuation<Void, any Error>
+}
 
 private final class NotificationObserverStorage: @unchecked Sendable {
     var observers: [any NSObjectProtocol] = []
@@ -59,6 +67,11 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var blobDBTimeoutTask: Task<Void, Never>?
     private var appReorderContinuation: CheckedContinuation<Void, any Error>?
     private var appReorderTimeoutTask: Task<Void, Never>?
+    private var nextAppMessageTransactionID: UInt8 = 0
+    private var queuedAppMessages: [PendingAppMessage] = []
+    private var activeAppMessage: PendingAppMessage?
+    private var activeAppMessageTransactionID: UInt8?
+    private var appMessageTimeoutTask: Task<Void, Never>?
 
     public override init() {
         super.init()
@@ -192,6 +205,27 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             throw PebbleConnectionError.disconnected
         }
         try sendFrame(AppFetchCodec.responseFrame(status: status), to: peripheral)
+    }
+
+    public func sendAppMessage(applicationID: UUID, tuples: [AppMessageTuple]) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            queuedAppMessages.append(PendingAppMessage(
+                applicationID: applicationID,
+                tuples: tuples,
+                continuation: continuation
+            ))
+            startNextAppMessageIfPossible()
+        }
+    }
+
+    public func respondToAppMessage(transactionID: UInt8, acknowledged: Bool) async throws {
+        guard let peripheral = connectedPeripheral, ppogSession != nil else {
+            throw PebbleConnectionError.disconnected
+        }
+        try sendFrame(
+            AppMessageCodec.resultFrame(transactionID: transactionID, acknowledged: acknowledged),
+            to: peripheral
+        )
     }
 
     public func installApplicationObject(
@@ -339,6 +373,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             eventContinuation?.yield(.deviceUpdated(connectedDevice))
         }
         startHealthChecks(on: peripheral)
+        startNextAppMessageIfPossible()
     }
 
     private func failConnection(_ error: PebbleConnectionError) {
@@ -360,6 +395,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         failTransfer(error)
         failBlobDBOperation(error)
         failAppReorder(error)
+        failAllAppMessages(error)
     }
 
     private func model(from advertisementData: [String: Any]) -> PebbleWatchModel? {
@@ -475,6 +511,11 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             return
         }
 
+        if frame.endpoint == AppMessageCodec.endpoint {
+            processAppMessage(frame)
+            return
+        }
+
         if frame.endpoint == AppReorderCodec.endpoint, appReorderContinuation != nil {
             processAppReorderResponse(frame)
             return
@@ -497,6 +538,75 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         let information = try WatchVersionCodec.decode(frame)
         try sendFrame(TimeSynchronizationCodec.frame(), to: peripheral)
         finishConnection(peripheral: peripheral, information: information)
+    }
+
+    private func processAppMessage(_ frame: PebbleProtocolFrame) {
+        do {
+            switch try AppMessageCodec.decode(frame) {
+            case .push(let message):
+                eventContinuation?.yield(.appMessageReceived(message))
+            case .acknowledgement(let transactionID):
+                guard transactionID == activeAppMessageTransactionID else { return }
+                finishActiveAppMessage()
+            case .negativeAcknowledgement(let transactionID):
+                guard transactionID == activeAppMessageTransactionID else { return }
+                finishActiveAppMessage(throwing: AppMessageClientError.negativeAcknowledgement)
+            }
+        } catch {
+            // Ignore malformed peer packets without terminating the transport.
+        }
+    }
+
+    private func startNextAppMessageIfPossible() {
+        guard activeAppMessage == nil,
+              !queuedAppMessages.isEmpty,
+              let peripheral = connectedPeripheral,
+              ppogSession != nil else { return }
+        let request = queuedAppMessages.removeFirst()
+        let transactionID = nextAppMessageTransactionID
+        nextAppMessageTransactionID &+= 1
+        activeAppMessage = request
+        activeAppMessageTransactionID = transactionID
+        do {
+            try sendFrame(AppMessageCodec.pushFrame(AppMessageData(
+                transactionID: transactionID,
+                applicationID: request.applicationID,
+                tuples: request.tuples
+            )), to: peripheral)
+            appMessageTimeoutTask = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(10))
+                guard !Task.isCancelled else { return }
+                self?.finishActiveAppMessage(throwing: PebbleConnectionError.connectionTimedOut)
+            }
+        } catch {
+            finishActiveAppMessage(throwing: error)
+        }
+    }
+
+    private func finishActiveAppMessage(throwing error: (any Error)? = nil) {
+        appMessageTimeoutTask?.cancel()
+        appMessageTimeoutTask = nil
+        let request = activeAppMessage
+        activeAppMessage = nil
+        activeAppMessageTransactionID = nil
+        if let error {
+            request?.continuation.resume(throwing: error)
+        } else {
+            request?.continuation.resume()
+        }
+        startNextAppMessageIfPossible()
+    }
+
+    private func failAllAppMessages(_ error: any Error) {
+        appMessageTimeoutTask?.cancel()
+        appMessageTimeoutTask = nil
+        activeAppMessage?.continuation.resume(throwing: error)
+        activeAppMessage = nil
+        activeAppMessageTransactionID = nil
+        for request in queuedAppMessages {
+            request.continuation.resume(throwing: error)
+        }
+        queuedAppMessages.removeAll()
     }
 
     private func processPingPong(
@@ -672,6 +782,13 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     }
 
     private func clearTransportState() {
+        appMessageTimeoutTask?.cancel()
+        appMessageTimeoutTask = nil
+        if let activeAppMessage {
+            queuedAppMessages.insert(activeAppMessage, at: 0)
+        }
+        activeAppMessage = nil
+        activeAppMessageTransactionID = nil
         activeWriteCharacteristic = nil
         activeBatteryCharacteristic = nil
         connectedPeripheral = nil
@@ -867,6 +984,7 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
         pendingDevice = nil
         clearTransportState()
         if wasIntentional {
+            failAllAppMessages(PebbleConnectionError.disconnected)
             reconnectDevice = nil
             isAutomaticReconnect = false
             return

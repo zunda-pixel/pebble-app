@@ -26,6 +26,9 @@ public final class AppModel {
     public private(set) var applicationManagementOperation: ApplicationManagementOperation?
     public private(set) var applicationManagementStatusMessage: String?
     public private(set) var isHandlingAppFetch = false
+    public private(set) var configurationApplication: PebbleApplication?
+    public private(set) var configurationURL: URL?
+    public private(set) var diagnosticReportURL: URL?
 
     private let client: any PebbleClient
     private let applicationLibrary: PebbleApplicationLibrary
@@ -34,6 +37,31 @@ public final class AppModel {
     @ObservationIgnored private var hasLoadedApplications = false
     @ObservationIgnored private var pendingImportSnapshots: [UUID: PebbleApplicationLibrarySnapshot] = [:]
     @ObservationIgnored private var needsApplicationSynchronization = false
+    @ObservationIgnored private lazy var companionRuntime = PebbleCompanionRuntime(
+        openURLHandler: { [weak self] url in self?.openConfigurationURL(url) },
+        appMessageHandler: { [weak self] applicationID, tuples in
+            guard let self else { throw PebbleConnectionError.disconnected }
+            try await self.client.sendAppMessage(applicationID: applicationID, tuples: tuples)
+        }
+    )
+
+    private func openConfigurationURL(_ url: URL) {
+        guard ["https", "http"].contains(url.scheme?.lowercased()),
+              url.host != nil,
+              url.user == nil,
+              url.password == nil else {
+            applicationLibraryErrorMessage = "The application requested an unsafe settings URL."
+            Task {
+                await PebbleDiagnostics.shared.record(
+                    .warning,
+                    category: "configuration",
+                    message: "Rejected an unsafe configuration URL"
+                )
+            }
+            return
+        }
+        configurationURL = url
+    }
 
     public init(
         client: any PebbleClient,
@@ -73,10 +101,12 @@ public final class AppModel {
         do {
             let connectedDevice = try await client.connect(to: device)
             connectionState = .connected(connectedDevice)
+            await PebbleDiagnostics.shared.record(category: "connection", message: "Watch connected")
             observeConnectionEvents()
             await synchronizeApplications(with: connectedDevice)
         } catch let error as PebbleConnectionError {
             connectionState = .failed(error)
+            await PebbleDiagnostics.shared.record(.error, category: "connection", message: error.message)
         } catch {
             connectionState = .failed(.protocolNegotiationFailed)
         }
@@ -111,6 +141,42 @@ public final class AppModel {
             applicationLibraryErrorMessage = nil
         } catch {
             applicationLibraryErrorMessage = error.localizedDescription
+        }
+    }
+
+    public func configureApplication(_ application: PebbleApplication) async {
+        guard application.isConfigurable else { return }
+        do {
+            guard let source = try await applicationLibrary.companionJavaScript(
+                applicationID: application.id
+            ) else { return }
+            configurationApplication = application
+            configurationURL = nil
+            try await companionRuntime.load(source: source, application: application)
+            try await companionRuntime.showConfiguration()
+            await PebbleDiagnostics.shared.record(
+                category: "configuration",
+                message: "Requested configuration for \(application.displayName)"
+            )
+        } catch {
+            applicationLibraryErrorMessage = "The application settings could not be opened."
+        }
+    }
+
+    public func closeConfiguration(response: String? = nil) async {
+        try? await companionRuntime.closeConfiguration(response: response)
+        configurationURL = nil
+        configurationApplication = nil
+    }
+
+    public func prepareDiagnosticReport() async {
+        do {
+            diagnosticReportURL = try await PebbleDiagnostics.shared.exportReport(
+                device: connectedDevice,
+                applications: watchApplications + watchfaces
+            )
+        } catch {
+            applicationLibraryErrorMessage = "The diagnostic report could not be created."
         }
     }
 
@@ -436,6 +502,8 @@ public final class AppModel {
                     }
                 case .appFetchRequested(let request):
                     self?.beginHandlingAppFetchRequest(request)
+                case .appMessageReceived(let message):
+                    Task { [weak self] in await self?.handleAppMessage(message) }
                 case .transferProgress(let progress):
                     self?.installationProgress = progress
                 case .reconnecting(let deviceID):
@@ -450,6 +518,38 @@ public final class AppModel {
                     return
                 }
             }
+        }
+    }
+
+    private func handleAppMessage(_ message: AppMessageData) async {
+        do {
+            guard let application = (watchApplications + watchfaces).first(where: {
+                $0.id == message.applicationID
+            }), let source = try await applicationLibrary.companionJavaScript(
+                applicationID: application.id
+            ) else {
+                try await client.respondToAppMessage(
+                    transactionID: message.transactionID,
+                    acknowledged: false
+                )
+                return
+            }
+            try await companionRuntime.load(source: source, application: application)
+            try await companionRuntime.deliver(message)
+            try await client.respondToAppMessage(
+                transactionID: message.transactionID,
+                acknowledged: true
+            )
+        } catch {
+            try? await client.respondToAppMessage(
+                transactionID: message.transactionID,
+                acknowledged: false
+            )
+            await PebbleDiagnostics.shared.record(
+                .error,
+                category: "appmessage",
+                message: "Incoming AppMessage delivery failed"
+            )
         }
     }
 

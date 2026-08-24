@@ -93,6 +93,11 @@ public actor PebbleApplicationLibrary {
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
+    public func companionJavaScript(applicationID: UUID) throws -> String? {
+        guard let url = storedPackageURL(applicationID: applicationID) else { return nil }
+        return try PBWPackageImporter.companionJavaScript(from: url)
+    }
+
     @discardableResult
     public func remove(applicationID: UUID) throws -> [PebbleApplication] {
         var current = try applications()

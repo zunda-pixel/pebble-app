@@ -1,6 +1,7 @@
 public import SwiftUI
 public import API
 import UniformTypeIdentifiers
+import WebKit
 
 public struct ContentView: View {
     @State private var model: AppModel
@@ -119,7 +120,7 @@ private struct SectionContent: View {
                 systemImage: "heart"
             )
         case .settings:
-            SettingsView()
+            SettingsView(model: model)
         }
     }
 }
@@ -149,6 +150,9 @@ private struct ApplicationsView: View {
                         toOffset: destination
                     )
                 }
+            },
+            configureApplication: { application in
+                Task { await model.configureApplication(application) }
             }
         )
         .navigationTitle("Apps")
@@ -176,6 +180,28 @@ private struct ApplicationsView: View {
             }
             Task { await model.importApplication(from: url) }
         }
+        .sheet(isPresented: Binding(
+            get: { model.configurationURL != nil },
+            set: { presented in
+                if !presented { Task { await model.closeConfiguration() } }
+            }
+        )) {
+            NavigationStack {
+                Group {
+                    if let configurationURL = model.configurationURL {
+                        ConfigurationWebView(url: configurationURL) { response in
+                            Task { await model.closeConfiguration(response: response) }
+                        }
+                    }
+                }
+                .navigationTitle(model.configurationApplication?.displayName ?? "App Settings")
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { Task { await model.closeConfiguration() } }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -196,6 +222,7 @@ private struct ApplicationsContent: View {
     var installationProgress: PutBytesTransferProgress?
     var removeApplication: (UUID) -> Void
     var reorderApplications: (PebbleApplicationKind, IndexSet, Int) -> Void
+    var configureApplication: (PebbleApplication) -> Void
 
     var body: some View {
         if isLoading && watchApplications.isEmpty && watchfaces.isEmpty {
@@ -235,6 +262,7 @@ private struct ApplicationsContent: View {
                         applications: watchApplications,
                         isOperationInProgress: isOperationInProgress,
                         removeApplication: removeApplication,
+                        configureApplication: configureApplication,
                         moveApplications: { offsets, destination in
                             reorderApplications(.watchapp, offsets, destination)
                         }
@@ -246,6 +274,7 @@ private struct ApplicationsContent: View {
                         applications: watchfaces,
                         isOperationInProgress: isOperationInProgress,
                         removeApplication: removeApplication,
+                        configureApplication: configureApplication,
                         moveApplications: { offsets, destination in
                             reorderApplications(.watchface, offsets, destination)
                         }
@@ -289,6 +318,7 @@ private struct ApplicationSection: View {
     var applications: [PebbleApplication]
     var isOperationInProgress: Bool
     var removeApplication: (UUID) -> Void
+    var configureApplication: (PebbleApplication) -> Void
     var moveApplications: (IndexSet, Int) -> Void
 
     var body: some View {
@@ -298,7 +328,9 @@ private struct ApplicationSection: View {
                     name: application.displayName,
                     companyName: application.companyName,
                     versionLabel: application.versionLabel,
-                    kind: application.kind
+                    kind: application.kind,
+                    isConfigurable: application.isConfigurable,
+                    configure: { configureApplication(application) }
                 )
                 .swipeActions {
                     Button("Remove", role: .destructive) {
@@ -318,6 +350,8 @@ private struct ApplicationRow: View {
     var companyName: String
     var versionLabel: String
     var kind: PebbleApplicationKind
+    var isConfigurable: Bool
+    var configure: () -> Void
 
     var body: some View {
         HStack(spacing: 16) {
@@ -338,6 +372,12 @@ private struct ApplicationRow: View {
             Text(versionLabel)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            if isConfigurable {
+                Button("Configure", systemImage: "gearshape", action: configure)
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.borderless)
+                    .accessibilityHint("Opens this watch application's settings")
+            }
         }
         .frame(minHeight: 44)
         .accessibilityElement(children: .combine)
@@ -521,14 +561,69 @@ private struct PlaceholderView: View {
 }
 
 private struct SettingsView: View {
+    var model: AppModel
+
     var body: some View {
         Form {
             Section("Support") {
                 LabeledContent("Supported Watches", value: "3 models")
                 LabeledContent("Connection", value: "Bluetooth LE")
             }
+            Section("Diagnostics") {
+                Button("Prepare Diagnostic Report", systemImage: "stethoscope") {
+                    Task { await model.prepareDiagnosticReport() }
+                }
+                if let diagnosticReportURL = model.diagnosticReportURL {
+                    ShareLink(item: diagnosticReportURL) {
+                        Label("Share Diagnostic Report", systemImage: "square.and.arrow.up")
+                    }
+                }
+            }
         }
         .navigationTitle("Settings")
+    }
+}
+
+private struct ConfigurationNavigationDecider: WebPage.NavigationDeciding {
+    var closeHandler: @MainActor @Sendable (String?) -> Void
+
+    mutating func decidePolicy(
+        for action: WebPage.NavigationAction,
+        preferences: inout WebPage.NavigationPreferences
+    ) async -> WKNavigationActionPolicy {
+        guard let url = action.request.url else { return .cancel }
+        if url.scheme?.lowercased() == "pebblejs", url.host?.lowercased() == "close" {
+            let encodedResponse = url.fragment ?? url.query
+            closeHandler(encodedResponse?.removingPercentEncoding ?? encodedResponse)
+            return .cancel
+        }
+        return ["https", "http"].contains(url.scheme?.lowercased()) ? .allow : .cancel
+    }
+}
+
+private struct ConfigurationWebView: View {
+    var url: URL
+    var closeHandler: @MainActor @Sendable (String?) -> Void
+    @State private var page: WebPage
+
+    init(url: URL, closeHandler: @escaping @MainActor @Sendable (String?) -> Void) {
+        self.url = url
+        self.closeHandler = closeHandler
+        _page = State(initialValue: WebPage(
+            navigationDecider: ConfigurationNavigationDecider(closeHandler: closeHandler)
+        ))
+    }
+
+    var body: some View {
+        WebView(page)
+            .webViewBackForwardNavigationGestures(.enabled)
+            .task(id: url) {
+                do {
+                    for try await _ in page.load(url) {}
+                } catch {
+                    // The containing screen retains native dismissal controls on load failure.
+                }
+            }
     }
 }
 

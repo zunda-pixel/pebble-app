@@ -70,6 +70,20 @@ let package = Package(
         .strictMemorySafety(),
       ],
     ),
+    .testTarget(
+      name: "UITests",
+      dependencies: ["UI", "API"],
+      swiftSettings: [
+        .enableUpcomingFeature("ExistentialAny"),
+        .enableUpcomingFeature("InternalImportsByDefault"),
+        .enableUpcomingFeature("MemberImportVisibility"),
+        .enableUpcomingFeature("InferIsolatedConformances"),
+        .enableUpcomingFeature("ImmutableWeakCaptures"),
+        .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
+        .defaultIsolation(nil),
+        .strictMemorySafety(),
+      ],
+    ),
   ],
   swiftLanguageModes: [.v6]
 )

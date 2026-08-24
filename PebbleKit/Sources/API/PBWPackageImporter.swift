@@ -25,9 +25,21 @@ public enum PBWPackageImporter {
 
     public static func application(from url: URL) throws -> PebbleApplication {
         let archive = try Archive(url: url, accessMode: .read)
-        return try PBWApplicationDecoder.decodeAppInfo(
+        var application = try PBWApplicationDecoder.decodeAppInfo(
             from: data(for: "appinfo.json", in: archive)
         )
+        application.hasCompanionJavaScript = archive["pebble-js-app.js"] != nil
+        return application
+    }
+
+    public static func companionJavaScript(from url: URL) throws -> String? {
+        let archive = try Archive(url: url, accessMode: .read)
+        guard archive["pebble-js-app.js"] != nil else { return nil }
+        let source = try data(for: "pebble-js-app.js", in: archive)
+        guard let script = String(data: source, encoding: .utf8) else {
+            throw PBWPackageImportError.invalidCompanionJavaScript
+        }
+        return script
     }
 
     public static func load(from url: URL, for model: PebbleWatchModel) throws -> PBWPackage {
@@ -139,4 +151,5 @@ public enum PBWPackageImportError: Error, Equatable, Sendable {
     case sizeMismatch(filename: String)
     case missingExecutable
     case applicationIDMismatch
+    case invalidCompanionJavaScript
 }

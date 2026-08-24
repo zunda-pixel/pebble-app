@@ -2,6 +2,14 @@ public import Foundation
 
 @MainActor
 public final class MockPebbleClient: PebbleClient {
+    public private(set) var sentFrames: [PebbleProtocolFrame] = []
+    public private(set) var sentAppMessages: [AppMessageData] = []
+    public private(set) var appMessageResponses: [(transactionID: UInt8, acknowledged: Bool)] = []
+    public private(set) var reorderedApplicationIDs: [[UUID]] = []
+    private var nextTransactionID: UInt8 = 0
+    private var frameContinuation: AsyncStream<PebbleProtocolFrame>.Continuation?
+    private var eventContinuation: AsyncStream<PebbleClientEvent>.Continuation?
+
     public init() {}
 
     public func scan() async throws -> [DiscoveredPebble] {
@@ -46,25 +54,50 @@ public final class MockPebbleClient: PebbleClient {
         await Task.yield()
     }
 
-    public func send(_ frame: PebbleProtocolFrame) async throws {}
+    public func send(_ frame: PebbleProtocolFrame) async throws {
+        sentFrames.append(frame)
+    }
 
     public func frames() -> AsyncStream<PebbleProtocolFrame> {
         AsyncStream { continuation in
-            continuation.finish()
+            frameContinuation = continuation
         }
     }
 
     public func events() -> AsyncStream<PebbleClientEvent> {
         AsyncStream { continuation in
-            continuation.finish()
+            eventContinuation = continuation
         }
     }
 
     public func synchronizeTime() async throws {}
 
-    public func reorderApplications(_ applicationIDs: [UUID]) async throws {}
+    public func reorderApplications(_ applicationIDs: [UUID]) async throws {
+        reorderedApplicationIDs.append(applicationIDs)
+    }
 
     public func respondToAppFetch(with status: AppFetchResponseStatus) async throws {}
+
+    public func sendAppMessage(applicationID: UUID, tuples: [AppMessageTuple]) async throws {
+        sentAppMessages.append(AppMessageData(
+            transactionID: nextTransactionID,
+            applicationID: applicationID,
+            tuples: tuples
+        ))
+        nextTransactionID &+= 1
+    }
+
+    public func respondToAppMessage(transactionID: UInt8, acknowledged: Bool) async throws {
+        appMessageResponses.append((transactionID, acknowledged))
+    }
+
+    public func emit(_ frame: PebbleProtocolFrame) {
+        frameContinuation?.yield(frame)
+    }
+
+    public func emit(_ event: PebbleClientEvent) {
+        eventContinuation?.yield(event)
+    }
 
     public func installApplicationObject(
         _ bytes: [UInt8],

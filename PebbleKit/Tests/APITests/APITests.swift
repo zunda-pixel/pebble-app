@@ -5,6 +5,55 @@ import Testing
 @Suite
 @MainActor
 struct APITests {
+    @Test func appMessagePushRoundTripsEveryTupleType() throws {
+        let applicationID = try #require(UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF"))
+        let message = AppMessageData(
+            transactionID: 7,
+            applicationID: applicationID,
+            tuples: [
+                AppMessageTuple(key: 1, value: .bytes([0xAA, 0xBB])),
+                AppMessageTuple(key: 2, value: .string("Pebble")),
+                AppMessageTuple(key: 3, value: .unsigned(0x12345678)),
+                AppMessageTuple(key: 4, value: .signed(-42)),
+            ]
+        )
+
+        let frame = try AppMessageCodec.pushFrame(message)
+
+        #expect(frame.endpoint == 48)
+        #expect(frame.payload[0..<2] == [0x01, 7])
+        #expect(try AppMessageCodec.decode(frame) == .push(message))
+    }
+
+    @Test func appMessageUsesOfficialTupleWireFormat() throws {
+        let applicationID = try #require(UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF"))
+        let frame = try AppMessageCodec.pushFrame(AppMessageData(
+            transactionID: 0x12,
+            applicationID: applicationID,
+            tuples: [AppMessageTuple(key: 0x12345678, value: .string("Hi"))]
+        ))
+
+        #expect(Array(frame.payload.prefix(19)) == [
+            0x01, 0x12,
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+            0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF,
+            0x01,
+        ])
+        #expect(Array(frame.payload.dropFirst(19)) == [
+            0x78, 0x56, 0x34, 0x12, 0x01, 0x03, 0x00, 0x48, 0x69, 0x00,
+        ])
+    }
+
+    @Test func appMessageACKAndNACKRoundTrip() throws {
+        let ack = AppMessageCodec.resultFrame(transactionID: 9, acknowledged: true)
+        let nack = AppMessageCodec.resultFrame(transactionID: 10, acknowledged: false)
+
+        #expect(ack.payload == [0xFF, 9])
+        #expect(nack.payload == [0x7F, 10])
+        #expect(try AppMessageCodec.decode(ack) == .acknowledgement(transactionID: 9))
+        #expect(try AppMessageCodec.decode(nack) == .negativeAcknowledgement(transactionID: 10))
+    }
+
     @Test func pbwBinaryHeaderProvidesBlobDBMetadata() throws {
         var bytes = [UInt8](repeating: 0, count: PBWBinaryHeaderDecoder.size)
         bytes.replaceSubrange(0..<8, with: [0x50, 0x42, 0x4C, 0x41, 0x50, 0x50, 0, 0])
@@ -578,5 +627,58 @@ struct APITests {
         )
 
         #expect(try PingPongCodec.decode(frame) == .pong(cookie: 42))
+    }
+
+    @Test
+    func mockClientRecordsAppMessagesAndResponses() async throws {
+        let client = MockPebbleClient()
+        let applicationID = UUID()
+        let tuples = [AppMessageTuple(key: 7, value: .string("value"))]
+
+        try await client.sendAppMessage(applicationID: applicationID, tuples: tuples)
+        try await client.respondToAppMessage(transactionID: 9, acknowledged: true)
+
+        #expect(client.sentAppMessages.count == 1)
+        #expect(client.sentAppMessages.first?.applicationID == applicationID)
+        #expect(client.sentAppMessages.first?.tuples == tuples)
+        #expect(client.appMessageResponses.first?.transactionID == 9)
+        #expect(client.appMessageResponses.first?.acknowledged == true)
+    }
+
+    @Test
+    func diagnosticsKeepsBoundedHistoryAndExportsReport() async throws {
+        let diagnostics = PebbleDiagnostics(maximumEntryCount: 2)
+        await diagnostics.record(category: "test", message: "first")
+        await diagnostics.record(.warning, category: "test", message: "second")
+        await diagnostics.record(.error, category: "test", message: "third")
+
+        let entries = await diagnostics.snapshot()
+        #expect(entries.map(\.message) == ["second", "third"])
+
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let reportURL = try await diagnostics.exportReport(
+            device: nil,
+            applications: [],
+            directory: directory
+        )
+        #expect(FileManager.default.fileExists(atPath: reportURL.path))
+        #expect(try Data(contentsOf: reportURL).isEmpty == false)
+    }
+
+    @Test
+    func applicationLibraryMetadataDecodesOlderSnapshots() throws {
+        let id = UUID()
+        let data = Data("""
+        [{"id":"\(id.uuidString)","shortName":"Old","longName":"","companyName":"",\
+        "versionLabel":"1.0","capabilities":[],"targetPlatforms":["aplite"],"kind":"watchapp"}]
+        """.utf8)
+
+        let application = try #require(JSONDecoder().decode([PebbleApplication].self, from: data).first)
+
+        #expect(application.appKeys.isEmpty)
+        #expect(application.hasCompanionJavaScript == false)
+        #expect(application.isConfigurable == false)
     }
 }

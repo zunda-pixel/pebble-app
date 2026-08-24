@@ -17,9 +17,38 @@ public struct PebbleApplication: Identifiable, Codable, Equatable, Sendable {
     public var capabilities: [String]
     public var targetPlatforms: [String]
     public var kind: PebbleApplicationKind
+    public var appKeys: [String: UInt32] = [:]
+    public var hasCompanionJavaScript: Bool = false
 
     public var displayName: String {
         longName.isEmpty ? shortName : longName
+    }
+
+    public var isConfigurable: Bool {
+        capabilities.contains("configurable") && hasCompanionJavaScript
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, shortName, longName, companyName, versionCode, versionLabel
+        case capabilities, targetPlatforms, kind, appKeys, hasCompanionJavaScript
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        shortName = try container.decode(String.self, forKey: .shortName)
+        longName = try container.decode(String.self, forKey: .longName)
+        companyName = try container.decode(String.self, forKey: .companyName)
+        versionCode = try container.decodeIfPresent(Double.self, forKey: .versionCode)
+        versionLabel = try container.decode(String.self, forKey: .versionLabel)
+        capabilities = try container.decode([String].self, forKey: .capabilities)
+        targetPlatforms = try container.decode([String].self, forKey: .targetPlatforms)
+        kind = try container.decode(PebbleApplicationKind.self, forKey: .kind)
+        appKeys = try container.decodeIfPresent([String: UInt32].self, forKey: .appKeys) ?? [:]
+        hasCompanionJavaScript = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .hasCompanionJavaScript
+        ) ?? false
     }
 
     public func bestVariant(for model: PebbleWatchModel) -> String? {
@@ -42,7 +71,8 @@ public enum PBWApplicationDecoder {
             versionLabel: raw.versionLabel,
             capabilities: raw.capabilities ?? [],
             targetPlatforms: raw.targetPlatforms ?? ["aplite"],
-            kind: raw.watchapp?.watchface == true ? .watchface : .watchapp
+            kind: raw.watchapp?.watchface == true ? .watchface : .watchapp,
+            appKeys: raw.appKeys ?? [:]
         )
     }
 }
@@ -61,6 +91,7 @@ private struct RawAppInfo: Decodable {
     var capabilities: [String]?
     var targetPlatforms: [String]?
     var watchapp: RawWatchapp?
+    var appKeys: [String: UInt32]?
 }
 
 private struct RawWatchapp: Decodable {
