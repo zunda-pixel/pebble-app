@@ -5,6 +5,85 @@ import Testing
 @Suite
 @MainActor
 struct APITests {
+    @Test func blobDBApplicationMetadataUsesPebbleWireLayout() throws {
+        let applicationID = try #require(UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF"))
+        let metadata = PebbleAppMetadata(
+            applicationID: applicationID,
+            flags: 0x12345678,
+            iconResourceID: 0x90ABCDEF,
+            appVersionMajor: 3,
+            appVersionMinor: 5,
+            sdkVersionMajor: 4,
+            sdkVersionMinor: 1,
+            name: "Orbit"
+        )
+
+        let bytes = metadata.encoded()
+
+        #expect(bytes.count == 126)
+        #expect(Array(bytes[0..<16]) == [
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+            0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF,
+        ])
+        #expect(Array(bytes[16..<24]) == [0x78, 0x56, 0x34, 0x12, 0xEF, 0xCD, 0xAB, 0x90])
+        #expect(Array(bytes[24..<30]) == [3, 5, 4, 1, 0, 0])
+        #expect(Array(bytes[30..<36]) == Array("Orbit".utf8) + [0])
+        #expect(bytes[125] == 0)
+    }
+
+    @Test func blobDBBuildsApplicationInsertAndDeleteFrames() throws {
+        let applicationID = try #require(UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF"))
+        let metadata = PebbleAppMetadata(
+            applicationID: applicationID,
+            flags: 0,
+            iconResourceID: 0,
+            appVersionMajor: 1,
+            appVersionMinor: 0,
+            sdkVersionMajor: 4,
+            sdkVersionMinor: 0,
+            name: "App"
+        )
+
+        let insert = BlobDBCodec.insertApplicationFrame(metadata: metadata, token: 0x1234)
+        let delete = BlobDBCodec.deleteApplicationFrame(applicationID: applicationID, token: 0xABCD)
+
+        #expect(insert.endpoint == 0xB1DB)
+        #expect(Array(insert.payload.prefix(21)) == [
+            0x01, 0x12, 0x34, 0x02, 0x10,
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+            0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF,
+        ])
+        #expect(Array(insert.payload[21..<23]) == [0x7E, 0x00])
+        #expect(delete.payload == [
+            0x04, 0xAB, 0xCD, 0x02, 0x10,
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+            0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF,
+        ])
+    }
+
+    @Test func blobDBDecodesResponseAndPreservesUTF8NameBoundary() throws {
+        let response = try BlobDBCodec.decodeResponse(PebbleProtocolFrame(
+            endpoint: BlobDBCodec.endpoint,
+            payload: [0x12, 0x34, 0x0B]
+        ))
+        let metadata = PebbleAppMetadata(
+            applicationID: UUID(),
+            flags: 0,
+            iconResourceID: 0,
+            appVersionMajor: 1,
+            appVersionMinor: 0,
+            sdkVersionMajor: 4,
+            sdkVersionMinor: 0,
+            name: String(repeating: "石", count: 40)
+        )
+        let nameBytes = Array(metadata.encoded()[30..<126])
+        let terminator = try #require(nameBytes.firstIndex(of: 0))
+
+        #expect(response == BlobDBResponse(token: 0x1234, status: .tryLater))
+        #expect(String(bytes: nameBytes[..<terminator], encoding: .utf8) != nil)
+        #expect(terminator <= 95)
+    }
+
     @Test func invalidPBWArchiveIsRejected() throws {
         let fileURL = FileManager.default.temporaryDirectory
             .appending(path: "\(UUID().uuidString).pbw")
