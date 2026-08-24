@@ -134,6 +134,15 @@ private struct ApplicationsView: View {
             errorMessage: model.applicationLibraryErrorMessage,
             removeApplication: { applicationID in
                 Task { await model.removeApplication(id: applicationID) }
+            },
+            reorderApplications: { kind, offsets, destination in
+                Task {
+                    await model.reorderApplications(
+                        kind: kind,
+                        fromOffsets: offsets,
+                        toOffset: destination
+                    )
+                }
             }
         )
         .navigationTitle("Apps")
@@ -147,6 +156,7 @@ private struct ApplicationsContent: View {
     var isLoading: Bool
     var errorMessage: String?
     var removeApplication: (UUID) -> Void
+    var reorderApplications: (PebbleApplicationKind, IndexSet, Int) -> Void
 
     var body: some View {
         if isLoading && watchApplications.isEmpty && watchfaces.isEmpty {
@@ -171,14 +181,20 @@ private struct ApplicationsContent: View {
                     ApplicationSection(
                         title: "Watch Apps",
                         applications: watchApplications,
-                        removeApplication: removeApplication
+                        removeApplication: removeApplication,
+                        moveApplications: { offsets, destination in
+                            reorderApplications(.watchapp, offsets, destination)
+                        }
                     )
                 }
                 if !watchfaces.isEmpty {
                     ApplicationSection(
                         title: "Watchfaces",
                         applications: watchfaces,
-                        removeApplication: removeApplication
+                        removeApplication: removeApplication,
+                        moveApplications: { offsets, destination in
+                            reorderApplications(.watchface, offsets, destination)
+                        }
                     )
                 }
             }
@@ -190,6 +206,7 @@ private struct ApplicationSection: View {
     var title: LocalizedStringKey
     var applications: [PebbleApplication]
     var removeApplication: (UUID) -> Void
+    var moveApplications: (IndexSet, Int) -> Void
 
     var body: some View {
         Section(title) {
@@ -206,6 +223,7 @@ private struct ApplicationSection: View {
                     }
                 }
             }
+            .onMove(perform: moveApplications)
         }
     }
 }

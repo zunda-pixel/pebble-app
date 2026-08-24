@@ -94,6 +94,53 @@ public final class AppModel {
         }
     }
 
+    public func reorderApplications(
+        kind: PebbleApplicationKind,
+        fromOffsets: IndexSet,
+        toOffset: Int
+    ) async {
+        var selectedApplications = kind == .watchapp ? watchApplications : watchfaces
+        guard move(&selectedApplications, fromOffsets: fromOffsets, toOffset: toOffset) else {
+            return
+        }
+        let orderedApplications = kind == .watchapp
+            ? selectedApplications + watchfaces
+            : watchApplications + selectedApplications
+
+        do {
+            let applications = try await applicationLibrary.reorder(
+                applicationIDs: orderedApplications.map(\.id)
+            )
+            updateApplications(applications)
+            if connectedDevice != nil {
+                try await client.reorderApplications(applications.map(\.id))
+            }
+            applicationLibraryErrorMessage = nil
+        } catch {
+            applicationLibraryErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func move(
+        _ applications: inout [PebbleApplication],
+        fromOffsets: IndexSet,
+        toOffset: Int
+    ) -> Bool {
+        guard !fromOffsets.isEmpty,
+              fromOffsets.allSatisfy(applications.indices.contains),
+              (0...applications.count).contains(toOffset) else {
+            return false
+        }
+        let movingApplications = fromOffsets.map { applications[$0] }
+        applications = applications.enumerated().compactMap { index, application in
+            fromOffsets.contains(index) ? nil : application
+        }
+        let removedBeforeDestination = fromOffsets.count { $0 < toOffset }
+        let insertionIndex = toOffset - removedBeforeDestination
+        applications.insert(contentsOf: movingApplications, at: insertionIndex)
+        return true
+    }
+
     private func updateApplications(_ applications: [PebbleApplication]) {
         watchApplications = applications.filter { $0.kind == .watchapp }
         watchfaces = applications.filter { $0.kind == .watchface }
