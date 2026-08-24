@@ -5,6 +5,37 @@ import Testing
 @Suite
 @MainActor
 struct APITests {
+    @Test func applicationLibraryPersistsUpdatesAndOrder() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let fileURL = directory.appending(path: "applications.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let library = PebbleApplicationLibrary(fileURL: fileURL)
+        let first = PebbleApplication(
+            id: try #require(UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF")),
+            shortName: "First",
+            longName: "",
+            companyName: "Pebble",
+            versionCode: 1,
+            versionLabel: "1.0",
+            capabilities: [],
+            targetPlatforms: ["aplite"],
+            kind: .watchapp
+        )
+        var second = first
+        second.id = try #require(UUID(uuidString: "10213243-5465-7687-98A9-BACBDCEDFE0F"))
+        second.shortName = "Second"
+
+        _ = try await library.upsert(first)
+        _ = try await library.upsert(second)
+        _ = try await library.reorder(applicationIDs: [second.id, first.id])
+
+        let reloaded = PebbleApplicationLibrary(fileURL: fileURL)
+        #expect(try await reloaded.applications().map(\.id) == [second.id, first.id])
+        _ = try await reloaded.remove(applicationID: second.id)
+        #expect(try await reloaded.applications() == [first])
+    }
+
     @Test func pbwAppInfoDecodesWatchfaceMetadata() throws {
         let json = Data(#"""
         {
