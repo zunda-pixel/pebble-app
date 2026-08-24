@@ -47,6 +47,12 @@ public protocol PebbleClient: Sendable {
         objectType: PutBytesObjectType,
         appBankID: UInt32
     ) async throws
+    func registerApplication(_ metadata: PebbleAppMetadata) async throws
+}
+
+public enum BlobDBClientError: Error, Equatable, Sendable {
+    case operationAlreadyInProgress
+    case rejected(BlobDBStatus)
 }
 
 public extension PebbleConnectionError {

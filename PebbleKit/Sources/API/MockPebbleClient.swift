@@ -71,4 +71,6 @@ public final class MockPebbleClient: PebbleClient {
         objectType: PutBytesObjectType,
         appBankID: UInt32
     ) async throws {}
+
+    public func registerApplication(_ metadata: PebbleAppMetadata) async throws {}
 }

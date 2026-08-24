@@ -52,6 +52,10 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var isAutomaticReconnect = false
     private var activeTransferSession: PutBytesTransferSession?
     private var transferContinuation: CheckedContinuation<Void, any Error>?
+    private var nextBlobDBToken: UInt16 = 1
+    private var pendingBlobDBToken: UInt16?
+    private var blobDBContinuation: CheckedContinuation<Void, any Error>?
+    private var blobDBTimeoutTask: Task<Void, Never>?
 
     public override init() {
         super.init()
@@ -204,6 +208,36 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
     }
 
+    public func registerApplication(_ metadata: PebbleAppMetadata) async throws {
+        guard let peripheral = connectedPeripheral,
+              ppogSession != nil else {
+            throw PebbleConnectionError.disconnected
+        }
+        guard blobDBContinuation == nil else {
+            throw BlobDBClientError.operationAlreadyInProgress
+        }
+
+        let token = nextBlobDBToken
+        nextBlobDBToken &+= 1
+        try await withCheckedThrowingContinuation { continuation in
+            pendingBlobDBToken = token
+            blobDBContinuation = continuation
+            do {
+                try sendFrame(
+                    BlobDBCodec.insertApplicationFrame(metadata: metadata, token: token),
+                    to: peripheral
+                )
+                blobDBTimeoutTask = Task { [weak self] in
+                    try? await Task.sleep(for: .seconds(20))
+                    guard !Task.isCancelled else { return }
+                    self?.failBlobDBOperation(PebbleConnectionError.connectionTimedOut)
+                }
+            } catch {
+                failBlobDBOperation(error)
+            }
+        }
+    }
+
     private func waitForBluetooth() async throws {
         switch centralManager.state {
         case .poweredOn:
@@ -293,6 +327,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         acknowledgementTimeoutTask = nil
         stopHealthChecks()
         failTransfer(error)
+        failBlobDBOperation(error)
     }
 
     private func model(from advertisementData: [String: Any]) -> PebbleWatchModel? {
@@ -413,6 +448,11 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             return
         }
 
+        if frame.endpoint == BlobDBCodec.endpoint, pendingBlobDBToken != nil {
+            processBlobDBResponse(frame)
+            return
+        }
+
         guard frame.endpoint == WatchVersionCodec.endpoint,
               pendingDevice != nil else {
             return
@@ -500,6 +540,32 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
     }
 
+    private func processBlobDBResponse(_ frame: PebbleProtocolFrame) {
+        do {
+            let response = try BlobDBCodec.decodeResponse(frame)
+            guard response.token == pendingBlobDBToken else { return }
+            guard response.status == .success else {
+                failBlobDBOperation(BlobDBClientError.rejected(response.status))
+                return
+            }
+            blobDBTimeoutTask?.cancel()
+            blobDBTimeoutTask = nil
+            pendingBlobDBToken = nil
+            blobDBContinuation?.resume()
+            blobDBContinuation = nil
+        } catch {
+            failBlobDBOperation(error)
+        }
+    }
+
+    private func failBlobDBOperation(_ error: any Error) {
+        blobDBTimeoutTask?.cancel()
+        blobDBTimeoutTask = nil
+        pendingBlobDBToken = nil
+        blobDBContinuation?.resume(throwing: error)
+        blobDBContinuation = nil
+    }
+
     private func handleTransferActions(
         _ actions: [PutBytesTransferAction],
         peripheral: CBPeripheral
@@ -556,6 +622,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         acknowledgementTimeoutTask = nil
         stopHealthChecks()
         failTransfer(PebbleConnectionError.disconnected)
+        failBlobDBOperation(PebbleConnectionError.disconnected)
     }
 
     private func reconnect(to device: DiscoveredPebble, using peripheral: CBPeripheral) {

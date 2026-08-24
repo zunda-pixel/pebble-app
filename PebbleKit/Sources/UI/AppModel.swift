@@ -247,6 +247,7 @@ public final class AppModel {
                     appBankID: request.appBankID
                 )
             }
+            try await client.registerApplication(package.appMetadata)
             applicationLibraryErrorMessage = nil
         } catch {
             applicationLibraryErrorMessage = error.localizedDescription
