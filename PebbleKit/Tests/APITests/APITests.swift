@@ -5,6 +5,40 @@ import Testing
 @Suite
 @MainActor
 struct APITests {
+    @Test func pbwBinaryHeaderProvidesBlobDBMetadata() throws {
+        var bytes = [UInt8](repeating: 0, count: PBWBinaryHeaderDecoder.size)
+        bytes.replaceSubrange(0..<8, with: [0x50, 0x42, 0x4C, 0x41, 0x50, 0x50, 0, 0])
+        bytes.replaceSubrange(8..<14, with: [1, 0, 4, 2, 3, 7])
+        bytes.replaceSubrange(88..<92, with: [0x78, 0x56, 0x34, 0x12])
+        bytes.replaceSubrange(96..<100, with: [0xEF, 0xCD, 0xAB, 0x90])
+        bytes.replaceSubrange(104..<120, with: [
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+            0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF,
+        ])
+
+        let header = try PBWBinaryHeaderDecoder.decode(from: Data(bytes))
+        let metadata = header.appMetadata(name: "Orbit")
+
+        #expect(header.headerVersionMajor == 1)
+        #expect(header.sdkVersionMajor == 4)
+        #expect(header.sdkVersionMinor == 2)
+        #expect(header.appVersionMajor == 3)
+        #expect(header.appVersionMinor == 7)
+        #expect(header.iconResourceID == 0x12345678)
+        #expect(header.flags == 0x90ABCDEF)
+        #expect(metadata.applicationID.uuidString == "00112233-4455-6677-8899-AABBCCDDEEFF")
+        #expect(metadata.name == "Orbit")
+    }
+
+    @Test func pbwBinaryHeaderRejectsInvalidInput() {
+        #expect(throws: PBWBinaryHeaderError.invalidSize) {
+            try PBWBinaryHeaderDecoder.decode(from: Data())
+        }
+        #expect(throws: PBWBinaryHeaderError.invalidSentinel) {
+            try PBWBinaryHeaderDecoder.decode(from: Data(repeating: 0, count: PBWBinaryHeaderDecoder.size))
+        }
+    }
+
     @Test func blobDBApplicationMetadataUsesPebbleWireLayout() throws {
         let applicationID = try #require(UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF"))
         let metadata = PebbleAppMetadata(

@@ -12,7 +12,12 @@ public struct PBWPackageObject: Equatable, Sendable {
 public struct PBWPackage: Equatable, Sendable {
     public var application: PebbleApplication
     public var variant: String
+    public var binaryHeader: PBWBinaryHeader
     public var objects: [PBWPackageObject]
+
+    public var appMetadata: PebbleAppMetadata {
+        binaryHeader.appMetadata(name: application.displayName)
+    }
 }
 
 public enum PBWPackageImporter {
@@ -59,9 +64,19 @@ public enum PBWPackageImporter {
                 data: blobData
             ))
         }
+        guard let executable = objects.first(where: {
+            $0.installationObject.objectType == .appExecutable
+        }) else {
+            throw PBWPackageImportError.missingExecutable
+        }
+        let binaryHeader = try PBWBinaryHeaderDecoder.decode(from: executable.data)
+        guard binaryHeader.applicationID == application.id else {
+            throw PBWPackageImportError.applicationIDMismatch
+        }
         return PBWPackage(
             application: application,
             variant: plan.variant,
+            binaryHeader: binaryHeader,
             objects: objects
         )
     }
@@ -122,4 +137,6 @@ public enum PBWPackageImportError: Error, Equatable, Sendable {
     case missingEntry(String)
     case entryTooLarge(String)
     case sizeMismatch(filename: String)
+    case missingExecutable
+    case applicationIDMismatch
 }
