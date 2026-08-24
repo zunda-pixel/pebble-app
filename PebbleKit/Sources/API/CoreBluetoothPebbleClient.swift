@@ -16,8 +16,14 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var connectionContinuation: CheckedContinuation<PebbleDevice, any Error>?
     private var pendingDevice: DiscoveredPebble?
     private var activeWriteCharacteristic: CBCharacteristic?
+    private var connectedPeripheral: CBPeripheral?
+    private var ppogSession: PPoGSession?
+    private var frameDecoder = PebbleProtocolFrameDecoder()
+    private var frameContinuation: AsyncStream<PebbleProtocolFrame>.Continuation?
+    private var pendingGattWrites: [Data] = []
     private var scanTimeoutTask: Task<Void, Never>?
     private var connectionTimeoutTask: Task<Void, Never>?
+    private var acknowledgementTimeoutTask: Task<Void, Never>?
 
     public override init() {
         super.init()
@@ -90,6 +96,26 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         centralManager.cancelPeripheralConnection(peripheral)
     }
 
+    public func send(_ frame: PebbleProtocolFrame) async throws {
+        guard let peripheral = connectedPeripheral,
+              var session = ppogSession else {
+            throw PebbleConnectionError.disconnected
+        }
+
+        let bytes = try frame.encoded()
+        let maximumPacketSize = peripheral.maximumWriteValueLength(for: .withoutResponse)
+        let actions = try session.enqueue(bytes, maximumPacketSize: maximumPacketSize)
+        ppogSession = session
+        try handle(actions, peripheral: peripheral)
+        updateAcknowledgementTimeout(for: peripheral)
+    }
+
+    public func frames() -> AsyncStream<PebbleProtocolFrame> {
+        AsyncStream { continuation in
+            frameContinuation = continuation
+        }
+    }
+
     private func waitForBluetooth() async throws {
         switch centralManager.state {
         case .poweredOn:
@@ -148,6 +174,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         )
         connectionContinuation = nil
         pendingDevice = nil
+        connectedPeripheral = peripheral
     }
 
     private func failConnection(_ error: PebbleConnectionError) {
@@ -157,6 +184,11 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         connectionContinuation = nil
         pendingDevice = nil
         activeWriteCharacteristic = nil
+        connectedPeripheral = nil
+        ppogSession = nil
+        pendingGattWrites.removeAll()
+        acknowledgementTimeoutTask?.cancel()
+        acknowledgementTimeoutTask = nil
     }
 
     private func model(from advertisementData: [String: Any]) -> PebbleWatchModel? {
@@ -219,7 +251,66 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
 
         let bytes = try packet.encoded(for: .one)
-        peripheral.writeValue(Data(bytes), for: characteristic, type: .withResponse)
+        pendingGattWrites.append(Data(bytes))
+        flushWrites(to: peripheral, characteristic: characteristic)
+    }
+
+    private func flushWrites(to peripheral: CBPeripheral, characteristic: CBCharacteristic) {
+        while peripheral.canSendWriteWithoutResponse,
+              !pendingGattWrites.isEmpty {
+            let value = pendingGattWrites.removeFirst()
+            peripheral.writeValue(value, for: characteristic, type: .withoutResponse)
+        }
+    }
+
+    private func handle(
+        _ actions: [PPoGSessionAction],
+        peripheral: CBPeripheral
+    ) throws {
+        for action in actions {
+            switch action {
+            case .send(let packet):
+                try write(packet, to: peripheral)
+            case .deliver(let bytes):
+                let frames = try frameDecoder.append(bytes)
+                frames.forEach { frameContinuation?.yield($0) }
+            case .resetRequired:
+                throw PebbleConnectionError.protocolNegotiationFailed
+            }
+        }
+    }
+
+    private func updateAcknowledgementTimeout(for peripheral: CBPeripheral) {
+        acknowledgementTimeoutTask?.cancel()
+        acknowledgementTimeoutTask = nil
+
+        guard ppogSession?.hasPendingAcknowledgements == true else {
+            return
+        }
+
+        acknowledgementTimeoutTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(10))
+            guard !Task.isCancelled else {
+                return
+            }
+            self?.retryUnacknowledgedPackets(on: peripheral)
+        }
+    }
+
+    private func retryUnacknowledgedPackets(on peripheral: CBPeripheral) {
+        guard var session = ppogSession else {
+            return
+        }
+
+        do {
+            let actions = try session.handleAcknowledgementTimeout()
+            ppogSession = session
+            try handle(actions, peripheral: peripheral)
+            updateAcknowledgementTimeout(for: peripheral)
+        } catch {
+            centralManager.cancelPeripheralConnection(peripheral)
+            failConnection(.connectionTimedOut)
+        }
     }
 }
 
@@ -294,6 +385,11 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
             failConnection(.disconnected)
         }
         activeWriteCharacteristic = nil
+        connectedPeripheral = nil
+        ppogSession = nil
+        pendingGattWrites.removeAll()
+        acknowledgementTimeoutTask?.cancel()
+        acknowledgementTimeoutTask = nil
     }
 
     public func centralManager(
@@ -381,17 +477,34 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
                 if version == .zero {
                     return
                 }
-            case .resetComplete:
+            case .resetComplete(_, let receiveWindow, let transmitWindow):
                 try write(
                     .resetComplete(sequence: 0, receiveWindow: 25, transmitWindow: 25),
                     to: peripheral
                 )
+                ppogSession = PPoGSession(
+                    receiveWindow: min(Int(transmitWindow), 25),
+                    transmitWindow: min(Int(receiveWindow), 25)
+                )
                 finishConnection(peripheral: peripheral)
             case .data, .acknowledgement:
-                return
+                guard var session = ppogSession else {
+                    return
+                }
+                let actions = try session.receive(packet)
+                ppogSession = session
+                try handle(actions, peripheral: peripheral)
+                updateAcknowledgementTimeout(for: peripheral)
             }
         } catch {
             failConnection(.protocolNegotiationFailed)
         }
+    }
+
+    public func peripheralIsReady(toSendWriteWithoutResponse peripheral: CBPeripheral) {
+        guard let characteristic = activeWriteCharacteristic else {
+            return
+        }
+        flushWrites(to: peripheral, characteristic: characteristic)
     }
 }

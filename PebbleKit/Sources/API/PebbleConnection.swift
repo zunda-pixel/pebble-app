@@ -26,6 +26,8 @@ public protocol PebbleClient: Sendable {
     func scan() async throws -> [DiscoveredPebble]
     func connect(to device: DiscoveredPebble) async throws -> PebbleDevice
     func disconnect(from device: PebbleDevice) async
+    func send(_ frame: PebbleProtocolFrame) async throws
+    func frames() -> AsyncStream<PebbleProtocolFrame>
 }
 
 public extension PebbleConnectionError {

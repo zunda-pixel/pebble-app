@@ -42,4 +42,12 @@ public final class MockPebbleClient: PebbleClient {
     public func disconnect(from device: PebbleDevice) async {
         await Task.yield()
     }
+
+    public func send(_ frame: PebbleProtocolFrame) async throws {}
+
+    public func frames() -> AsyncStream<PebbleProtocolFrame> {
+        AsyncStream { continuation in
+            continuation.finish()
+        }
+    }
 }

@@ -59,4 +59,56 @@ struct APITests {
             try packet.encoded(for: .one)
         }
     }
+
+    @Test
+    func ppogSessionHonorsTransmitWindow() throws {
+        var session = PPoGSession(receiveWindow: 2, transmitWindow: 2)
+        let initialActions = try session.enqueue(
+            Array(0..<10),
+            maximumPacketSize: 4
+        )
+
+        #expect(initialActions == [
+            .send(.data(sequence: 0, payload: [0, 1, 2])),
+            .send(.data(sequence: 1, payload: [3, 4, 5])),
+        ])
+
+        let nextActions = try session.receive(.acknowledgement(sequence: 0))
+        #expect(nextActions == [
+            .send(.data(sequence: 2, payload: [6, 7, 8])),
+        ])
+    }
+
+    @Test
+    func ppogSessionAcknowledgesOrderedInboundData() throws {
+        var session = PPoGSession()
+
+        let actions = try session.receive(.data(sequence: 0, payload: [1, 2, 3]))
+
+        #expect(actions == [
+            .deliver([1, 2, 3]),
+            .send(.acknowledgement(sequence: 0)),
+        ])
+    }
+
+    @Test
+    func pebbleProtocolFrameRoundTripsFragmentedInput() throws {
+        let frame = PebbleProtocolFrame(endpoint: 2_001, payload: [0x00, 0x00, 0x00, 0x2A])
+        let bytes = try frame.encoded()
+        var decoder = PebbleProtocolFrameDecoder()
+
+        #expect(try decoder.append(Array(bytes.prefix(3))).isEmpty)
+        #expect(try decoder.append(Array(bytes.dropFirst(3))) == [frame])
+    }
+
+    @Test
+    func pebbleProtocolDecoderEmitsMultipleFrames() throws {
+        let first = PebbleProtocolFrame(endpoint: 16, payload: [0x00])
+        let second = PebbleProtocolFrame(endpoint: 18, payload: [0x01, 0x02])
+        var decoder = PebbleProtocolFrameDecoder()
+
+        let frames = try decoder.append(first.encoded() + second.encoded())
+
+        #expect(frames == [first, second])
+    }
 }
