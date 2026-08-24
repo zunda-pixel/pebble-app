@@ -8,14 +8,17 @@ final class PebbleCompanionRuntime: NSObject, @preconcurrency WKScriptMessageHan
     private var application: PebbleApplication?
     private var openURLHandler: (URL) -> Void
     private var appMessageHandler: (UUID, [AppMessageTuple]) async throws -> Void
+    private var notificationHandler: (PebbleApplication, String, String) async throws -> Void
     private var loadContinuation: CheckedContinuation<Void, any Error>?
 
     init(
         openURLHandler: @escaping (URL) -> Void,
-        appMessageHandler: @escaping (UUID, [AppMessageTuple]) async throws -> Void
+        appMessageHandler: @escaping (UUID, [AppMessageTuple]) async throws -> Void,
+        notificationHandler: @escaping (PebbleApplication, String, String) async throws -> Void
     ) {
         self.openURLHandler = openURLHandler
         self.appMessageHandler = appMessageHandler
+        self.notificationHandler = notificationHandler
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
         webView = WKWebView(frame: .zero, configuration: configuration)
@@ -41,7 +44,9 @@ final class PebbleCompanionRuntime: NSObject, @preconcurrency WKScriptMessageHan
             webkit.messageHandlers.pebble.postMessage({type:'sendAppMessage', id, message});
           },
           getActiveWatchInfo: () => ({platform:'unknown', model:'unknown', language:'en'}),
-          getAccountToken: () => '', getWatchToken: () => ''
+          getAccountToken: () => '', getWatchToken: () => '',
+          showSimpleNotificationOnPebble: (title, body) =>
+            webkit.messageHandlers.pebble.postMessage({type:'notification', title, body})
         };
         window.__pebbleDispatch = (name, detail) => (listeners[name] || []).forEach(fn => fn(detail));
         window.__pebbleResult = (id, ok) => { const cb = callbacks[id]; if (!cb) return;
@@ -96,6 +101,13 @@ final class PebbleCompanionRuntime: NSObject, @preconcurrency WKScriptMessageHan
               let type = body["type"] as? String else { return }
         if type == "openURL", let value = body["url"] as? String, let url = URL(string: value) {
             openURLHandler(url)
+            return
+        }
+        if type == "notification",
+           let title = body["title"] as? String,
+           let notificationBody = body["body"] as? String,
+           let application {
+            Task { try? await notificationHandler(application, title, notificationBody) }
             return
         }
         guard type == "sendAppMessage",

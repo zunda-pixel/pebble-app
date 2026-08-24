@@ -228,6 +228,12 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         )
     }
 
+    public func sendNotification(_ notification: PebbleTimelineNotification) async throws {
+        try await performBlobDBOperation(acceptedStatuses: [.success]) { token in
+            try TimelineNotificationCodec.insertFrame(notification, token: token)
+        }
+    }
+
     public func installApplicationObject(
         _ bytes: [UInt8],
         objectType: PutBytesObjectType,
@@ -274,7 +280,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
 
     private func performBlobDBOperation(
         acceptedStatuses: [BlobDBStatus],
-        frame: (UInt16) -> PebbleProtocolFrame
+        frame: (UInt16) throws -> PebbleProtocolFrame
     ) async throws {
         guard let peripheral = connectedPeripheral,
               ppogSession != nil else {
@@ -291,7 +297,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             acceptedBlobDBStatuses = acceptedStatuses
             blobDBContinuation = continuation
             do {
-                try sendFrame(frame(token), to: peripheral)
+                try sendFrame(try frame(token), to: peripheral)
                 blobDBTimeoutTask = Task { [weak self] in
                     try? await Task.sleep(for: .seconds(20))
                     guard !Task.isCancelled else { return }

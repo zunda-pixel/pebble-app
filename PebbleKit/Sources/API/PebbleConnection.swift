@@ -45,6 +45,7 @@ public protocol PebbleClient: Sendable {
     func respondToAppFetch(with status: AppFetchResponseStatus) async throws
     func sendAppMessage(applicationID: UUID, tuples: [AppMessageTuple]) async throws
     func respondToAppMessage(transactionID: UInt8, acknowledged: Bool) async throws
+    func sendNotification(_ notification: PebbleTimelineNotification) async throws
     func installApplicationObject(
         _ bytes: [UInt8],
         objectType: PutBytesObjectType,

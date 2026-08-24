@@ -29,6 +29,8 @@ public final class AppModel {
     public private(set) var configurationApplication: PebbleApplication?
     public private(set) var configurationURL: URL?
     public private(set) var diagnosticReportURL: URL?
+    public private(set) var companionNotificationsEnabled = true
+    public private(set) var notificationStatusMessage: String?
 
     private let client: any PebbleClient
     private let applicationLibrary: PebbleApplicationLibrary
@@ -37,11 +39,21 @@ public final class AppModel {
     @ObservationIgnored private var hasLoadedApplications = false
     @ObservationIgnored private var pendingImportSnapshots: [UUID: PebbleApplicationLibrarySnapshot] = [:]
     @ObservationIgnored private var needsApplicationSynchronization = false
+    @ObservationIgnored private var recentNotificationFingerprints: [String: Date] = [:]
+    @ObservationIgnored private var pendingNotifications: [PebbleTimelineNotification] = []
     @ObservationIgnored private lazy var companionRuntime = PebbleCompanionRuntime(
         openURLHandler: { [weak self] url in self?.openConfigurationURL(url) },
         appMessageHandler: { [weak self] applicationID, tuples in
             guard let self else { throw PebbleConnectionError.disconnected }
             try await self.client.sendAppMessage(applicationID: applicationID, tuples: tuples)
+        },
+        notificationHandler: { [weak self] application, title, body in
+            guard let self else { throw PebbleConnectionError.disconnected }
+            try await self.sendCompanionNotification(
+                application: application,
+                title: title,
+                body: body
+            )
         }
     )
 
@@ -69,6 +81,9 @@ public final class AppModel {
     ) {
         self.client = client
         self.applicationLibrary = applicationLibrary
+        companionNotificationsEnabled = UserDefaults.standard.object(
+            forKey: "companionNotificationsEnabled"
+        ) as? Bool ?? true
     }
 
     public var connectedDevice: PebbleDevice? {
@@ -104,6 +119,7 @@ public final class AppModel {
             await PebbleDiagnostics.shared.record(category: "connection", message: "Watch connected")
             observeConnectionEvents()
             await synchronizeApplications(with: connectedDevice)
+            await flushPendingNotifications()
         } catch let error as PebbleConnectionError {
             connectionState = .failed(error)
             await PebbleDiagnostics.shared.record(.error, category: "connection", message: error.message)
@@ -177,6 +193,86 @@ public final class AppModel {
             )
         } catch {
             applicationLibraryErrorMessage = "The diagnostic report could not be created."
+        }
+    }
+
+    public func setCompanionNotificationsEnabled(_ enabled: Bool) {
+        companionNotificationsEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "companionNotificationsEnabled")
+        notificationStatusMessage = enabled
+            ? "Watch app notifications are enabled."
+            : "Watch app notifications are disabled."
+    }
+
+    public func sendTestNotification() async {
+        guard connectedDevice != nil else {
+            notificationStatusMessage = "Connect a Pebble before sending a test notification."
+            return
+        }
+        do {
+            try await client.sendNotification(PebbleTimelineNotification(
+                parentApplicationID: UUID(),
+                title: "Pebble Test",
+                body: "Notifications are reaching your watch.",
+                appName: "Pebble"
+            ))
+            notificationStatusMessage = "Test notification sent."
+            await PebbleDiagnostics.shared.record(
+                category: "notification",
+                message: "Test notification sent"
+            )
+        } catch {
+            notificationStatusMessage = "The test notification could not be sent."
+            await PebbleDiagnostics.shared.record(
+                .error,
+                category: "notification",
+                message: "Test notification delivery failed"
+            )
+        }
+    }
+
+    private func sendCompanionNotification(
+        application: PebbleApplication,
+        title: String,
+        body: String
+    ) async throws {
+        guard companionNotificationsEnabled else { return }
+        let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedBody = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedTitle.isEmpty || !normalizedBody.isEmpty else { return }
+        let now = Date()
+        recentNotificationFingerprints = recentNotificationFingerprints.filter {
+            now.timeIntervalSince($0.value) < 30
+        }
+        let fingerprint = "\(application.id.uuidString)|\(normalizedTitle)|\(normalizedBody)"
+        guard recentNotificationFingerprints[fingerprint] == nil else { return }
+        recentNotificationFingerprints[fingerprint] = now
+        do {
+            let notification = PebbleTimelineNotification(
+                parentApplicationID: application.id,
+                title: normalizedTitle,
+                body: normalizedBody,
+                appName: application.displayName
+            )
+            guard connectedDevice != nil else {
+                pendingNotifications.append(notification)
+                if pendingNotifications.count > 20 {
+                    pendingNotifications.removeFirst(pendingNotifications.count - 20)
+                }
+                await PebbleDiagnostics.shared.record(
+                    category: "notification",
+                    message: "Watch app notification queued until reconnection"
+                )
+                return
+            }
+            try await client.sendNotification(notification)
+            await PebbleDiagnostics.shared.record(
+                category: "notification",
+                message: "Watch app notification sent"
+            )
+        } catch {
+            recentNotificationFingerprints[fingerprint] = nil
+            throw error
         }
     }
 
@@ -499,6 +595,7 @@ public final class AppModel {
                     self?.connectionState = .connected(device)
                     Task { [weak self] in
                         await self?.synchronizeApplications(with: device)
+                        await self?.flushPendingNotifications()
                     }
                 case .appFetchRequested(let request):
                     self?.beginHandlingAppFetchRequest(request)
@@ -549,6 +646,26 @@ public final class AppModel {
                 .error,
                 category: "appmessage",
                 message: "Incoming AppMessage delivery failed"
+            )
+        }
+    }
+
+    private func flushPendingNotifications() async {
+        guard connectedDevice != nil, !pendingNotifications.isEmpty else { return }
+        var remaining: [PebbleTimelineNotification] = []
+        for (index, notification) in pendingNotifications.enumerated() {
+            do {
+                try await client.sendNotification(notification)
+            } catch {
+                remaining.append(contentsOf: pendingNotifications[index...])
+                break
+            }
+        }
+        pendingNotifications = remaining
+        if remaining.isEmpty {
+            await PebbleDiagnostics.shared.record(
+                category: "notification",
+                message: "Queued watch app notifications delivered"
             )
         }
     }

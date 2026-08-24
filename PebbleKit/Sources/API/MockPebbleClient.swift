@@ -6,6 +6,7 @@ public final class MockPebbleClient: PebbleClient {
     public private(set) var sentAppMessages: [AppMessageData] = []
     public private(set) var appMessageResponses: [(transactionID: UInt8, acknowledged: Bool)] = []
     public private(set) var reorderedApplicationIDs: [[UUID]] = []
+    public private(set) var sentNotifications: [PebbleTimelineNotification] = []
     private var nextTransactionID: UInt8 = 0
     private var frameContinuation: AsyncStream<PebbleProtocolFrame>.Continuation?
     private var eventContinuation: AsyncStream<PebbleClientEvent>.Continuation?
@@ -89,6 +90,10 @@ public final class MockPebbleClient: PebbleClient {
 
     public func respondToAppMessage(transactionID: UInt8, acknowledged: Bool) async throws {
         appMessageResponses.append((transactionID, acknowledged))
+    }
+
+    public func sendNotification(_ notification: PebbleTimelineNotification) async throws {
+        sentNotifications.append(notification)
     }
 
     public func emit(_ frame: PebbleProtocolFrame) {

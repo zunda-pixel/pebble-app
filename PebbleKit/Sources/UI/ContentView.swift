@@ -569,6 +569,24 @@ private struct SettingsView: View {
                 LabeledContent("Supported Watches", value: "3 models")
                 LabeledContent("Connection", value: "Bluetooth LE")
             }
+            Section {
+                Toggle("Watch App Notifications", isOn: Binding(
+                    get: { model.companionNotificationsEnabled },
+                    set: { model.setCompanionNotificationsEnabled($0) }
+                ))
+                Button("Send Test Notification", systemImage: "bell.badge") {
+                    Task { await model.sendTestNotification() }
+                }
+                .disabled(model.connectedDevice == nil)
+                if let notificationStatusMessage = model.notificationStatusMessage {
+                    Label(notificationStatusMessage, systemImage: "info.circle")
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Notifications")
+            } footer: {
+                Text("System notifications are delivered directly to a paired Pebble using Apple Notification Center Service. This switch controls notifications created by installed watch apps.")
+            }
             Section("Diagnostics") {
                 Button("Prepare Diagnostic Report", systemImage: "stethoscope") {
                     Task { await model.prepareDiagnosticReport() }

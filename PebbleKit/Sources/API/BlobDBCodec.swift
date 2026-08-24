@@ -67,9 +67,21 @@ public enum BlobDBCodec {
         metadata: PebbleAppMetadata,
         token: UInt16
     ) -> PebbleProtocolFrame {
-        let key = uuidBytes(metadata.applicationID)
-        let value = metadata.encoded()
-        var payload = commonHeader(command: 0x01, token: token)
+        insertFrame(
+            databaseID: applicationDatabaseID,
+            key: uuidBytes(metadata.applicationID),
+            value: metadata.encoded(),
+            token: token
+        )
+    }
+
+    public static func insertFrame(
+        databaseID: UInt8,
+        key: [UInt8],
+        value: [UInt8],
+        token: UInt16
+    ) -> PebbleProtocolFrame {
+        var payload = commonHeader(command: 0x01, token: token, databaseID: databaseID)
         payload.append(UInt8(key.count))
         payload.append(contentsOf: key)
         payload.append(contentsOf: UInt16(value.count).littleEndianBytes)
@@ -82,7 +94,11 @@ public enum BlobDBCodec {
         token: UInt16
     ) -> PebbleProtocolFrame {
         let key = uuidBytes(applicationID)
-        var payload = commonHeader(command: 0x04, token: token)
+        var payload = commonHeader(
+            command: 0x04,
+            token: token,
+            databaseID: applicationDatabaseID
+        )
         payload.append(UInt8(key.count))
         payload.append(contentsOf: key)
         return PebbleProtocolFrame(endpoint: endpoint, payload: payload)
@@ -109,8 +125,12 @@ public enum BlobDBCodec {
             .compactMap { UInt8($0, radix: 16) }
     }
 
-    private static func commonHeader(command: UInt8, token: UInt16) -> [UInt8] {
-        [command, UInt8(token >> 8), UInt8(token & 0xFF), applicationDatabaseID]
+    private static func commonHeader(
+        command: UInt8,
+        token: UInt16,
+        databaseID: UInt8
+    ) -> [UInt8] {
+        [command, UInt8(token >> 8), UInt8(token & 0xFF), databaseID]
     }
 }
 

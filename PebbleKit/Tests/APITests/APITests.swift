@@ -681,4 +681,74 @@ struct APITests {
         #expect(application.hasCompanionJavaScript == false)
         #expect(application.isConfigurable == false)
     }
+
+    @Test
+    func timelineNotificationUsesOfficialBlobDBLayout() throws {
+        let itemID = try #require(UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF"))
+        let parentID = try #require(UUID(uuidString: "FFEEDDCC-BBAA-9988-7766-554433221100"))
+        let notification = PebbleTimelineNotification(
+            id: itemID,
+            parentApplicationID: parentID,
+            timestamp: Date(timeIntervalSince1970: 1_700_000_000),
+            title: "Title",
+            body: "Body",
+            appName: "App"
+        )
+
+        let frame = try TimelineNotificationCodec.insertFrame(notification, token: 0x1234)
+
+        #expect(frame.endpoint == 0xB1DB)
+        #expect(Array(frame.payload.prefix(5)) == [0x01, 0x12, 0x34, 0x04, 0x10])
+        #expect(Array(frame.payload[5..<21]) == [
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+            0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF,
+        ])
+        let value = try notification.encoded()
+        #expect(Array(frame.payload.dropFirst(23)) == value)
+        #expect(Array(value[32..<46]) == [
+            0x00, 0xF1, 0x53, 0x65,
+            0x00, 0x00,
+            0x01,
+            0x00, 0x00,
+            0x04,
+            0x15, 0x00,
+            0x03,
+            0x00,
+        ])
+        #expect(Array(value.dropFirst(46)) == [
+            0x01, 0x05, 0x00, 0x54, 0x69, 0x74, 0x6C, 0x65,
+            0x03, 0x04, 0x00, 0x42, 0x6F, 0x64, 0x79,
+            0x1E, 0x03, 0x00, 0x41, 0x70, 0x70,
+        ])
+    }
+
+    @Test
+    func timelineNotificationTrimsTextWithoutSplittingUTF8() throws {
+        let notification = PebbleTimelineNotification(
+            parentApplicationID: UUID(),
+            title: String(repeating: "石", count: 30),
+            body: "Body"
+        )
+
+        let value = try notification.encoded()
+        let titleLength = Int(value[47]) | Int(value[48]) << 8
+        let titleBytes = Array(value[49..<(49 + titleLength)])
+
+        #expect(titleLength == 63)
+        #expect(String(bytes: titleBytes, encoding: .utf8) != nil)
+    }
+
+    @Test
+    func mockClientRecordsTimelineNotifications() async throws {
+        let client = MockPebbleClient()
+        let notification = PebbleTimelineNotification(
+            parentApplicationID: UUID(),
+            title: "Title",
+            body: "Body"
+        )
+
+        try await client.sendNotification(notification)
+
+        #expect(client.sentNotifications == [notification])
+    }
 }
