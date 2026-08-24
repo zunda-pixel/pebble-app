@@ -134,6 +134,8 @@ private struct ApplicationsView: View {
             watchfaces: model.watchfaces,
             isLoading: model.isLoadingApplications,
             errorMessage: model.applicationLibraryErrorMessage,
+            installingApplicationName: model.installingApplicationName,
+            installationProgress: model.installationProgress,
             removeApplication: { applicationID in
                 Task { await model.removeApplication(id: applicationID) }
             },
@@ -185,6 +187,8 @@ private struct ApplicationsContent: View {
     var watchfaces: [PebbleApplication]
     var isLoading: Bool
     var errorMessage: String?
+    var installingApplicationName: String?
+    var installationProgress: PutBytesTransferProgress?
     var removeApplication: (UUID) -> Void
     var reorderApplications: (PebbleApplicationKind, IndexSet, Int) -> Void
 
@@ -203,6 +207,13 @@ private struct ApplicationsContent: View {
             )
         } else {
             List {
+                if let installingApplicationName,
+                   let installationProgress {
+                    InstallationProgressSection(
+                        applicationName: installingApplicationName,
+                        progress: installationProgress
+                    )
+                }
                 if let errorMessage {
                     Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.red)
@@ -228,6 +239,34 @@ private struct ApplicationsContent: View {
                     )
                 }
             }
+        }
+    }
+}
+
+private struct InstallationProgressSection: View {
+    var applicationName: String
+    var progress: PutBytesTransferProgress
+
+    var body: some View {
+        Section("Installing") {
+            VStack(alignment: .leading, spacing: 8) {
+                Label(applicationName, systemImage: "arrow.down.app")
+                    .font(.headline)
+                if progress.totalBytes > 0 {
+                    ProgressView(
+                        value: Double(progress.bytesSent),
+                        total: Double(progress.totalBytes)
+                    )
+                    Text("\(progress.bytesSent, format: .number) of \(progress.totalBytes, format: .number) bytes")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ProgressView()
+                        .accessibilityLabel("Preparing installation")
+                }
+            }
+            .padding(.vertical, 8)
+            .accessibilityElement(children: .combine)
         }
     }
 }

@@ -13,6 +13,7 @@ public final class AppModel {
     public private(set) var isImportingApplication = false
     public private(set) var applicationLibraryErrorMessage: String?
     public private(set) var installingApplicationID: UUID?
+    public private(set) var installingApplicationName: String?
     public private(set) var installationProgress: PutBytesTransferProgress?
 
     private let client: any PebbleClient
@@ -218,9 +219,13 @@ public final class AppModel {
         }
 
         installingApplicationID = request.applicationID
+        installingApplicationName = (watchApplications + watchfaces)
+            .first { $0.id == request.applicationID }?
+            .displayName
         installationProgress = PutBytesTransferProgress(bytesSent: 0, totalBytes: 0)
         defer {
             installingApplicationID = nil
+            installingApplicationName = nil
             installationProgress = nil
         }
 
