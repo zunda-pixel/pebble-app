@@ -56,6 +56,11 @@ public enum BlobDBClientError: Error, Equatable, Sendable {
     case rejected(BlobDBStatus)
 }
 
+public enum AppReorderClientError: Error, Equatable, Sendable {
+    case operationAlreadyInProgress
+    case rejected(AppReorderResult)
+}
+
 public extension PebbleConnectionError {
     var message: String {
         switch self {

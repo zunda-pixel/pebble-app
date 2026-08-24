@@ -57,6 +57,8 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var acceptedBlobDBStatuses: [BlobDBStatus] = []
     private var blobDBContinuation: CheckedContinuation<Void, any Error>?
     private var blobDBTimeoutTask: Task<Void, Never>?
+    private var appReorderContinuation: CheckedContinuation<Void, any Error>?
+    private var appReorderTimeoutTask: Task<Void, Never>?
 
     public override init() {
         super.init()
@@ -166,7 +168,22 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
               ppogSession != nil else {
             throw PebbleConnectionError.disconnected
         }
-        try sendFrame(AppReorderCodec.frame(applicationIDs: applicationIDs), to: peripheral)
+        guard appReorderContinuation == nil else {
+            throw AppReorderClientError.operationAlreadyInProgress
+        }
+        try await withCheckedThrowingContinuation { continuation in
+            appReorderContinuation = continuation
+            do {
+                try sendFrame(AppReorderCodec.frame(applicationIDs: applicationIDs), to: peripheral)
+                appReorderTimeoutTask = Task { [weak self] in
+                    try? await Task.sleep(for: .seconds(20))
+                    guard !Task.isCancelled else { return }
+                    self?.failAppReorder(PebbleConnectionError.connectionTimedOut)
+                }
+            } catch {
+                failAppReorder(error)
+            }
+        }
     }
 
     public func respondToAppFetch(with status: AppFetchResponseStatus) async throws {
@@ -342,6 +359,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         stopHealthChecks()
         failTransfer(error)
         failBlobDBOperation(error)
+        failAppReorder(error)
     }
 
     private func model(from advertisementData: [String: Any]) -> PebbleWatchModel? {
@@ -454,6 +472,11 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
 
         if frame.endpoint == AppFetchCodec.endpoint {
             eventContinuation?.yield(.appFetchRequested(try AppFetchCodec.decodeRequest(frame)))
+            return
+        }
+
+        if frame.endpoint == AppReorderCodec.endpoint, appReorderContinuation != nil {
+            processAppReorderResponse(frame)
             return
         }
 
@@ -573,6 +596,29 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
     }
 
+    private func processAppReorderResponse(_ frame: PebbleProtocolFrame) {
+        do {
+            let result = try AppReorderCodec.decodeResult(frame)
+            guard result == .success else {
+                failAppReorder(AppReorderClientError.rejected(result))
+                return
+            }
+            appReorderTimeoutTask?.cancel()
+            appReorderTimeoutTask = nil
+            appReorderContinuation?.resume()
+            appReorderContinuation = nil
+        } catch {
+            failAppReorder(error)
+        }
+    }
+
+    private func failAppReorder(_ error: any Error) {
+        appReorderTimeoutTask?.cancel()
+        appReorderTimeoutTask = nil
+        appReorderContinuation?.resume(throwing: error)
+        appReorderContinuation = nil
+    }
+
     private func failBlobDBOperation(_ error: any Error) {
         blobDBTimeoutTask?.cancel()
         blobDBTimeoutTask = nil
@@ -639,6 +685,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         stopHealthChecks()
         failTransfer(PebbleConnectionError.disconnected)
         failBlobDBOperation(PebbleConnectionError.disconnected)
+        failAppReorder(PebbleConnectionError.disconnected)
     }
 
     private func reconnect(to device: DiscoveredPebble, using peripheral: CBPeripheral) {

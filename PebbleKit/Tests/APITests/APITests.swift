@@ -203,6 +203,54 @@ struct APITests {
         #expect(try await reloaded.applications() == [first])
     }
 
+    @Test func applicationLibrarySnapshotRestoresMetadata() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let fileURL = directory.appending(path: "applications.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let library = PebbleApplicationLibrary(fileURL: fileURL)
+        let application = PebbleApplication(
+            id: try #require(UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF")),
+            shortName: "Original",
+            longName: "",
+            companyName: "Pebble",
+            versionCode: 1,
+            versionLabel: "1.0",
+            capabilities: [],
+            targetPlatforms: ["aplite"],
+            kind: .watchapp
+        )
+        _ = try await library.upsert(application)
+        let snapshot = try await library.snapshot(applicationID: application.id)
+        var updated = application
+        updated.shortName = "Updated"
+        updated.versionLabel = "2.0"
+        _ = try await library.upsert(updated)
+
+        let restored = try await library.restore(snapshot)
+
+        #expect(restored == [application])
+        #expect(try await library.applications() == [application])
+    }
+
+    @Test func applicationLibraryPersistsPerWatchSynchronizationState() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let fileURL = directory.appending(path: "applications.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let firstID = UUID()
+        let secondID = UUID()
+        let library = PebbleApplicationLibrary(fileURL: fileURL)
+
+        try await library.setSynchronizedApplicationIDs([firstID, secondID], deviceID: "watch-a")
+        try await library.setSynchronizedApplicationIDs([secondID], deviceID: "watch-b")
+        let reloaded = PebbleApplicationLibrary(fileURL: fileURL)
+
+        #expect(try await reloaded.synchronizedApplicationIDs(deviceID: "watch-a") == [firstID, secondID])
+        #expect(try await reloaded.synchronizedApplicationIDs(deviceID: "watch-b") == [secondID])
+        #expect(try await reloaded.synchronizedApplicationIDs(deviceID: "unknown") == [])
+    }
+
     @Test func pbwAppInfoDecodesWatchfaceMetadata() throws {
         let json = Data(#"""
         {

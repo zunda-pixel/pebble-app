@@ -1,4 +1,12 @@
 public import Foundation
+import MemberwiseInit
+
+@MemberwiseInit(.public)
+public struct PebbleApplicationLibrarySnapshot: Sendable {
+    public var applicationID: UUID
+    public var applications: [PebbleApplication]
+    public var packageData: Data?
+}
 
 public actor PebbleApplicationLibrary {
     private var fileURL: URL
@@ -37,6 +45,7 @@ public actor PebbleApplicationLibrary {
     @discardableResult
     public func importPackage(from sourceURL: URL) throws -> [PebbleApplication] {
         let application = try PBWPackageImporter.application(from: sourceURL)
+        let snapshot = try snapshot(applicationID: application.id)
         let packageURL = packageURL(applicationID: application.id)
         try FileManager.default.createDirectory(
             at: packageURL.deletingLastPathComponent(),
@@ -46,9 +55,37 @@ public actor PebbleApplicationLibrary {
         do {
             return try upsert(application)
         } catch {
-            try? FileManager.default.removeItem(at: packageURL)
+            try? restore(snapshot)
             throw error
         }
+    }
+
+    public func snapshot(applicationID: UUID) throws -> PebbleApplicationLibrarySnapshot {
+        let storedPackageURL = packageURL(applicationID: applicationID)
+        let packageData = FileManager.default.fileExists(atPath: storedPackageURL.path)
+            ? try Data(contentsOf: storedPackageURL)
+            : nil
+        return PebbleApplicationLibrarySnapshot(
+            applicationID: applicationID,
+            applications: try applications(),
+            packageData: packageData
+        )
+    }
+
+    @discardableResult
+    public func restore(_ snapshot: PebbleApplicationLibrarySnapshot) throws -> [PebbleApplication] {
+        let storedPackageURL = packageURL(applicationID: snapshot.applicationID)
+        if let packageData = snapshot.packageData {
+            try FileManager.default.createDirectory(
+                at: storedPackageURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try packageData.write(to: storedPackageURL, options: .atomic)
+        } else if FileManager.default.fileExists(atPath: storedPackageURL.path) {
+            try FileManager.default.removeItem(at: storedPackageURL)
+        }
+        try persist(snapshot.applications)
+        return snapshot.applications
     }
 
     public func storedPackageURL(applicationID: UUID) -> URL? {
@@ -79,6 +116,23 @@ public actor PebbleApplicationLibrary {
         return ordered
     }
 
+    public func synchronizedApplicationIDs(deviceID: String) throws -> [UUID] {
+        try synchronizationStates()[deviceID] ?? []
+    }
+
+    public func setSynchronizedApplicationIDs(_ applicationIDs: [UUID], deviceID: String) throws {
+        var states = try synchronizationStates()
+        states[deviceID] = applicationIDs
+        let url = synchronizationStateURL
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try encoder.encode(states).write(to: url, options: .atomic)
+    }
+
     private func persist(_ applications: [PebbleApplication]) throws {
         try FileManager.default.createDirectory(
             at: fileURL.deletingLastPathComponent(),
@@ -94,6 +148,21 @@ public actor PebbleApplicationLibrary {
         fileURL.deletingLastPathComponent()
             .appending(path: "Packages", directoryHint: .isDirectory)
             .appending(path: "\(applicationID.uuidString).pbw", directoryHint: .notDirectory)
+    }
+
+    private func synchronizationStates() throws -> [String: [UUID]] {
+        guard FileManager.default.fileExists(atPath: synchronizationStateURL.path) else {
+            return [:]
+        }
+        return try JSONDecoder().decode(
+            [String: [UUID]].self,
+            from: Data(contentsOf: synchronizationStateURL)
+        )
+    }
+
+    private var synchronizationStateURL: URL {
+        fileURL.deletingLastPathComponent()
+            .appending(path: "application-sync.json", directoryHint: .notDirectory)
     }
 
     private static var defaultFileURL: URL {

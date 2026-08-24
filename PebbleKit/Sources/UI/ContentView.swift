@@ -134,6 +134,8 @@ private struct ApplicationsView: View {
             watchfaces: model.watchfaces,
             isLoading: model.isLoadingApplications,
             errorMessage: model.applicationLibraryErrorMessage,
+            operationStatusMessage: model.applicationManagementStatusMessage,
+            isOperationInProgress: model.isApplicationManagementBusy,
             installingApplicationName: model.installingApplicationName,
             installationProgress: model.installationProgress,
             removeApplication: { applicationID in
@@ -161,6 +163,7 @@ private struct ApplicationsView: View {
                         isChoosingPackage = true
                     }
                     .accessibilityHint("Choose a PBW package from Files")
+                    .disabled(model.isApplicationManagementBusy)
                 }
             }
         }
@@ -187,6 +190,8 @@ private struct ApplicationsContent: View {
     var watchfaces: [PebbleApplication]
     var isLoading: Bool
     var errorMessage: String?
+    var operationStatusMessage: String?
+    var isOperationInProgress: Bool
     var installingApplicationName: String?
     var installationProgress: PutBytesTransferProgress?
     var removeApplication: (UUID) -> Void
@@ -207,6 +212,12 @@ private struct ApplicationsContent: View {
             )
         } else {
             List {
+                if let operationStatusMessage {
+                    Section {
+                        Label(operationStatusMessage, systemImage: "arrow.triangle.2.circlepath")
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 if let installingApplicationName,
                    let installationProgress {
                     InstallationProgressSection(
@@ -222,6 +233,7 @@ private struct ApplicationsContent: View {
                     ApplicationSection(
                         title: "Watch Apps",
                         applications: watchApplications,
+                        isOperationInProgress: isOperationInProgress,
                         removeApplication: removeApplication,
                         moveApplications: { offsets, destination in
                             reorderApplications(.watchapp, offsets, destination)
@@ -232,6 +244,7 @@ private struct ApplicationsContent: View {
                     ApplicationSection(
                         title: "Watchfaces",
                         applications: watchfaces,
+                        isOperationInProgress: isOperationInProgress,
                         removeApplication: removeApplication,
                         moveApplications: { offsets, destination in
                             reorderApplications(.watchface, offsets, destination)
@@ -274,6 +287,7 @@ private struct InstallationProgressSection: View {
 private struct ApplicationSection: View {
     var title: LocalizedStringKey
     var applications: [PebbleApplication]
+    var isOperationInProgress: Bool
     var removeApplication: (UUID) -> Void
     var moveApplications: (IndexSet, Int) -> Void
 
@@ -290,9 +304,11 @@ private struct ApplicationSection: View {
                     Button("Remove", role: .destructive) {
                         removeApplication(application.id)
                     }
+                    .disabled(isOperationInProgress)
                 }
             }
             .onMove(perform: moveApplications)
+            .moveDisabled(isOperationInProgress)
         }
     }
 }
