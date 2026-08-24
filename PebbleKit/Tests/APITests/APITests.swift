@@ -5,6 +5,36 @@ import Testing
 @Suite
 @MainActor
 struct APITests {
+    @Test func putBytesAppInitializationUsesAppBitAndBigEndianValues() {
+        let frame = PutBytesCodec.appInitializationFrame(
+            objectSize: 1_000,
+            objectType: .appExecutable,
+            appBankID: 0x12345678
+        )
+
+        #expect(frame == PebbleProtocolFrame(endpoint: 0xBEEF, payload: [
+            0x01,
+            0x00, 0x00, 0x03, 0xE8,
+            0x85,
+            0x12, 0x34, 0x56, 0x78,
+        ]))
+    }
+
+    @Test func putBytesDataAndResponseUseOfficialWireFormat() throws {
+        let put = try PutBytesCodec.putFrame(cookie: 0x12345678, bytes: [0xAA, 0xBB])
+        #expect(put.payload == [
+            0x02,
+            0x12, 0x34, 0x56, 0x78,
+            0x00, 0x00, 0x00, 0x02,
+            0xAA, 0xBB,
+        ])
+
+        let response = try PutBytesCodec.decodeResponse(
+            PebbleProtocolFrame(endpoint: 0xBEEF, payload: [0x01, 0xCA, 0xFE, 0xBA, 0xBE])
+        )
+        #expect(response == PutBytesResponse(result: .acknowledgement, cookie: 0xCAFEBABE))
+    }
+
     @Test func appFetchRequestDecodesUUIDAndLittleEndianBankID() throws {
         let frame = PebbleProtocolFrame(endpoint: 6_001, payload: [
             0x01,
