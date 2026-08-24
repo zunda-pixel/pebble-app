@@ -226,6 +226,11 @@ private struct ConnectedDeviceRow: View {
                     Label("\(batteryLevel)%", systemImage: "battery.75percent")
                         .foregroundStyle(.secondary)
                 }
+                if let serialNumber = device.serialNumber {
+                    Text(serialNumber)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         } label: {
             Label {

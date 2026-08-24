@@ -98,16 +98,10 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
 
     public func send(_ frame: PebbleProtocolFrame) async throws {
         guard let peripheral = connectedPeripheral,
-              var session = ppogSession else {
+              ppogSession != nil else {
             throw PebbleConnectionError.disconnected
         }
-
-        let bytes = try frame.encoded()
-        let maximumPacketSize = peripheral.maximumWriteValueLength(for: .withoutResponse)
-        let actions = try session.enqueue(bytes, maximumPacketSize: maximumPacketSize)
-        ppogSession = session
-        try handle(actions, peripheral: peripheral)
-        updateAcknowledgementTimeout(for: peripheral)
+        try sendFrame(frame, to: peripheral)
     }
 
     public func frames() -> AsyncStream<PebbleProtocolFrame> {
@@ -155,7 +149,10 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         scanContinuation = nil
     }
 
-    private func finishConnection(peripheral: CBPeripheral) {
+    private func finishConnection(
+        peripheral: CBPeripheral,
+        information: WatchVersionInformation
+    ) {
         guard let device = pendingDevice else {
             failConnection(.protocolNegotiationFailed)
             return
@@ -167,9 +164,10 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             returning: PebbleDevice(
                 id: peripheral.identifier.uuidString,
                 name: device.name,
-                model: device.model,
-                firmwareVersion: nil,
-                batteryLevel: nil
+                model: PebbleWatchModel(hardwarePlatform: information.hardwarePlatform) ?? device.model,
+                firmwareVersion: information.firmwareVersion,
+                batteryLevel: nil,
+                serialNumber: information.serialNumber
             )
         )
         connectionContinuation = nil
@@ -217,16 +215,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     }
 
     private func model(fromHardwarePlatform value: UInt8) -> PebbleWatchModel? {
-        switch value {
-        case 15:
-            .pebble2Duo
-        case 13, 16, 17, 18, 243, 244, 247, 249:
-            .pebbleTime2
-        case 19, 20, 21:
-            .pebbleRound2
-        default:
-            nil
-        }
+        PebbleWatchModel(hardwarePlatform: value)
     }
 
     private func model(fromName name: String?) -> PebbleWatchModel? {
@@ -273,11 +262,43 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
                 try write(packet, to: peripheral)
             case .deliver(let bytes):
                 let frames = try frameDecoder.append(bytes)
-                frames.forEach { frameContinuation?.yield($0) }
+                for frame in frames {
+                    try process(frame, peripheral: peripheral)
+                    frameContinuation?.yield(frame)
+                }
             case .resetRequired:
                 throw PebbleConnectionError.protocolNegotiationFailed
             }
         }
+    }
+
+    private func sendFrame(
+        _ frame: PebbleProtocolFrame,
+        to peripheral: CBPeripheral
+    ) throws {
+        guard var session = ppogSession else {
+            throw PebbleConnectionError.disconnected
+        }
+
+        let bytes = try frame.encoded()
+        let maximumPacketSize = peripheral.maximumWriteValueLength(for: .withoutResponse)
+        let actions = try session.enqueue(bytes, maximumPacketSize: maximumPacketSize)
+        ppogSession = session
+        try handle(actions, peripheral: peripheral)
+        updateAcknowledgementTimeout(for: peripheral)
+    }
+
+    private func process(
+        _ frame: PebbleProtocolFrame,
+        peripheral: CBPeripheral
+    ) throws {
+        guard frame.endpoint == WatchVersionCodec.endpoint,
+              pendingDevice != nil else {
+            return
+        }
+
+        let information = try WatchVersionCodec.decode(frame)
+        finishConnection(peripheral: peripheral, information: information)
     }
 
     private func updateAcknowledgementTimeout(for peripheral: CBPeripheral) {
@@ -486,7 +507,8 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
                     receiveWindow: min(Int(transmitWindow), 25),
                     transmitWindow: min(Int(receiveWindow), 25)
                 )
-                finishConnection(peripheral: peripheral)
+                connectedPeripheral = peripheral
+                try sendFrame(WatchVersionCodec.requestFrame(), to: peripheral)
             case .data, .acknowledgement:
                 guard var session = ppogSession else {
                     return

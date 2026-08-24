@@ -35,7 +35,8 @@ public final class MockPebbleClient: PebbleClient {
             name: device.name,
             model: device.model,
             firmwareVersion: "v5.0.0-mock",
-            batteryLevel: 84
+            batteryLevel: 84,
+            serialNumber: "MOCK00000001"
         )
     }
 

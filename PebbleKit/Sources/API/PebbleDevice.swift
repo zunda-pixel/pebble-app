@@ -32,4 +32,5 @@ public struct PebbleDevice: Identifiable, Hashable, Sendable {
     public var model: PebbleWatchModel
     public var firmwareVersion: String?
     public var batteryLevel: Int?
+    public var serialNumber: String? = nil
 }

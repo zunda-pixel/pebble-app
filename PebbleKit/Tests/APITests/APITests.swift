@@ -111,4 +111,29 @@ struct APITests {
 
         #expect(frames == [first, second])
     }
+
+    @Test
+    func watchVersionRequestUsesVersionEndpoint() {
+        #expect(WatchVersionCodec.requestFrame() == PebbleProtocolFrame(
+            endpoint: 16,
+            payload: [0x00]
+        ))
+    }
+
+    @Test
+    func watchVersionResponseDecodesRunningFirmwareAndSerial() throws {
+        var payload = [UInt8](repeating: 0, count: 120)
+        payload[0] = 0x01
+        payload.replaceSubrange(5..<11, with: Array("v5.1.0".utf8))
+        payload[46] = 15
+        payload.replaceSubrange(108..<120, with: Array("FLINT1234567".utf8))
+
+        let information = try WatchVersionCodec.decode(
+            PebbleProtocolFrame(endpoint: 16, payload: payload)
+        )
+
+        #expect(information.firmwareVersion == "v5.1.0")
+        #expect(information.serialNumber == "FLINT1234567")
+        #expect(PebbleWatchModel(hardwarePlatform: information.hardwarePlatform) == .pebble2Duo)
+    }
 }
