@@ -1,3 +1,5 @@
+public import Foundation
+
 @MainActor
 public final class MockPebbleClient: PebbleClient {
     public init() {}
@@ -59,4 +61,6 @@ public final class MockPebbleClient: PebbleClient {
     }
 
     public func synchronizeTime() async throws {}
+
+    public func reorderApplications(_ applicationIDs: [UUID]) async throws {}
 }

@@ -1,3 +1,5 @@
+public import Foundation
+
 public enum PebbleConnectionState: Equatable, Sendable {
     case idle
     case scanning
@@ -36,6 +38,7 @@ public protocol PebbleClient: Sendable {
     func frames() -> AsyncStream<PebbleProtocolFrame>
     func events() -> AsyncStream<PebbleClientEvent>
     func synchronizeTime() async throws
+    func reorderApplications(_ applicationIDs: [UUID]) async throws
 }
 
 public extension PebbleConnectionError {

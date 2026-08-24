@@ -153,6 +153,14 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         try sendFrame(TimeSynchronizationCodec.frame(), to: peripheral)
     }
 
+    public func reorderApplications(_ applicationIDs: [UUID]) async throws {
+        guard let peripheral = connectedPeripheral,
+              ppogSession != nil else {
+            throw PebbleConnectionError.disconnected
+        }
+        try sendFrame(AppReorderCodec.frame(applicationIDs: applicationIDs), to: peripheral)
+    }
+
     private func waitForBluetooth() async throws {
         switch centralManager.state {
         case .poweredOn:
