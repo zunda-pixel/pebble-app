@@ -110,11 +110,7 @@ private struct SectionContent: View {
         case .devices:
             DevicesView(model: model)
         case .apps:
-            PlaceholderView(
-                title: "Apps",
-                description: "Watch app and watchface management will be added after device connectivity.",
-                systemImage: "square.grid.2x2"
-            )
+            ApplicationsView(model: model)
         case .health:
             PlaceholderView(
                 title: "Health",
@@ -124,6 +120,139 @@ private struct SectionContent: View {
         case .settings:
             SettingsView()
         }
+    }
+}
+
+private struct ApplicationsView: View {
+    var model: AppModel
+
+    var body: some View {
+        ApplicationsContent(
+            watchApplications: model.watchApplications,
+            watchfaces: model.watchfaces,
+            isLoading: model.isLoadingApplications,
+            errorMessage: model.applicationLibraryErrorMessage,
+            removeApplication: { applicationID in
+                Task { await model.removeApplication(id: applicationID) }
+            }
+        )
+        .navigationTitle("Apps")
+        .task { await model.loadApplications() }
+    }
+}
+
+private struct ApplicationsContent: View {
+    var watchApplications: [PebbleApplication]
+    var watchfaces: [PebbleApplication]
+    var isLoading: Bool
+    var errorMessage: String?
+    var removeApplication: (UUID) -> Void
+
+    var body: some View {
+        if isLoading && watchApplications.isEmpty && watchfaces.isEmpty {
+            List(0..<3, id: \.self) { _ in
+                ApplicationPlaceholderRow()
+            }
+            .redacted(reason: .placeholder)
+            .accessibilityLabel("Loading applications")
+        } else if watchApplications.isEmpty && watchfaces.isEmpty {
+            ContentUnavailableView(
+                "No Apps",
+                systemImage: "square.grid.2x2",
+                description: Text("Imported watch apps and watchfaces will appear here.")
+            )
+        } else {
+            List {
+                if let errorMessage {
+                    Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                }
+                if !watchApplications.isEmpty {
+                    ApplicationSection(
+                        title: "Watch Apps",
+                        applications: watchApplications,
+                        removeApplication: removeApplication
+                    )
+                }
+                if !watchfaces.isEmpty {
+                    ApplicationSection(
+                        title: "Watchfaces",
+                        applications: watchfaces,
+                        removeApplication: removeApplication
+                    )
+                }
+            }
+        }
+    }
+}
+
+private struct ApplicationSection: View {
+    var title: LocalizedStringKey
+    var applications: [PebbleApplication]
+    var removeApplication: (UUID) -> Void
+
+    var body: some View {
+        Section(title) {
+            ForEach(applications) { application in
+                ApplicationRow(
+                    name: application.displayName,
+                    companyName: application.companyName,
+                    versionLabel: application.versionLabel,
+                    kind: application.kind
+                )
+                .swipeActions {
+                    Button("Remove", role: .destructive) {
+                        removeApplication(application.id)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct ApplicationRow: View {
+    var name: String
+    var companyName: String
+    var versionLabel: String
+    var kind: PebbleApplicationKind
+
+    var body: some View {
+        HStack(spacing: 16) {
+            Image(systemName: kind == .watchface ? "clock" : "square.grid.2x2")
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(.tint)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(name)
+                    .font(.headline)
+                if !companyName.isEmpty {
+                    Text(companyName)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            Text(versionLabel)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(minHeight: 44)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct ApplicationPlaceholderRow: View {
+    var body: some View {
+        HStack(spacing: 16) {
+            Image(systemName: "square.grid.2x2")
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Application Name")
+                    .font(.headline)
+                Text("Developer")
+                    .font(.subheadline)
+            }
+        }
+        .frame(minHeight: 44)
     }
 }
 

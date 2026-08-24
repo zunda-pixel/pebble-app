@@ -1,4 +1,5 @@
 public import API
+public import Foundation
 import Observation
 
 @MainActor
@@ -6,12 +7,22 @@ import Observation
 public final class AppModel {
     public private(set) var connectionState: PebbleConnectionState = .idle
     public private(set) var discoveredDevices: [DiscoveredPebble] = []
+    public private(set) var watchApplications: [PebbleApplication] = []
+    public private(set) var watchfaces: [PebbleApplication] = []
+    public private(set) var isLoadingApplications = false
+    public private(set) var applicationLibraryErrorMessage: String?
 
     private let client: any PebbleClient
+    private let applicationLibrary: PebbleApplicationLibrary
     @ObservationIgnored private var connectionEventsTask: Task<Void, Never>?
+    @ObservationIgnored private var hasLoadedApplications = false
 
-    public init(client: any PebbleClient) {
+    public init(
+        client: any PebbleClient,
+        applicationLibrary: PebbleApplicationLibrary = PebbleApplicationLibrary()
+    ) {
         self.client = client
+        self.applicationLibrary = applicationLibrary
     }
 
     public var connectedDevice: PebbleDevice? {
@@ -57,6 +68,35 @@ public final class AppModel {
         connectionEventsTask?.cancel()
         connectionEventsTask = nil
         connectionState = .idle
+    }
+
+    public func loadApplications() async {
+        guard !hasLoadedApplications else {
+            return
+        }
+        hasLoadedApplications = true
+        isLoadingApplications = true
+        defer { isLoadingApplications = false }
+        do {
+            updateApplications(try await applicationLibrary.applications())
+            applicationLibraryErrorMessage = nil
+        } catch {
+            applicationLibraryErrorMessage = error.localizedDescription
+        }
+    }
+
+    public func removeApplication(id: UUID) async {
+        do {
+            updateApplications(try await applicationLibrary.remove(applicationID: id))
+            applicationLibraryErrorMessage = nil
+        } catch {
+            applicationLibraryErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func updateApplications(_ applications: [PebbleApplication]) {
+        watchApplications = applications.filter { $0.kind == .watchapp }
+        watchfaces = applications.filter { $0.kind == .watchface }
     }
 
     private func observeConnectionEvents() {
