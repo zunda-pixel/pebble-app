@@ -18,6 +18,13 @@ public struct PBWPackage: Equatable, Sendable {
 public enum PBWPackageImporter {
     private static var maximumEntrySize: UInt64 { 32 * 1_024 * 1_024 }
 
+    public static func application(from url: URL) throws -> PebbleApplication {
+        let archive = try Archive(url: url, accessMode: .read)
+        return try PBWApplicationDecoder.decodeAppInfo(
+            from: data(for: "appinfo.json", in: archive)
+        )
+    }
+
     public static func load(from url: URL, for model: PebbleWatchModel) throws -> PBWPackage {
         let archive = try Archive(url: url, accessMode: .read)
         let appInfoData = try data(for: "appinfo.json", in: archive)

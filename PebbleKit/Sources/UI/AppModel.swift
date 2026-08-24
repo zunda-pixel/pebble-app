@@ -10,6 +10,7 @@ public final class AppModel {
     public private(set) var watchApplications: [PebbleApplication] = []
     public private(set) var watchfaces: [PebbleApplication] = []
     public private(set) var isLoadingApplications = false
+    public private(set) var isImportingApplication = false
     public private(set) var applicationLibraryErrorMessage: String?
 
     private let client: any PebbleClient
@@ -88,6 +89,24 @@ public final class AppModel {
     public func removeApplication(id: UUID) async {
         do {
             updateApplications(try await applicationLibrary.remove(applicationID: id))
+            applicationLibraryErrorMessage = nil
+        } catch {
+            applicationLibraryErrorMessage = error.localizedDescription
+        }
+    }
+
+    public func importApplication(from url: URL) async {
+        isImportingApplication = true
+        defer { isImportingApplication = false }
+        let accessedSecurityScopedResource = url.startAccessingSecurityScopedResource()
+        defer {
+            if accessedSecurityScopedResource {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+        do {
+            updateApplications(try await applicationLibrary.importPackage(from: url))
+            hasLoadedApplications = true
             applicationLibraryErrorMessage = nil
         } catch {
             applicationLibraryErrorMessage = error.localizedDescription

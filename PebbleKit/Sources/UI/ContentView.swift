@@ -1,5 +1,6 @@
 public import SwiftUI
 public import API
+import UniformTypeIdentifiers
 
 public struct ContentView: View {
     @State private var model: AppModel
@@ -125,6 +126,7 @@ private struct SectionContent: View {
 
 private struct ApplicationsView: View {
     var model: AppModel
+    @State private var isChoosingPackage = false
 
     var body: some View {
         ApplicationsContent(
@@ -147,6 +149,34 @@ private struct ApplicationsView: View {
         )
         .navigationTitle("Apps")
         .task { await model.loadApplications() }
+        .toolbar {
+            ToolbarItem {
+                if model.isImportingApplication {
+                    ProgressView()
+                        .accessibilityLabel("Importing Pebble application")
+                } else {
+                    Button("Import", systemImage: "square.and.arrow.down") {
+                        isChoosingPackage = true
+                    }
+                    .accessibilityHint("Choose a PBW package from Files")
+                }
+            }
+        }
+        .fileImporter(
+            isPresented: $isChoosingPackage,
+            allowedContentTypes: [.pebblePackage]
+        ) { result in
+            guard case .success(let url) = result else {
+                return
+            }
+            Task { await model.importApplication(from: url) }
+        }
+    }
+}
+
+private extension UTType {
+    static var pebblePackage: UTType {
+        UTType(filenameExtension: "pbw") ?? .data
     }
 }
 

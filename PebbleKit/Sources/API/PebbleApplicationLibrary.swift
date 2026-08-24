@@ -35,10 +35,36 @@ public actor PebbleApplicationLibrary {
     }
 
     @discardableResult
+    public func importPackage(from sourceURL: URL) throws -> [PebbleApplication] {
+        let application = try PBWPackageImporter.application(from: sourceURL)
+        let packageURL = packageURL(applicationID: application.id)
+        try FileManager.default.createDirectory(
+            at: packageURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data(contentsOf: sourceURL).write(to: packageURL, options: .atomic)
+        do {
+            return try upsert(application)
+        } catch {
+            try? FileManager.default.removeItem(at: packageURL)
+            throw error
+        }
+    }
+
+    public func storedPackageURL(applicationID: UUID) -> URL? {
+        let url = packageURL(applicationID: applicationID)
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
+
+    @discardableResult
     public func remove(applicationID: UUID) throws -> [PebbleApplication] {
         var current = try applications()
         current.removeAll { $0.id == applicationID }
         try persist(current)
+        let storedPackageURL = packageURL(applicationID: applicationID)
+        if FileManager.default.fileExists(atPath: storedPackageURL.path) {
+            try? FileManager.default.removeItem(at: storedPackageURL)
+        }
         return current
     }
 
@@ -62,6 +88,12 @@ public actor PebbleApplicationLibrary {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try encoder.encode(applications).write(to: fileURL, options: .atomic)
         cachedApplications = applications
+    }
+
+    private func packageURL(applicationID: UUID) -> URL {
+        fileURL.deletingLastPathComponent()
+            .appending(path: "Packages", directoryHint: .isDirectory)
+            .appending(path: "\(applicationID.uuidString).pbw", directoryHint: .notDirectory)
     }
 
     private static var defaultFileURL: URL {
