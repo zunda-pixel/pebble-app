@@ -8,6 +8,7 @@ public final class AppModel {
     public private(set) var discoveredDevices: [DiscoveredPebble] = []
 
     private let client: any PebbleClient
+    @ObservationIgnored private var connectionEventsTask: Task<Void, Never>?
 
     public init(client: any PebbleClient) {
         self.client = client
@@ -39,6 +40,7 @@ public final class AppModel {
         do {
             let connectedDevice = try await client.connect(to: device)
             connectionState = .connected(connectedDevice)
+            observeConnectionEvents()
         } catch let error as PebbleConnectionError {
             connectionState = .failed(error)
         } catch {
@@ -52,6 +54,26 @@ public final class AppModel {
         }
 
         await client.disconnect(from: device)
+        connectionEventsTask?.cancel()
+        connectionEventsTask = nil
         connectionState = .idle
+    }
+
+    private func observeConnectionEvents() {
+        connectionEventsTask?.cancel()
+        connectionEventsTask = Task { [weak self, client] in
+            for await event in client.events() {
+                guard !Task.isCancelled else {
+                    return
+                }
+                switch event {
+                case .deviceUpdated(let device):
+                    self?.connectionState = .connected(device)
+                case .disconnected(let error):
+                    self?.connectionState = .failed(error)
+                    return
+                }
+            }
+        }
     }
 }

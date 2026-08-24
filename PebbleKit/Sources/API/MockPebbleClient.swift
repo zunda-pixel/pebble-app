@@ -51,4 +51,10 @@ public final class MockPebbleClient: PebbleClient {
             continuation.finish()
         }
     }
+
+    public func events() -> AsyncStream<PebbleClientEvent> {
+        AsyncStream { continuation in
+            continuation.finish()
+        }
+    }
 }

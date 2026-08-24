@@ -136,4 +136,12 @@ struct APITests {
         #expect(information.serialNumber == "FLINT1234567")
         #expect(PebbleWatchModel(hardwarePlatform: information.hardwarePlatform) == .pebble2Duo)
     }
+
+    @Test
+    func batteryLevelCodecAcceptsBluetoothPercentage() {
+        #expect(BatteryLevelCodec.decode([84]) == 84)
+        #expect(BatteryLevelCodec.decode([100]) == 100)
+        #expect(BatteryLevelCodec.decode([]) == nil)
+        #expect(BatteryLevelCodec.decode([101]) == nil)
+    }
 }

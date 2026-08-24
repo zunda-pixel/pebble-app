@@ -8,6 +8,11 @@ public enum PebbleConnectionState: Equatable, Sendable {
     case failed(PebbleConnectionError)
 }
 
+public enum PebbleClientEvent: Equatable, Sendable {
+    case deviceUpdated(PebbleDevice)
+    case disconnected(PebbleConnectionError)
+}
+
 public enum PebbleConnectionError: Error, Equatable, Sendable {
     case bluetoothUnavailable
     case bluetoothUnsupported
@@ -28,6 +33,7 @@ public protocol PebbleClient: Sendable {
     func disconnect(from device: PebbleDevice) async
     func send(_ frame: PebbleProtocolFrame) async throws
     func frames() -> AsyncStream<PebbleProtocolFrame>
+    func events() -> AsyncStream<PebbleClientEvent>
 }
 
 public extension PebbleConnectionError {

@@ -6,6 +6,8 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private static var ppogService = CBUUID(string: "40000000-328E-0FBB-C642-1AA6699BDADA")
     private static var ppogNotifyCharacteristic = CBUUID(string: "40000001-328E-0FBB-C642-1AA6699BDADA")
     private static var ppogWriteCharacteristic = CBUUID(string: "40000003-328E-0FBB-C642-1AA6699BDADA")
+    private static var batteryService = CBUUID(string: "180F")
+    private static var batteryLevelCharacteristic = CBUUID(string: "2A19")
     private static var vendorIdentifiers: Set<UInt16> = [0x0154, 0x0EEA]
 
     private var centralManager: CBCentralManager!
@@ -16,11 +18,16 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var connectionContinuation: CheckedContinuation<PebbleDevice, any Error>?
     private var pendingDevice: DiscoveredPebble?
     private var activeWriteCharacteristic: CBCharacteristic?
+    private var activeBatteryCharacteristic: CBCharacteristic?
     private var connectedPeripheral: CBPeripheral?
+    private var connectedDevice: PebbleDevice?
+    private var latestBatteryLevel: Int?
     private var ppogSession: PPoGSession?
     private var frameDecoder = PebbleProtocolFrameDecoder()
     private var frameContinuation: AsyncStream<PebbleProtocolFrame>.Continuation?
+    private var eventContinuation: AsyncStream<PebbleClientEvent>.Continuation?
     private var pendingGattWrites: [Data] = []
+    private var intentionalDisconnectIdentifiers: Set<String> = []
     private var scanTimeoutTask: Task<Void, Never>?
     private var connectionTimeoutTask: Task<Void, Never>?
     private var acknowledgementTimeoutTask: Task<Void, Never>?
@@ -93,6 +100,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         guard let peripheral = discoveredPeripherals[device.id] else {
             return
         }
+        intentionalDisconnectIdentifiers.insert(device.id)
         centralManager.cancelPeripheralConnection(peripheral)
     }
 
@@ -107,6 +115,12 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     public func frames() -> AsyncStream<PebbleProtocolFrame> {
         AsyncStream { continuation in
             frameContinuation = continuation
+        }
+    }
+
+    public func events() -> AsyncStream<PebbleClientEvent> {
+        AsyncStream { continuation in
+            eventContinuation = continuation
         }
     }
 
@@ -160,16 +174,16 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
 
         connectionTimeoutTask?.cancel()
         connectionTimeoutTask = nil
-        connectionContinuation?.resume(
-            returning: PebbleDevice(
-                id: peripheral.identifier.uuidString,
-                name: device.name,
-                model: PebbleWatchModel(hardwarePlatform: information.hardwarePlatform) ?? device.model,
-                firmwareVersion: information.firmwareVersion,
-                batteryLevel: nil,
-                serialNumber: information.serialNumber
-            )
+        let connectedDevice = PebbleDevice(
+            id: peripheral.identifier.uuidString,
+            name: device.name,
+            model: PebbleWatchModel(hardwarePlatform: information.hardwarePlatform) ?? device.model,
+            firmwareVersion: information.firmwareVersion,
+            batteryLevel: latestBatteryLevel,
+            serialNumber: information.serialNumber
         )
+        self.connectedDevice = connectedDevice
+        connectionContinuation?.resume(returning: connectedDevice)
         connectionContinuation = nil
         pendingDevice = nil
         connectedPeripheral = peripheral
@@ -182,7 +196,10 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         connectionContinuation = nil
         pendingDevice = nil
         activeWriteCharacteristic = nil
+        activeBatteryCharacteristic = nil
         connectedPeripheral = nil
+        connectedDevice = nil
+        latestBatteryLevel = nil
         ppogSession = nil
         pendingGattWrites.removeAll()
         acknowledgementTimeoutTask?.cancel()
@@ -301,6 +318,20 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         finishConnection(peripheral: peripheral, information: information)
     }
 
+    private func updateBatteryLevel(from bytes: [UInt8]) {
+        guard let batteryLevel = BatteryLevelCodec.decode(bytes) else {
+            return
+        }
+
+        latestBatteryLevel = batteryLevel
+        guard var device = connectedDevice else {
+            return
+        }
+        device.batteryLevel = batteryLevel
+        connectedDevice = device
+        eventContinuation?.yield(.deviceUpdated(device))
+    }
+
     private func updateAcknowledgementTimeout(for peripheral: CBPeripheral) {
         acknowledgementTimeoutTask?.cancel()
         acknowledgementTimeoutTask = nil
@@ -384,7 +415,7 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
     }
 
     public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        peripheral.discoverServices([Self.ppogService])
+        peripheral.discoverServices([Self.ppogService, Self.batteryService])
     }
 
     public func centralManager(
@@ -402,15 +433,24 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
         isReconnecting: Bool,
         error: (any Error)?
     ) {
+        let identifier = peripheral.identifier.uuidString
+        let wasConnected = connectedDevice != nil
+        let wasIntentional = intentionalDisconnectIdentifiers.remove(identifier) != nil
         if pendingDevice?.id == peripheral.identifier.uuidString {
             failConnection(.disconnected)
         }
         activeWriteCharacteristic = nil
+        activeBatteryCharacteristic = nil
         connectedPeripheral = nil
+        connectedDevice = nil
+        latestBatteryLevel = nil
         ppogSession = nil
         pendingGattWrites.removeAll()
         acknowledgementTimeoutTask?.cancel()
         acknowledgementTimeoutTask = nil
+        if wasConnected && !wasIntentional {
+            eventContinuation?.yield(.disconnected(.disconnected))
+        }
     }
 
     public func centralManager(
@@ -437,6 +477,13 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
             [Self.ppogNotifyCharacteristic, Self.ppogWriteCharacteristic],
             for: service
         )
+
+        if let batteryService = peripheral.services?.first(where: { $0.uuid == Self.batteryService }) {
+            peripheral.discoverCharacteristics(
+                [Self.batteryLevelCharacteristic],
+                for: batteryService
+            )
+        }
     }
 
     public func peripheral(
@@ -444,6 +491,23 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
         didDiscoverCharacteristicsFor service: CBService,
         error: (any Error)?
     ) {
+        if service.uuid == Self.batteryService {
+            guard error == nil,
+                  let characteristic = service.characteristics?.first(where: {
+                      $0.uuid == Self.batteryLevelCharacteristic
+                  }) else {
+                return
+            }
+
+            activeBatteryCharacteristic = characteristic
+            peripheral.readValue(for: characteristic)
+            if characteristic.properties.contains(.notify)
+                || characteristic.properties.contains(.indicate) {
+                peripheral.setNotifyValue(true, for: characteristic)
+            }
+            return
+        }
+
         guard error == nil,
               let characteristics = service.characteristics,
               let notifyCharacteristic = characteristics.first(where: { $0.uuid == Self.ppogNotifyCharacteristic }),
@@ -461,6 +525,10 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
         didUpdateNotificationStateFor characteristic: CBCharacteristic,
         error: (any Error)?
     ) {
+        if characteristic.uuid == Self.batteryLevelCharacteristic {
+            return
+        }
+
         guard characteristic.uuid == Self.ppogNotifyCharacteristic,
               error == nil,
               characteristic.isNotifying else {
@@ -480,6 +548,14 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
         didUpdateValueFor characteristic: CBCharacteristic,
         error: (any Error)?
     ) {
+        if characteristic.uuid == Self.batteryLevelCharacteristic {
+            guard error == nil, let value = characteristic.value else {
+                return
+            }
+            updateBatteryLevel(from: [UInt8](value))
+            return
+        }
+
         guard characteristic.uuid == Self.ppogNotifyCharacteristic,
               error == nil,
               let value = characteristic.value else {
