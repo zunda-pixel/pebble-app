@@ -5,6 +5,23 @@ import Testing
 @Suite
 @MainActor
 struct APITests {
+    @Test func appFetchRequestDecodesUUIDAndLittleEndianBankID() throws {
+        let frame = PebbleProtocolFrame(endpoint: 6_001, payload: [
+            0x01,
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+            0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF,
+            0x78, 0x56, 0x34, 0x12,
+        ])
+        let request = try AppFetchCodec.decodeRequest(frame)
+        #expect(request.applicationID.uuidString == "00112233-4455-6677-8899-AABBCCDDEEFF")
+        #expect(request.appBankID == 0x12345678)
+    }
+
+    @Test func appFetchBusyResponseUsesOfficialWireFormat() {
+        let frame = AppFetchCodec.responseFrame(status: .busy)
+        #expect(frame == PebbleProtocolFrame(endpoint: 6_001, payload: [0x01, 0x02]))
+    }
+
     @Test func appReorderRequestUsesOfficialWireFormat() throws {
         let first = try #require(UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF"))
         let second = try #require(UUID(uuidString: "10213243-5465-7687-98A9-BACBDCEDFE0F"))

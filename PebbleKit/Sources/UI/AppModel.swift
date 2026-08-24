@@ -69,6 +69,8 @@ public final class AppModel {
                 switch event {
                 case .deviceUpdated(let device):
                     self?.connectionState = .connected(device)
+                case .appFetchRequested:
+                    try? await client.respondToAppFetch(with: .noData)
                 case .reconnecting(let deviceID):
                     self?.connectionState = .reconnecting(deviceID: deviceID)
                 case .disconnected(let error):

@@ -63,4 +63,6 @@ public final class MockPebbleClient: PebbleClient {
     public func synchronizeTime() async throws {}
 
     public func reorderApplications(_ applicationIDs: [UUID]) async throws {}
+
+    public func respondToAppFetch(with status: AppFetchResponseStatus) async throws {}
 }

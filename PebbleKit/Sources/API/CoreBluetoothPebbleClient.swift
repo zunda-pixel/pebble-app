@@ -161,6 +161,14 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         try sendFrame(AppReorderCodec.frame(applicationIDs: applicationIDs), to: peripheral)
     }
 
+    public func respondToAppFetch(with status: AppFetchResponseStatus) async throws {
+        guard let peripheral = connectedPeripheral,
+              ppogSession != nil else {
+            throw PebbleConnectionError.disconnected
+        }
+        try sendFrame(AppFetchCodec.responseFrame(status: status), to: peripheral)
+    }
+
     private func waitForBluetooth() async throws {
         switch centralManager.state {
         case .poweredOn:
@@ -356,6 +364,11 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     ) throws {
         if frame.endpoint == PingPongCodec.endpoint {
             try processPingPong(frame, peripheral: peripheral)
+            return
+        }
+
+        if frame.endpoint == AppFetchCodec.endpoint {
+            eventContinuation?.yield(.appFetchRequested(try AppFetchCodec.decodeRequest(frame)))
             return
         }
 
