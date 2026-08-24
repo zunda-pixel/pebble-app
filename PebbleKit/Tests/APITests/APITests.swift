@@ -5,6 +5,45 @@ import Testing
 @Suite
 @MainActor
 struct APITests {
+    @Test func pbwAppInfoDecodesWatchfaceMetadata() throws {
+        let json = Data(#"""
+        {
+          "uuid": "00112233-4455-6677-8899-aabbccddeeff",
+          "shortName": "Orbit",
+          "longName": "Orbit Face",
+          "companyName": "Pebble",
+          "versionCode": 3.5,
+          "versionLabel": "3.5",
+          "capabilities": ["configurable"],
+          "targetPlatforms": ["emery", "basalt"],
+          "watchapp": { "watchface": true }
+        }
+        """#.utf8)
+
+        let application = try PBWApplicationDecoder.decodeAppInfo(from: json)
+
+        #expect(application.displayName == "Orbit Face")
+        #expect(application.kind == .watchface)
+        #expect(application.bestVariant(for: .pebbleTime2) == "emery")
+        #expect(application.bestVariant(for: .pebble2Duo) == nil)
+    }
+
+    @Test func legacyPBWDefaultsToApliteAndWatchapp() throws {
+        let json = Data(#"""
+        {
+          "uuid": "00112233-4455-6677-8899-aabbccddeeff",
+          "shortName": "Legacy",
+          "versionLabel": "1.0"
+        }
+        """#.utf8)
+
+        let application = try PBWApplicationDecoder.decodeAppInfo(from: json)
+
+        #expect(application.targetPlatforms == ["aplite"])
+        #expect(application.kind == .watchapp)
+        #expect(application.bestVariant(for: .pebble2Duo) == "aplite")
+    }
+
     @Test func putBytesTransferWaitsForEveryAcknowledgement() throws {
         var session = PutBytesTransferSession(
             bytes: [0x01, 0x02, 0x03],
