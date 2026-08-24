@@ -5,6 +5,17 @@ import Testing
 @Suite
 @MainActor
 struct APITests {
+    @Test func invalidPBWArchiveIsRejected() throws {
+        let fileURL = FileManager.default.temporaryDirectory
+            .appending(path: "\(UUID().uuidString).pbw")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        try Data("not a zip archive".utf8).write(to: fileURL)
+
+        #expect(throws: (any Error).self) {
+            try PBWPackageImporter.load(from: fileURL, for: .pebbleTime2)
+        }
+    }
+
     @Test func pbwManifestSelectsBestVariantAndTransferOrder() throws {
         let basalt = Data(#"""
         {
