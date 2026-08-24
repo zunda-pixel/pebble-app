@@ -5,6 +5,41 @@ import Testing
 @Suite
 @MainActor
 struct APITests {
+    @Test func putBytesTransferWaitsForEveryAcknowledgement() throws {
+        var session = PutBytesTransferSession(
+            bytes: [0x01, 0x02, 0x03],
+            objectType: .appExecutable,
+            appBankID: 7,
+            chunkSize: 2
+        )
+
+        #expect(try session.start() == .send(PutBytesCodec.appInitializationFrame(
+            objectSize: 3,
+            objectType: .appExecutable,
+            appBankID: 7
+        )))
+        let first = try session.receive(PutBytesResponse(result: .acknowledgement, cookie: 42))
+        #expect(first == [.send(try PutBytesCodec.putFrame(cookie: 42, bytes: [0x01, 0x02]))])
+        let second = try session.receive(PutBytesResponse(result: .acknowledgement, cookie: 42))
+        #expect(second == [
+            .progress(PutBytesTransferProgress(bytesSent: 2, totalBytes: 3)),
+            .send(try PutBytesCodec.putFrame(cookie: 42, bytes: [0x03])),
+        ])
+        let commit = try session.receive(PutBytesResponse(result: .acknowledgement, cookie: 42))
+        #expect(commit == [
+            .progress(PutBytesTransferProgress(bytesSent: 3, totalBytes: 3)),
+            .send(PutBytesCodec.commitFrame(cookie: 42, crc: PebbleCRC32.calculate([0x01, 0x02, 0x03]))),
+        ])
+        #expect(try session.receive(PutBytesResponse(result: .acknowledgement, cookie: 42)) == [
+            .send(PutBytesCodec.installFrame(cookie: 42)),
+        ])
+        #expect(try session.receive(PutBytesResponse(result: .acknowledgement, cookie: 42)) == [.finished])
+    }
+
+    @Test func pebbleCRC32MatchesSTMWordAlgorithm() {
+        #expect(PebbleCRC32.calculate([0x01, 0x02, 0x03, 0x04]) == 0x1DABE74F)
+    }
+
     @Test func putBytesAppInitializationUsesAppBitAndBigEndianValues() {
         let frame = PutBytesCodec.appInitializationFrame(
             objectSize: 1_000,
