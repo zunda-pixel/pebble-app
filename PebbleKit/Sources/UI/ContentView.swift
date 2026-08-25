@@ -265,36 +265,187 @@ private struct HealthView: View {
     private var trackedSleepDays: Int { filteredSamples.count { $0.sleepMinutes > 0 } }
 }
 
+private enum CatalogKindFilter: String, CaseIterable, Identifiable {
+    case all, watchapps, watchfaces
+    var id: Self { self }
+}
+
+private enum CatalogSort: String, CaseIterable, Identifiable {
+    case name, category, version
+    var id: Self { self }
+}
+
 private struct CatalogView: View {
     var model: AppModel
     @State private var query = ""
+    @State private var category = "All"
+    @State private var kind: CatalogKindFilter = .all
+    @State private var sort: CatalogSort = .name
 
     var body: some View {
-        List(filteredApplications) { application in
-            LabeledContent {
-                Button("Install") { Task { await model.installCatalogApplication(application) } }
-            } label: {
-                VStack(alignment: .leading) {
-                    Text(application.name).font(.headline)
-                    Text("\(application.developer) · \(application.version)").foregroundStyle(.secondary)
+        List {
+            Section("Browse") {
+                Picker("Type", selection: $kind) {
+                    ForEach(CatalogKindFilter.allCases) { Text($0.rawValue.capitalized).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                Picker("Category", selection: $category) {
+                    ForEach(categories, id: \.self) { Text($0).tag($0) }
+                }
+                Picker("Sort", selection: $sort) {
+                    ForEach(CatalogSort.allCases) { Text($0.rawValue.capitalized).tag($0) }
+                }
+            }
+            Section("Applications") {
+                ForEach(filteredApplications) { application in
+                    NavigationLink {
+                        CatalogApplicationDetailView(application: application, model: model)
+                    } label: {
+                        CatalogApplicationRow(
+                            application: application,
+                            state: model.catalogInstallationState(for: application)
+                        )
+                    }
                 }
             }
         }
         .searchable(text: $query)
         .navigationTitle("Catalog")
+        .toolbar {
+            ToolbarItemGroup {
+                Button("Update All", systemImage: "arrow.down.app") {
+                    Task { await model.installCatalogUpdates() }
+                }
+                Button("Refresh", systemImage: "arrow.clockwise") {
+                    Task { await model.refreshCatalog() }
+                }
+                .disabled(model.isUpdatingCatalog)
+            }
+        }
         .overlay {
             if filteredApplications.isEmpty {
                 ContentUnavailableView("No Catalog Apps", systemImage: "bag", description: Text("Catalog sources can be added in Settings."))
             }
         }
-        .task { await model.loadCatalog() }
+        .task {
+            await model.loadCatalog()
+            if model.catalogApplications.isEmpty { await model.refreshCatalog() }
+        }
     }
 
     private var filteredApplications: [PebbleCatalogApplication] {
-        query.isEmpty ? model.catalogApplications : model.catalogApplications.filter {
-            $0.name.localizedCaseInsensitiveContains(query) || $0.developer.localizedCaseInsensitiveContains(query)
+        let filtered = model.catalogApplications.filter { application in
+            let matchesQuery = query.isEmpty
+                || application.name.localizedCaseInsensitiveContains(query)
+                || application.developer.localizedCaseInsensitiveContains(query)
+                || application.summary.localizedCaseInsensitiveContains(query)
+            let matchesCategory = category == "All" || application.category == category
+            let matchesKind = kind == .all
+                || (kind == .watchapps && application.kind == .watchapp)
+                || (kind == .watchfaces && application.kind == .watchface)
+            return matchesQuery && matchesCategory && matchesKind
+        }
+        return filtered.sorted { lhs, rhs in
+            switch sort {
+            case .name: lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+            case .category: lhs.category.localizedCaseInsensitiveCompare(rhs.category) == .orderedAscending
+            case .version: lhs.version.compare(rhs.version, options: .numeric) == .orderedDescending
+            }
         }
     }
+
+    private var categories: [String] {
+        ["All"] + Set(model.catalogApplications.map(\.category)).sorted()
+    }
+}
+
+private struct CatalogApplicationRow: View {
+    var application: PebbleCatalogApplication
+    var state: CatalogInstallationState
+
+    var body: some View {
+        HStack(spacing: 12) {
+            AsyncImage(url: application.iconURL) { image in
+                image.resizable().scaledToFit()
+            } placeholder: {
+                Image(systemName: application.kind == .watchface ? "clock" : "square.grid.2x2")
+                    .foregroundStyle(.secondary)
+            }
+            .frame(width: 44, height: 44)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(application.name).font(.headline)
+                Text("\(application.developer) · \(application.version)").foregroundStyle(.secondary)
+                Text(application.category).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            CatalogStateLabel(state: state)
+        }
+        .frame(minHeight: 52)
+    }
+}
+
+private struct CatalogStateLabel: View {
+    var state: CatalogInstallationState
+    var body: some View {
+        switch state {
+        case .available: EmptyView()
+        case .installed: Label("Installed", systemImage: "checkmark.circle").foregroundStyle(.secondary)
+        case .updateAvailable: Label("Update", systemImage: "arrow.down.circle").foregroundStyle(.tint)
+        case .incompatible: Label("Incompatible", systemImage: "nosign").foregroundStyle(.secondary)
+        }
+    }
+}
+
+private struct CatalogApplicationDetailView: View {
+    var application: PebbleCatalogApplication
+    var model: AppModel
+
+    var body: some View {
+        List {
+            Section {
+                CatalogApplicationRow(
+                    application: application,
+                    state: model.catalogInstallationState(for: application)
+                )
+                if !application.summary.isEmpty { Text(application.summary) }
+            }
+            if !application.screenshotURLs.isEmpty {
+                Section("Screenshots") {
+                    ScrollView(.horizontal) {
+                        HStack {
+                            ForEach(application.screenshotURLs, id: \.self) { url in
+                                AsyncImage(url: url) { image in
+                                    image.resizable().scaledToFit()
+                                } placeholder: {
+                                    ProgressView()
+                                }
+                                .frame(width: 220, height: 220)
+                            }
+                        }
+                    }
+                }
+            }
+            Section("Compatibility") {
+                Text(application.supportedPlatforms.sorted().joined(separator: ", "))
+            }
+            if let releaseNotes = application.releaseNotes, !releaseNotes.isEmpty {
+                Section("Release Notes") { Text(releaseNotes) }
+            }
+            Section {
+                Button(installButtonTitle, systemImage: "arrow.down.app") {
+                    Task { await model.installCatalogApplication(application) }
+                }
+                .disabled(!canInstall || model.installingCatalogApplicationID != nil)
+                if model.installingCatalogApplicationID == application.id { ProgressView() }
+                if let message = model.dataSyncStatusMessage { Text(message).foregroundStyle(.secondary) }
+            }
+        }
+        .navigationTitle(application.name)
+    }
+
+    private var state: CatalogInstallationState { model.catalogInstallationState(for: application) }
+    private var canInstall: Bool { state == .available || state == .updateAvailable }
+    private var installButtonTitle: String { state == .updateAvailable ? "Update" : "Install" }
 }
 
 private struct ApplicationsView: View {
@@ -833,7 +984,8 @@ private struct PlaceholderView: View {
 private struct SettingsView: View {
     var model: AppModel
     @State private var isChoosingFirmware = false
-    @State private var catalogSource = UserDefaults.standard.string(forKey: "appCatalogSource") ?? ""
+    @State private var catalogSource = UserDefaults.standard.string(forKey: "appCatalogSource")
+        ?? "https://appstore-api.repebble.com/api"
     @AppStorage("autoResumeFirmwareUpdate") private var autoResumeFirmwareUpdate = true
 
     var body: some View {

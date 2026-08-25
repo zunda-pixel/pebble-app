@@ -10,6 +10,13 @@ public enum ApplicationManagementOperation: Equatable, Sendable {
     case synchronizing
 }
 
+public enum CatalogInstallationState: Equatable, Sendable {
+    case available
+    case installed
+    case updateAvailable
+    case incompatible
+}
+
 @MainActor
 @Observable
 public final class AppModel {
@@ -39,6 +46,9 @@ public final class AppModel {
     public private(set) var timelinePins: [PebbleTimelinePin] = []
     public private(set) var healthSamples: [PebbleHealthSample] = []
     public private(set) var catalogApplications: [PebbleCatalogApplication] = []
+    public private(set) var catalogLastUpdated: Date?
+    public private(set) var isUpdatingCatalog = false
+    public private(set) var installingCatalogApplicationID: UUID?
     public private(set) var firmwareUpdateStatusMessage: String?
     public private(set) var firmwareUpdateJournal: FirmwareUpdateJournal?
     public private(set) var firmwareRequiresConfirmation = false
@@ -430,43 +440,92 @@ public final class AppModel {
     }
 
     public func loadCatalog() async {
-        do { catalogApplications = try await appCatalog.cachedApplications() }
+        do {
+            let snapshot = try await appCatalog.cachedSnapshot()
+            catalogApplications = snapshot?.applications ?? []
+            catalogLastUpdated = snapshot?.fetchedAt
+        }
         catch { dataSyncStatusMessage = "The app catalog cache could not be loaded." }
     }
 
     public func updateCatalog(source: String) async {
-        guard let url = URL(string: source), ["https", "http"].contains(url.scheme?.lowercased()) else {
+        guard let url = URL(string: source), url.scheme?.lowercased() == "https" else {
             dataSyncStatusMessage = "Enter a valid HTTPS catalog URL."
             return
         }
+        guard !isUpdatingCatalog else { return }
+        isUpdatingCatalog = true
+        defer { isUpdatingCatalog = false }
         do {
-            catalogApplications = try await appCatalog.update(from: url)
+            let snapshot = try await appCatalog.update(from: url, model: connectedDevice?.model)
+            catalogApplications = snapshot.applications
+            catalogLastUpdated = snapshot.fetchedAt
             UserDefaults.standard.set(source, forKey: "appCatalogSource")
-            dataSyncStatusMessage = "App catalog updated."
-        } catch { dataSyncStatusMessage = "The app catalog could not be updated." }
+            dataSyncStatusMessage = "App catalog updated with \(catalogApplications.count) apps."
+        } catch {
+            dataSyncStatusMessage = catalogApplications.isEmpty
+                ? "The app catalog could not be updated."
+                : "Catalog refresh failed; showing the offline cache."
+        }
+    }
+
+    public func refreshCatalog() async {
+        let source = UserDefaults.standard.string(forKey: "appCatalogSource")
+            ?? "https://appstore-api.repebble.com/api"
+        await updateCatalog(source: source)
+    }
+
+    public func catalogInstallationState(for application: PebbleCatalogApplication) -> CatalogInstallationState {
+        if let model = connectedDevice?.model, !application.supports(model) { return .incompatible }
+        guard let installed = (watchApplications + watchfaces).first(where: { $0.id == application.id }) else {
+            return .available
+        }
+        return application.isNewer(than: installed.versionLabel) ? .updateAvailable : .installed
     }
 
     public func installCatalogApplication(_ application: PebbleCatalogApplication) async {
-        guard ["https", "http"].contains(application.downloadURL.scheme?.lowercased()) else {
+        guard application.downloadURL.scheme?.lowercased() == "https" else {
             dataSyncStatusMessage = "The catalog provided an unsafe download URL."
             return
         }
+        if let model = connectedDevice?.model, !application.supports(model) {
+            dataSyncStatusMessage = "\(application.name) is not compatible with this watch."
+            return
+        }
+        guard installingCatalogApplicationID == nil else { return }
+        installingCatalogApplicationID = application.id
+        defer { installingCatalogApplicationID = nil }
         do {
             dataSyncStatusMessage = "Downloading \(application.name)…"
-            let (temporaryURL, response) = try await URLSession.shared.download(from: application.downloadURL)
-            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-                throw AppCatalogError.invalidResponse
+            let packageURL = try await appCatalog.download(application)
+            let decoded = try await Task.detached { try PBWPackageImporter.application(from: packageURL) }.value
+            guard decoded.id == application.id else { throw AppCatalogError.applicationIDMismatch }
+            if let model = connectedDevice?.model {
+                let package = try await loadPackage(from: packageURL, for: model)
+                guard package.application.id == application.id else { throw AppCatalogError.applicationIDMismatch }
             }
-            let packageURL = FileManager.default.temporaryDirectory
-                .appending(path: "\(application.id.uuidString).pbw")
-            try? FileManager.default.removeItem(at: packageURL)
-            try FileManager.default.moveItem(at: temporaryURL, to: packageURL)
+            applicationLibraryErrorMessage = nil
             await importApplication(from: packageURL)
             try? FileManager.default.removeItem(at: packageURL)
             dataSyncStatusMessage = applicationLibraryErrorMessage == nil
                 ? "\(application.name) installed."
                 : applicationLibraryErrorMessage
-        } catch { dataSyncStatusMessage = "The catalog app could not be downloaded." }
+        } catch {
+            dataSyncStatusMessage = "The catalog package was rejected: \(error.localizedDescription)"
+        }
+    }
+
+    public func installCatalogUpdates() async {
+        let updates = catalogApplications.filter { catalogInstallationState(for: $0) == .updateAvailable }
+        guard !updates.isEmpty else {
+            dataSyncStatusMessage = "Installed apps are up to date."
+            return
+        }
+        for application in updates {
+            await installCatalogApplication(application)
+            if applicationLibraryErrorMessage != nil { return }
+        }
+        dataSyncStatusMessage = "Installed \(updates.count) catalog update(s)."
     }
 
     public func loadSavedWatches() async {

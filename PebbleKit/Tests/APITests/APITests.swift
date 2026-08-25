@@ -975,4 +975,63 @@ struct CompanionDataTests {
         try await library.updatePhase(.transferring)
         #expect(try await library.journal()?.phase == .transferring)
     }
+
+    @Test func officialCatalogResponseMapsToInstallableApplication() throws {
+        let json = """
+        {
+          "applications": [{
+            "author": "Pebble Developer",
+            "category": "Tools & Utilities",
+            "description": "A useful app",
+            "id": "store-id",
+            "title": "Utility",
+            "type": "watchapp",
+            "uuid": "00112233-4455-6677-8899-aabbccddeeff",
+            "hardware_platforms": [{"name":"emery"}],
+            "icon_image": {"small":"https://example.com/icon.png"},
+            "screenshot_images": [{"emery":"https://example.com/screenshot.png"}],
+            "latest_release": {
+              "pbw_file":"https://example.com/utility.pbw",
+              "release_notes":"Improved reliability",
+              "version":"2.0"
+            }
+          }]
+        }
+        """
+        let home = try JSONDecoder().decode(OfficialCatalogHome.self, from: Data(json.utf8))
+        let application = try #require(home.applications.first?.application(kind: .watchapp))
+        #expect(application.name == "Utility")
+        #expect(application.version == "2.0")
+        #expect(application.supports(.pebbleTime2))
+        #expect(!application.supports(.pebble2Duo))
+        #expect(application.releaseNotes == "Improved reliability")
+    }
+
+    @Test func catalogVersionComparisonUsesNumericOrdering() {
+        let application = PebbleCatalogApplication(
+            id: UUID(), name: "App", developer: "Developer", version: "2.10",
+            downloadURL: URL(string: "https://example.com/app.pbw")!, supportedPlatforms: ["emery"]
+        )
+        #expect(application.isNewer(than: "2.9"))
+        #expect(!application.isNewer(than: "2.10"))
+        #expect(!application.isNewer(than: "3.0"))
+    }
+
+    @Test func catalogSnapshotPersistsOfflineMetadata() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let url = directory.appending(path: "catalog.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let application = PebbleCatalogApplication(
+            id: UUID(), name: "Cached", developer: "Developer", version: "1.0",
+            downloadURL: URL(string: "https://example.com/app.pbw")!, supportedPlatforms: ["emery"]
+        )
+        let snapshot = PebbleCatalogSnapshot(
+            sourceURL: URL(string: "https://example.com/api")!, fetchedAt: Date(timeIntervalSince1970: 100),
+            applications: [application]
+        )
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try JSONEncoder().encode(snapshot).write(to: url, options: .atomic)
+        let catalog = PebbleAppCatalog(cacheURL: url)
+        #expect(try await catalog.cachedSnapshot() == snapshot)
+    }
 }
