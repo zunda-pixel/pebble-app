@@ -10,6 +10,16 @@
 		2E004FAA303C7E4C001DFDE0 /* PebbleKit in Frameworks */ = {isa = PBXBuildFile; productRef = 2E004FA9303C7E4C001DFDE0 /* PebbleKit */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		2E881D9D303DB05900375F90 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 000000000000000100000000;
+			remoteInfo = Pebble;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* Pebble.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Pebble.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2E004FA7303C7E3A001DFDE0 /* PebbleKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = PebbleKit; sourceTree = "<group>"; };
@@ -118,6 +128,9 @@
 			);
 			buildRules = (
 			);
+			dependencies = (
+				2E881D9E303DB05900375F90 /* PBXTargetDependency */,
+			);
 			fileSystemSynchronizedGroups = (
 				2E78407B303D37E4003810DA /* PebbleUIAutomationTests */,
 			);
@@ -141,6 +154,7 @@
 					};
 					2E784079303D37E4003810DA = {
 						CreatedOnToolsVersion = 27.0;
+						TestTargetID = 000000000000000100000000;
 					};
 				};
 			};
@@ -190,6 +204,14 @@
 			);
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		2E881D9E303DB05900375F90 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 000000000000000100000000 /* Pebble */;
+			targetProxy = 2E881D9D303DB05900375F90 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		000000000000000011000000 /* Debug configuration for PBXProject "Pebble" */ = {
@@ -455,6 +477,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_TARGET_NAME = Pebble;
 				XROS_DEPLOYMENT_TARGET = 27.0;
 			};
 			name = Debug;
@@ -478,6 +501,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_TARGET_NAME = Pebble;
 				XROS_DEPLOYMENT_TARGET = 27.0;
 			};
 			name = Release;
