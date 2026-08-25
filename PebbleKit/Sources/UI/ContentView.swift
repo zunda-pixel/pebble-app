@@ -181,6 +181,7 @@ private struct TimelineView: View {
 private struct HealthView: View {
     var model: AppModel
     @State private var period: HealthAnalysisPeriod = .week
+    @State private var isImportingArchive = false
 
     var body: some View {
         List {
@@ -198,6 +199,8 @@ private struct HealthView: View {
                 }
                 .frame(minHeight: 180)
                 LabeledContent("Daily Average", value: "\(averageSteps)")
+                LabeledContent("Period Total", value: "\(totalSteps)")
+                LabeledContent("Best Day", value: "\(bestStepCount)")
             }
             Section("Sleep") {
                 Chart(filteredSamples) { sample in
@@ -205,6 +208,7 @@ private struct HealthView: View {
                 }
                 .frame(minHeight: 180)
                 LabeledContent("Daily Average", value: "\(averageSleep) min")
+                LabeledContent("Tracked Days", value: "\(trackedSleepDays)")
             }
             Button("Sync Health Data", systemImage: "arrow.triangle.2.circlepath") {
                 Task { await model.requestHealthSync() }
@@ -222,6 +226,9 @@ private struct HealthView: View {
                 Task { await model.exportHealthData() }
             }
             if let url = model.healthExportURL { ShareLink(item: url) { Text("Share Export") } }
+            Button("Import Health Archive", systemImage: "square.and.arrow.down.on.square") {
+                isImportingArchive = true
+            }
             Button("Delete Local Health Data", role: .destructive) {
                 Task { await model.deleteHealthData() }
             }
@@ -229,6 +236,10 @@ private struct HealthView: View {
         }
         .navigationTitle("Health")
         .task { await model.loadHealth() }
+        .fileImporter(isPresented: $isImportingArchive, allowedContentTypes: [.json]) { result in
+            guard case .success(let url) = result else { return }
+            Task { await model.importHealthData(from: url) }
+        }
     }
 
     private var filteredSamples: [PebbleHealthSample] {
@@ -240,9 +251,15 @@ private struct HealthView: View {
         filteredSamples.isEmpty ? 0 : filteredSamples.map(\.steps).reduce(0, +) / filteredSamples.count
     }
 
+    private var totalSteps: Int { filteredSamples.map(\.steps).reduce(0, +) }
+
+    private var bestStepCount: Int { filteredSamples.map(\.steps).max() ?? 0 }
+
     private var averageSleep: Int {
         filteredSamples.isEmpty ? 0 : filteredSamples.map(\.sleepMinutes).reduce(0, +) / filteredSamples.count
     }
+
+    private var trackedSleepDays: Int { filteredSamples.count { $0.sleepMinutes > 0 } }
 }
 
 private struct CatalogView: View {

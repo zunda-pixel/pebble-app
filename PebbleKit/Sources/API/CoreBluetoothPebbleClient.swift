@@ -77,6 +77,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var activeAppMessage: PendingAppMessage?
     private var activeAppMessageTransactionID: UInt8?
     private var appMessageTimeoutTask: Task<Void, Never>?
+    private var healthDataLoggingProcessor = HealthDataLoggingProcessor()
 
     public override init() {
         super.init()
@@ -574,6 +575,13 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
 
         if frame.endpoint == HealthSyncCodec.endpoint {
             eventContinuation?.yield(.healthSyncCompleted(try HealthSyncResponseCodec.decode(frame)))
+            return
+        }
+
+        if frame.endpoint == HealthDataLoggingCodec.endpoint {
+            let result = try healthDataLoggingProcessor.process(frame)
+            if let response = result.response { try sendFrame(response, to: peripheral) }
+            if !result.samples.isEmpty { eventContinuation?.yield(.healthSamplesReceived(result.samples)) }
             return
         }
 

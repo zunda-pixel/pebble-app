@@ -6,6 +6,10 @@ import HealthKit
 @MainActor
 final class HealthKitBridge {
     private var store = HKHealthStore()
+    private var lastExportDate: Date {
+        get { UserDefaults.standard.object(forKey: "healthKitLastExportDate") as? Date ?? .distantPast }
+        set { UserDefaults.standard.set(newValue, forKey: "healthKitLastExportDate") }
+    }
 
     func synchronize(_ samples: [PebbleHealthSample]) async throws {
         guard HKHealthStore.isHealthDataAvailable(),
@@ -14,27 +18,40 @@ final class HealthKitBridge {
             throw HealthKitBridgeError.unavailable
         }
         try await store.requestAuthorization(toShare: [stepsType, sleepType], read: [stepsType, sleepType])
+        let changedSamples = samples.filter { $0.updatedAt > lastExportDate && $0.source != .healthKit }
         var healthSamples: [HKSample] = []
-        for sample in samples {
-            let metadata = [HKMetadataKeyExternalUUID: sample.id.uuidString]
+        for sample in changedSamples {
+            let version = max(1, Int(sample.updatedAt.timeIntervalSince1970))
+            let baseIdentifier = "pebble.\(sample.id.uuidString.lowercased())"
+            let commonMetadata: [String: Any] = [
+                HKMetadataKeyExternalUUID: sample.id.uuidString,
+                HKMetadataKeySyncVersion: version,
+            ]
+            var stepsMetadata = commonMetadata
+            stepsMetadata[HKMetadataKeySyncIdentifier] = "\(baseIdentifier).steps"
             healthSamples.append(HKQuantitySample(
                 type: stepsType,
                 quantity: HKQuantity(unit: .count(), doubleValue: Double(sample.steps)),
                 start: sample.date,
-                end: sample.date,
-                metadata: metadata
+                end: sample.date.addingTimeInterval(60),
+                metadata: stepsMetadata
             ))
             if sample.sleepMinutes > 0 {
+                var sleepMetadata = commonMetadata
+                sleepMetadata[HKMetadataKeySyncIdentifier] = "\(baseIdentifier).sleep"
                 healthSamples.append(HKCategorySample(
                     type: sleepType,
                     value: HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue,
                     start: sample.date.addingTimeInterval(TimeInterval(-sample.sleepMinutes * 60)),
                     end: sample.date,
-                    metadata: metadata
+                    metadata: sleepMetadata
                 ))
             }
         }
-        if !healthSamples.isEmpty { try await store.save(healthSamples) }
+        if !healthSamples.isEmpty {
+            try await store.save(healthSamples)
+            lastExportDate = changedSamples.map(\.updatedAt).max() ?? lastExportDate
+        }
     }
 
     func readRecentSamples(days: Int = 90) async throws -> [PebbleHealthSample] {
@@ -48,10 +65,15 @@ final class HealthKitBridge {
         let end = Date()
         async let stepSamples = query(type: stepsType, start: start, end: end)
         async let sleepSamples = query(type: sleepType, start: start, end: end)
-        var daily: [Date: (steps: Int, sleep: Int)] = [:]
+        var stepsBySource: [Date: [String: Int]] = [:]
+        var sleepBySource: [Date: [String: Int]] = [:]
+        var updatedAtByDay: [Date: Date] = [:]
         for case let sample as HKQuantitySample in try await stepSamples {
+            guard !(sample.metadata?[HKMetadataKeySyncIdentifier] as? String ?? "").hasPrefix("pebble.") else { continue }
             let day = Calendar.current.startOfDay(for: sample.startDate)
-            daily[day, default: (0, 0)].steps += Int(sample.quantity.doubleValue(for: .count()))
+            let source = sample.sourceRevision.source.bundleIdentifier
+            stepsBySource[day, default: [:]][source, default: 0] += Int(sample.quantity.doubleValue(for: .count()))
+            updatedAtByDay[day] = max(updatedAtByDay[day] ?? .distantPast, sample.endDate)
         }
         let asleepValues: Set<Int> = [
             HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue,
@@ -60,10 +82,22 @@ final class HealthKitBridge {
             HKCategoryValueSleepAnalysis.asleepREM.rawValue,
         ]
         for case let sample as HKCategorySample in try await sleepSamples where asleepValues.contains(sample.value) {
+            guard !(sample.metadata?[HKMetadataKeySyncIdentifier] as? String ?? "").hasPrefix("pebble.") else { continue }
             let day = Calendar.current.startOfDay(for: sample.endDate)
-            daily[day, default: (0, 0)].sleep += Int(sample.endDate.timeIntervalSince(sample.startDate) / 60)
+            let source = sample.sourceRevision.source.bundleIdentifier
+            sleepBySource[day, default: [:]][source, default: 0] += Int(sample.endDate.timeIntervalSince(sample.startDate) / 60)
+            updatedAtByDay[day] = max(updatedAtByDay[day] ?? .distantPast, sample.endDate)
         }
-        return daily.map { PebbleHealthSample(date: $0.key, steps: $0.value.steps, sleepMinutes: $0.value.sleep) }
+        let days = Set(stepsBySource.keys).union(sleepBySource.keys)
+        return days.map { day in
+            PebbleHealthSample(
+                date: day,
+                steps: stepsBySource[day]?.values.max() ?? 0,
+                sleepMinutes: min(24 * 60, sleepBySource[day]?.values.max() ?? 0),
+                source: .healthKit,
+                updatedAt: updatedAtByDay[day] ?? day
+            )
+        }
     }
 
     private func query(type: HKSampleType, start: Date, end: Date) async throws -> [HKSample] {

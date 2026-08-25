@@ -18,6 +18,7 @@ public enum PebbleClientEvent: Equatable, Sendable {
     case reconnecting(deviceID: String)
     case disconnected(PebbleConnectionError)
     case healthSyncCompleted(Bool)
+    case healthSamplesReceived([PebbleHealthSample])
     case timelineActionInvoked(TimelineActionInvocation)
 }
 

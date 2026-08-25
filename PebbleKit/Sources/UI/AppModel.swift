@@ -269,6 +269,7 @@ public final class AppModel {
     public func requestHealthSync() async {
         guard connectedDevice != nil else { return }
         do {
+            try await client.send(HealthDataLoggingCodec.reportOpenSessionsFrame())
             try await client.send(HealthSyncCodec.requestFrame(since: healthSamples.map(\.date).max()))
             dataSyncStatusMessage = "Health synchronization requested."
         } catch { dataSyncStatusMessage = "Health synchronization will retry after reconnection." }
@@ -293,6 +294,17 @@ public final class AppModel {
     public func exportHealthData() async {
         do { healthExportURL = try await healthLibrary.export() }
         catch { dataSyncStatusMessage = "Health data could not be exported." }
+    }
+
+    public func importHealthData(from url: URL) async {
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+        do {
+            healthSamples = try await healthLibrary.importArchive(from: url)
+            dataSyncStatusMessage = "Health archive imported and reconciled."
+        } catch {
+            dataSyncStatusMessage = "The selected health archive is invalid or unsupported."
+        }
     }
 
     public func deleteHealthData() async {
@@ -865,6 +877,19 @@ public final class AppModel {
                     return
                 case .healthSyncCompleted(let succeeded):
                     self?.dataSyncStatusMessage = succeeded ? "Health synchronization completed." : "The watch rejected health synchronization."
+                case .healthSamplesReceived(let samples):
+                    Task { [weak self] in
+                        guard let self else { return }
+                        do {
+                            self.healthSamples = try await self.healthLibrary.merge(samples)
+                            self.dataSyncStatusMessage = "Received \(samples.count) health update(s) from the watch."
+                            #if os(iOS)
+                            try await self.healthKitBridge.synchronize(self.healthSamples)
+                            #endif
+                        } catch {
+                            self.dataSyncStatusMessage = "Watch health data could not be saved."
+                        }
+                    }
                 case .timelineActionInvoked(let invocation):
                     Task { [weak self] in
                         guard let self, let index = self.timelinePins.firstIndex(where: { $0.id == invocation.itemID }) else { return }

@@ -29,6 +29,7 @@ public final class QEMUPebbleClient: PebbleClient {
     private var connectedDevice: PebbleDevice?
     private var reconnectTask: Task<Void, Never>?
     private var isManualDisconnect = false
+    private var healthDataLoggingProcessor = HealthDataLoggingProcessor()
 
     public init(host: String = "127.0.0.1", port: UInt16 = 12_344) {
         self.host = NWEndpoint.Host(host)
@@ -374,6 +375,10 @@ public final class QEMUPebbleClient: PebbleClient {
             eventContinuation?.yield(.appFetchRequested(try AppFetchCodec.decodeRequest(frame)))
         } else if frame.endpoint == HealthSyncCodec.endpoint {
             eventContinuation?.yield(.healthSyncCompleted(try HealthSyncResponseCodec.decode(frame)))
+        } else if frame.endpoint == HealthDataLoggingCodec.endpoint {
+            let result = try healthDataLoggingProcessor.process(frame)
+            if let response = result.response { Task { try? await send(response) } }
+            if !result.samples.isEmpty { eventContinuation?.yield(.healthSamplesReceived(result.samples)) }
         } else if frame.endpoint == TimelineActionCodec.endpoint {
             let invocation = try TimelineActionCodec.decode(frame)
             eventContinuation?.yield(.timelineActionInvoked(invocation))

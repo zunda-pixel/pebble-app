@@ -810,10 +810,39 @@ struct CompanionDataTests {
         #expect(SystemMessageCodec.firmwareUpdateCompleteFrame().payload == [0, 2])
     }
 
-    @Test func healthSyncUsesOfficialEndpointAndLittleEndianTimestamp() {
-        let frame = HealthSyncCodec.requestFrame(since: Date(timeIntervalSince1970: 0x12345678))
+    @Test func healthSyncUsesOfficialEndpointAndLittleEndianElapsedTime() {
+        let frame = HealthSyncCodec.requestFrame(
+            since: Date(timeIntervalSince1970: 100),
+            now: Date(timeIntervalSince1970: 0x12345678 + 100)
+        )
         #expect(frame.endpoint == 911)
         #expect(frame.payload == [0x01, 0x78, 0x56, 0x34, 0x12])
+    }
+
+    @Test func fullHealthSyncUsesMaximumElapsedTime() {
+        #expect(HealthSyncCodec.requestFrame(since: nil).payload == [0x01, 0xff, 0xff, 0xff, 0xff])
+    }
+
+    @Test func healthDataLoggingDecodesStepSessionAndAcknowledgesPackets() throws {
+        var processor = HealthDataLoggingProcessor()
+        let openPayload: [UInt8] = [0x01, 7] + Array(repeating: 0, count: 16)
+            + [0, 0, 0, 0] + [81, 0, 0, 0] + [0, 15, 0]
+        let open = try processor.process(PebbleProtocolFrame(endpoint: 6_778, payload: openPayload))
+        #expect(open.response?.payload == [0x85, 7])
+
+        let item: [UInt8] = [5, 0, 100, 0, 0, 0, 0, 6, 1, 42, 0, 0, 0, 0, 0]
+        let sendPayload: [UInt8] = [0x02, 7] + Array(repeating: 0, count: 8) + item
+        let result = try processor.process(PebbleProtocolFrame(endpoint: 6_778, payload: sendPayload))
+        #expect(result.response?.payload == [0x85, 7])
+        #expect(result.samples.count == 1)
+        #expect(result.samples[0].steps == 42)
+    }
+
+    @Test func unknownHealthDataLoggingSessionIsRejected() throws {
+        var processor = HealthDataLoggingProcessor()
+        let payload: [UInt8] = [0x02, 9] + Array(repeating: 0, count: 8)
+        let result = try processor.process(PebbleProtocolFrame(endpoint: 6_778, payload: payload))
+        #expect(result.response?.payload == [0x86, 9])
     }
 
     @Test func timelinePinEncodesPinTypeAndGenericLayout() throws {
@@ -836,10 +865,55 @@ struct CompanionDataTests {
         let url = directory.appending(path: "health.json")
         defer { try? FileManager.default.removeItem(at: directory) }
         let library = PebbleHealthLibrary(fileURL: url)
-        let sample = PebbleHealthSample(date: Date(timeIntervalSince1970: 10), steps: 1234, sleepMinutes: 420)
+        let sample = PebbleHealthSample(
+            date: Date(timeIntervalSince1970: 10), steps: 1234, sleepMinutes: 420,
+            timeZoneIdentifier: "UTC", updatedAt: Date(timeIntervalSince1970: 20)
+        )
         try await library.save([sample])
         #expect(try await library.samples() == [sample])
-        let replacement = PebbleHealthSample(date: sample.date, steps: 2000, sleepMinutes: 400)
-        #expect(try await library.merge([replacement]) == [replacement])
+        let replacement = PebbleHealthSample(
+            date: sample.date, steps: 2000, sleepMinutes: 400,
+            timeZoneIdentifier: "UTC", updatedAt: Date(timeIntervalSince1970: 30)
+        )
+        let merged = try await library.merge([replacement])
+        #expect(merged.count == 1)
+        #expect(merged[0].steps == 2000)
+        #expect(merged[0].sleepMinutes == 400)
+        #expect(merged[0].date == Date(timeIntervalSince1970: 0))
+    }
+
+    @Test func healthMergeKeepsHighestStepsAndLatestSleep() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let url = directory.appending(path: "health.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let library = PebbleHealthLibrary(fileURL: url)
+        let watch = PebbleHealthSample(
+            date: Date(timeIntervalSince1970: 100), steps: 8_000, sleepMinutes: 300,
+            timeZoneIdentifier: "UTC", updatedAt: Date(timeIntervalSince1970: 200)
+        )
+        let imported = PebbleHealthSample(
+            date: Date(timeIntervalSince1970: 200), steps: 7_000, sleepMinutes: 450,
+            timeZoneIdentifier: "UTC", source: .imported, updatedAt: Date(timeIntervalSince1970: 300)
+        )
+        let merged = try await library.merge([watch, imported])
+        #expect(merged.count == 1)
+        #expect(merged[0].steps == 8_000)
+        #expect(merged[0].sleepMinutes == 450)
+        #expect(merged[0].source == .imported)
+    }
+
+    @Test func healthArchiveRoundTrips() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let sourceURL = directory.appending(path: "source.json")
+        let destinationURL = directory.appending(path: "destination.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = PebbleHealthLibrary(fileURL: sourceURL)
+        try await source.save([PebbleHealthSample(date: .now, steps: 123, sleepMinutes: 45)])
+        let archiveURL = try await source.export()
+        let destination = PebbleHealthLibrary(fileURL: destinationURL)
+        let imported = try await destination.importArchive(from: archiveURL)
+        #expect(imported.count == 1)
+        #expect(imported[0].steps == 123)
+        #expect(imported[0].source == .imported)
     }
 }

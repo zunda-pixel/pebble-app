@@ -7,6 +7,38 @@ public struct PebbleHealthSample: Codable, Equatable, Identifiable, Sendable {
     public var date: Date
     public var steps: Int
     public var sleepMinutes: Int
+    public var timeZoneIdentifier: String = TimeZone.current.identifier
+    public var source: PebbleHealthDataSource = .watch
+    public var updatedAt: Date = Date()
+
+    private enum CodingKeys: String, CodingKey {
+        case id, date, steps, sleepMinutes, timeZoneIdentifier, source, updatedAt
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        date = try container.decode(Date.self, forKey: .date)
+        steps = try container.decode(Int.self, forKey: .steps)
+        sleepMinutes = try container.decode(Int.self, forKey: .sleepMinutes)
+        timeZoneIdentifier = try container.decodeIfPresent(String.self, forKey: .timeZoneIdentifier)
+            ?? TimeZone.current.identifier
+        source = try container.decodeIfPresent(PebbleHealthDataSource.self, forKey: .source) ?? .watch
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? date
+    }
+}
+
+public enum PebbleHealthDataSource: String, Codable, Equatable, Sendable {
+    case watch
+    case healthKit
+    case imported
+}
+
+@MemberwiseInit(.public)
+public struct PebbleHealthArchive: Codable, Equatable, Sendable {
+    public var schemaVersion: Int = 1
+    public var exportedAt: Date = Date()
+    public var samples: [PebbleHealthSample]
 }
 
 public actor PebbleHealthLibrary {
@@ -19,11 +51,24 @@ public actor PebbleHealthLibrary {
     public func samples() throws -> [PebbleHealthSample] { try PersistentJSON.load([PebbleHealthSample].self, from: fileURL) ?? [] }
     public func save(_ samples: [PebbleHealthSample]) throws { try PersistentJSON.save(samples, to: fileURL) }
     public func merge(_ incoming: [PebbleHealthSample]) throws -> [PebbleHealthSample] {
-        var values = try samples()
-        for sample in incoming {
-            values.removeAll { Calendar.current.isDate($0.date, inSameDayAs: sample.date) }
-            values.append(sample)
+        var merged: [String: PebbleHealthSample] = [:]
+        for sample in try samples() + incoming {
+            let normalized = normalized(sample)
+            let key = dayKey(for: normalized)
+            guard let existing = merged[key] else {
+                merged[key] = normalized
+                continue
+            }
+            var resolved = normalized.updatedAt >= existing.updatedAt ? normalized : existing
+            resolved.steps = max(existing.steps, normalized.steps)
+            if normalized.sleepMinutes > 0 && normalized.updatedAt >= existing.updatedAt {
+                resolved.sleepMinutes = normalized.sleepMinutes
+            } else {
+                resolved.sleepMinutes = existing.sleepMinutes
+            }
+            merged[key] = resolved
         }
+        var values = Array(merged.values)
         values.sort { $0.date < $1.date }
         try save(values)
         return values
@@ -31,10 +76,54 @@ public actor PebbleHealthLibrary {
     public func deleteAll() throws { try? FileManager.default.removeItem(at: fileURL) }
     public func export() throws -> URL {
         let output = FileManager.default.temporaryDirectory.appending(path: "pebble-health.json")
-        try JSONEncoder().encode(try samples()).write(to: output, options: .atomic)
+        let archive = PebbleHealthArchive(samples: try samples())
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        try encoder.encode(archive).write(to: output, options: .atomic)
         return output
     }
+
+    public func importArchive(from url: URL) throws -> [PebbleHealthSample] {
+        let data = try Data(contentsOf: url)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        if let archive = try? decoder.decode(PebbleHealthArchive.self, from: data) {
+            guard archive.schemaVersion == 1 else { throw PebbleHealthArchiveError.unsupportedVersion }
+            return try merge(archive.samples.map { sample in
+                var value = sample
+                value.source = .imported
+                return value
+            })
+        }
+        let legacyDecoder = JSONDecoder()
+        let legacy = try legacyDecoder.decode([PebbleHealthSample].self, from: data)
+        return try merge(legacy.map { sample in
+            var value = sample
+            value.source = .imported
+            return value
+        })
+    }
+
+    private func normalized(_ sample: PebbleHealthSample) -> PebbleHealthSample {
+        var value = sample
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: sample.timeZoneIdentifier) ?? .current
+        value.date = calendar.startOfDay(for: sample.date)
+        value.steps = max(0, sample.steps)
+        value.sleepMinutes = min(24 * 60, max(0, sample.sleepMinutes))
+        return value
+    }
+
+    private func dayKey(for sample: PebbleHealthSample) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: sample.timeZoneIdentifier) ?? .current
+        let components = calendar.dateComponents([.year, .month, .day], from: sample.date)
+        return String(format: "%04d-%02d-%02d", components.year ?? 0, components.month ?? 0, components.day ?? 0)
+    }
 }
+
+public enum PebbleHealthArchiveError: Error, Equatable, Sendable { case unsupportedVersion }
 
 public enum HealthAnalysisPeriod: String, CaseIterable, Identifiable, Sendable {
     case week, month, quarter
@@ -114,8 +203,9 @@ public actor PendingFirmwareUpdateLibrary {
 public enum HealthSyncCodec {
     public static var endpoint: UInt16 { 911 }
 
-    public static func requestFrame(since date: Date?) -> PebbleProtocolFrame {
-        let seconds = UInt32(max(0, min(Double(UInt32.max), date?.timeIntervalSince1970 ?? 0)))
+    public static func requestFrame(since date: Date?, now: Date = Date()) -> PebbleProtocolFrame {
+        let interval = date.map { max(0, now.timeIntervalSince($0)) } ?? Double(UInt32.max)
+        let seconds = UInt32(min(Double(UInt32.max), interval))
         return PebbleProtocolFrame(endpoint: endpoint, payload: [0x01] + seconds.littleEndianBytes)
     }
 }
