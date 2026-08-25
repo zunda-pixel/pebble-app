@@ -53,6 +53,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var healthCheckTask: Task<Void, Never>?
     private var pongTimeoutTask: Task<Void, Never>?
     private var reconnectTask: Task<Void, Never>?
+    private var reconnectBackoff = PebbleReconnectBackoff()
     private var transferTimeoutTask: Task<Void, Never>?
     private var reconnectDevice: DiscoveredPebble?
     private var pendingPingCookie: UInt32?
@@ -150,6 +151,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
         intentionalDisconnectIdentifiers.insert(device.id)
         reconnectDevice = nil
+        reconnectBackoff.reset()
         stopHealthChecks()
         centralManager.cancelPeripheralConnection(peripheral)
     }
@@ -435,6 +437,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         pendingDevice = nil
         connectedPeripheral = peripheral
         reconnectDevice = device
+        reconnectBackoff.reset()
         isAutomaticReconnect = false
         if initialConnectionContinuation == nil {
             eventContinuation?.yield(.deviceUpdated(connectedDevice))
@@ -931,7 +934,8 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         reconnectTask?.cancel()
         reconnectTask = nil
         guard centralManager.state == .poweredOn else {
-            eventContinuation?.yield(.disconnected(.bluetoothUnavailable))
+            eventContinuation?.yield(.reconnecting(deviceID: device.id))
+            scheduleReconnect(to: device, using: peripheral)
             return
         }
         pendingDevice = device
@@ -943,8 +947,9 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
 
     private func scheduleReconnect(to device: DiscoveredPebble, using peripheral: CBPeripheral) {
         reconnectTask?.cancel()
+        let delay = reconnectBackoff.nextDelay()
         reconnectTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(5))
+            try? await Task.sleep(for: delay)
             guard !Task.isCancelled else {
                 return
             }
@@ -1108,6 +1113,7 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
         if wasIntentional {
             failAllAppMessages(PebbleConnectionError.disconnected)
             reconnectDevice = nil
+            reconnectBackoff.reset()
             isAutomaticReconnect = false
             return
         }

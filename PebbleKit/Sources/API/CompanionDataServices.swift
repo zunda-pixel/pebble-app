@@ -49,7 +49,7 @@ public actor PebbleHealthLibrary {
         self.fileURL = fileURL ?? applicationSupportURL("health.json")
     }
 
-    public func samples() throws -> [PebbleHealthSample] { try PersistentJSON.load([PebbleHealthSample].self, from: fileURL) ?? [] }
+    public func samples() throws -> [PebbleHealthSample] { try PersistentJSON.loadRecovering([PebbleHealthSample].self, from: fileURL) ?? [] }
     public func save(_ samples: [PebbleHealthSample]) throws { try PersistentJSON.save(samples, to: fileURL) }
     public func merge(_ incoming: [PebbleHealthSample]) throws -> [PebbleHealthSample] {
         var merged: [String: PebbleHealthSample] = [:]
@@ -197,10 +197,13 @@ public actor PebbleAppCatalog {
     }
 
     public func cachedSnapshot() throws -> PebbleCatalogSnapshot? {
-        if let snapshot = try PersistentJSON.load(PebbleCatalogSnapshot.self, from: cacheURL) { return snapshot }
-        if let applications = try PersistentJSON.load([PebbleCatalogApplication].self, from: cacheURL) {
+        guard FileManager.default.fileExists(atPath: cacheURL.path) else { return nil }
+        let data = try Data(contentsOf: cacheURL)
+        if let snapshot = try? JSONDecoder().decode(PebbleCatalogSnapshot.self, from: data) { return snapshot }
+        if let applications = try? JSONDecoder().decode([PebbleCatalogApplication].self, from: data) {
             return PebbleCatalogSnapshot(sourceURL: URL(string: "https://appstore-api.repebble.com/api")!, applications: applications)
         }
+        try PersistentJSON.quarantine(cacheURL)
         return nil
     }
 
@@ -343,7 +346,7 @@ public actor PendingNotificationLibrary {
     }
 
     public func notifications() throws -> [PebbleTimelineNotification] {
-        try PersistentJSON.load([PebbleTimelineNotification].self, from: fileURL) ?? []
+        try PersistentJSON.loadRecovering([PebbleTimelineNotification].self, from: fileURL) ?? []
     }
 
     public func save(_ notifications: [PebbleTimelineNotification]) throws {
@@ -375,7 +378,7 @@ public actor NotificationPreferenceLibrary {
         self.fileURL = fileURL ?? applicationSupportURL("notification-preferences.json")
     }
     public func preferences() throws -> NotificationDeliveryPreferences {
-        try PersistentJSON.load(NotificationDeliveryPreferences.self, from: fileURL) ?? NotificationDeliveryPreferences()
+        try PersistentJSON.loadRecovering(NotificationDeliveryPreferences.self, from: fileURL) ?? NotificationDeliveryPreferences()
     }
     public func save(_ preferences: NotificationDeliveryPreferences) throws {
         try PersistentJSON.save(preferences, to: fileURL)
@@ -395,7 +398,7 @@ public actor PendingTimelineOperationLibrary {
     }
 
     public func operations() throws -> [PendingTimelineOperation] {
-        try PersistentJSON.load([PendingTimelineOperation].self, from: fileURL) ?? []
+        try PersistentJSON.loadRecovering([PendingTimelineOperation].self, from: fileURL) ?? []
     }
 
     public func save(_ operations: [PendingTimelineOperation]) throws {
@@ -414,20 +417,20 @@ public struct StoredAppMessage: Codable, Equatable, Identifiable, Sendable {
 public actor PendingAppMessageLibrary {
     private var fileURL: URL
     public init(fileURL: URL? = nil) { self.fileURL = fileURL ?? applicationSupportURL("pending-appmessages.json") }
-    public func messages() throws -> [StoredAppMessage] { try PersistentJSON.load([StoredAppMessage].self, from: fileURL) ?? [] }
+    public func messages() throws -> [StoredAppMessage] { try PersistentJSON.loadRecovering([StoredAppMessage].self, from: fileURL) ?? [] }
     public func save(_ messages: [StoredAppMessage]) throws { try PersistentJSON.save(messages, to: fileURL) }
 }
 
 public actor PendingFirmwareUpdateLibrary {
     private var fileURL: URL
     private var journalURL: URL
-    public func package() throws -> PBZFirmwarePackage? { try PersistentJSON.load(PBZFirmwarePackage.self, from: fileURL) }
+    public func package() throws -> PBZFirmwarePackage? { try PersistentJSON.loadRecovering(PBZFirmwarePackage.self, from: fileURL) }
     public init(fileURL: URL? = nil, journalURL: URL? = nil) {
         self.fileURL = fileURL ?? applicationSupportURL("pending-firmware.json")
         self.journalURL = journalURL ?? applicationSupportURL("pending-firmware-journal.json")
     }
     public func journal() throws -> FirmwareUpdateJournal? {
-        try PersistentJSON.load(FirmwareUpdateJournal.self, from: journalURL)
+        try PersistentJSON.loadRecovering(FirmwareUpdateJournal.self, from: journalURL)
     }
     public func save(_ package: PBZFirmwarePackage, journal: FirmwareUpdateJournal) throws {
         try PersistentJSON.save(package, to: fileURL)
@@ -487,6 +490,25 @@ private enum PersistentJSON {
     static func save<Value: Encodable>(_ value: Value, to url: URL) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try JSONEncoder().encode(value).write(to: url, options: .atomic)
+    }
+
+    static func loadRecovering<Value: Decodable>(_ type: Value.Type, from url: URL) throws -> Value? {
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        let data = try Data(contentsOf: url)
+        do {
+            return try JSONDecoder().decode(type, from: data)
+        } catch is DecodingError {
+            try quarantine(url)
+            return nil
+        }
+    }
+
+    static func quarantine(_ url: URL) throws {
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        let backupURL = url
+            .deletingLastPathComponent()
+            .appending(path: "\(url.lastPathComponent).corrupt-\(UUID().uuidString)")
+        try FileManager.default.moveItem(at: url, to: backupURL)
     }
 }
 

@@ -727,7 +727,8 @@ struct APITests {
         let notification = PebbleTimelineNotification(
             parentApplicationID: UUID(),
             title: String(repeating: "石", count: 30),
-            body: "Body"
+            body: "Body",
+            appName: nil
         )
 
         let value = try notification.encoded()
@@ -744,7 +745,8 @@ struct APITests {
         let notification = PebbleTimelineNotification(
             parentApplicationID: UUID(),
             title: "Title",
-            body: "Body"
+            body: "Body",
+            appName: nil
         )
 
         try await client.sendNotification(notification)
@@ -857,7 +859,7 @@ struct CompanionDataTests {
         let bytes = try pin.encoded()
         #expect(bytes[38] == 0x02)
         #expect(bytes[41] == 0x01)
-        #expect(TimelinePinCodec.insertFrame(pin, token: 1).endpoint == BlobDBCodec.endpoint)
+        #expect(try TimelinePinCodec.insertFrame(pin, token: 1).endpoint == BlobDBCodec.endpoint)
     }
 
     @Test func healthLibraryPersistsSamples() async throws {
@@ -953,11 +955,13 @@ struct CompanionDataTests {
         let bytes = Data([1, 2, 3, 4])
         let blob = PBZFirmwareBlob(
             name: "firmware.bin", type: "normal", hardwareRevision: "EMERY",
-            size: bytes.count, crc: PebbleCRC32.calculate([UInt8](bytes))
+            size: bytes.count, crc: PebbleCRC32.calculate([UInt8](bytes)),
+            versionTag: nil, slot: nil
         )
         let package = PBZFirmwarePackage(
-            manifest: PBZFirmwareManifest(manifestVersion: 1, firmware: blob),
-            firmware: bytes
+            manifest: PBZFirmwareManifest(manifestVersion: 1, firmware: blob, resources: nil),
+            firmware: bytes,
+            resources: nil
         )
         try package.validateIntegrity()
         #expect(package.sha256.count == 64)
@@ -968,7 +972,8 @@ struct CompanionDataTests {
             journalURL: directory.appending(path: "journal.json")
         )
         let journal = FirmwareUpdateJournal(
-            deviceID: "watch", hardwareRevision: "EMERY", packageSHA256: package.sha256
+            deviceID: "watch", hardwareRevision: "EMERY", previousVersion: nil,
+            targetVersion: nil, packageSHA256: package.sha256
         )
         try await library.save(package, journal: journal)
         #expect(try await library.journal() == journal)
@@ -1033,5 +1038,56 @@ struct CompanionDataTests {
         try JSONEncoder().encode(snapshot).write(to: url, options: .atomic)
         let catalog = PebbleAppCatalog(cacheURL: url)
         #expect(try await catalog.cachedSnapshot() == snapshot)
+    }
+
+    @Test func reconnectBackoffGrowsExponentiallyAndCaps() {
+        var backoff = PebbleReconnectBackoff(
+            attempt: 0,
+            initialDelay: .seconds(2),
+            maximumDelay: .seconds(10)
+        )
+
+        #expect(backoff.nextDelay() == .seconds(2))
+        #expect(backoff.nextDelay() == .seconds(4))
+        #expect(backoff.nextDelay() == .seconds(8))
+        #expect(backoff.nextDelay() == .seconds(10))
+        #expect(backoff.nextDelay() == .seconds(10))
+
+        backoff.reset()
+        #expect(backoff.nextDelay() == .seconds(2))
+    }
+
+    @Test func corruptPendingOperationsAreQuarantinedAndRecovered() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let url = directory.appending(path: "pending-timeline.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data("not-json".utf8).write(to: url)
+        let library = PendingTimelineOperationLibrary(fileURL: url)
+
+        #expect(try await library.operations().isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: url.path))
+        let backups = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+        #expect(backups.count == 1)
+        #expect(backups[0].hasPrefix("pending-timeline.json.corrupt-"))
+
+        let operation = PendingTimelineOperation.delete(UUID())
+        try await library.save([operation])
+        #expect(try await library.operations() == [operation])
+    }
+
+    @Test func corruptCatalogIsQuarantinedAndReturnsNoSnapshot() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let url = directory.appending(path: "catalog.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data([0xFF, 0x00, 0x01]).write(to: url)
+        let catalog = PebbleAppCatalog(cacheURL: url)
+
+        #expect(try await catalog.cachedSnapshot() == nil)
+        #expect(!FileManager.default.fileExists(atPath: url.path))
+        let backups = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+        #expect(backups.count == 1)
+        #expect(backups[0].hasPrefix("catalog.json.corrupt-"))
     }
 }

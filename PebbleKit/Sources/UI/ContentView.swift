@@ -5,6 +5,17 @@ import UniformTypeIdentifiers
 import WebKit
 
 #if os(macOS)
+import AppKit
+#elseif os(iOS)
+import UIKit
+#endif
+
+public extension Notification.Name {
+    static var pebbleScanRequested: Notification.Name { Notification.Name("PebbleScanRequested") }
+    static var pebbleSectionRequested: Notification.Name { Notification.Name("PebbleSectionRequested") }
+}
+
+#if os(macOS)
 @MainActor
 public func makeQEMUPebbleClient() -> any PebbleClient {
     QEMUPebbleClient()
@@ -75,13 +86,24 @@ private enum AppSection: String, CaseIterable, Identifiable {
 
 private struct AppRootView: View {
     var model: AppModel
+    @AppStorage("hasCompletedPebbleOnboarding") private var hasCompletedOnboarding = false
 
     var body: some View {
+        Group {
 #if os(macOS)
-        MacRootView(model: model)
+            MacRootView(model: model)
 #else
-        IOSRootView(model: model)
+            IOSRootView(model: model)
 #endif
+        }
+        .sheet(isPresented: Binding(
+            get: { !hasCompletedOnboarding },
+            set: { if !$0 { hasCompletedOnboarding = true } }
+        )) {
+            OnboardingView {
+                hasCompletedOnboarding = true
+            }
+        }
     }
 }
 
@@ -99,8 +121,21 @@ private struct MacRootView: View {
             .navigationTitle("Pebble")
         } detail: {
             NavigationStack {
-                SectionContent(section: selection ?? .devices, model: model)
+                VStack(spacing: 0) {
+                    ConnectionStatusBanner(state: model.connectionState)
+                    SectionContent(section: selection ?? .devices, model: model)
+                }
             }
+        }
+        .frame(minWidth: 680, minHeight: 480)
+        .onReceive(NotificationCenter.default.publisher(for: .pebbleScanRequested)) { _ in
+            selection = .devices
+            Task { await model.scan() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .pebbleSectionRequested)) { notification in
+            guard let rawValue = notification.object as? String,
+                  let requestedSection = AppSection(rawValue: rawValue) else { return }
+            selection = requestedSection
         }
     }
 }
@@ -118,9 +153,76 @@ private struct IOSRootView: View {
                 }
             }
         }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            ConnectionStatusBanner(state: model.connectionState)
+        }
     }
 }
 #endif
+
+private struct OnboardingView: View {
+    var complete: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Label("Welcome to Pebble", systemImage: "applewatch")
+                .font(.largeTitle)
+                .accessibilityAddTraits(.isHeader)
+            Text("Connect your Pebble, install watch apps, and keep timeline and health data synchronized.")
+                .font(.body)
+            VStack(alignment: .leading, spacing: 12) {
+                Label("Turn on your Pebble and keep it nearby.", systemImage: "1.circle")
+                Label("Allow Bluetooth access when requested.", systemImage: "2.circle")
+                Label("Choose Devices, then Scan to connect.", systemImage: "3.circle")
+            }
+            .accessibilityElement(children: .contain)
+            HStack {
+                Spacer()
+                Button("Get Started", action: complete)
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(24)
+        .frame(minWidth: 420, idealWidth: 520)
+    }
+}
+
+private struct ConnectionStatusBanner: View {
+    var state: PebbleConnectionState
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    var body: some View {
+        Label(title, systemImage: systemImage)
+            .font(.callout)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            .background(reduceTransparency ? AnyShapeStyle(.background) : AnyShapeStyle(.regularMaterial))
+            .accessibilityLabel("Connection status: \(title)")
+    }
+
+    private var title: String {
+        switch state {
+        case .idle: "Not connected"
+        case .scanning: "Scanning for watches…"
+        case .connecting: "Connecting…"
+        case .negotiating: "Setting up connection…"
+        case .connected(let device): "Connected to \(device.name)"
+        case .reconnecting: "Connection lost — reconnecting…"
+        case .failed(let error): "Connection failed: \(error.message)"
+        }
+    }
+
+    private var systemImage: String {
+        switch state {
+        case .connected: "checkmark.circle.fill"
+        case .scanning, .connecting, .negotiating, .reconnecting: "arrow.triangle.2.circlepath"
+        case .failed: "exclamationmark.triangle.fill"
+        case .idle: "applewatch.slash"
+        }
+    }
+}
 
 private struct SectionContent: View {
     var section: AppSection
@@ -185,6 +287,7 @@ private struct HealthView: View {
     var model: AppModel
     @State private var period: HealthAnalysisPeriod = .week
     @State private var isImportingArchive = false
+    @State private var isConfirmingHealthDeletion = false
 
     var body: some View {
         List {
@@ -233,7 +336,7 @@ private struct HealthView: View {
                 isImportingArchive = true
             }
             Button("Delete Local Health Data", role: .destructive) {
-                Task { await model.deleteHealthData() }
+                isConfirmingHealthDeletion = true
             }
             if let message = model.dataSyncStatusMessage { Text(message).foregroundStyle(.secondary) }
         }
@@ -242,6 +345,18 @@ private struct HealthView: View {
         .fileImporter(isPresented: $isImportingArchive, allowedContentTypes: [.json]) { result in
             guard case .success(let url) = result else { return }
             Task { await model.importHealthData(from: url) }
+        }
+        .confirmationDialog(
+            "Delete all local health data?",
+            isPresented: $isConfirmingHealthDeletion,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Health Data", role: .destructive) {
+                Task { await model.deleteHealthData() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes locally stored step and sleep history. This action cannot be undone.")
         }
     }
 
@@ -372,6 +487,7 @@ private struct CatalogApplicationRow: View {
                     .foregroundStyle(.secondary)
             }
             .frame(width: 44, height: 44)
+            .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(application.name).font(.headline)
                 Text("\(application.developer) · \(application.version)").foregroundStyle(.secondary)
@@ -420,6 +536,7 @@ private struct CatalogApplicationDetailView: View {
                                     ProgressView()
                                 }
                                 .frame(width: 220, height: 220)
+                                .accessibilityLabel("Screenshot of \(application.name)")
                             }
                         }
                     }
@@ -451,6 +568,7 @@ private struct CatalogApplicationDetailView: View {
 private struct ApplicationsView: View {
     var model: AppModel
     @State private var isChoosingPackage = false
+    @State private var pendingRemovalID: UUID?
 
     var body: some View {
         ApplicationsContent(
@@ -465,7 +583,7 @@ private struct ApplicationsView: View {
             installingApplicationName: model.installingApplicationName,
             installationProgress: model.installationProgress,
             removeApplication: { applicationID in
-                Task { await model.removeApplication(id: applicationID) }
+                pendingRemovalID = applicationID
             },
             reorderApplications: { kind, offsets, destination in
                 Task {
@@ -510,6 +628,23 @@ private struct ApplicationsView: View {
                 return
             }
             Task { await model.importApplication(from: url) }
+        }
+        .confirmationDialog(
+            "Remove this watch application?",
+            isPresented: Binding(
+                get: { pendingRemovalID != nil },
+                set: { if !$0 { pendingRemovalID = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Remove Application", role: .destructive) {
+                guard let applicationID = pendingRemovalID else { return }
+                pendingRemovalID = nil
+                Task { await model.removeApplication(id: applicationID) }
+            }
+            Button("Cancel", role: .cancel) { pendingRemovalID = nil }
+        } message: {
+            Text("The application and its settings will be removed from the connected Pebble.")
         }
         .sheet(isPresented: Binding(
             get: { model.configurationURL != nil },
@@ -745,7 +880,7 @@ private struct ApplicationRow: View {
             }
         }
         .frame(minHeight: 44)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
     }
 }
 
@@ -766,6 +901,7 @@ private struct ApplicationPlaceholderRow: View {
 
 private struct DevicesView: View {
     var model: AppModel
+    @State private var pendingForgottenWatch: SavedPebbleWatch?
 
     var body: some View {
         List {
@@ -816,7 +952,7 @@ private struct DevicesView: View {
                                 }
                             },
                             forget: {
-                                Task { await model.forgetWatch(id: watch.id) }
+                                pendingForgottenWatch = watch
                             }
                         )
                     }
@@ -838,7 +974,25 @@ private struct DevicesView: View {
                     }
                 }
                 .disabled(isBusy)
+                .keyboardShortcut("r", modifiers: .command)
             }
+        }
+        .confirmationDialog(
+            "Forget \(pendingForgottenWatch?.name ?? "this watch")?",
+            isPresented: Binding(
+                get: { pendingForgottenWatch != nil },
+                set: { if !$0 { pendingForgottenWatch = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Forget Watch", role: .destructive) {
+                guard let watch = pendingForgottenWatch else { return }
+                pendingForgottenWatch = nil
+                Task { await model.forgetWatch(id: watch.id) }
+            }
+            Button("Cancel", role: .cancel) { pendingForgottenWatch = nil }
+        } message: {
+            Text("Automatic reconnection information for this Pebble will be removed.")
         }
         .overlay {
             if isBusy {
@@ -987,12 +1141,20 @@ private struct SettingsView: View {
     @State private var catalogSource = UserDefaults.standard.string(forKey: "appCatalogSource")
         ?? "https://appstore-api.repebble.com/api"
     @AppStorage("autoResumeFirmwareUpdate") private var autoResumeFirmwareUpdate = true
+    @State private var destructiveFirmwareAction: FirmwareDestructiveAction?
 
     var body: some View {
         Form {
             Section("Support") {
                 LabeledContent("Supported Watches", value: "3 models")
                 LabeledContent("Connection", value: "Bluetooth LE")
+            }
+            Section("Permissions") {
+                LabeledContent("Bluetooth", value: "Required to connect to Pebble")
+                LabeledContent("Calendar", value: "Used only when you sync timeline events")
+                Button("Open Privacy Settings", systemImage: "gear") {
+                    openPrivacySettings()
+                }
             }
             Section {
                 Toggle("Watch App Notifications", isOn: Binding(
@@ -1064,7 +1226,7 @@ private struct SettingsView: View {
                 .disabled(model.connectedDevice == nil)
                 if model.firmwareRequiresConfirmation {
                     Button("Install Recovery Firmware", role: .destructive) {
-                        Task { await model.confirmRecoveryFirmwareUpdate() }
+                        destructiveFirmwareAction = .installRecovery
                     }
                 }
                 if let journal = model.firmwareUpdateJournal {
@@ -1085,7 +1247,7 @@ private struct SettingsView: View {
                         Task { await model.cancelFirmwareUpdate() }
                     }
                     Button("Discard Recovery Data", role: .destructive) {
-                        Task { await model.discardPendingFirmwareUpdate() }
+                        destructiveFirmwareAction = .discardRecovery
                     }
                 }
                 if let message = model.firmwareUpdateStatusMessage { Text(message).foregroundStyle(.secondary) }
@@ -1101,6 +1263,67 @@ private struct SettingsView: View {
         .fileImporter(isPresented: $isChoosingFirmware, allowedContentTypes: [.pebbleFirmware]) { result in
             guard case .success(let url) = result else { return }
             Task { await model.installFirmware(from: url) }
+        }
+        .confirmationDialog(
+            destructiveFirmwareAction?.title ?? "Confirm firmware action",
+            isPresented: Binding(
+                get: { destructiveFirmwareAction != nil },
+                set: { if !$0 { destructiveFirmwareAction = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(destructiveFirmwareAction?.buttonTitle ?? "Continue", role: .destructive) {
+                let action = destructiveFirmwareAction
+                destructiveFirmwareAction = nil
+                Task {
+                    switch action {
+                    case .installRecovery: await model.confirmRecoveryFirmwareUpdate()
+                    case .discardRecovery: await model.discardPendingFirmwareUpdate()
+                    case nil: break
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) { destructiveFirmwareAction = nil }
+        } message: {
+            Text(destructiveFirmwareAction?.message ?? "Review this action before continuing.")
+        }
+    }
+
+    private func openPrivacySettings() {
+#if os(macOS)
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy") else { return }
+        NSWorkspace.shared.open(url)
+#elseif os(iOS)
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
+#endif
+    }
+}
+
+private enum FirmwareDestructiveAction: Identifiable {
+    case installRecovery
+    case discardRecovery
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .installRecovery: "Install recovery firmware?"
+        case .discardRecovery: "Discard recovery data?"
+        }
+    }
+
+    var buttonTitle: String {
+        switch self {
+        case .installRecovery: "Install Recovery Firmware"
+        case .discardRecovery: "Discard Recovery Data"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .installRecovery: "Installing recovery firmware can make the watch temporarily unavailable. Keep it connected until the update completes."
+        case .discardRecovery: "The interrupted update can no longer be resumed after its recovery data is discarded."
         }
     }
 }
