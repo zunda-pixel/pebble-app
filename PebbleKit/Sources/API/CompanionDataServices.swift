@@ -481,7 +481,7 @@ public enum AppCatalogError: Error, Equatable, Sendable {
     case incompatibleHardware
 }
 
-private enum PersistentJSON {
+enum PersistentJSON {
     static var maximumFileSize: Int { 64 * 1_024 * 1_024 }
 
     static func load<Value: Decodable>(_ type: Value.Type, from url: URL) throws -> Value? {
@@ -530,7 +530,7 @@ private extension FixedWidthInteger {
     var littleEndianBytes: [UInt8] { withUnsafeBytes(of: littleEndian) { Array($0) } }
 }
 
-private func applicationSupportURL(_ name: String) -> URL {
+func applicationSupportURL(_ name: String) -> URL {
     let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
         ?? FileManager.default.temporaryDirectory
     return base.appending(path: "Pebble", directoryHint: .isDirectory).appending(path: name)

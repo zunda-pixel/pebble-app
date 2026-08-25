@@ -51,6 +51,9 @@
     "Apps" : {
 
     },
+    "Apps the watch has seen sending notifications. Turning one off tells the watch to filter that app's notifications." : {
+
+    },
     "Automatic reconnection information for this Pebble will be removed." : {
 
     },
@@ -198,6 +201,9 @@
     "Importing Pebble application" : {
 
     },
+    "Incoming Call" : {
+
+    },
     "Incompatible" : {
 
     },
@@ -259,6 +265,9 @@
 
     },
     "Permissions" : {
+
+    },
+    "Phone App Notifications" : {
 
     },
     "Pins" : {

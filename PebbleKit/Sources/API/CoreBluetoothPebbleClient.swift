@@ -577,6 +577,16 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             return
         }
 
+        if PhoneVersionCodec.isRequest(frame) {
+            #if os(macOS)
+            let operatingSystem = PhoneOperatingSystem.macOS
+            #else
+            let operatingSystem = PhoneOperatingSystem.iOS
+            #endif
+            try sendFrame(PhoneVersionCodec.responseFrame(operatingSystem: operatingSystem), to: peripheral)
+            return
+        }
+
         if frame.endpoint == AppFetchCodec.endpoint {
             eventContinuation?.yield(.appFetchRequested(try AppFetchCodec.decodeRequest(frame)))
             return

@@ -56,6 +56,7 @@ public final class AppModel {
     public private(set) var dataSyncStatusMessage: String?
     public private(set) var timelineActionStatusMessage: String?
     public private(set) var healthExportURL: URL?
+    public private(set) var notificationSourceApps: [NotificationSourceApp] = []
 
     public var isScanningOrConnecting: Bool {
         switch connectionState {
@@ -83,6 +84,22 @@ public final class AppModel {
     #if os(iOS)
     private let healthKitBridge = HealthKitBridge()
     #endif
+    private let notificationSourceAppLibrary = NotificationSourceAppLibrary()
+    @ObservationIgnored private var companionFramesTask: Task<Void, Never>?
+    @ObservationIgnored private var synchronizedNotificationAppRecords: [String: [UInt8]] = [:]
+    @ObservationIgnored private var blobDBTokenCounter: UInt16 = 0x4000
+    @ObservationIgnored private lazy var musicCoordinator = MusicCoordinator(
+        source: makeSystemMusicSource(),
+        send: { [client] frame in try await client.send(frame) }
+    )
+    @ObservationIgnored private lazy var phoneCallCoordinator = PhoneCallCoordinator(
+        source: makeSystemCallSource(),
+        send: { [client] frame in try await client.send(frame) }
+    )
+    @ObservationIgnored private lazy var voiceCoordinator = VoiceSessionCoordinator(
+        provider: nil,
+        send: { [client] frame in try await client.send(frame) }
+    )
     @ObservationIgnored private var connectionEventsTask: Task<Void, Never>?
     @ObservationIgnored private var firmwareUpdateTask: Task<Void, any Error>?
     @ObservationIgnored private var appFetchTask: Task<Void, Never>?
@@ -166,6 +183,9 @@ public final class AppModel {
         await loadHealth()
         await loadCatalog()
         firmwareUpdateJournal = try? await pendingFirmwareUpdateLibrary.journal()
+        notificationSourceApps = (try? await notificationSourceAppLibrary.apps()) ?? []
+        musicCoordinator.start()
+        phoneCallCoordinator.start()
         if savedWatches.contains(where: \.automaticallyConnects) {
             await scan()
         }
@@ -223,6 +243,9 @@ public final class AppModel {
             await restorePendingNotifications()
             await PebbleDiagnostics.shared.record(category: "connection", message: "Watch connected")
             observeConnectionEvents()
+            observeCompanionFrames()
+            musicCoordinator.watchConnected()
+            await synchronizeNotificationSourceApps()
             await synchronizeApplications(with: connectedDevice)
             try? await client.send(AppRunStateCodec.requestFrame())
             await flushPendingNotifications()
@@ -1105,8 +1128,10 @@ public final class AppModel {
                 switch event {
                 case .deviceUpdated(let device):
                     self?.connectionState = .connected(device)
+                    self?.musicCoordinator.watchConnected()
                     Task { [weak self] in
                         await self?.recordConnectedWatch(device)
+                        await self?.synchronizeNotificationSourceApps()
                         await self?.synchronizeApplications(with: device)
                         await self?.flushPendingNotifications()
                         await self?.flushPendingAppMessages()
@@ -1130,6 +1155,8 @@ public final class AppModel {
                     self?.isHandlingAppFetch = false
                     self?.applicationManagementOperation = nil
                     self?.applicationManagementStatusMessage = nil
+                    self?.synchronizedNotificationAppRecords = [:]
+                    self?.voiceCoordinator.reset()
                     return
                 case .healthSyncCompleted(let succeeded):
                     self?.dataSyncStatusMessage = succeeded ? "Health synchronization completed." : "The watch rejected health synchronization."
@@ -1165,6 +1192,101 @@ public final class AppModel {
                     }
                 }
             }
+        }
+    }
+
+    private func observeCompanionFrames() {
+        companionFramesTask?.cancel()
+        companionFramesTask = Task { [weak self, client] in
+            for await frame in client.frames() {
+                guard !Task.isCancelled, let self else {
+                    return
+                }
+                switch frame.endpoint {
+                case MusicControlCodec.endpoint:
+                    self.musicCoordinator.handleFrame(frame)
+                case PhoneControlCodec.endpoint:
+                    self.phoneCallCoordinator.handleFrame(frame)
+                case VoiceControlCodec.endpoint:
+                    await self.voiceCoordinator.handleVoiceFrame(frame)
+                case AudioStreamCodec.endpoint:
+                    await self.voiceCoordinator.handleAudioFrame(frame)
+                case BlobDB2Codec.endpoint:
+                    await self.handleWatchDatabaseWrite(frame)
+                default:
+                    continue
+                }
+            }
+        }
+    }
+
+    private func handleWatchDatabaseWrite(_ frame: PebbleProtocolFrame) async {
+        guard let message = try? BlobDB2Codec.decode(frame) else {
+            return
+        }
+        switch message {
+        case .write(let write), .writeBack(let write):
+            var succeeded = false
+            if write.databaseID == NotificationAppsCodec.databaseID,
+               let app = try? NotificationAppsCodec.decodeRecord(
+                   key: write.key,
+                   value: write.value,
+                   timestamp: write.timestamp
+               ),
+               let apps = try? await notificationSourceAppLibrary.merge(app) {
+                notificationSourceApps = apps
+                // The watch already holds this record; skip echoing it back.
+                synchronizedNotificationAppRecords[app.bundleID] = NotificationAppsCodec.value(
+                    for: apps.first { $0.bundleID == app.bundleID } ?? app
+                )
+                succeeded = true
+            }
+            try? await client.send(BlobDB2Codec.responseFrame(to: message, succeeded: succeeded))
+        case .syncDone:
+            try? await client.send(BlobDB2Codec.responseFrame(to: message, succeeded: true))
+        }
+    }
+
+    private func synchronizeNotificationSourceApps() async {
+        for app in notificationSourceApps {
+            let value = NotificationAppsCodec.value(for: app)
+            guard synchronizedNotificationAppRecords[app.bundleID] != value else {
+                continue
+            }
+            blobDBTokenCounter &+= 1
+            do {
+                try await client.send(NotificationAppsCodec.insertFrame(app: app, token: blobDBTokenCounter))
+                synchronizedNotificationAppRecords[app.bundleID] = value
+            } catch {
+                return
+            }
+        }
+    }
+
+    public func setNotificationSourceAppMute(bundleID: String, muteState: NotificationAppMuteState) async {
+        guard var app = notificationSourceApps.first(where: { $0.bundleID == bundleID }) else {
+            return
+        }
+        app.muteState = muteState
+        app.muteExpiration = nil
+        app.stateUpdated = .now
+        if let apps = try? await notificationSourceAppLibrary.merge(app) {
+            notificationSourceApps = apps
+        }
+        await synchronizeNotificationSourceApps()
+    }
+
+    public func removeNotificationSourceApps(at offsets: IndexSet) async {
+        let removed = offsets.compactMap { notificationSourceApps.indices.contains($0) ? notificationSourceApps[$0] : nil }
+        guard !removed.isEmpty else { return }
+        var apps = notificationSourceApps
+        apps.remove(atOffsets: offsets)
+        try? await notificationSourceAppLibrary.save(apps)
+        notificationSourceApps = (try? await notificationSourceAppLibrary.apps()) ?? apps
+        for app in removed {
+            blobDBTokenCounter &+= 1
+            synchronizedNotificationAppRecords[app.bundleID] = nil
+            try? await client.send(NotificationAppsCodec.deleteFrame(bundleID: app.bundleID, token: blobDBTokenCounter))
         }
     }
 

@@ -377,6 +377,8 @@ public final class QEMUPebbleClient: PebbleClient {
             if case .ping(let cookie) = try PingPongCodec.decode(frame) {
                 Task { try? await send(PingPongCodec.frame(for: .pong(cookie: cookie))) }
             }
+        } else if PhoneVersionCodec.isRequest(frame) {
+            Task { try? await send(PhoneVersionCodec.responseFrame(operatingSystem: .macOS)) }
         } else if frame.endpoint == AppFetchCodec.endpoint {
             eventContinuation?.yield(.appFetchRequested(try AppFetchCodec.decodeRequest(frame)))
         } else if frame.endpoint == HealthSyncCodec.endpoint {

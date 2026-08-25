@@ -1270,6 +1270,30 @@ private struct SettingsView: View {
             } footer: {
                 Text("System notifications are delivered directly to a paired Pebble using Apple Notification Center Service. This switch controls notifications created by installed watch apps.")
             }
+            if !model.notificationSourceApps.isEmpty {
+                Section {
+                    ForEach(model.notificationSourceApps) { app in
+                        Toggle(app.displayName, isOn: Binding(
+                            get: { app.muteState == .never },
+                            set: { enabled in
+                                Task {
+                                    await model.setNotificationSourceAppMute(
+                                        bundleID: app.bundleID,
+                                        muteState: enabled ? .never : .always
+                                    )
+                                }
+                            }
+                        ))
+                    }
+                    .onDelete { offsets in
+                        Task { await model.removeNotificationSourceApps(at: offsets) }
+                    }
+                } header: {
+                    Text("Phone App Notifications")
+                } footer: {
+                    Text("Apps the watch has seen sending notifications. Turning one off tells the watch to filter that app's notifications.")
+                }
+            }
             Section("Diagnostics") {
                 Button("Prepare Diagnostic Report", systemImage: "stethoscope") {
                     Task { await model.prepareDiagnosticReport() }
