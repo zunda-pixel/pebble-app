@@ -21,6 +21,8 @@ public final class QEMUPebbleClient: PebbleClient {
     private var waitingForReorder = false
     private var transferSession: PutBytesTransferSession?
     private var completedTransferCookie: UInt32?
+    private var waitingForFirmwareStart = false
+    private var pendingInstallCookie: UInt32?
     private var nextAppMessageTransactionID: UInt8 = 0
     private var pendingAppMessageTransactionID: UInt8?
     private var reconnectDevice: DiscoveredPebble?
@@ -197,7 +199,8 @@ public final class QEMUPebbleClient: PebbleClient {
     public func installFirmware(_ package: PBZFirmwarePackage) async throws {
         let total = package.firmware.count + (package.resources?.count ?? 0)
         guard let byteCount = UInt32(exactly: total) else { throw PutBytesTransferError.invalidConfiguration }
-        try await send(SystemMessageCodec.firmwareUpdateStartFrame(bytesToSend: byteCount))
+        waitingForFirmwareStart = true
+        try await performOperation(frame: SystemMessageCodec.firmwareUpdateStartFrame(bytesToSend: byteCount), timeout: .seconds(10))
         try await installApplicationObject([UInt8](package.firmware), objectType: package.manifest.firmware.type == "recovery" ? .recovery : .firmware, appBankID: UInt32(package.manifest.firmware.slot ?? 0))
         guard let firmwareCookie = completedTransferCookie else { throw PutBytesTransferError.invalidState }
         var cookies = [firmwareCookie]
@@ -206,7 +209,10 @@ public final class QEMUPebbleClient: PebbleClient {
             guard let resourceCookie = completedTransferCookie else { throw PutBytesTransferError.invalidState }
             cookies.append(resourceCookie)
         }
-        for cookie in cookies { try await send(PutBytesCodec.installFrame(cookie: cookie)) }
+        for cookie in cookies {
+            pendingInstallCookie = cookie
+            try await performOperation(frame: PutBytesCodec.installFrame(cookie: cookie), timeout: .seconds(10))
+        }
         try await send(SystemMessageCodec.firmwareUpdateCompleteFrame())
     }
 
@@ -366,6 +372,12 @@ public final class QEMUPebbleClient: PebbleClient {
             }
         } else if frame.endpoint == AppFetchCodec.endpoint {
             eventContinuation?.yield(.appFetchRequested(try AppFetchCodec.decodeRequest(frame)))
+        } else if frame.endpoint == HealthSyncCodec.endpoint {
+            eventContinuation?.yield(.healthSyncCompleted(try HealthSyncResponseCodec.decode(frame)))
+        } else if frame.endpoint == TimelineActionCodec.endpoint {
+            let invocation = try TimelineActionCodec.decode(frame)
+            eventContinuation?.yield(.timelineActionInvoked(invocation))
+            Task { try? await send(TimelineActionCodec.responseFrame(itemID: invocation.itemID, succeeded: true)) }
         } else if frame.endpoint == BlobDBCodec.endpoint, let token = pendingBlobToken {
             let response = try BlobDBCodec.decodeResponse(frame)
             guard response.token == token else { return }
@@ -393,6 +405,16 @@ public final class QEMUPebbleClient: PebbleClient {
                     finishOperation()
                 }
             }
+        } else if frame.endpoint == PutBytesCodec.endpoint, let cookie = pendingInstallCookie {
+            let response = try PutBytesCodec.decodeResponse(frame)
+            guard response.cookie == cookie else { return }
+            pendingInstallCookie = nil
+            response.result == .acknowledgement ? finishOperation() : failOperation(PutBytesTransferError.negativeAcknowledgement)
+        } else if frame.endpoint == SystemMessageCodec.endpoint, waitingForFirmwareStart {
+            waitingForFirmwareStart = false
+            try SystemMessageCodec.decodeFirmwareUpdateStartResponse(frame)
+                ? finishOperation()
+                : failOperation(SystemMessageCodecError.updateRejected)
         } else if frame.endpoint == AppMessageCodec.endpoint {
             switch try AppMessageCodec.decode(frame) {
             case .push(let message): eventContinuation?.yield(.appMessageReceived(message))
@@ -430,6 +452,8 @@ public final class QEMUPebbleClient: PebbleClient {
         waitingForReorder = false
         transferSession = nil
         pendingAppMessageTransactionID = nil
+        pendingInstallCookie = nil
+        waitingForFirmwareStart = false
         operationContinuation?.resume(throwing: error)
         operationContinuation = nil
     }

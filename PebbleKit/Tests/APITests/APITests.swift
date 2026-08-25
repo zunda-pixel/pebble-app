@@ -786,6 +786,19 @@ struct PebbleWatchLibraryTests {
 
 @Suite
 struct CompanionDataTests {
+    @Test func firmwareStartResponseAndTimelineActionRoundTrip() throws {
+        #expect(try SystemMessageCodec.decodeFirmwareUpdateStartResponse(PebbleProtocolFrame(
+            endpoint: SystemMessageCodec.endpoint, payload: [0, 0x0A, 1]
+        )))
+        let id = try #require(UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF"))
+        let invocation = try TimelineActionCodec.decode(PebbleProtocolFrame(
+            endpoint: TimelineActionCodec.endpoint,
+            payload: [0x02] + BlobDBCodec.uuidBytes(id) + [7, 0]
+        ))
+        #expect(invocation == TimelineActionInvocation(itemID: id, actionID: 7))
+        #expect(TimelineActionCodec.responseFrame(itemID: id, succeeded: true).payload.last == 0)
+    }
+
     @Test func firmwareUsesSystemPutBytesAndSystemMessages() throws {
         var session = PutBytesTransferSession(bytes: [1, 2, 3], objectType: .firmware, appBankID: 1)
         guard case .send(let initialization) = try session.start() else {
@@ -826,5 +839,7 @@ struct CompanionDataTests {
         let sample = PebbleHealthSample(date: Date(timeIntervalSince1970: 10), steps: 1234, sleepMinutes: 420)
         try await library.save([sample])
         #expect(try await library.samples() == [sample])
+        let replacement = PebbleHealthSample(date: sample.date, steps: 2000, sleepMinutes: 400)
+        #expect(try await library.merge([replacement]) == [replacement])
     }
 }

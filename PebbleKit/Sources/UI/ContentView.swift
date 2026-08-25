@@ -1,5 +1,6 @@
 public import SwiftUI
 public import API
+import Charts
 import UniformTypeIdentifiers
 import WebKit
 
@@ -166,6 +167,11 @@ private struct TimelineView: View {
                 }
                 .onDelete { offsets in Task { await model.removeTimelinePins(at: offsets) } }
             }
+            Section("Calendar") {
+                Button("Sync Calendar", systemImage: "calendar.badge.clock") {
+                    Task { await model.synchronizeCalendar() }
+                }
+            }
         }
         .navigationTitle("Timeline")
         .task { await model.loadTimeline() }
@@ -174,12 +180,31 @@ private struct TimelineView: View {
 
 private struct HealthView: View {
     var model: AppModel
+    @State private var period: HealthAnalysisPeriod = .week
 
     var body: some View {
         List {
+            Picker("Period", selection: $period) {
+                ForEach(HealthAnalysisPeriod.allCases) { period in Text(period.rawValue.capitalized).tag(period) }
+            }
+            .pickerStyle(.segmented)
             Section("Today") {
                 LabeledContent("Steps", value: "\(model.healthSamples.last?.steps ?? 0)")
                 LabeledContent("Sleep", value: "\(model.healthSamples.last?.sleepMinutes ?? 0) min")
+            }
+            Section("Steps") {
+                Chart(filteredSamples) { sample in
+                    BarMark(x: .value("Date", sample.date), y: .value("Steps", sample.steps))
+                }
+                .frame(minHeight: 180)
+                LabeledContent("Daily Average", value: "\(averageSteps)")
+            }
+            Section("Sleep") {
+                Chart(filteredSamples) { sample in
+                    LineMark(x: .value("Date", sample.date), y: .value("Minutes", sample.sleepMinutes))
+                }
+                .frame(minHeight: 180)
+                LabeledContent("Daily Average", value: "\(averageSleep) min")
             }
             Button("Sync Health Data", systemImage: "arrow.triangle.2.circlepath") {
                 Task { await model.requestHealthSync() }
@@ -189,11 +214,34 @@ private struct HealthView: View {
             Button("Sync with Apple Health", systemImage: "heart.fill") {
                 Task { await model.synchronizeWithHealthKit() }
             }
+            Button("Import from Apple Health", systemImage: "square.and.arrow.down") {
+                Task { await model.importFromHealthKit() }
+            }
             #endif
+            Button("Export Health Data", systemImage: "square.and.arrow.up") {
+                Task { await model.exportHealthData() }
+            }
+            if let url = model.healthExportURL { ShareLink(item: url) { Text("Share Export") } }
+            Button("Delete Local Health Data", role: .destructive) {
+                Task { await model.deleteHealthData() }
+            }
             if let message = model.dataSyncStatusMessage { Text(message).foregroundStyle(.secondary) }
         }
         .navigationTitle("Health")
         .task { await model.loadHealth() }
+    }
+
+    private var filteredSamples: [PebbleHealthSample] {
+        let start = Calendar.current.date(byAdding: .day, value: -period.days, to: Date()) ?? .distantPast
+        return model.healthSamples.filter { $0.date >= start }
+    }
+
+    private var averageSteps: Int {
+        filteredSamples.isEmpty ? 0 : filteredSamples.map(\.steps).reduce(0, +) / filteredSamples.count
+    }
+
+    private var averageSleep: Int {
+        filteredSamples.isEmpty ? 0 : filteredSamples.map(\.sleepMinutes).reduce(0, +) / filteredSamples.count
     }
 }
 
@@ -724,6 +772,7 @@ private struct SettingsView: View {
     var model: AppModel
     @State private var isChoosingFirmware = false
     @State private var catalogSource = UserDefaults.standard.string(forKey: "appCatalogSource") ?? ""
+    @AppStorage("autoResumeFirmwareUpdate") private var autoResumeFirmwareUpdate = true
 
     var body: some View {
         Form {
@@ -760,6 +809,7 @@ private struct SettingsView: View {
                 }
             }
             Section("Firmware") {
+                Toggle("Resume Interrupted Updates", isOn: $autoResumeFirmwareUpdate)
                 Button("Choose PBZ Firmware", systemImage: "externaldrive.badge.timemachine") {
                     isChoosingFirmware = true
                 }

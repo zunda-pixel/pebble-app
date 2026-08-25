@@ -17,6 +17,8 @@ public enum PebbleClientEvent: Equatable, Sendable {
     case transferProgress(PutBytesTransferProgress)
     case reconnecting(deviceID: String)
     case disconnected(PebbleConnectionError)
+    case healthSyncCompleted(Bool)
+    case timelineActionInvoked(TimelineActionInvocation)
 }
 
 public enum PebbleConnectionError: Error, Equatable, Sendable {

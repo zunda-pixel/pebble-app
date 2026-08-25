@@ -1,7 +1,7 @@
 public import Foundation
 import MemberwiseInit
 
-public enum AppMessageValue: Equatable, Sendable {
+public enum AppMessageValue: Codable, Equatable, Sendable {
     case bytes([UInt8])
     case string(String)
     case unsigned(UInt32)
@@ -9,13 +9,13 @@ public enum AppMessageValue: Equatable, Sendable {
 }
 
 @MemberwiseInit(.public)
-public struct AppMessageTuple: Equatable, Sendable {
+public struct AppMessageTuple: Codable, Equatable, Sendable {
     public var key: UInt32
     public var value: AppMessageValue
 }
 
 @MemberwiseInit(.public)
-public struct AppMessageData: Equatable, Sendable {
+public struct AppMessageData: Codable, Equatable, Sendable {
     public var transactionID: UInt8
     public var applicationID: UUID
     public var tuples: [AppMessageTuple]

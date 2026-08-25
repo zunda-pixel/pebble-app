@@ -60,6 +60,10 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var isAutomaticReconnect = false
     private var activeTransferSession: PutBytesTransferSession?
     private var completedTransferCookie: UInt32?
+    private var firmwareResponseContinuation: CheckedContinuation<Void, any Error>?
+    private var firmwareResponseTimeoutTask: Task<Void, Never>?
+    private var waitingForFirmwareStart = false
+    private var pendingInstallCookie: UInt32?
     private var transferContinuation: CheckedContinuation<Void, any Error>?
     private var nextBlobDBToken: UInt16 = 1
     private var pendingBlobDBToken: UInt16?
@@ -283,7 +287,10 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     public func installFirmware(_ package: PBZFirmwarePackage) async throws {
         let total = package.firmware.count + (package.resources?.count ?? 0)
         guard let byteCount = UInt32(exactly: total) else { throw PutBytesTransferError.invalidConfiguration }
-        try await send(SystemMessageCodec.firmwareUpdateStartFrame(bytesToSend: byteCount))
+        try await sendFirmwareControl(
+            SystemMessageCodec.firmwareUpdateStartFrame(bytesToSend: byteCount),
+            waitingForStart: true
+        )
         try await installApplicationObject([UInt8](package.firmware), objectType: package.manifest.firmware.type == "recovery" ? .recovery : .firmware, appBankID: UInt32(package.manifest.firmware.slot ?? 0))
         guard let firmwareCookie = completedTransferCookie else { throw PutBytesTransferError.invalidState }
         var cookies = [firmwareCookie]
@@ -292,8 +299,26 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             guard let resourceCookie = completedTransferCookie else { throw PutBytesTransferError.invalidState }
             cookies.append(resourceCookie)
         }
-        for cookie in cookies { try await send(PutBytesCodec.installFrame(cookie: cookie)) }
+        for cookie in cookies {
+            pendingInstallCookie = cookie
+            try await sendFirmwareControl(PutBytesCodec.installFrame(cookie: cookie), waitingForStart: false)
+        }
         try await send(SystemMessageCodec.firmwareUpdateCompleteFrame())
+    }
+
+    private func sendFirmwareControl(_ frame: PebbleProtocolFrame, waitingForStart: Bool) async throws {
+        guard let peripheral = connectedPeripheral else { throw PebbleConnectionError.disconnected }
+        self.waitingForFirmwareStart = waitingForStart
+        try await withCheckedThrowingContinuation { continuation in
+            firmwareResponseContinuation = continuation
+            do { try sendFrame(frame, to: peripheral) }
+            catch { finishFirmwareControl(throwing: error); return }
+            firmwareResponseTimeoutTask = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(10))
+                guard !Task.isCancelled else { return }
+                self?.finishFirmwareControl(throwing: PebbleConnectionError.connectionTimedOut)
+            }
+        }
     }
 
     public func registerApplication(_ metadata: PebbleAppMetadata) async throws {
@@ -547,6 +572,18 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             return
         }
 
+        if frame.endpoint == HealthSyncCodec.endpoint {
+            eventContinuation?.yield(.healthSyncCompleted(try HealthSyncResponseCodec.decode(frame)))
+            return
+        }
+
+        if frame.endpoint == TimelineActionCodec.endpoint {
+            let invocation = try TimelineActionCodec.decode(frame)
+            eventContinuation?.yield(.timelineActionInvoked(invocation))
+            try sendFrame(TimelineActionCodec.responseFrame(itemID: invocation.itemID, succeeded: true), to: peripheral)
+            return
+        }
+
         if frame.endpoint == AppMessageCodec.endpoint {
             processAppMessage(frame)
             return
@@ -562,6 +599,24 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             return
         }
 
+        if frame.endpoint == PutBytesCodec.endpoint, let cookie = pendingInstallCookie {
+            let response = try PutBytesCodec.decodeResponse(frame)
+            guard response.cookie == cookie else { return }
+            pendingInstallCookie = nil
+            response.result == .acknowledgement
+                ? finishFirmwareControl()
+                : finishFirmwareControl(throwing: PutBytesTransferError.negativeAcknowledgement)
+            return
+        }
+
+        if frame.endpoint == SystemMessageCodec.endpoint, waitingForFirmwareStart {
+            waitingForFirmwareStart = false
+            try SystemMessageCodec.decodeFirmwareUpdateStartResponse(frame)
+                ? finishFirmwareControl()
+                : finishFirmwareControl(throwing: SystemMessageCodecError.updateRejected)
+            return
+        }
+
         if frame.endpoint == BlobDBCodec.endpoint, pendingBlobDBToken != nil {
             processBlobDBResponse(frame)
             return
@@ -574,6 +629,16 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         let information = try WatchVersionCodec.decode(frame)
         try sendFrame(TimeSynchronizationCodec.frame(), to: peripheral)
         finishConnection(peripheral: peripheral, information: information)
+    }
+
+    private func finishFirmwareControl(throwing error: (any Error)? = nil) {
+        firmwareResponseTimeoutTask?.cancel()
+        firmwareResponseTimeoutTask = nil
+        waitingForFirmwareStart = false
+        pendingInstallCookie = nil
+        if let error { firmwareResponseContinuation?.resume(throwing: error) }
+        else { firmwareResponseContinuation?.resume() }
+        firmwareResponseContinuation = nil
     }
 
     private func processAppMessage(_ frame: PebbleProtocolFrame) {

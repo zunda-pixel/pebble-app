@@ -38,6 +38,7 @@ public final class AppModel {
     public private(set) var catalogApplications: [PebbleCatalogApplication] = []
     public private(set) var firmwareUpdateStatusMessage: String?
     public private(set) var dataSyncStatusMessage: String?
+    public private(set) var healthExportURL: URL?
 
     private let client: any PebbleClient
     private let applicationLibrary: PebbleApplicationLibrary
@@ -46,6 +47,11 @@ public final class AppModel {
     private let healthLibrary = PebbleHealthLibrary()
     private let appCatalog = PebbleAppCatalog()
     private let pendingNotificationLibrary = PendingNotificationLibrary()
+    private let pendingAppMessageLibrary = PendingAppMessageLibrary()
+    private let pendingFirmwareUpdateLibrary = PendingFirmwareUpdateLibrary()
+    private var pendingAppMessages: [StoredAppMessage] = []
+    private let calendarBridge = CalendarBridge()
+    @ObservationIgnored private var calendarChangesTask: Task<Void, Never>?
     #if os(iOS)
     private let healthKitBridge = HealthKitBridge()
     #endif
@@ -61,7 +67,7 @@ public final class AppModel {
         openURLHandler: { [weak self] url in self?.openConfigurationURL(url) },
         appMessageHandler: { [weak self] applicationID, tuples in
             guard let self else { throw PebbleConnectionError.disconnected }
-            try await self.client.sendAppMessage(applicationID: applicationID, tuples: tuples)
+            try await self.sendOrQueueAppMessage(applicationID: applicationID, tuples: tuples)
         },
         notificationHandler: { [weak self] application, title, body in
             guard let self else { throw PebbleConnectionError.disconnected }
@@ -121,12 +127,14 @@ public final class AppModel {
         hasStarted = true
         await loadSavedWatches()
         await restorePendingNotifications()
+        pendingAppMessages = (try? await pendingAppMessageLibrary.messages()) ?? []
         await loadTimeline()
         await loadHealth()
         await loadCatalog()
         if savedWatches.contains(where: \.automaticallyConnects) {
             await scan()
         }
+        observeCalendarChanges()
     }
 
     public func scan() async {
@@ -162,8 +170,10 @@ public final class AppModel {
             observeConnectionEvents()
             await synchronizeApplications(with: connectedDevice)
             await flushPendingNotifications()
+            await flushPendingAppMessages()
             await synchronizeTimeline()
             await requestHealthSync()
+            await resumePendingFirmwareUpdate()
         } catch let error as PebbleConnectionError {
             connectionState = .failed(error)
             await PebbleDiagnostics.shared.record(.error, category: "connection", message: error.message)
@@ -184,8 +194,10 @@ public final class AppModel {
             let package = try await Task.detached {
                 try PBZFirmwareImporter.load(from: url, for: device.model)
             }.value
+            try await pendingFirmwareUpdateLibrary.save(package)
             firmwareUpdateStatusMessage = "Transferring and installing firmware…"
             try await client.installFirmware(package)
+            await pendingFirmwareUpdateLibrary.clear()
             firmwareUpdateStatusMessage = "Firmware installed. Waiting for the watch to restart."
         } catch {
             firmwareUpdateStatusMessage = "Firmware update stopped safely: \(error.localizedDescription)"
@@ -223,6 +235,32 @@ public final class AppModel {
         for pin in timelinePins { try? await client.upsertTimelinePin(pin) }
     }
 
+    public func synchronizeCalendar() async {
+        do {
+            let calendarPins = try await calendarBridge.timelinePins()
+            let oldCalendarPins = timelinePins.filter { $0.parentApplicationID == CalendarBridge.calendarApplicationID }
+            timelinePins.removeAll { $0.parentApplicationID == CalendarBridge.calendarApplicationID }
+            timelinePins.append(contentsOf: calendarPins)
+            try await timelineLibrary.save(timelinePins)
+            if connectedDevice != nil {
+                let newIDs = Set(calendarPins.map(\.id))
+                for pin in oldCalendarPins where !newIDs.contains(pin.id) { try? await client.deleteTimelinePin(id: pin.id) }
+                for pin in calendarPins { try await client.upsertTimelinePin(pin) }
+            }
+            dataSyncStatusMessage = "Calendar synchronized with Timeline."
+        } catch { dataSyncStatusMessage = "Calendar access or synchronization failed." }
+    }
+
+    private func observeCalendarChanges() {
+        calendarChangesTask?.cancel()
+        calendarChangesTask = Task { [weak self] in
+            for await _ in NotificationCenter.default.notifications(named: .EKEventStoreChanged) {
+                guard !Task.isCancelled else { return }
+                await self?.synchronizeCalendar()
+            }
+        }
+    }
+
     public func loadHealth() async {
         do { healthSamples = try await healthLibrary.samples() }
         catch { dataSyncStatusMessage = "Health data could not be loaded." }
@@ -243,7 +281,26 @@ public final class AppModel {
             dataSyncStatusMessage = "Health data synchronized with HealthKit."
         } catch { dataSyncStatusMessage = "HealthKit access or synchronization failed." }
     }
+
+    public func importFromHealthKit() async {
+        do {
+            healthSamples = try await healthLibrary.merge(try await healthKitBridge.readRecentSamples())
+            dataSyncStatusMessage = "HealthKit data imported and deduplicated."
+        } catch { dataSyncStatusMessage = "HealthKit data could not be read." }
+    }
     #endif
+
+    public func exportHealthData() async {
+        do { healthExportURL = try await healthLibrary.export() }
+        catch { dataSyncStatusMessage = "Health data could not be exported." }
+    }
+
+    public func deleteHealthData() async {
+        try? await healthLibrary.deleteAll()
+        healthSamples = []
+        healthExportURL = nil
+        dataSyncStatusMessage = "Local Pebble health data deleted."
+    }
 
     public func loadCatalog() async {
         do { catalogApplications = try await appCatalog.cachedApplications() }
@@ -785,8 +842,10 @@ public final class AppModel {
                         await self?.recordConnectedWatch(device)
                         await self?.synchronizeApplications(with: device)
                         await self?.flushPendingNotifications()
+                        await self?.flushPendingAppMessages()
                         await self?.synchronizeTimeline()
                         await self?.requestHealthSync()
+                        await self?.resumePendingFirmwareUpdate()
                     }
                 case .appFetchRequested(let request):
                     self?.beginHandlingAppFetchRequest(request)
@@ -804,6 +863,14 @@ public final class AppModel {
                     self?.applicationManagementOperation = nil
                     self?.applicationManagementStatusMessage = nil
                     return
+                case .healthSyncCompleted(let succeeded):
+                    self?.dataSyncStatusMessage = succeeded ? "Health synchronization completed." : "The watch rejected health synchronization."
+                case .timelineActionInvoked(let invocation):
+                    Task { [weak self] in
+                        guard let self, let index = self.timelinePins.firstIndex(where: { $0.id == invocation.itemID }) else { return }
+                        self.timelinePins.remove(at: index)
+                        try? await self.timelineLibrary.save(self.timelinePins)
+                    }
                 }
             }
         }
@@ -874,6 +941,41 @@ public final class AppModel {
     private func restorePendingNotifications() async {
         if let saved = try? await pendingNotificationLibrary.notifications() {
             pendingNotifications = saved
+        }
+    }
+
+    private func sendOrQueueAppMessage(applicationID: UUID, tuples: [AppMessageTuple]) async throws {
+        guard connectedDevice != nil else {
+            pendingAppMessages.append(StoredAppMessage(applicationID: applicationID, tuples: tuples))
+            if pendingAppMessages.count > 50 { pendingAppMessages.removeFirst(pendingAppMessages.count - 50) }
+            try await pendingAppMessageLibrary.save(pendingAppMessages)
+            return
+        }
+        try await client.sendAppMessage(applicationID: applicationID, tuples: tuples)
+    }
+
+    private func flushPendingAppMessages() async {
+        guard connectedDevice != nil else { return }
+        while let message = pendingAppMessages.first {
+            do {
+                try await client.sendAppMessage(applicationID: message.applicationID, tuples: message.tuples)
+                pendingAppMessages.removeFirst()
+            } catch { break }
+        }
+        try? await pendingAppMessageLibrary.save(pendingAppMessages)
+    }
+
+    private func resumePendingFirmwareUpdate() async {
+        guard connectedDevice != nil,
+              UserDefaults.standard.object(forKey: "autoResumeFirmwareUpdate") as? Bool ?? true,
+              let package = try? await pendingFirmwareUpdateLibrary.package() else { return }
+        do {
+            firmwareUpdateStatusMessage = "Resuming interrupted firmware update…"
+            try await client.installFirmware(package)
+            await pendingFirmwareUpdateLibrary.clear()
+            firmwareUpdateStatusMessage = "Firmware update resumed successfully."
+        } catch {
+            firmwareUpdateStatusMessage = "Firmware update remains queued for reconnection."
         }
     }
 

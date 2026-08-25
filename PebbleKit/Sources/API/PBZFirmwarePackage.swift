@@ -33,7 +33,7 @@ public struct PBZFirmwareBlob: Codable, Equatable, Sendable {
 }
 
 @MemberwiseInit(.public)
-public struct PBZFirmwarePackage: Equatable, Sendable {
+public struct PBZFirmwarePackage: Codable, Equatable, Sendable {
     public var manifest: PBZFirmwareManifest
     public var firmware: Data
     public var resources: Data?

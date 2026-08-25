@@ -36,6 +36,45 @@ final class HealthKitBridge {
         }
         if !healthSamples.isEmpty { try await store.save(healthSamples) }
     }
+
+    func readRecentSamples(days: Int = 90) async throws -> [PebbleHealthSample] {
+        guard HKHealthStore.isHealthDataAvailable(),
+              let stepsType = HKQuantityType.quantityType(forIdentifier: .stepCount),
+              let sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) else {
+            throw HealthKitBridgeError.unavailable
+        }
+        try await store.requestAuthorization(toShare: [], read: [stepsType, sleepType])
+        let start = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? .distantPast
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: Date())
+        async let stepSamples = query(type: stepsType, predicate: predicate)
+        async let sleepSamples = query(type: sleepType, predicate: predicate)
+        var daily: [Date: (steps: Int, sleep: Int)] = [:]
+        for case let sample as HKQuantitySample in try await stepSamples {
+            let day = Calendar.current.startOfDay(for: sample.startDate)
+            daily[day, default: (0, 0)].steps += Int(sample.quantity.doubleValue(for: .count()))
+        }
+        let asleepValues: Set<Int> = [
+            HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue,
+            HKCategoryValueSleepAnalysis.asleepCore.rawValue,
+            HKCategoryValueSleepAnalysis.asleepDeep.rawValue,
+            HKCategoryValueSleepAnalysis.asleepREM.rawValue,
+        ]
+        for case let sample as HKCategorySample in try await sleepSamples where asleepValues.contains(sample.value) {
+            let day = Calendar.current.startOfDay(for: sample.endDate)
+            daily[day, default: (0, 0)].sleep += Int(sample.endDate.timeIntervalSince(sample.startDate) / 60)
+        }
+        return daily.map { PebbleHealthSample(date: $0.key, steps: $0.value.steps, sleepMinutes: $0.value.sleep) }
+    }
+
+    private func query(type: HKSampleType, predicate: NSPredicate) async throws -> [HKSample] {
+        try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
+                if let error { continuation.resume(throwing: error) }
+                else { continuation.resume(returning: samples ?? []) }
+            }
+            store.execute(query)
+        }
+    }
 }
 
 enum HealthKitBridgeError: Error { case unavailable }
