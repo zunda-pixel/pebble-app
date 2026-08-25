@@ -55,11 +55,11 @@ final class PebbleCompanionRuntime: NSObject, @preconcurrency WKScriptMessageHan
             webkit.messageHandlers.pebble.postMessage({type:'sendAppMessage', id, message});
           },
           getActiveWatchInfo: () => ({
-            platform: (platformLiteral), model: (modelLiteral), language: navigator.language,
-            firmware: {major: 0, minor: 0, patch: 0, suffix: (firmwareLiteral)}
+            platform: \(platformLiteral), model: \(modelLiteral), language: navigator.language,
+            firmware: {major: 0, minor: 0, patch: 0, suffix: \(firmwareLiteral)}
           }),
-          getAccountToken: () => (accountTokenLiteral),
-          getWatchToken: () => (watchTokenLiteral),
+          getAccountToken: () => \(accountTokenLiteral),
+          getWatchToken: () => \(watchTokenLiteral),
           showSimpleNotificationOnPebble: (title, body) =>
             webkit.messageHandlers.pebble.postMessage({type:'notification', title, body})
         };

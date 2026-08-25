@@ -70,7 +70,7 @@ public actor PebbleDiagnostics {
             generatedAt: Date(),
             operatingSystem: ProcessInfo.processInfo.operatingSystemVersionString,
             deviceDescription: device.map {
-                "\($0.name) / \($0.model.displayName) / \($0.firmwareVersion)"
+                "\($0.name) / \($0.model.displayName) / \($0.firmwareVersion ?? "unknown")"
             },
             applications: applications,
             entries: entries
