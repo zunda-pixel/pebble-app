@@ -45,9 +45,9 @@ final class HealthKitBridge {
         }
         try await store.requestAuthorization(toShare: [], read: [stepsType, sleepType])
         let start = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? .distantPast
-        let predicate = HKQuery.predicateForSamples(withStart: start, end: Date())
-        async let stepSamples = query(type: stepsType, predicate: predicate)
-        async let sleepSamples = query(type: sleepType, predicate: predicate)
+        let end = Date()
+        async let stepSamples = query(type: stepsType, start: start, end: end)
+        async let sleepSamples = query(type: sleepType, start: start, end: end)
         var daily: [Date: (steps: Int, sleep: Int)] = [:]
         for case let sample as HKQuantitySample in try await stepSamples {
             let day = Calendar.current.startOfDay(for: sample.startDate)
@@ -66,8 +66,9 @@ final class HealthKitBridge {
         return daily.map { PebbleHealthSample(date: $0.key, steps: $0.value.steps, sleepMinutes: $0.value.sleep) }
     }
 
-    private func query(type: HKSampleType, predicate: NSPredicate) async throws -> [HKSample] {
+    private func query(type: HKSampleType, start: Date, end: Date) async throws -> [HKSample] {
         try await withCheckedThrowingContinuation { continuation in
+            let predicate = HKQuery.predicateForSamples(withStart: start, end: end)
             let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
                 if let error { continuation.resume(throwing: error) }
                 else { continuation.resume(returning: samples ?? []) }
