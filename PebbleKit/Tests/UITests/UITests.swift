@@ -152,4 +152,24 @@ struct UITests {
         #expect(model.connectionState == .failed(.connectionTimedOut))
         #expect(model.connectedDevice == nil)
     }
+
+    @Test
+    func foregroundRecoveryKeepsConnectedSessionHealthy() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: client,
+            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        )
+        await model.scan()
+        let discovered = try #require(model.discoveredDevices.first)
+        await model.connect(to: discovered)
+
+        await model.applicationDidBecomeActive()
+
+        #expect(model.connectedDevice?.id == discovered.id)
+        #expect(client.reorderedApplicationIDs.last == [])
+    }
 }

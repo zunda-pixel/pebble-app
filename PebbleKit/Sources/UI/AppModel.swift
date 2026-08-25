@@ -172,6 +172,26 @@ public final class AppModel {
         observeCalendarChanges()
     }
 
+    public func applicationDidBecomeActive() async {
+        await start()
+        await PebbleDiagnostics.shared.record(category: "lifecycle", message: "Application became active")
+        switch connectionState {
+        case .connected:
+            try? await client.synchronizeTime()
+            await restorePendingNotifications()
+            pendingAppMessages = (try? await pendingAppMessageLibrary.messages()) ?? pendingAppMessages
+            await flushPendingNotifications()
+            await flushPendingAppMessages()
+            await synchronizeTimeline()
+        case .idle, .failed:
+            if savedWatches.contains(where: \.automaticallyConnects) {
+                await scan()
+            }
+        case .scanning, .connecting, .negotiating, .reconnecting:
+            break
+        }
+    }
+
     public func scan() async {
         connectionState = .scanning
 

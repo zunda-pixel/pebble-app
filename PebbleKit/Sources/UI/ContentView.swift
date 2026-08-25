@@ -29,6 +29,7 @@ public func makeQEMUPebbleClient() -> any PebbleClient {
 
 public struct ContentView: View {
     @State private var model: AppModel
+    @Environment(\.scenePhase) private var scenePhase
 
     public init() {
         self.init(client: CoreBluetoothPebbleClient())
@@ -45,6 +46,10 @@ public struct ContentView: View {
     public var body: some View {
         AppRootView(model: model)
             .task { await model.start() }
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
+                Task { await model.applicationDidBecomeActive() }
+            }
     }
 }
 

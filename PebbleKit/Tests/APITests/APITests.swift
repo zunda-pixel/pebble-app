@@ -1096,4 +1096,24 @@ struct CompanionDataTests {
         #expect(backups.count == 1)
         #expect(backups[0].hasPrefix("catalog.json.corrupt-"))
     }
+
+    @Test func healthLibraryMergesLargeBatchesWithoutUnboundedGrowth() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let url = directory.appending(path: "health.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let samples = (0..<10_000).map { index in
+            PebbleHealthSample(
+                date: start.addingTimeInterval(Double(index % 365) * 86_400),
+                steps: index,
+                sleepMinutes: index % 480
+            )
+        }
+        let library = PebbleHealthLibrary(fileURL: url)
+
+        let merged = try await library.merge(samples)
+
+        #expect(merged.count <= 366)
+        #expect(try await library.samples() == merged)
+    }
 }
