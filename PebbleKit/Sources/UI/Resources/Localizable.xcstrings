@@ -1,0 +1,407 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "%@ of %@ bytes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ of %2$@ bytes"
+          }
+        }
+      }
+    },
+    "%lld dBm" : {
+
+    },
+    "%lld%%" : {
+
+    },
+    "Activate" : {
+
+    },
+    "Active" : {
+
+    },
+    "Add to Timeline" : {
+
+    },
+    "Allow Bluetooth access when requested." : {
+
+    },
+    "App Catalog" : {
+
+    },
+    "Application Name" : {
+
+    },
+    "Applications" : {
+
+    },
+    "Apps" : {
+
+    },
+    "Automatic reconnection information for this Pebble will be removed." : {
+
+    },
+    "Best Day" : {
+
+    },
+    "Bluetooth" : {
+
+    },
+    "Bluetooth error: %@" : {
+
+    },
+    "Browse" : {
+
+    },
+    "Calendar" : {
+
+    },
+    "Cancel" : {
+
+    },
+    "Cancel Update" : {
+
+    },
+    "Catalog" : {
+
+    },
+    "Catalog JSON URL" : {
+
+    },
+    "Catalog sources can be added in Settings." : {
+
+    },
+    "Category" : {
+
+    },
+    "Choose a PBW package from Files" : {
+
+    },
+    "Choose Devices, then Scan to connect." : {
+
+    },
+    "Choose PBZ Firmware" : {
+
+    },
+    "Compatibility" : {
+
+    },
+    "Configure" : {
+
+    },
+    "Connect Automatically" : {
+
+    },
+    "Connect your Pebble, install watch apps, and keep timeline and health data synchronized." : {
+
+    },
+    "Connected" : {
+
+    },
+    "Connection" : {
+
+    },
+    "Connection status: %@" : {
+
+    },
+    "Connects to this watch" : {
+
+    },
+    "Current Version" : {
+
+    },
+    "Daily Average" : {
+
+    },
+    "Date" : {
+
+    },
+    "Delete all local health data?" : {
+
+    },
+    "Delete Health Data" : {
+
+    },
+    "Delete Local Health Data" : {
+
+    },
+    "Developer" : {
+
+    },
+    "Devices" : {
+
+    },
+    "Diagnostics" : {
+
+    },
+    "Discard Recovery Data" : {
+
+    },
+    "Disconnect" : {
+
+    },
+    "Done" : {
+
+    },
+    "Ends at %lld:00" : {
+
+    },
+    "Export Health Data" : {
+
+    },
+    "Favorite" : {
+
+    },
+    "Favorite Watchface" : {
+
+    },
+    "Firmware" : {
+
+    },
+    "Forget %@?" : {
+
+    },
+    "Forget Watch" : {
+
+    },
+    "Get Started" : {
+
+    },
+    "Health" : {
+
+    },
+    "Import" : {
+
+    },
+    "Import from Apple Health" : {
+
+    },
+    "Import Health Archive" : {
+
+    },
+    "Imported watch apps and watchfaces will appear here." : {
+
+    },
+    "Importing Pebble application" : {
+
+    },
+    "Incompatible" : {
+
+    },
+    "Install Recovery Firmware" : {
+
+    },
+    "Installed" : {
+
+    },
+    "Installing" : {
+
+    },
+    "Loading applications" : {
+
+    },
+    "Makes this the active watchface" : {
+
+    },
+    "Minutes" : {
+
+    },
+    "My Watches" : {
+
+    },
+    "Nearby" : {
+
+    },
+    "New Pin" : {
+
+    },
+    "No Apps" : {
+
+    },
+    "No Catalog Apps" : {
+
+    },
+    "No Watches Found" : {
+
+    },
+    "Notifications" : {
+
+    },
+    "Open Privacy Settings" : {
+
+    },
+    "Opens this watch application's settings" : {
+
+    },
+    "Pebble" : {
+
+    },
+    "Per-App Notifications" : {
+
+    },
+    "Period" : {
+
+    },
+    "Period Total" : {
+
+    },
+    "Permissions" : {
+
+    },
+    "Pins" : {
+
+    },
+    "Prepare Diagnostic Report" : {
+
+    },
+    "Preparing installation" : {
+
+    },
+    "Quiet Hours" : {
+
+    },
+    "Refresh" : {
+
+    },
+    "Release Notes" : {
+
+    },
+    "Remove" : {
+
+    },
+    "Remove Application" : {
+
+    },
+    "Remove Favorite" : {
+
+    },
+    "Remove this watch application?" : {
+
+    },
+    "Resume Interrupted Updates" : {
+
+    },
+    "Scan" : {
+
+    },
+    "Scan for a Pebble 2 Duo, Pebble Time 2, or Pebble Round 2." : {
+
+    },
+    "Screenshot of %@" : {
+
+    },
+    "Screenshots" : {
+
+    },
+    "Send Test Notification" : {
+
+    },
+    "Settings" : {
+
+    },
+    "Settings Unavailable" : {
+
+    },
+    "Share Diagnostic Report" : {
+
+    },
+    "Share Export" : {
+
+    },
+    "Sleep" : {
+
+    },
+    "Sort" : {
+
+    },
+    "Starts at %lld:00" : {
+
+    },
+    "Steps" : {
+
+    },
+    "Support" : {
+
+    },
+    "Supported Watches" : {
+
+    },
+    "Sync Calendar" : {
+
+    },
+    "Sync Health Data" : {
+
+    },
+    "Sync with Apple Health" : {
+
+    },
+    "System notifications are delivered directly to a paired Pebble using Apple Notification Center Service. This switch controls notifications created by installed watch apps." : {
+
+    },
+    "Target Version" : {
+
+    },
+    "The application and its settings will be removed from the connected Pebble." : {
+
+    },
+    "This removes locally stored step and sleep history. This action cannot be undone." : {
+
+    },
+    "Timeline" : {
+
+    },
+    "Title" : {
+
+    },
+    "Today" : {
+
+    },
+    "Tracked Days" : {
+
+    },
+    "Turn on your Pebble and keep it nearby." : {
+
+    },
+    "Type" : {
+
+    },
+    "Update" : {
+
+    },
+    "Update All" : {
+
+    },
+    "Update Catalog" : {
+
+    },
+    "Update State" : {
+
+    },
+    "Watch App Notifications" : {
+
+    },
+    "Watch Apps" : {
+
+    },
+    "Watchfaces" : {
+
+    },
+    "Welcome to Pebble" : {
+
+    }
+  },
+  "version" : "1.3"
+}

@@ -1,0 +1,26 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Pebble" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Pebble"
+          }
+        }
+      }
+    },
+    "Scan for Watches" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチをスキャン"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.3"
+}
