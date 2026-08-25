@@ -916,4 +916,63 @@ struct CompanionDataTests {
         #expect(imported[0].steps == 123)
         #expect(imported[0].source == .imported)
     }
+
+    @Test func appRunStateUsesOfficialEndpointAndUUIDPayload() throws {
+        let id = UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF")!
+        let frame = AppRunStateCodec.startFrame(applicationID: id)
+        #expect(frame.endpoint == 52)
+        #expect(frame.payload == [0x01, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff])
+        #expect(try AppRunStateCodec.decode(frame) == .started(id))
+        #expect(AppRunStateCodec.requestFrame().payload == [0x03])
+    }
+
+    @Test func notificationPreferencesApplyMuteAndOvernightQuietHours() {
+        let id = UUID()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let tenPM = calendar.date(from: DateComponents(year: 2026, month: 1, day: 1, hour: 22))!
+        let noon = calendar.date(from: DateComponents(year: 2026, month: 1, day: 1, hour: 12))!
+        let quiet = NotificationDeliveryPreferences(quietHoursEnabled: true, quietHoursStart: 21, quietHoursEnd: 7)
+        #expect(!quiet.permits(applicationID: id, at: tenPM, calendar: calendar))
+        #expect(quiet.permits(applicationID: id, at: noon, calendar: calendar))
+        let muted = NotificationDeliveryPreferences(mutedApplicationIDs: [id])
+        #expect(!muted.permits(applicationID: id, at: noon, calendar: calendar))
+    }
+
+    @Test func pendingTimelineOperationsPersist() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let url = directory.appending(path: "timeline-operations.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let library = PendingTimelineOperationLibrary(fileURL: url)
+        let id = UUID()
+        try await library.save([.delete(id)])
+        #expect(try await library.operations() == [.delete(id)])
+    }
+
+    @Test func firmwareJournalAndSHA256DetectPackageIdentity() async throws {
+        let bytes = Data([1, 2, 3, 4])
+        let blob = PBZFirmwareBlob(
+            name: "firmware.bin", type: "normal", hardwareRevision: "EMERY",
+            size: bytes.count, crc: PebbleCRC32.calculate([UInt8](bytes))
+        )
+        let package = PBZFirmwarePackage(
+            manifest: PBZFirmwareManifest(manifestVersion: 1, firmware: blob),
+            firmware: bytes
+        )
+        try package.validateIntegrity()
+        #expect(package.sha256.count == 64)
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let library = PendingFirmwareUpdateLibrary(
+            fileURL: directory.appending(path: "package.json"),
+            journalURL: directory.appending(path: "journal.json")
+        )
+        let journal = FirmwareUpdateJournal(
+            deviceID: "watch", hardwareRevision: "EMERY", packageSHA256: package.sha256
+        )
+        try await library.save(package, journal: journal)
+        #expect(try await library.journal() == journal)
+        try await library.updatePhase(.transferring)
+        #expect(try await library.journal()?.phase == .transferring)
+    }
 }

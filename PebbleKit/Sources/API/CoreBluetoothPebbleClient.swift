@@ -159,6 +159,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
               ppogSession != nil else {
             throw PebbleConnectionError.disconnected
         }
+        await PebbleDiagnostics.shared.recordFrame(direction: "out", frame: frame)
         try sendFrame(frame, to: peripheral)
     }
 
@@ -250,6 +251,10 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         try await performBlobDBOperation(acceptedStatuses: [.success, .keyDoesNotExist]) { token in
             TimelinePinCodec.deleteFrame(id: id, token: token)
         }
+    }
+
+    public func launchApplication(id: UUID) async throws {
+        try await send(AppRunStateCodec.startFrame(applicationID: id))
     }
 
     public func installApplicationObject(
@@ -563,6 +568,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         _ frame: PebbleProtocolFrame,
         peripheral: CBPeripheral
     ) throws {
+        Task { await PebbleDiagnostics.shared.recordFrame(direction: "in", frame: frame) }
         if frame.endpoint == PingPongCodec.endpoint {
             try processPingPong(frame, peripheral: peripheral)
             return
@@ -589,6 +595,12 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             let invocation = try TimelineActionCodec.decode(frame)
             eventContinuation?.yield(.timelineActionInvoked(invocation))
             try sendFrame(TimelineActionCodec.responseFrame(itemID: invocation.itemID, succeeded: true), to: peripheral)
+            return
+        }
+
+
+        if frame.endpoint == AppRunStateCodec.endpoint {
+            eventContinuation?.yield(.appRunStateChanged(try AppRunStateCodec.decode(frame)))
             return
         }
 

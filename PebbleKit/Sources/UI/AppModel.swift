@@ -17,6 +17,8 @@ public final class AppModel {
     public private(set) var discoveredDevices: [DiscoveredPebble] = []
     public private(set) var watchApplications: [PebbleApplication] = []
     public private(set) var watchfaces: [PebbleApplication] = []
+    public private(set) var activeWatchfaceID: UUID?
+    public private(set) var favoriteWatchfaceIDs: Set<UUID> = []
     public private(set) var isLoadingApplications = false
     public private(set) var isImportingApplication = false
     public private(set) var applicationLibraryErrorMessage: String?
@@ -31,13 +33,18 @@ public final class AppModel {
     public private(set) var diagnosticReportURL: URL?
     public private(set) var companionNotificationsEnabled = true
     public private(set) var notificationStatusMessage: String?
+    public private(set) var notificationPreferences = NotificationDeliveryPreferences()
     public private(set) var savedWatches: [SavedPebbleWatch] = []
     public private(set) var watchManagementErrorMessage: String?
     public private(set) var timelinePins: [PebbleTimelinePin] = []
     public private(set) var healthSamples: [PebbleHealthSample] = []
     public private(set) var catalogApplications: [PebbleCatalogApplication] = []
     public private(set) var firmwareUpdateStatusMessage: String?
+    public private(set) var firmwareUpdateJournal: FirmwareUpdateJournal?
+    public private(set) var firmwareRequiresConfirmation = false
+    public private(set) var firmwareUpdateProgress: PutBytesTransferProgress?
     public private(set) var dataSyncStatusMessage: String?
+    public private(set) var timelineActionStatusMessage: String?
     public private(set) var healthExportURL: URL?
 
     private let client: any PebbleClient
@@ -47,6 +54,8 @@ public final class AppModel {
     private let healthLibrary = PebbleHealthLibrary()
     private let appCatalog = PebbleAppCatalog()
     private let pendingNotificationLibrary = PendingNotificationLibrary()
+    private let notificationPreferenceLibrary = NotificationPreferenceLibrary()
+    private let pendingTimelineOperationLibrary = PendingTimelineOperationLibrary()
     private let pendingAppMessageLibrary = PendingAppMessageLibrary()
     private let pendingFirmwareUpdateLibrary = PendingFirmwareUpdateLibrary()
     private var pendingAppMessages: [StoredAppMessage] = []
@@ -56,6 +65,7 @@ public final class AppModel {
     private let healthKitBridge = HealthKitBridge()
     #endif
     @ObservationIgnored private var connectionEventsTask: Task<Void, Never>?
+    @ObservationIgnored private var firmwareUpdateTask: Task<Void, any Error>?
     @ObservationIgnored private var appFetchTask: Task<Void, Never>?
     @ObservationIgnored private var hasLoadedApplications = false
     @ObservationIgnored private var pendingImportSnapshots: [UUID: PebbleApplicationLibrarySnapshot] = [:]
@@ -109,6 +119,10 @@ public final class AppModel {
         companionNotificationsEnabled = UserDefaults.standard.object(
             forKey: "companionNotificationsEnabled"
         ) as? Bool ?? true
+        activeWatchfaceID = UserDefaults.standard.string(forKey: "activeWatchfaceID").flatMap(UUID.init(uuidString:))
+        favoriteWatchfaceIDs = Set(
+            UserDefaults.standard.stringArray(forKey: "favoriteWatchfaceIDs")?.compactMap(UUID.init(uuidString:)) ?? []
+        )
     }
 
     public var connectedDevice: PebbleDevice? {
@@ -127,10 +141,12 @@ public final class AppModel {
         hasStarted = true
         await loadSavedWatches()
         await restorePendingNotifications()
+        notificationPreferences = (try? await notificationPreferenceLibrary.preferences()) ?? NotificationDeliveryPreferences()
         pendingAppMessages = (try? await pendingAppMessageLibrary.messages()) ?? []
         await loadTimeline()
         await loadHealth()
         await loadCatalog()
+        firmwareUpdateJournal = try? await pendingFirmwareUpdateLibrary.journal()
         if savedWatches.contains(where: \.automaticallyConnects) {
             await scan()
         }
@@ -169,6 +185,7 @@ public final class AppModel {
             await PebbleDiagnostics.shared.record(category: "connection", message: "Watch connected")
             observeConnectionEvents()
             await synchronizeApplications(with: connectedDevice)
+            try? await client.send(AppRunStateCodec.requestFrame())
             await flushPendingNotifications()
             await flushPendingAppMessages()
             await synchronizeTimeline()
@@ -194,14 +211,73 @@ public final class AppModel {
             let package = try await Task.detached {
                 try PBZFirmwareImporter.load(from: url, for: device.model)
             }.value
-            try await pendingFirmwareUpdateLibrary.save(package)
-            firmwareUpdateStatusMessage = "Transferring and installing firmware…"
-            try await client.installFirmware(package)
-            await pendingFirmwareUpdateLibrary.clear()
-            firmwareUpdateStatusMessage = "Firmware installed. Waiting for the watch to restart."
+            try package.validateIntegrity()
+            let journal = FirmwareUpdateJournal(
+                deviceID: device.id,
+                hardwareRevision: device.model.rawValue,
+                previousVersion: device.firmwareVersion,
+                targetVersion: package.manifest.firmware.versionTag,
+                packageSHA256: package.sha256
+            )
+            try await pendingFirmwareUpdateLibrary.save(package, journal: journal)
+            firmwareUpdateJournal = journal
+            if package.manifest.firmware.type == "recovery" {
+                firmwareRequiresConfirmation = true
+                firmwareUpdateStatusMessage = "Recovery firmware validated. Confirm to continue."
+                return
+            }
+            try await performFirmwareUpdate(package)
         } catch {
             firmwareUpdateStatusMessage = "Firmware update stopped safely: \(error.localizedDescription)"
         }
+    }
+
+    public func confirmRecoveryFirmwareUpdate() async {
+        guard firmwareRequiresConfirmation,
+              let package = try? await pendingFirmwareUpdateLibrary.package() else { return }
+        firmwareRequiresConfirmation = false
+        do { try await performFirmwareUpdate(package) }
+        catch { firmwareUpdateStatusMessage = "Recovery update stopped safely: \(error.localizedDescription)" }
+    }
+
+    public func cancelFirmwareUpdate() async {
+        firmwareUpdateTask?.cancel()
+        firmwareUpdateTask = nil
+        firmwareRequiresConfirmation = false
+        try? await pendingFirmwareUpdateLibrary.updatePhase(.cancelled)
+        firmwareUpdateJournal = try? await pendingFirmwareUpdateLibrary.journal()
+        firmwareUpdateStatusMessage = "Firmware update cancelled; recovery data was retained."
+        if connectedDevice != nil { await disconnect() }
+    }
+
+    public func discardPendingFirmwareUpdate() async {
+        firmwareUpdateTask?.cancel()
+        firmwareUpdateTask = nil
+        await pendingFirmwareUpdateLibrary.clear()
+        firmwareUpdateJournal = nil
+        firmwareRequiresConfirmation = false
+        firmwareUpdateStatusMessage = "Pending firmware update removed."
+    }
+
+    private func performFirmwareUpdate(_ package: PBZFirmwarePackage) async throws {
+        try package.validateIntegrity()
+        guard let journal = try await pendingFirmwareUpdateLibrary.journal(),
+              journal.packageSHA256 == package.sha256,
+              journal.deviceID == connectedDevice?.id else {
+            throw PBZFirmwareError.unsafeManifest
+        }
+        try await pendingFirmwareUpdateLibrary.updatePhase(.transferring)
+        firmwareUpdateJournal = try await pendingFirmwareUpdateLibrary.journal()
+        firmwareUpdateStatusMessage = "Transferring verified firmware…"
+        firmwareUpdateProgress = nil
+        let task = Task { [client] in try await client.installFirmware(package) }
+        firmwareUpdateTask = task
+        defer { firmwareUpdateTask = nil }
+        try await task.value
+        try await pendingFirmwareUpdateLibrary.updatePhase(.awaitingRestart)
+        firmwareUpdateJournal = try await pendingFirmwareUpdateLibrary.journal()
+        firmwareUpdateStatusMessage = "Firmware installed. Waiting for the watch to restart."
+        await pendingFirmwareUpdateLibrary.clear()
     }
 
     public func loadTimeline() async {
@@ -216,7 +292,8 @@ public final class AppModel {
         timelinePins.append(pin)
         do {
             try await timelineLibrary.save(timelinePins)
-            if connectedDevice != nil { try await client.upsertTimelinePin(pin) }
+            try await queueTimelineOperation(.upsert(pin))
+            if connectedDevice != nil { await synchronizeTimeline() }
             dataSyncStatusMessage = "Timeline pin saved."
         } catch { dataSyncStatusMessage = "Timeline pin queued for the next connection." }
     }
@@ -225,14 +302,51 @@ public final class AppModel {
         let removed = offsets.compactMap { timelinePins.indices.contains($0) ? timelinePins[$0] : nil }
         timelinePins.remove(atOffsets: offsets)
         try? await timelineLibrary.save(timelinePins)
-        guard connectedDevice != nil else { return }
-        for pin in removed { try? await client.deleteTimelinePin(id: pin.id) }
+        for pin in removed { try? await queueTimelineOperation(.delete(pin.id)) }
+        if connectedDevice != nil { await synchronizeTimeline() }
     }
 
     public func synchronizeTimeline() async {
         await loadTimeline()
         guard connectedDevice != nil else { return }
-        for pin in timelinePins { try? await client.upsertTimelinePin(pin) }
+        var operations = (try? await pendingTimelineOperationLibrary.operations()) ?? []
+        let queuedUpserts = Set(operations.compactMap { operation -> UUID? in
+            if case .upsert(let pin) = operation { return pin.id }
+            return nil
+        })
+        operations += timelinePins.filter { !queuedUpserts.contains($0.id) }.map(PendingTimelineOperation.upsert)
+        var remaining: [PendingTimelineOperation] = []
+        for (index, operation) in operations.enumerated() {
+            do {
+                switch operation {
+                case .upsert(let pin):
+                    try await PebbleRetryPolicy().execute { [client] in try await client.upsertTimelinePin(pin) }
+                case .delete(let id):
+                    try await PebbleRetryPolicy().execute { [client] in try await client.deleteTimelinePin(id: id) }
+                }
+            } catch {
+                remaining.append(contentsOf: operations[index...])
+                break
+            }
+        }
+        try? await pendingTimelineOperationLibrary.save(remaining)
+    }
+
+    private func queueTimelineOperation(_ operation: PendingTimelineOperation) async throws {
+        var operations = try await pendingTimelineOperationLibrary.operations()
+        let id: UUID
+        switch operation {
+        case .upsert(let pin): id = pin.id
+        case .delete(let value): id = value
+        }
+        operations.removeAll { existing in
+            switch existing {
+            case .upsert(let pin): pin.id == id
+            case .delete(let value): value == id
+            }
+        }
+        operations.append(operation)
+        try await pendingTimelineOperationLibrary.save(operations)
     }
 
     public func synchronizeCalendar() async {
@@ -242,11 +356,12 @@ public final class AppModel {
             timelinePins.removeAll { $0.parentApplicationID == CalendarBridge.calendarApplicationID }
             timelinePins.append(contentsOf: calendarPins)
             try await timelineLibrary.save(timelinePins)
-            if connectedDevice != nil {
-                let newIDs = Set(calendarPins.map(\.id))
-                for pin in oldCalendarPins where !newIDs.contains(pin.id) { try? await client.deleteTimelinePin(id: pin.id) }
-                for pin in calendarPins { try await client.upsertTimelinePin(pin) }
+            let newIDs = Set(calendarPins.map(\.id))
+            for pin in oldCalendarPins where !newIDs.contains(pin.id) {
+                try await queueTimelineOperation(.delete(pin.id))
             }
+            for pin in calendarPins { try await queueTimelineOperation(.upsert(pin)) }
+            if connectedDevice != nil { await synchronizeTimeline() }
             dataSyncStatusMessage = "Calendar synchronized with Timeline."
         } catch { dataSyncStatusMessage = "Calendar access or synchronization failed." }
     }
@@ -435,6 +550,27 @@ public final class AppModel {
         }
     }
 
+    public func activateWatchface(_ application: PebbleApplication) async {
+        guard application.kind == .watchface, connectedDevice != nil else { return }
+        do {
+            try await PebbleRetryPolicy().execute { [client] in
+                try await client.launchApplication(id: application.id)
+            }
+            activeWatchfaceID = application.id
+            UserDefaults.standard.set(application.id.uuidString, forKey: "activeWatchfaceID")
+            applicationManagementStatusMessage = "\(application.displayName) is active."
+        } catch {
+            applicationLibraryErrorMessage = "The watchface could not be activated."
+        }
+    }
+
+    public func toggleFavoriteWatchface(_ application: PebbleApplication) {
+        guard application.kind == .watchface else { return }
+        if favoriteWatchfaceIDs.contains(application.id) { favoriteWatchfaceIDs.remove(application.id) }
+        else { favoriteWatchfaceIDs.insert(application.id) }
+        UserDefaults.standard.set(favoriteWatchfaceIDs.map(\.uuidString), forKey: "favoriteWatchfaceIDs")
+    }
+
     public func closeConfiguration(response: String? = nil) async {
         try? await companionRuntime.closeConfiguration(response: response)
         configurationURL = nil
@@ -458,6 +594,20 @@ public final class AppModel {
         notificationStatusMessage = enabled
             ? "Watch app notifications are enabled."
             : "Watch app notifications are disabled."
+    }
+
+    public func setNotificationsEnabled(_ enabled: Bool, applicationID: UUID) async {
+        if enabled { notificationPreferences.mutedApplicationIDs.remove(applicationID) }
+        else { notificationPreferences.mutedApplicationIDs.insert(applicationID) }
+        try? await notificationPreferenceLibrary.save(notificationPreferences)
+        notificationStatusMessage = enabled ? "Notifications enabled for this app." : "Notifications muted for this app."
+    }
+
+    public func setQuietHours(enabled: Bool, start: Int? = nil, end: Int? = nil) async {
+        notificationPreferences.quietHoursEnabled = enabled
+        if let start { notificationPreferences.quietHoursStart = min(23, max(0, start)) }
+        if let end { notificationPreferences.quietHoursEnd = min(23, max(0, end)) }
+        try? await notificationPreferenceLibrary.save(notificationPreferences)
     }
 
     public func sendTestNotification() async {
@@ -493,6 +643,10 @@ public final class AppModel {
         body: String
     ) async throws {
         guard companionNotificationsEnabled else { return }
+        guard notificationPreferences.permits(applicationID: application.id, at: Date()) else {
+            await PebbleDiagnostics.shared.record(category: "notification", message: "Notification suppressed by delivery preferences")
+            return
+        }
         let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedBody = body.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedTitle.isEmpty || !normalizedBody.isEmpty else { return }
@@ -522,7 +676,9 @@ public final class AppModel {
                 )
                 return
             }
-            try await client.sendNotification(notification)
+            try await PebbleRetryPolicy().execute { [client] in
+                try await client.sendNotification(notification)
+            }
             await PebbleDiagnostics.shared.record(
                 category: "notification",
                 message: "Watch app notification sent"
@@ -534,6 +690,14 @@ public final class AppModel {
     }
 
     public func removeApplication(id: UUID) async {
+        if activeWatchfaceID == id {
+            guard let fallback = watchfaces.first(where: { $0.id != id }) else {
+                applicationLibraryErrorMessage = "Install and activate another watchface before removing the active one."
+                return
+            }
+            await activateWatchface(fallback)
+            guard activeWatchfaceID == fallback.id else { return }
+        }
         guard beginApplicationOperation(.removing(id)) else { return }
         defer { finishApplicationOperation(.removing(id)) }
         do {
@@ -864,7 +1028,8 @@ public final class AppModel {
                 case .appMessageReceived(let message):
                     Task { [weak self] in await self?.handleAppMessage(message) }
                 case .transferProgress(let progress):
-                    self?.installationProgress = progress
+                    if self?.firmwareUpdateTask != nil { self?.firmwareUpdateProgress = progress }
+                    else { self?.installationProgress = progress }
                 case .reconnecting(let deviceID):
                     self?.connectionState = .reconnecting(deviceID: deviceID)
                     self?.needsApplicationSynchronization = true
@@ -890,11 +1055,22 @@ public final class AppModel {
                             self.dataSyncStatusMessage = "Watch health data could not be saved."
                         }
                     }
+                case .appRunStateChanged(let event):
+                    switch event {
+                    case .started(let id):
+                        if self?.watchfaces.contains(where: { $0.id == id }) == true {
+                            self?.activeWatchfaceID = id
+                            UserDefaults.standard.set(id.uuidString, forKey: "activeWatchfaceID")
+                        }
+                    case .stopped(let id):
+                        if self?.activeWatchfaceID == id { self?.activeWatchfaceID = nil }
+                    }
                 case .timelineActionInvoked(let invocation):
                     Task { [weak self] in
                         guard let self, let index = self.timelinePins.firstIndex(where: { $0.id == invocation.itemID }) else { return }
                         self.timelinePins.remove(at: index)
                         try? await self.timelineLibrary.save(self.timelinePins)
+                        self.timelineActionStatusMessage = "Timeline action completed."
                     }
                 }
             }
@@ -947,7 +1123,9 @@ public final class AppModel {
         var remaining: [PebbleTimelineNotification] = []
         for (index, notification) in pendingNotifications.enumerated() {
             do {
-                try await client.sendNotification(notification)
+                try await PebbleRetryPolicy().execute { [client] in
+                    try await client.sendNotification(notification)
+                }
             } catch {
                 remaining.append(contentsOf: pendingNotifications[index...])
                 break
@@ -991,13 +1169,23 @@ public final class AppModel {
     }
 
     private func resumePendingFirmwareUpdate() async {
-        guard connectedDevice != nil,
+        guard let device = connectedDevice,
               UserDefaults.standard.object(forKey: "autoResumeFirmwareUpdate") as? Bool ?? true,
-              let package = try? await pendingFirmwareUpdateLibrary.package() else { return }
+              let package = try? await pendingFirmwareUpdateLibrary.package(),
+              let journal = try? await pendingFirmwareUpdateLibrary.journal(),
+              journal.deviceID == device.id,
+              journal.hardwareRevision == device.model.rawValue,
+              journal.packageSHA256 == package.sha256,
+              journal.phase != .cancelled else { return }
+        firmwareUpdateJournal = journal
+        if package.manifest.firmware.type == "recovery" {
+            firmwareRequiresConfirmation = true
+            firmwareUpdateStatusMessage = "Interrupted recovery update requires confirmation."
+            return
+        }
         do {
             firmwareUpdateStatusMessage = "Resuming interrupted firmware update…"
-            try await client.installFirmware(package)
-            await pendingFirmwareUpdateLibrary.clear()
+            try await performFirmwareUpdate(package)
             firmwareUpdateStatusMessage = "Firmware update resumed successfully."
         } catch {
             firmwareUpdateStatusMessage = "Firmware update remains queued for reconnection."

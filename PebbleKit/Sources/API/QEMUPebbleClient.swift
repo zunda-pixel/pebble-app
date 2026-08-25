@@ -104,6 +104,7 @@ public final class QEMUPebbleClient: PebbleClient {
 
     public func send(_ frame: PebbleProtocolFrame) async throws {
         guard let connection else { throw PebbleConnectionError.disconnected }
+        await PebbleDiagnostics.shared.recordFrame(direction: "out", frame: frame)
         let frameBytes = try frame.encoded()
         guard frameBytes.count <= 2_048 else { throw QEMUTransportError.messageTooLarge }
         var bytes: [UInt8] = [0xFE, 0xED, 0x00, 0x01]
@@ -177,6 +178,10 @@ public final class QEMUPebbleClient: PebbleClient {
         try await performBlobOperation(acceptedStatuses: [.success, .keyDoesNotExist]) { token in
             TimelinePinCodec.deleteFrame(id: id, token: token)
         }
+    }
+
+    public func launchApplication(id: UUID) async throws {
+        try await send(AppRunStateCodec.startFrame(applicationID: id))
     }
 
     public func installApplicationObject(
@@ -365,6 +370,7 @@ public final class QEMUPebbleClient: PebbleClient {
     }
 
     private func process(_ frame: PebbleProtocolFrame) throws {
+        Task { await PebbleDiagnostics.shared.recordFrame(direction: "in", frame: frame) }
         if frame.endpoint == WatchVersionCodec.endpoint, versionContinuation != nil {
             finishVersion(returning: try WatchVersionCodec.decode(frame))
         } else if frame.endpoint == PingPongCodec.endpoint {
@@ -383,6 +389,8 @@ public final class QEMUPebbleClient: PebbleClient {
             let invocation = try TimelineActionCodec.decode(frame)
             eventContinuation?.yield(.timelineActionInvoked(invocation))
             Task { try? await send(TimelineActionCodec.responseFrame(itemID: invocation.itemID, succeeded: true)) }
+        } else if frame.endpoint == AppRunStateCodec.endpoint {
+            eventContinuation?.yield(.appRunStateChanged(try AppRunStateCodec.decode(frame)))
         } else if frame.endpoint == BlobDBCodec.endpoint, let token = pendingBlobToken {
             let response = try BlobDBCodec.decodeResponse(frame)
             guard response.token == token else { return }

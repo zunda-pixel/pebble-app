@@ -178,6 +178,58 @@ public actor PendingNotificationLibrary {
 }
 
 @MemberwiseInit(.public)
+public struct NotificationDeliveryPreferences: Codable, Equatable, Sendable {
+    public var mutedApplicationIDs: Set<UUID> = []
+    public var quietHoursEnabled: Bool = false
+    public var quietHoursStart: Int = 22
+    public var quietHoursEnd: Int = 7
+
+    public func permits(applicationID: UUID, at date: Date, calendar: Calendar = .current) -> Bool {
+        guard !mutedApplicationIDs.contains(applicationID) else { return false }
+        guard quietHoursEnabled else { return true }
+        let hour = calendar.component(.hour, from: date)
+        if quietHoursStart == quietHoursEnd { return false }
+        return quietHoursStart < quietHoursEnd
+            ? !(quietHoursStart..<quietHoursEnd).contains(hour)
+            : !(hour >= quietHoursStart || hour < quietHoursEnd)
+    }
+}
+
+public actor NotificationPreferenceLibrary {
+    private var fileURL: URL
+    public init(fileURL: URL? = nil) {
+        self.fileURL = fileURL ?? applicationSupportURL("notification-preferences.json")
+    }
+    public func preferences() throws -> NotificationDeliveryPreferences {
+        try PersistentJSON.load(NotificationDeliveryPreferences.self, from: fileURL) ?? NotificationDeliveryPreferences()
+    }
+    public func save(_ preferences: NotificationDeliveryPreferences) throws {
+        try PersistentJSON.save(preferences, to: fileURL)
+    }
+}
+
+public enum PendingTimelineOperation: Codable, Equatable, Sendable {
+    case upsert(PebbleTimelinePin)
+    case delete(UUID)
+}
+
+public actor PendingTimelineOperationLibrary {
+    private var fileURL: URL
+
+    public init(fileURL: URL? = nil) {
+        self.fileURL = fileURL ?? applicationSupportURL("pending-timeline.json")
+    }
+
+    public func operations() throws -> [PendingTimelineOperation] {
+        try PersistentJSON.load([PendingTimelineOperation].self, from: fileURL) ?? []
+    }
+
+    public func save(_ operations: [PendingTimelineOperation]) throws {
+        try PersistentJSON.save(operations, to: fileURL)
+    }
+}
+
+@MemberwiseInit(.public)
 public struct StoredAppMessage: Codable, Equatable, Identifiable, Sendable {
     public var id: UUID = UUID()
     public var applicationID: UUID
@@ -194,10 +246,43 @@ public actor PendingAppMessageLibrary {
 
 public actor PendingFirmwareUpdateLibrary {
     private var fileURL: URL
-    public init(fileURL: URL? = nil) { self.fileURL = fileURL ?? applicationSupportURL("pending-firmware.json") }
+    private var journalURL: URL
     public func package() throws -> PBZFirmwarePackage? { try PersistentJSON.load(PBZFirmwarePackage.self, from: fileURL) }
-    public func save(_ package: PBZFirmwarePackage) throws { try PersistentJSON.save(package, to: fileURL) }
-    public func clear() { try? FileManager.default.removeItem(at: fileURL) }
+    public init(fileURL: URL? = nil, journalURL: URL? = nil) {
+        self.fileURL = fileURL ?? applicationSupportURL("pending-firmware.json")
+        self.journalURL = journalURL ?? applicationSupportURL("pending-firmware-journal.json")
+    }
+    public func journal() throws -> FirmwareUpdateJournal? {
+        try PersistentJSON.load(FirmwareUpdateJournal.self, from: journalURL)
+    }
+    public func save(_ package: PBZFirmwarePackage, journal: FirmwareUpdateJournal) throws {
+        try PersistentJSON.save(package, to: fileURL)
+        try PersistentJSON.save(journal, to: journalURL)
+    }
+    public func updatePhase(_ phase: FirmwareUpdatePhase) throws {
+        guard var value = try journal() else { return }
+        value.phase = phase
+        try PersistentJSON.save(value, to: journalURL)
+    }
+    public func clear() {
+        try? FileManager.default.removeItem(at: fileURL)
+        try? FileManager.default.removeItem(at: journalURL)
+    }
+}
+
+public enum FirmwareUpdatePhase: String, Codable, Equatable, Sendable {
+    case validated, transferring, installing, awaitingRestart, cancelled
+}
+
+@MemberwiseInit(.public)
+public struct FirmwareUpdateJournal: Codable, Equatable, Sendable {
+    public var deviceID: String
+    public var hardwareRevision: String
+    public var previousVersion: String?
+    public var targetVersion: String?
+    public var packageSHA256: String
+    public var phase: FirmwareUpdatePhase = .validated
+    public var createdAt: Date = Date()
 }
 
 public enum HealthSyncCodec {

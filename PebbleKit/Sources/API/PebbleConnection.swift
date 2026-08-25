@@ -20,6 +20,7 @@ public enum PebbleClientEvent: Equatable, Sendable {
     case healthSyncCompleted(Bool)
     case healthSamplesReceived([PebbleHealthSample])
     case timelineActionInvoked(TimelineActionInvocation)
+    case appRunStateChanged(AppRunStateEvent)
 }
 
 public enum PebbleConnectionError: Error, Equatable, Sendable {
@@ -51,6 +52,7 @@ public protocol PebbleClient: Sendable {
     func sendNotification(_ notification: PebbleTimelineNotification) async throws
     func upsertTimelinePin(_ pin: PebbleTimelinePin) async throws
     func deleteTimelinePin(id: UUID) async throws
+    func launchApplication(id: UUID) async throws
     func installApplicationObject(
         _ bytes: [UInt8],
         objectType: PutBytesObjectType,

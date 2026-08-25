@@ -106,6 +106,10 @@ public final class MockPebbleClient: PebbleClient {
         timelinePins.removeAll { $0.id == id }
     }
 
+    public func launchApplication(id: UUID) async throws {
+        eventContinuation?.yield(.appRunStateChanged(.started(id)))
+    }
+
     public func emit(_ frame: PebbleProtocolFrame) {
         frameContinuation?.yield(frame)
     }

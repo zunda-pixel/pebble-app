@@ -167,6 +167,9 @@ private struct TimelineView: View {
                 }
                 .onDelete { offsets in Task { await model.removeTimelinePins(at: offsets) } }
             }
+            if let message = model.timelineActionStatusMessage {
+                Text(message).foregroundStyle(.secondary)
+            }
             Section("Calendar") {
                 Button("Sync Calendar", systemImage: "calendar.badge.clock") {
                     Task { await model.synchronizeCalendar() }
@@ -302,6 +305,8 @@ private struct ApplicationsView: View {
         ApplicationsContent(
             watchApplications: model.watchApplications,
             watchfaces: model.watchfaces,
+            activeWatchfaceID: model.activeWatchfaceID,
+            favoriteWatchfaceIDs: model.favoriteWatchfaceIDs,
             isLoading: model.isLoadingApplications,
             errorMessage: model.applicationLibraryErrorMessage,
             operationStatusMessage: model.applicationManagementStatusMessage,
@@ -322,6 +327,12 @@ private struct ApplicationsView: View {
             },
             configureApplication: { application in
                 Task { await model.configureApplication(application) }
+            },
+            activateWatchface: { application in
+                Task { await model.activateWatchface(application) }
+            },
+            toggleFavoriteWatchface: { application in
+                model.toggleFavoriteWatchface(application)
             }
         )
         .navigationTitle("Apps")
@@ -383,6 +394,8 @@ private extension UTType {
 private struct ApplicationsContent: View {
     var watchApplications: [PebbleApplication]
     var watchfaces: [PebbleApplication]
+    var activeWatchfaceID: UUID?
+    var favoriteWatchfaceIDs: Set<UUID>
     var isLoading: Bool
     var errorMessage: String?
     var operationStatusMessage: String?
@@ -392,6 +405,8 @@ private struct ApplicationsContent: View {
     var removeApplication: (UUID) -> Void
     var reorderApplications: (PebbleApplicationKind, IndexSet, Int) -> Void
     var configureApplication: (PebbleApplication) -> Void
+    var activateWatchface: (PebbleApplication) -> Void
+    var toggleFavoriteWatchface: (PebbleApplication) -> Void
 
     var body: some View {
         if isLoading && watchApplications.isEmpty && watchfaces.isEmpty {
@@ -429,9 +444,13 @@ private struct ApplicationsContent: View {
                     ApplicationSection(
                         title: "Watch Apps",
                         applications: watchApplications,
+                        activeWatchfaceID: activeWatchfaceID,
+                        favoriteWatchfaceIDs: favoriteWatchfaceIDs,
                         isOperationInProgress: isOperationInProgress,
                         removeApplication: removeApplication,
                         configureApplication: configureApplication,
+                        activateWatchface: activateWatchface,
+                        toggleFavoriteWatchface: toggleFavoriteWatchface,
                         moveApplications: { offsets, destination in
                             reorderApplications(.watchapp, offsets, destination)
                         }
@@ -441,9 +460,13 @@ private struct ApplicationsContent: View {
                     ApplicationSection(
                         title: "Watchfaces",
                         applications: watchfaces,
+                        activeWatchfaceID: activeWatchfaceID,
+                        favoriteWatchfaceIDs: favoriteWatchfaceIDs,
                         isOperationInProgress: isOperationInProgress,
                         removeApplication: removeApplication,
                         configureApplication: configureApplication,
+                        activateWatchface: activateWatchface,
+                        toggleFavoriteWatchface: toggleFavoriteWatchface,
                         moveApplications: { offsets, destination in
                             reorderApplications(.watchface, offsets, destination)
                         }
@@ -485,9 +508,13 @@ private struct InstallationProgressSection: View {
 private struct ApplicationSection: View {
     var title: LocalizedStringKey
     var applications: [PebbleApplication]
+    var activeWatchfaceID: UUID?
+    var favoriteWatchfaceIDs: Set<UUID>
     var isOperationInProgress: Bool
     var removeApplication: (UUID) -> Void
     var configureApplication: (PebbleApplication) -> Void
+    var activateWatchface: (PebbleApplication) -> Void
+    var toggleFavoriteWatchface: (PebbleApplication) -> Void
     var moveApplications: (IndexSet, Int) -> Void
 
     var body: some View {
@@ -498,8 +525,12 @@ private struct ApplicationSection: View {
                     companyName: application.companyName,
                     versionLabel: application.versionLabel,
                     kind: application.kind,
+                    isActive: activeWatchfaceID == application.id,
+                    isFavorite: favoriteWatchfaceIDs.contains(application.id),
                     isConfigurable: application.isConfigurable,
-                    configure: { configureApplication(application) }
+                    configure: { configureApplication(application) },
+                    activate: { activateWatchface(application) },
+                    toggleFavorite: { toggleFavoriteWatchface(application) }
                 )
                 .swipeActions {
                     Button("Remove", role: .destructive) {
@@ -519,8 +550,12 @@ private struct ApplicationRow: View {
     var companyName: String
     var versionLabel: String
     var kind: PebbleApplicationKind
+    var isActive: Bool
+    var isFavorite: Bool
     var isConfigurable: Bool
     var configure: () -> Void
+    var activate: () -> Void
+    var toggleFavorite: () -> Void
 
     var body: some View {
         HStack(spacing: 16) {
@@ -538,6 +573,16 @@ private struct ApplicationRow: View {
                 }
             }
             Spacer()
+            if kind == .watchface {
+                Button(isFavorite ? "Remove Favorite" : "Favorite", systemImage: isFavorite ? "star.fill" : "star", action: toggleFavorite)
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.borderless)
+                Button(isActive ? "Active" : "Activate", systemImage: isActive ? "checkmark.circle.fill" : "play.circle", action: activate)
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.borderless)
+                    .disabled(isActive)
+                    .accessibilityHint("Makes this the active watchface")
+            }
             Text(versionLabel)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -802,6 +847,40 @@ private struct SettingsView: View {
                     get: { model.companionNotificationsEnabled },
                     set: { model.setCompanionNotificationsEnabled($0) }
                 ))
+                Toggle("Quiet Hours", isOn: Binding(
+                    get: { model.notificationPreferences.quietHoursEnabled },
+                    set: { value in Task { await model.setQuietHours(enabled: value) } }
+                ))
+                if model.notificationPreferences.quietHoursEnabled {
+                    Stepper(
+                        "Starts at \(model.notificationPreferences.quietHoursStart):00",
+                        value: Binding(
+                            get: { model.notificationPreferences.quietHoursStart },
+                            set: { value in Task { await model.setQuietHours(enabled: true, start: value) } }
+                        ),
+                        in: 0...23
+                    )
+                    Stepper(
+                        "Ends at \(model.notificationPreferences.quietHoursEnd):00",
+                        value: Binding(
+                            get: { model.notificationPreferences.quietHoursEnd },
+                            set: { value in Task { await model.setQuietHours(enabled: true, end: value) } }
+                        ),
+                        in: 0...23
+                    )
+                }
+                if !(model.watchApplications + model.watchfaces).isEmpty {
+                    DisclosureGroup("Per-App Notifications") {
+                        ForEach(model.watchApplications + model.watchfaces) { application in
+                            Toggle(application.displayName, isOn: Binding(
+                                get: { !model.notificationPreferences.mutedApplicationIDs.contains(application.id) },
+                                set: { enabled in
+                                    Task { await model.setNotificationsEnabled(enabled, applicationID: application.id) }
+                                }
+                            ))
+                        }
+                    }
+                }
                 Button("Send Test Notification", systemImage: "bell.badge") {
                     Task { await model.sendTestNotification() }
                 }
@@ -831,6 +910,32 @@ private struct SettingsView: View {
                     isChoosingFirmware = true
                 }
                 .disabled(model.connectedDevice == nil)
+                if model.firmwareRequiresConfirmation {
+                    Button("Install Recovery Firmware", role: .destructive) {
+                        Task { await model.confirmRecoveryFirmwareUpdate() }
+                    }
+                }
+                if let journal = model.firmwareUpdateJournal {
+                    LabeledContent("Update State", value: journal.phase.rawValue)
+                    if let previousVersion = journal.previousVersion {
+                        LabeledContent("Current Version", value: previousVersion)
+                    }
+                    if let targetVersion = journal.targetVersion {
+                        LabeledContent("Target Version", value: targetVersion)
+                    }
+                    if let progress = model.firmwareUpdateProgress, progress.totalBytes > 0 {
+                        ProgressView(value: Double(progress.bytesSent), total: Double(progress.totalBytes))
+                        Text("\(progress.bytesSent, format: .number) of \(progress.totalBytes, format: .number) bytes")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Button("Cancel Update", role: .destructive) {
+                        Task { await model.cancelFirmwareUpdate() }
+                    }
+                    Button("Discard Recovery Data", role: .destructive) {
+                        Task { await model.discardPendingFirmwareUpdate() }
+                    }
+                }
                 if let message = model.firmwareUpdateStatusMessage { Text(message).foregroundStyle(.secondary) }
             }
             Section("App Catalog") {

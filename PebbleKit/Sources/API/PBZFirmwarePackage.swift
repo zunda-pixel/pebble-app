@@ -1,6 +1,7 @@
 public import Foundation
 import MemberwiseInit
 import ZIPFoundation
+import CryptoKit
 
 @MemberwiseInit(.public)
 public struct PBZBlob: Codable, Equatable, Sendable {
@@ -37,6 +38,17 @@ public struct PBZFirmwarePackage: Codable, Equatable, Sendable {
     public var manifest: PBZFirmwareManifest
     public var firmware: Data
     public var resources: Data?
+
+    public var sha256: String {
+        SHA256.hash(data: firmware + (resources ?? Data())).map { String(format: "%02x", $0) }.joined()
+    }
+
+    public func validateIntegrity() throws {
+        try PBZFirmwareImporter.validate(firmware, blob: PBZBlob(
+            name: manifest.firmware.name, size: manifest.firmware.size, crc: manifest.firmware.crc
+        ))
+        if let resources, let blob = manifest.resources { try PBZFirmwareImporter.validate(resources, blob: blob) }
+    }
 }
 
 public enum PBZFirmwareImporter {
@@ -52,8 +64,10 @@ public enum PBZFirmwareImporter {
                 continue
             }
             guard ["normal", "recovery"].contains(manifest.firmware.type),
+                  manifest.manifestVersion > 0,
                   manifest.firmware.size > 0,
-                  manifest.firmware.crc > 0 else {
+                  manifest.firmware.crc > 0,
+                  (manifest.firmware.slot ?? 0) >= 0 else {
                 throw PBZFirmwareError.unsafeManifest
             }
             let directory = (entry.path as NSString).deletingLastPathComponent
@@ -89,7 +103,7 @@ public enum PBZFirmwareImporter {
         return result
     }
 
-    private static func validate(_ data: Data, blob: PBZBlob) throws {
+    fileprivate static func validate(_ data: Data, blob: PBZBlob) throws {
         guard data.count == blob.size else { throw PBZFirmwareError.sizeMismatch(blob.name) }
         guard PebbleCRC32.calculate([UInt8](data)) == blob.crc else {
             throw PBZFirmwareError.crcMismatch(blob.name)
