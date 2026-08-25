@@ -55,10 +55,9 @@ public actor PebbleDiagnostics {
     }
 
     public func recordFrame(direction: String, frame: PebbleProtocolFrame) {
-        let prefix = frame.payload.prefix(16).map { String(format: "%02x", $0) }.joined()
         record(
             category: "packet",
-            message: "\(direction) endpoint=\(frame.endpoint) bytes=\(frame.payload.count) prefix=\(prefix)"
+            message: "\(direction) endpoint=\(frame.endpoint) bytes=\(frame.payload.count)"
         )
     }
 

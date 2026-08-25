@@ -8,6 +8,10 @@ public final class MockPebbleClient: PebbleClient {
     public private(set) var reorderedApplicationIDs: [[UUID]] = []
     public private(set) var sentNotifications: [PebbleTimelineNotification] = []
     public private(set) var timelinePins: [PebbleTimelinePin] = []
+    public private(set) var installedObjects: [(bytes: [UInt8], objectType: PutBytesObjectType, appBankID: UInt32)] = []
+    public private(set) var installedFirmwarePackages: [PBZFirmwarePackage] = []
+    public private(set) var registeredApplications: [PebbleAppMetadata] = []
+    public private(set) var unregisteredApplicationIDs: [UUID] = []
     private var nextTransactionID: UInt8 = 0
     private var frameContinuation: AsyncStream<PebbleProtocolFrame>.Continuation?
     private var eventContinuation: AsyncStream<PebbleClientEvent>.Continuation?
@@ -122,11 +126,21 @@ public final class MockPebbleClient: PebbleClient {
         _ bytes: [UInt8],
         objectType: PutBytesObjectType,
         appBankID: UInt32
-    ) async throws {}
+    ) async throws {
+        installedObjects.append((bytes, objectType, appBankID))
+    }
 
-    public func installFirmware(_ package: PBZFirmwarePackage) async throws {}
+    public func installFirmware(_ package: PBZFirmwarePackage) async throws {
+        installedFirmwarePackages.append(package)
+    }
 
-    public func registerApplication(_ metadata: PebbleAppMetadata) async throws {}
+    public func registerApplication(_ metadata: PebbleAppMetadata) async throws {
+        registeredApplications.removeAll { $0.applicationID == metadata.applicationID }
+        registeredApplications.append(metadata)
+    }
 
-    public func unregisterApplication(applicationID: UUID) async throws {}
+    public func unregisterApplication(applicationID: UUID) async throws {
+        unregisteredApplicationIDs.append(applicationID)
+        registeredApplications.removeAll { $0.applicationID == applicationID }
+    }
 }

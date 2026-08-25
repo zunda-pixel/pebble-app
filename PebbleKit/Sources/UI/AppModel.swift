@@ -57,6 +57,15 @@ public final class AppModel {
     public private(set) var timelineActionStatusMessage: String?
     public private(set) var healthExportURL: URL?
 
+    public var isScanningOrConnecting: Bool {
+        switch connectionState {
+        case .scanning, .connecting:
+            true
+        default:
+            false
+        }
+    }
+
     private let client: any PebbleClient
     private let applicationLibrary: PebbleApplicationLibrary
     private let watchLibrary: PebbleWatchLibrary
@@ -101,7 +110,7 @@ public final class AppModel {
     )
 
     private func openConfigurationURL(_ url: URL) {
-        guard ["https", "http"].contains(url.scheme?.lowercased()),
+        guard url.scheme?.lowercased() == "https",
               url.host != nil,
               url.user == nil,
               url.password == nil else {
@@ -356,6 +365,9 @@ public final class AppModel {
             }
         }
         operations.append(operation)
+        if operations.count > 200 {
+            operations.removeFirst(operations.count - 200)
+        }
         try await pendingTimelineOperationLibrary.save(operations)
     }
 

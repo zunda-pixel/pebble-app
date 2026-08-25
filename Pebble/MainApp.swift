@@ -3,26 +3,32 @@ import UI
 
 @main
 struct MainApp: App {
+  @State private var model: AppModel
+
+  init() {
+#if os(macOS)
+    let useQEMU = ProcessInfo.processInfo.environment["PEBBLE_QEMU"] == "1"
+      || CommandLine.arguments.contains("--qemu")
+    _model = State(initialValue: AppModel(client: useQEMU ? makeQEMUPebbleClient() : makeDefaultPebbleClient()))
+#else
+    _model = State(initialValue: AppModel(client: makeDefaultPebbleClient()))
+#endif
+  }
+
   var body: some Scene {
-    WindowGroup {
-      #if os(macOS)
-      if ProcessInfo.processInfo.environment["PEBBLE_QEMU"] == "1"
-          || CommandLine.arguments.contains("--qemu") {
-        ContentView(client: makeQEMUPebbleClient())
-      } else {
-        ContentView()
-      }
-      #else
-      ContentView()
-      #endif
+#if os(macOS)
+    WindowGroup(id: "main") {
+      ContentView(model: model)
     }
-    #if os(macOS)
+    .defaultSize(width: 960, height: 680)
+    .windowToolbarStyle(.unified)
     .commands {
       CommandMenu("Pebble") {
         Button("Scan for Watches") {
           NotificationCenter.default.post(name: .pebbleScanRequested, object: nil)
         }
         .keyboardShortcut("r", modifiers: .command)
+        .disabled(model.isScanningOrConnecting)
 
         Divider()
 
@@ -33,14 +39,17 @@ struct MainApp: App {
           .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
         }
 
-        Divider()
-
-        Button("Settings") {
-          NotificationCenter.default.post(name: .pebbleSectionRequested, object: "settings")
-        }
-        .keyboardShortcut(",", modifiers: .command)
       }
     }
-    #endif
+
+    Settings {
+      PebbleSettingsView(model: model)
+        .frame(width: 620, height: 680)
+    }
+#else
+    WindowGroup {
+      ContentView(model: model)
+    }
+#endif
   }
 }

@@ -15,6 +15,11 @@ public extension Notification.Name {
     static var pebbleSectionRequested: Notification.Name { Notification.Name("PebbleSectionRequested") }
 }
 
+@MainActor
+public func makeDefaultPebbleClient() -> any PebbleClient {
+    CoreBluetoothPebbleClient()
+}
+
 #if os(macOS)
 @MainActor
 public func makeQEMUPebbleClient() -> any PebbleClient {
@@ -31,6 +36,10 @@ public struct ContentView: View {
 
     public init(client: any PebbleClient) {
         _model = State(initialValue: AppModel(client: client))
+    }
+
+    public init(model: AppModel) {
+        _model = State(initialValue: model)
     }
 
     public var body: some View {
@@ -114,7 +123,7 @@ private struct MacRootView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(AppSection.allCases, selection: $selection) { section in
+            List(AppSection.allCases.filter { $0 != .settings }, selection: $selection) { section in
                 Label(section.title, systemImage: section.systemImage)
                     .tag(section)
             }
@@ -567,6 +576,7 @@ private struct CatalogApplicationDetailView: View {
 
 private struct ApplicationsView: View {
     var model: AppModel
+    @Environment(\.undoManager) private var undoManager
     @State private var isChoosingPackage = false
     @State private var pendingRemovalID: UUID?
 
@@ -602,6 +612,10 @@ private struct ApplicationsView: View {
             },
             toggleFavoriteWatchface: { application in
                 model.toggleFavoriteWatchface(application)
+                undoManager?.registerUndo(withTarget: model) { target in
+                    target.toggleFavoriteWatchface(application)
+                }
+                undoManager?.setActionName("Favorite Watchface")
             }
         )
         .navigationTitle("Apps")
@@ -628,6 +642,13 @@ private struct ApplicationsView: View {
                 return
             }
             Task { await model.importApplication(from: url) }
+        }
+        .dropDestination(for: URL.self) { urls, _ in
+            guard let packageURL = urls.first(where: { $0.pathExtension.lowercased() == "pbw" }) else {
+                return false
+            }
+            Task { await model.importApplication(from: packageURL) }
+            return true
         }
         .confirmationDialog(
             "Remove this watch application?",
@@ -820,6 +841,27 @@ private struct ApplicationSection: View {
                 )
                 .swipeActions {
                     Button("Remove", role: .destructive) {
+                        removeApplication(application.id)
+                    }
+                    .disabled(isOperationInProgress)
+                }
+                .contextMenu {
+                    if application.isConfigurable {
+                        Button("Configure", systemImage: "gearshape") {
+                            configureApplication(application)
+                        }
+                    }
+                    if application.kind == .watchface {
+                        Button(activeWatchfaceID == application.id ? "Active" : "Activate", systemImage: "play.circle") {
+                            activateWatchface(application)
+                        }
+                        .disabled(activeWatchfaceID == application.id)
+                        Button(favoriteWatchfaceIDs.contains(application.id) ? "Remove Favorite" : "Favorite", systemImage: "star") {
+                            toggleFavoriteWatchface(application)
+                        }
+                    }
+                    Divider()
+                    Button("Remove", systemImage: "trash", role: .destructive) {
                         removeApplication(application.id)
                     }
                     .disabled(isOperationInProgress)
@@ -1135,6 +1177,21 @@ private struct PlaceholderView: View {
     }
 }
 
+public struct PebbleSettingsView: View {
+    var model: AppModel
+
+    public init(model: AppModel) {
+        self.model = model
+    }
+
+    public var body: some View {
+        NavigationStack {
+            SettingsView(model: model)
+        }
+        .task { await model.start() }
+    }
+}
+
 private struct SettingsView: View {
     var model: AppModel
     @State private var isChoosingFirmware = false
@@ -1264,6 +1321,13 @@ private struct SettingsView: View {
             guard case .success(let url) = result else { return }
             Task { await model.installFirmware(from: url) }
         }
+        .dropDestination(for: URL.self) { urls, _ in
+            guard let firmwareURL = urls.first(where: { $0.pathExtension.lowercased() == "pbz" }) else {
+                return false
+            }
+            Task { await model.installFirmware(from: firmwareURL) }
+            return true
+        }
         .confirmationDialog(
             destructiveFirmwareAction?.title ?? "Confirm firmware action",
             isPresented: Binding(
@@ -1345,7 +1409,7 @@ private struct ConfigurationNavigationDecider: WebPage.NavigationDeciding {
             closeHandler(encodedResponse?.removingPercentEncoding ?? encodedResponse)
             return .cancel
         }
-        return ["https", "http"].contains(url.scheme?.lowercased()) ? .allow : .cancel
+        return url.scheme?.lowercased() == "https" ? .allow : .cancel
     }
 }
 

@@ -648,6 +648,12 @@ struct APITests {
     @Test
     func diagnosticsKeepsBoundedHistoryAndExportsReport() async throws {
         let diagnostics = PebbleDiagnostics(maximumEntryCount: 2)
+        await diagnostics.recordFrame(
+            direction: "out",
+            frame: PebbleProtocolFrame(endpoint: 48, payload: Array("private-token".utf8))
+        )
+        let packetEntry = try #require(await diagnostics.snapshot().last)
+        #expect(!packetEntry.message.contains("private-token"))
         await diagnostics.record(category: "test", message: "first")
         await diagnostics.record(.warning, category: "test", message: "second")
         await diagnostics.record(.error, category: "test", message: "third")

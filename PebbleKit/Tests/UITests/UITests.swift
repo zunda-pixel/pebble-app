@@ -7,6 +7,55 @@ import Testing
 @MainActor
 struct UITests {
     @Test
+    func mockTransportCompletesCompanionLifecycle() async throws {
+        let client = MockPebbleClient()
+        let applicationID = UUID()
+        let metadata = PebbleAppMetadata(
+            applicationID: applicationID,
+            flags: 0,
+            iconResourceID: 0,
+            appVersionMajor: 1,
+            appVersionMinor: 0,
+            sdkVersionMajor: 3,
+            sdkVersionMinor: 0,
+            name: "E2E"
+        )
+        let pin = PebbleTimelinePin(
+            id: UUID(),
+            parentApplicationID: applicationID,
+            timestamp: Date(),
+            title: "E2E",
+            subtitle: nil,
+            body: nil
+        )
+
+        let discovered = try #require(try await client.scan().first)
+        let device = try await client.connect(to: discovered)
+        try await client.registerApplication(metadata)
+        try await client.sendAppMessage(applicationID: applicationID, tuples: [])
+        try await client.upsertTimelinePin(pin)
+        try await client.unregisterApplication(applicationID: applicationID)
+        await client.disconnect(from: device)
+
+        #expect(client.sentAppMessages.map(\.applicationID) == [applicationID])
+        #expect(client.timelinePins.map(\.id) == [pin.id])
+        #expect(client.unregisteredApplicationIDs == [applicationID])
+        #expect(client.registeredApplications.isEmpty)
+    }
+
+#if os(macOS)
+    @Test
+    func qemuTransportSmokeTestWhenEnabled() async throws {
+        guard ProcessInfo.processInfo.environment["PEBBLE_QEMU_E2E"] == "1" else { return }
+        let client = QEMUPebbleClient()
+        let discovered = try #require(try await client.scan().first)
+        let device = try await client.connect(to: discovered)
+        try await client.synchronizeTime()
+        await client.disconnect(from: device)
+    }
+#endif
+
+    @Test
     func appModelScansConnectsAndSynchronizesEmptyLibrary() async throws {
         let client = MockPebbleClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
