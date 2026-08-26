@@ -8,6 +8,12 @@
             "state" : "new",
             "value" : "%1$@ · %2$@"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%1$@ · %2$@"
+          }
         }
       }
     },
@@ -18,398 +24,1314 @@
             "state" : "new",
             "value" : "%1$@ of %2$@ bytes"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%2$@バイト中%1$@バイト"
+          }
         }
       }
     },
     "%lld dBm" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%lld dBm"
+          }
+        }
+      }
     },
     "%lld%%" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%lld%%"
+          }
+        }
+      }
     },
     "Activate" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "適用"
+          }
+        }
+      }
     },
     "Active" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "適用中"
+          }
+        }
+      }
     },
     "Add to Timeline" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "タイムラインに追加"
+          }
+        }
+      }
     },
     "Allow Bluetooth access when requested." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "求められたらBluetoothへのアクセスを許可してください。"
+          }
+        }
+      }
     },
     "App Catalog" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリカタログ"
+          }
+        }
+      }
     },
     "Application Name" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリケーション名"
+          }
+        }
+      }
     },
     "Applications" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリケーション"
+          }
+        }
+      }
     },
     "Apps" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリ"
+          }
+        }
+      }
     },
     "Apps the watch has seen sending notifications. Turning one off tells the watch to filter that app's notifications." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチが通知の送信を検出したアプリの一覧です。オフにすると、そのアプリの通知はウォッチでフィルタリングされます。"
+          }
+        }
+      }
     },
     "Automatic reconnection information for this Pebble will be removed." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このPebbleの自動再接続情報が削除されます。"
+          }
+        }
+      }
     },
     "Best Day" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "1日の最高記録"
+          }
+        }
+      }
     },
     "Bluetooth" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Bluetooth"
+          }
+        }
+      }
     },
     "Bluetooth error: %@" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Bluetoothエラー: %@"
+          }
+        }
+      }
     },
     "Browse" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ブラウズ"
+          }
+        }
+      }
     },
     "Calendar" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "カレンダー"
+          }
+        }
+      }
     },
     "Cancel" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "キャンセル"
+          }
+        }
+      }
     },
     "Cancel Update" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アップデートをキャンセル"
+          }
+        }
+      }
     },
     "Catalog" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "カタログ"
+          }
+        }
+      }
     },
     "Catalog JSON URL" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "カタログのJSON URL"
+          }
+        }
+      }
     },
     "Catalog sources can be added in Settings." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "カタログソースは“設定”で追加できます。"
+          }
+        }
+      }
     },
     "Category" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "カテゴリ"
+          }
+        }
+      }
     },
     "Choose a PBW package from Files" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“ファイル”からPBWパッケージを選択します"
+          }
+        }
+      }
     },
     "Choose Devices, then Scan to connect." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“デバイス”を選択してから“スキャン”で接続します。"
+          }
+        }
+      }
     },
     "Choose PBZ Firmware" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "PBZファームウェアを選択"
+          }
+        }
+      }
     },
     "Compatibility" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "互換性"
+          }
+        }
+      }
     },
     "Configure" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "構成"
+          }
+        }
+      }
     },
     "Connect Automatically" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "自動的に接続"
+          }
+        }
+      }
     },
     "Connect your Pebble, install watch apps, and keep timeline and health data synchronized." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Pebbleを接続して、ウォッチアプリをインストールし、タイムラインとヘルスケアデータを常に同期できます。"
+          }
+        }
+      }
     },
     "Connected" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "接続済み"
+          }
+        }
+      }
     },
     "Connection" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "接続"
+          }
+        }
+      }
     },
     "Connection status: %@" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "接続状態: %@"
+          }
+        }
+      }
     },
     "Connects to this watch" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このウォッチに接続します"
+          }
+        }
+      }
     },
     "Current Version" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "現在のバージョン"
+          }
+        }
+      }
     },
     "Daily Average" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "1日の平均"
+          }
+        }
+      }
     },
     "Date" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "日付"
+          }
+        }
+      }
     },
     "Delete all local health data?" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ローカルのヘルスケアデータをすべて削除しますか?"
+          }
+        }
+      }
     },
     "Delete Health Data" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ヘルスケアデータを削除"
+          }
+        }
+      }
     },
     "Delete Local Health Data" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ローカルのヘルスケアデータを削除"
+          }
+        }
+      }
     },
     "Developer" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "デベロッパ"
+          }
+        }
+      }
     },
     "Devices" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "デバイス"
+          }
+        }
+      }
     },
     "Diagnostics" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "診断"
+          }
+        }
+      }
     },
     "Discard Recovery Data" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リカバリデータを破棄"
+          }
+        }
+      }
     },
     "Disconnect" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "接続解除"
+          }
+        }
+      }
     },
     "Done" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "完了"
+          }
+        }
+      }
     },
     "Ends at %lld:00" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "終了: %lld:00"
+          }
+        }
+      }
     },
     "Export Health Data" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ヘルスケアデータを書き出す"
+          }
+        }
+      }
     },
     "Favorite" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "お気に入りに追加"
+          }
+        }
+      }
     },
     "Favorite Watchface" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチフェイスをお気に入りに追加"
+          }
+        }
+      }
     },
     "Firmware" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ファームウェア"
+          }
+        }
+      }
     },
     "Forget %@?" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“%@”の登録を解除しますか?"
+          }
+        }
+      }
     },
     "Forget Watch" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチの登録を解除"
+          }
+        }
+      }
     },
     "Get Started" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "はじめよう"
+          }
+        }
+      }
     },
     "Health" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ヘルスケア"
+          }
+        }
+      }
     },
     "Import" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "読み込む"
+          }
+        }
+      }
     },
     "Import from Apple Health" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“ヘルスケア”から読み込む"
+          }
+        }
+      }
     },
     "Import Health Archive" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ヘルスケアアーカイブを読み込む"
+          }
+        }
+      }
     },
     "Imported watch apps and watchfaces will appear here." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "読み込んだウォッチアプリとウォッチフェイスがここに表示されます。"
+          }
+        }
+      }
     },
     "Importing Pebble application" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Pebbleアプリケーションを読み込み中"
+          }
+        }
+      }
     },
     "Incoming Call" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "着信"
+          }
+        }
+      }
     },
     "Incompatible" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "非対応"
+          }
+        }
+      }
     },
     "Install Recovery Firmware" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リカバリファームウェアをインストール"
+          }
+        }
+      }
     },
     "Installed" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "インストール済み"
+          }
+        }
+      }
     },
     "Installing" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "インストール中"
+          }
+        }
+      }
     },
     "Loading applications" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリケーションを読み込み中"
+          }
+        }
+      }
     },
     "Makes this the active watchface" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このウォッチフェイスを適用します"
+          }
+        }
+      }
     },
     "Minutes" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "分"
+          }
+        }
+      }
     },
     "My Watches" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "マイウォッチ"
+          }
+        }
+      }
     },
     "Nearby" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "近くのウォッチ"
+          }
+        }
+      }
     },
     "New Pin" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "新規ピン"
+          }
+        }
+      }
     },
     "No Apps" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリなし"
+          }
+        }
+      }
     },
     "No Catalog Apps" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "カタログアプリなし"
+          }
+        }
+      }
     },
     "No Watches Found" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチが見つかりません"
+          }
+        }
+      }
     },
     "Notifications" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "通知"
+          }
+        }
+      }
     },
     "Open Privacy Settings" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "プライバシー設定を開く"
+          }
+        }
+      }
     },
     "Opens this watch application's settings" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このウォッチアプリケーションの設定を開きます"
+          }
+        }
+      }
     },
     "Pebble" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Pebble"
+          }
+        }
+      }
     },
     "Per-App Notifications" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリごとの通知"
+          }
+        }
+      }
     },
     "Period" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "期間"
+          }
+        }
+      }
     },
     "Period Total" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "期間合計"
+          }
+        }
+      }
     },
     "Permissions" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アクセス許可"
+          }
+        }
+      }
     },
     "Phone App Notifications" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "スマートフォンアプリの通知"
+          }
+        }
+      }
     },
     "Pins" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ピン"
+          }
+        }
+      }
     },
     "Prepare Diagnostic Report" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "診断レポートを作成"
+          }
+        }
+      }
     },
     "Preparing installation" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "インストールを準備中"
+          }
+        }
+      }
     },
     "Quiet Hours" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "サイレント時間帯"
+          }
+        }
+      }
     },
     "Refresh" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "再読み込み"
+          }
+        }
+      }
     },
     "Release Notes" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リリースノート"
+          }
+        }
+      }
     },
     "Remove" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "削除"
+          }
+        }
+      }
     },
     "Remove Application" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリケーションを削除"
+          }
+        }
+      }
     },
     "Remove Favorite" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "お気に入りから削除"
+          }
+        }
+      }
     },
     "Remove this watch application?" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このウォッチアプリケーションを削除しますか?"
+          }
+        }
+      }
     },
     "Resume Interrupted Updates" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "中断されたアップデートを再開"
+          }
+        }
+      }
     },
     "Scan" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "スキャン"
+          }
+        }
+      }
     },
     "Scan for a Pebble 2 Duo, Pebble Time 2, or Pebble Round 2." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Pebble 2 Duo、Pebble Time 2、またはPebble Round 2をスキャンしてください。"
+          }
+        }
+      }
     },
     "Screenshot of %@" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%@のスクリーンショット"
+          }
+        }
+      }
     },
     "Screenshots" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "スクリーンショット"
+          }
+        }
+      }
     },
     "Send Test Notification" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "テスト通知を送信"
+          }
+        }
+      }
     },
     "Settings" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "設定"
+          }
+        }
+      }
     },
     "Settings Unavailable" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "設定を利用できません"
+          }
+        }
+      }
     },
     "Share Diagnostic Report" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "診断レポートを共有"
+          }
+        }
+      }
     },
     "Share Export" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "書き出したデータを共有"
+          }
+        }
+      }
     },
     "Sleep" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "睡眠"
+          }
+        }
+      }
     },
     "Sort" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "並べ替え"
+          }
+        }
+      }
     },
     "Starts at %lld:00" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "開始: %lld:00"
+          }
+        }
+      }
     },
     "Steps" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "歩数"
+          }
+        }
+      }
     },
     "Support" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "サポート"
+          }
+        }
+      }
     },
     "Supported Watches" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "対応ウォッチ"
+          }
+        }
+      }
     },
     "Sync Calendar" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "カレンダーを同期"
+          }
+        }
+      }
     },
     "Sync Health Data" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ヘルスケアデータを同期"
+          }
+        }
+      }
     },
     "Sync with Apple Health" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“ヘルスケア”と同期"
+          }
+        }
+      }
     },
     "System notifications are delivered directly to a paired Pebble using Apple Notification Center Service. This switch controls notifications created by installed watch apps." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "システム通知は、Apple Notification Center Serviceを使用してペアリング済みのPebbleに直接配信されます。このスイッチでは、インストール済みのウォッチアプリが作成する通知を制御できます。"
+          }
+        }
+      }
     },
     "Target Version" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "対象バージョン"
+          }
+        }
+      }
     },
     "The application and its settings will be removed from the connected Pebble." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "接続中のPebbleからアプリケーションとその設定が削除されます。"
+          }
+        }
+      }
     },
     "This removes locally stored step and sleep history. This action cannot be undone." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ローカルに保存されている歩数と睡眠の履歴が削除されます。この操作は取り消せません。"
+          }
+        }
+      }
     },
     "Timeline" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "タイムライン"
+          }
+        }
+      }
     },
     "Title" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "タイトル"
+          }
+        }
+      }
     },
     "Today" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "今日"
+          }
+        }
+      }
     },
     "Tracked Days" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "記録日数"
+          }
+        }
+      }
     },
     "Turn on your Pebble and keep it nearby." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Pebbleの電源を入れて、近くに置いてください。"
+          }
+        }
+      }
     },
     "Type" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "種類"
+          }
+        }
+      }
     },
     "Update" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アップデート"
+          }
+        }
+      }
     },
     "Update All" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "すべてアップデート"
+          }
+        }
+      }
     },
     "Update Catalog" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "カタログをアップデート"
+          }
+        }
+      }
     },
     "Update State" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アップデートの状態"
+          }
+        }
+      }
     },
     "Watch App Notifications" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチアプリの通知"
+          }
+        }
+      }
     },
     "Watch Apps" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチアプリ"
+          }
+        }
+      }
     },
     "Watchfaces" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチフェイス"
+          }
+        }
+      }
     },
     "Welcome to Pebble" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Pebbleへようこそ"
+          }
+        }
+      }
     }
   },
   "version" : "1.3"

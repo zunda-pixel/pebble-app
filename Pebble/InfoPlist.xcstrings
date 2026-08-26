@@ -28,6 +28,12 @@
             "state" : "new",
             "value" : "Pebble shows the current song on your watch and lets it control playback."
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Pebbleは現在再生中の曲をウォッチに表示し、ウォッチから再生をコントロールできるようにします。"
+          }
         }
       }
     },
@@ -76,6 +82,12 @@
             "state" : "new",
             "value" : "Pebble reads steps and sleep data to keep your watch health history synchronized."
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Pebbleは歩数と睡眠のデータを読み取り、ウォッチのヘルスケア履歴を常に同期します。"
+          }
         }
       }
     },
@@ -88,6 +100,12 @@
             "state" : "new",
             "value" : "Pebble saves watch steps and sleep data to your Health data when you choose to synchronize."
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Pebbleは、同期を選択した場合にウォッチの歩数と睡眠のデータをヘルスケアデータに保存します。"
+          }
         }
       }
     },
@@ -99,6 +117,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Pebble synchronizes upcoming reminders to your watch timeline."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Pebbleは今後のリマインダーをウォッチのタイムラインに同期します。"
           }
         }
       }
