@@ -21,6 +21,8 @@ public enum CatalogInstallationState: Equatable, Sendable {
 @Observable
 public final class AppModel {
     public private(set) var connectionState: PebbleConnectionState = .idle
+    public private(set) var connections: [WatchConnection] = []
+    public private(set) var connectingDeviceIDs: Set<String> = []
     public private(set) var discoveredDevices: [DiscoveredPebble] = []
     public private(set) var watchApplications: [PebbleApplication] = []
     public private(set) var watchfaces: [PebbleApplication] = []
@@ -67,7 +69,30 @@ public final class AppModel {
         }
     }
 
-    private let client: any PebbleClient
+    public var connectedDevices: [PebbleDevice] {
+        activeConnections.map(\.device)
+    }
+
+    /// The primary watch: the first connected one. Flows that can only target
+    /// a single watch (PBW configuration pages, the catalog compatibility
+    /// filter) use it.
+    public var connectedDevice: PebbleDevice? {
+        activeConnections.first?.device
+    }
+
+    private var activeConnections: [WatchConnection] {
+        connections.filter(\.isConnected)
+    }
+
+    private func connection(for deviceID: String?) -> WatchConnection? {
+        guard let deviceID else {
+            return activeConnections.first
+        }
+        return connections.first { $0.device.id == deviceID }
+    }
+
+    private let scannerClient: any PebbleClient
+    private let clientFactory: @MainActor (String) -> any PebbleClient
     private let applicationLibrary: PebbleApplicationLibrary
     private let watchLibrary: PebbleWatchLibrary
     private let timelineLibrary = TimelinePinLibrary()
@@ -85,23 +110,16 @@ public final class AppModel {
     private let healthKitBridge = HealthKitBridge()
     #endif
     private let notificationSourceAppLibrary = NotificationSourceAppLibrary()
-    @ObservationIgnored private var companionFramesTask: Task<Void, Never>?
-    @ObservationIgnored private var synchronizedNotificationAppRecords: [String: [UInt8]] = [:]
-    @ObservationIgnored private var blobDBTokenCounter: UInt16 = 0x4000
     @ObservationIgnored private lazy var musicCoordinator = MusicCoordinator(
         source: makeSystemMusicSource(),
-        send: { [client] frame in try await client.send(frame) }
+        send: { [weak self] frame in try await self?.broadcast(frame) }
     )
     @ObservationIgnored private lazy var phoneCallCoordinator = PhoneCallCoordinator(
         source: makeSystemCallSource(),
-        send: { [client] frame in try await client.send(frame) }
-    )
-    @ObservationIgnored private lazy var voiceCoordinator = VoiceSessionCoordinator(
-        provider: nil,
-        send: { [client] frame in try await client.send(frame) }
+        send: { [weak self] frame in try await self?.broadcast(frame) }
     )
     @ObservationIgnored private var isPerformingScan = false
-    @ObservationIgnored private var connectionEventsTask: Task<Void, Never>?
+    @ObservationIgnored private var lastConnectionError: PebbleConnectionError?
     @ObservationIgnored private var firmwareUpdateTask: Task<Void, any Error>?
     @ObservationIgnored private var appFetchTask: Task<Void, Never>?
     @ObservationIgnored private var hasLoadedApplications = false
@@ -148,9 +166,13 @@ public final class AppModel {
     public init(
         client: any PebbleClient,
         applicationLibrary: PebbleApplicationLibrary = PebbleApplicationLibrary(),
-        watchLibrary: PebbleWatchLibrary = PebbleWatchLibrary()
+        watchLibrary: PebbleWatchLibrary = PebbleWatchLibrary(),
+        clientFactory: (@MainActor (String) -> any PebbleClient)? = nil
     ) {
-        self.client = client
+        self.scannerClient = client
+        // Without a factory every connection shares the scanning client, which
+        // limits the app to one watch at a time (mock and QEMU transports).
+        self.clientFactory = clientFactory ?? { _ in client }
         self.applicationLibrary = applicationLibrary
         self.watchLibrary = watchLibrary
         companionNotificationsEnabled = UserDefaults.standard.object(
@@ -160,13 +182,6 @@ public final class AppModel {
         favoriteWatchfaceIDs = Set(
             UserDefaults.standard.stringArray(forKey: "favoriteWatchfaceIDs")?.compactMap(UUID.init(uuidString:)) ?? []
         )
-    }
-
-    public var connectedDevice: PebbleDevice? {
-        guard case .connected(let device) = connectionState else {
-            return nil
-        }
-        return device
     }
 
     public var isApplicationManagementBusy: Bool {
@@ -196,69 +211,65 @@ public final class AppModel {
     public func applicationDidBecomeActive() async {
         await start()
         await PebbleDiagnostics.shared.record(category: "lifecycle", message: "Application became active")
-        switch connectionState {
-        case .connected:
-            try? await client.synchronizeTime()
+        if !activeConnections.isEmpty {
+            for connection in activeConnections {
+                try? await connection.client.synchronizeTime()
+            }
             await restorePendingNotifications()
             pendingAppMessages = (try? await pendingAppMessageLibrary.messages()) ?? pendingAppMessages
             await flushPendingNotifications()
             await flushPendingAppMessages()
             await synchronizeTimeline()
-        case .idle, .failed:
+        } else if !isPerformingScan, connectingDeviceIDs.isEmpty, connections.isEmpty {
             if savedWatches.contains(where: \.automaticallyConnects) {
                 await scan()
             }
-        case .scanning, .connecting, .negotiating, .reconnecting:
-            break
         }
     }
 
     public func scan() async {
         guard !isPerformingScan else { return }
         isPerformingScan = true
-        defer { isPerformingScan = false }
-        // Scanning must not displace an existing connection: connectedDevice
-        // is derived from connectionState, so overwriting it would make the
-        // whole app treat a live link as disconnected.
-        if connectedDevice == nil {
+        if connections.isEmpty, connectingDeviceIDs.isEmpty {
             connectionState = .scanning
+        }
+        defer {
+            isPerformingScan = false
+            refreshConnectionState()
         }
 
         do {
             await loadSavedWatches()
-            var devices = try await client.scan()
+            var devices = try await scannerClient.scan()
             // Bonded watches do not advertise, so scanning alone never finds
             // them again; look the saved ones up by identifier as well.
+            let connectedIDs = Set(connections.map(\.device.id))
             let missingSavedWatches = savedWatches
                 .filter { saved in
-                    saved.id != connectedDevice?.id && !devices.contains { $0.id == saved.id }
+                    !connectedIDs.contains(saved.id) && !devices.contains { $0.id == saved.id }
                 }
                 .map { saved in
                     DiscoveredPebble(id: saved.id, name: saved.name, model: saved.model, signalStrength: 0)
                 }
             if !missingSavedWatches.isEmpty,
-               let retrieved = try? await client.retrieveKnownDevices(missingSavedWatches) {
+               let retrieved = try? await scannerClient.retrieveKnownDevices(missingSavedWatches) {
                 devices.append(contentsOf: retrieved)
             }
-            discoveredDevices = devices.filter { $0.id != connectedDevice?.id }
-            if case .scanning = connectionState {
-                connectionState = .idle
+            discoveredDevices = devices.filter { !connectedIDs.contains($0.id) }
+            refreshConnectionState()
+            let automaticTargets = discoveredDevices.filter { discovered in
+                savedWatches.contains { $0.id == discovered.id && $0.automaticallyConnects }
             }
-            guard case .idle = connectionState else { return }
-            if let device = discoveredDevices.first(where: { discovered in
-                savedWatches.contains {
-                    $0.id == discovered.id && $0.automaticallyConnects
-                }
-            }) {
+            for device in automaticTargets {
                 await connect(to: device)
             }
         } catch let error as PebbleConnectionError {
-            if case .scanning = connectionState {
-                connectionState = .failed(error)
+            if connections.isEmpty {
+                lastConnectionError = error
             }
         } catch {
-            if case .scanning = connectionState {
-                connectionState = .failed(.bluetoothUnavailable)
+            if connections.isEmpty {
+                lastConnectionError = .bluetoothUnavailable
             }
         }
     }
@@ -273,47 +284,78 @@ public final class AppModel {
     }
 
     public func connect(to device: DiscoveredPebble) async {
-        switch connectionState {
-        case .connecting, .negotiating, .reconnecting:
+        guard !connectingDeviceIDs.contains(device.id),
+              !connections.contains(where: { $0.device.id == device.id }) else {
             return
-        case .connected(let current):
-            guard current.id != device.id else { return }
-            await disconnect()
-        case .idle, .scanning, .failed:
-            break
         }
-        connectionState = .connecting(deviceID: device.id)
+        connectingDeviceIDs.insert(device.id)
+        refreshConnectionState()
+        defer {
+            connectingDeviceIDs.remove(device.id)
+            refreshConnectionState()
+        }
 
+        let connectionClient = clientFactory(device.id)
         do {
-            let connectedDevice = try await client.connect(to: device)
-            connectionState = .connected(connectedDevice)
+            let connectedDevice = try await connectionClient.connect(to: device)
+            lastConnectionError = nil
+            let connection = WatchConnection(client: connectionClient, device: connectedDevice)
+            connections.append(connection)
+            connection.startObserving(
+                onEvent: { [weak self] connection, event in
+                    self?.handleEvent(event, from: connection)
+                },
+                onFrame: { [weak self] connection, frame in
+                    await self?.handleCompanionFrame(frame, from: connection)
+                }
+            )
+            discoveredDevices.removeAll { $0.id == device.id }
+            refreshConnectionState()
             await recordConnectedWatch(connectedDevice)
             await restorePendingNotifications()
             await PebbleDiagnostics.shared.record(category: "connection", message: "Watch connected")
-            observeConnectionEvents()
-            observeCompanionFrames()
             musicCoordinator.watchConnected()
-            await synchronizeNotificationSourceApps()
-            await synchronizeApplications(with: connectedDevice)
-            try? await client.send(AppRunStateCodec.requestFrame())
+            await synchronizeNotificationSourceApps(on: connection)
+            await synchronizeApplications(on: connection)
+            try? await connectionClient.send(AppRunStateCodec.requestFrame())
             await flushPendingNotifications()
             await flushPendingAppMessages()
             await synchronizeTimeline()
-            await requestHealthSync()
-            await resumePendingFirmwareUpdate()
+            await requestHealthSync(on: connection)
+            await resumePendingFirmwareUpdate(on: connection)
         } catch let error as PebbleConnectionError {
-            connectionState = .failed(error)
+            lastConnectionError = error
+            if !connections.isEmpty {
+                watchManagementErrorMessage = error.message
+            }
             await PebbleDiagnostics.shared.record(.error, category: "connection", message: error.message)
         } catch {
-            connectionState = .failed(.protocolNegotiationFailed)
+            lastConnectionError = .protocolNegotiationFailed
         }
     }
 
-    public func installFirmware(from url: URL) async {
-        guard let device = connectedDevice else {
+    private func refreshConnectionState() {
+        if let connectingID = connectingDeviceIDs.first {
+            connectionState = .connecting(deviceID: connectingID)
+        } else if let primary = activeConnections.first {
+            connectionState = .connected(primary.device)
+        } else if let reconnecting = connections.first(where: { $0.phase == .reconnecting }) {
+            connectionState = .reconnecting(deviceID: reconnecting.device.id)
+        } else if isPerformingScan {
+            connectionState = .scanning
+        } else if let error = lastConnectionError {
+            connectionState = .failed(error)
+        } else {
+            connectionState = .idle
+        }
+    }
+
+    public func installFirmware(from url: URL, deviceID: String? = nil) async {
+        guard let connection = connection(for: deviceID), connection.isConnected else {
             firmwareUpdateStatusMessage = "Connect the target Pebble before selecting firmware."
             return
         }
+        let device = connection.device
         let accessed = url.startAccessingSecurityScopedResource()
         defer { if accessed { url.stopAccessingSecurityScopedResource() } }
         do {
@@ -336,7 +378,7 @@ public final class AppModel {
                 firmwareUpdateStatusMessage = "Recovery firmware validated. Confirm to continue."
                 return
             }
-            try await performFirmwareUpdate(package)
+            try await performFirmwareUpdate(package, on: connection)
         } catch {
             firmwareUpdateStatusMessage = "Firmware update stopped safely: \(error.localizedDescription)"
         }
@@ -344,9 +386,11 @@ public final class AppModel {
 
     public func confirmRecoveryFirmwareUpdate() async {
         guard firmwareRequiresConfirmation,
-              let package = try? await pendingFirmwareUpdateLibrary.package() else { return }
+              let package = try? await pendingFirmwareUpdateLibrary.package(),
+              let journal = try? await pendingFirmwareUpdateLibrary.journal(),
+              let connection = connection(for: journal.deviceID) else { return }
         firmwareRequiresConfirmation = false
-        do { try await performFirmwareUpdate(package) }
+        do { try await performFirmwareUpdate(package, on: connection) }
         catch { firmwareUpdateStatusMessage = "Recovery update stopped safely: \(error.localizedDescription)" }
     }
 
@@ -357,7 +401,10 @@ public final class AppModel {
         try? await pendingFirmwareUpdateLibrary.updatePhase(.cancelled)
         firmwareUpdateJournal = try? await pendingFirmwareUpdateLibrary.journal()
         firmwareUpdateStatusMessage = "Firmware update cancelled; recovery data was retained."
-        if connectedDevice != nil { await disconnect() }
+        if let deviceID = firmwareUpdateJournal?.deviceID,
+           let connection = connection(for: deviceID) {
+            await disconnect(deviceID: connection.device.id)
+        }
     }
 
     public func discardPendingFirmwareUpdate() async {
@@ -369,18 +416,22 @@ public final class AppModel {
         firmwareUpdateStatusMessage = "Pending firmware update removed."
     }
 
-    private func performFirmwareUpdate(_ package: PBZFirmwarePackage) async throws {
+    private func performFirmwareUpdate(
+        _ package: PBZFirmwarePackage,
+        on connection: WatchConnection
+    ) async throws {
         try package.validateIntegrity()
         guard let journal = try await pendingFirmwareUpdateLibrary.journal(),
               journal.packageSHA256 == package.sha256,
-              journal.deviceID == connectedDevice?.id else {
+              journal.deviceID == connection.device.id else {
             throw PBZFirmwareError.unsafeManifest
         }
         try await pendingFirmwareUpdateLibrary.updatePhase(.transferring)
         firmwareUpdateJournal = try await pendingFirmwareUpdateLibrary.journal()
         firmwareUpdateStatusMessage = "Transferring verified firmware…"
         firmwareUpdateProgress = nil
-        let task = Task { [client] in try await client.installFirmware(package) }
+        let client = connection.client
+        let task = Task { try await client.installFirmware(package) }
         firmwareUpdateTask = task
         defer { firmwareUpdateTask = nil }
         try await task.value
@@ -418,7 +469,7 @@ public final class AppModel {
 
     public func synchronizeTimeline() async {
         await loadTimeline()
-        guard connectedDevice != nil else { return }
+        guard !activeConnections.isEmpty else { return }
         var operations = (try? await pendingTimelineOperationLibrary.operations()) ?? []
         let queuedUpserts = Set(operations.compactMap { operation -> UUID? in
             if case .upsert(let pin) = operation { return pin.id }
@@ -428,11 +479,14 @@ public final class AppModel {
         var remaining: [PendingTimelineOperation] = []
         for (index, operation) in operations.enumerated() {
             do {
-                switch operation {
-                case .upsert(let pin):
-                    try await PebbleRetryPolicy().execute { [client] in try await client.upsertTimelinePin(pin) }
-                case .delete(let id):
-                    try await PebbleRetryPolicy().execute { [client] in try await client.deleteTimelinePin(id: id) }
+                for connection in activeConnections {
+                    let client = connection.client
+                    switch operation {
+                    case .upsert(let pin):
+                        try await PebbleRetryPolicy().execute { try await client.upsertTimelinePin(pin) }
+                    case .delete(let id):
+                        try await PebbleRetryPolicy().execute { try await client.deleteTimelinePin(id: id) }
+                    }
                 }
             } catch {
                 remaining.append(contentsOf: operations[index...])
@@ -495,10 +549,16 @@ public final class AppModel {
     }
 
     public func requestHealthSync() async {
-        guard connectedDevice != nil else { return }
+        guard !activeConnections.isEmpty else { return }
+        for connection in activeConnections {
+            await requestHealthSync(on: connection)
+        }
+    }
+
+    private func requestHealthSync(on connection: WatchConnection) async {
         do {
-            try await client.send(HealthDataLoggingCodec.reportOpenSessionsFrame())
-            try await client.send(HealthSyncCodec.requestFrame(since: healthSamples.map(\.date).max()))
+            try await connection.client.send(HealthDataLoggingCodec.reportOpenSessionsFrame())
+            try await connection.client.send(HealthSyncCodec.requestFrame(since: healthSamples.map(\.date).max()))
             dataSyncStatusMessage = "Health synchronization requested."
         } catch { dataSyncStatusMessage = "Health synchronization will retry after reconnection." }
     }
@@ -579,7 +639,10 @@ public final class AppModel {
     }
 
     public func catalogInstallationState(for application: PebbleCatalogApplication) -> CatalogInstallationState {
-        if let model = connectedDevice?.model, !application.supports(model) { return .incompatible }
+        if !connectedDevices.isEmpty,
+           !connectedDevices.contains(where: { application.supports($0.model) }) {
+            return .incompatible
+        }
         guard let installed = (watchApplications + watchfaces).first(where: { $0.id == application.id }) else {
             return .available
         }
@@ -591,7 +654,7 @@ public final class AppModel {
             dataSyncStatusMessage = "The catalog provided an unsafe download URL."
             return
         }
-        if let model = connectedDevice?.model, !application.supports(model) {
+        if catalogInstallationState(for: application) == .incompatible {
             dataSyncStatusMessage = "\(application.name) is not compatible with this watch."
             return
         }
@@ -603,10 +666,6 @@ public final class AppModel {
             let packageURL = try await appCatalog.download(application)
             let decoded = try await Task.detached { try PBWPackageImporter.application(from: packageURL) }.value
             guard decoded.id == application.id else { throw AppCatalogError.applicationIDMismatch }
-            if let model = connectedDevice?.model {
-                let package = try await loadPackage(from: packageURL, for: model)
-                guard package.application.id == application.id else { throw AppCatalogError.applicationIDMismatch }
-            }
             applicationLibraryErrorMessage = nil
             await importApplication(from: packageURL)
             try? FileManager.default.removeItem(at: packageURL)
@@ -650,21 +709,10 @@ public final class AppModel {
     }
 
     public func forgetWatch(id: String) async {
-        if connectedDevice?.id == id {
-            await disconnect()
-        } else if let watch = savedWatches.first(where: { $0.id == id }) {
-            // The client may still be trying to reconnect to this watch in the
-            // background; a successful reconnect would re-save the entry.
-            await client.disconnect(from: PebbleDevice(
-                id: watch.id,
-                name: watch.name,
-                model: watch.model,
-                firmwareVersion: watch.firmwareVersion,
-                batteryLevel: nil
-            ))
-            if case .reconnecting(let deviceID) = connectionState, deviceID == id {
-                connectionState = .idle
-            }
+        // Closing the connection also stops any background reconnect loop; a
+        // successful reconnect would otherwise re-save the forgotten entry.
+        if let connection = connections.first(where: { $0.device.id == id }) {
+            await close(connection)
         }
         do {
             savedWatches = try await watchLibrary.remove(watchID: id)
@@ -674,34 +722,29 @@ public final class AppModel {
         }
     }
 
-    public func disconnect() async {
-        let device: PebbleDevice
-        switch connectionState {
-        case .connected(let connected):
-            device = connected
-        case .reconnecting(let deviceID):
-            let saved = savedWatches.first { $0.id == deviceID }
-            device = PebbleDevice(
-                id: deviceID,
-                name: saved?.name ?? deviceID,
-                model: saved?.model ?? .pebbleTime2,
-                firmwareVersion: saved?.firmwareVersion,
-                batteryLevel: nil
-            )
-        default:
+    public func disconnect(deviceID: String) async {
+        guard let connection = connections.first(where: { $0.device.id == deviceID }) else {
             return
         }
-
-        await client.disconnect(from: device)
-        resetSessionState()
-        connectionState = .idle
+        await close(connection)
     }
 
-    private func resetSessionState() {
-        connectionEventsTask?.cancel()
-        connectionEventsTask = nil
-        companionFramesTask?.cancel()
-        companionFramesTask = nil
+    public func disconnect() async {
+        for connection in connections {
+            await close(connection)
+        }
+    }
+
+    private func close(_ connection: WatchConnection) async {
+        connections.removeAll { $0 === connection }
+        await connection.close()
+        clearBusyOperationState()
+        needsApplicationSynchronization = true
+        lastConnectionError = nil
+        refreshConnectionState()
+    }
+
+    private func clearBusyOperationState() {
         appFetchTask?.cancel()
         appFetchTask = nil
         isHandlingAppFetch = false
@@ -710,9 +753,6 @@ public final class AppModel {
         installingApplicationID = nil
         installingApplicationName = nil
         installationProgress = nil
-        needsApplicationSynchronization = true
-        synchronizedNotificationAppRecords = [:]
-        voiceCoordinator.reset()
     }
 
     public func loadApplications() async {
@@ -750,10 +790,13 @@ public final class AppModel {
     }
 
     public func activateWatchface(_ application: PebbleApplication) async {
-        guard application.kind == .watchface, connectedDevice != nil else { return }
+        guard application.kind == .watchface, !activeConnections.isEmpty else { return }
         do {
-            try await PebbleRetryPolicy().execute { [client] in
-                try await client.launchApplication(id: application.id)
+            for connection in activeConnections {
+                let client = connection.client
+                try await PebbleRetryPolicy().execute {
+                    try await client.launchApplication(id: application.id)
+                }
             }
             activeWatchfaceID = application.id
             UserDefaults.standard.set(application.id.uuidString, forKey: "activeWatchfaceID")
@@ -809,13 +852,13 @@ public final class AppModel {
         try? await notificationPreferenceLibrary.save(notificationPreferences)
     }
 
-    public func sendTestNotification() async {
-        guard connectedDevice != nil else {
+    public func sendTestNotification(deviceID: String? = nil) async {
+        guard let connection = connection(for: deviceID), connection.isConnected else {
             notificationStatusMessage = "Connect a Pebble before sending a test notification."
             return
         }
         do {
-            try await client.sendNotification(PebbleTimelineNotification(
+            try await connection.client.sendNotification(PebbleTimelineNotification(
                 parentApplicationID: UUID(),
                 title: "Pebble Test",
                 body: "Notifications are reaching your watch.",
@@ -833,6 +876,23 @@ public final class AppModel {
                 category: "notification",
                 message: "Test notification delivery failed"
             )
+        }
+    }
+
+    /// Sends a frame to every connected watch, throwing only when no watch
+    /// received it.
+    private func broadcast(_ frame: PebbleProtocolFrame) async throws {
+        var delivered = false
+        for connection in activeConnections {
+            do {
+                try await connection.client.send(frame)
+                delivered = true
+            } catch {
+                continue
+            }
+        }
+        guard delivered else {
+            throw PebbleConnectionError.disconnected
         }
     }
 
@@ -863,7 +923,7 @@ public final class AppModel {
                 body: normalizedBody,
                 appName: application.displayName
             )
-            guard connectedDevice != nil else {
+            guard !activeConnections.isEmpty else {
                 pendingNotifications.append(notification)
                 if pendingNotifications.count > 20 {
                     pendingNotifications.removeFirst(pendingNotifications.count - 20)
@@ -875,8 +935,11 @@ public final class AppModel {
                 )
                 return
             }
-            try await PebbleRetryPolicy().execute { [client] in
-                try await client.sendNotification(notification)
+            for connection in activeConnections {
+                let client = connection.client
+                try await PebbleRetryPolicy().execute {
+                    try await client.sendNotification(notification)
+                }
             }
             await PebbleDiagnostics.shared.record(
                 category: "notification",
@@ -900,26 +963,9 @@ public final class AppModel {
         guard beginApplicationOperation(.removing(id)) else { return }
         defer { finishApplicationOperation(.removing(id)) }
         do {
-            let snapshot = try await applicationLibrary.snapshot(applicationID: id)
-            var previousMetadata: PebbleAppMetadata?
-            if let connectedDevice,
-               let packageURL = await applicationLibrary.storedPackageURL(applicationID: id) {
-                previousMetadata = try await loadPackage(from: packageURL, for: connectedDevice.model).appMetadata
-                try await client.unregisterApplication(applicationID: id)
-            }
-            do {
-                let applications = try await applicationLibrary.remove(applicationID: id)
-                updateApplications(applications)
-                if let connectedDevice {
-                    try await recordSynchronizedApplications(applications, device: connectedDevice)
-                }
-            } catch {
-                if let previousMetadata {
-                    try? await client.registerApplication(previousMetadata)
-                }
-                _ = try? await applicationLibrary.restore(snapshot)
-                throw error
-            }
+            let applications = try await applicationLibrary.remove(applicationID: id)
+            updateApplications(applications)
+            try await synchronizeAllWatches()
             applicationLibraryErrorMessage = nil
         } catch {
             applicationLibraryErrorMessage = applicationErrorMessage(error)
@@ -944,33 +990,12 @@ public final class AppModel {
                 try PBWPackageImporter.application(from: url)
             }.value
             let snapshot = try await applicationLibrary.snapshot(applicationID: application.id)
-            let connectedPackage: PBWPackage?
-            if let connectedDevice {
-                connectedPackage = try await loadPackage(from: url, for: connectedDevice.model)
-            } else {
-                connectedPackage = nil
-            }
-
             let applications = try await applicationLibrary.importPackage(from: url)
             updateApplications(applications)
-            if let connectedDevice, let connectedPackage {
+            if !activeConnections.isEmpty {
                 pendingImportSnapshots[application.id] = snapshot
-                do {
-                    try await client.registerApplication(connectedPackage.appMetadata)
-                    let compatibleApplications = compatibleApplications(applications, with: connectedDevice.model)
-                    try await client.reorderApplications(compatibleApplications.map(\.id))
-                    try await recordSynchronizedApplications(applications, device: connectedDevice)
-                    expirePendingSnapshot(applicationID: application.id)
-                } catch {
-                    pendingImportSnapshots[application.id] = nil
-                    updateApplications(try await applicationLibrary.restore(snapshot))
-                    try? await restoreWatchRegistration(
-                        snapshot: snapshot,
-                        applicationID: application.id,
-                        model: connectedDevice.model
-                    )
-                    throw error
-                }
+                try await synchronizeAllWatches()
+                expirePendingSnapshot(applicationID: application.id)
             }
             hasLoadedApplications = true
             applicationLibraryErrorMessage = nil
@@ -1000,21 +1025,15 @@ public final class AppModel {
                 applicationIDs: orderedApplications.map(\.id)
             )
             updateApplications(applications)
-            if let connectedDevice {
-                do {
-                    let compatibleApplications = compatibleApplications(applications, with: connectedDevice.model)
-                    try await client.reorderApplications(compatibleApplications.map(\.id))
-                    try await recordSynchronizedApplications(applications, device: connectedDevice)
-                } catch {
-                    let restored = try await applicationLibrary.reorder(
-                        applicationIDs: previousApplications.map(\.id)
-                    )
-                    updateApplications(restored)
-                    try? await client.reorderApplications(
-                        compatibleApplications(restored, with: connectedDevice.model).map(\.id)
-                    )
-                    throw error
-                }
+            do {
+                try await synchronizeAllWatches()
+            } catch {
+                let restored = try await applicationLibrary.reorder(
+                    applicationIDs: previousApplications.map(\.id)
+                )
+                updateApplications(restored)
+                try? await synchronizeAllWatches()
+                throw error
             }
             applicationLibraryErrorMessage = nil
         } catch {
@@ -1059,15 +1078,28 @@ public final class AppModel {
         applicationManagementStatusMessage = nil
         if needsApplicationSynchronization,
            completedOperation != .synchronizing,
-           let connectedDevice {
+           !activeConnections.isEmpty {
             needsApplicationSynchronization = false
             Task { [weak self] in
-                await self?.synchronizeApplications(with: connectedDevice)
+                guard let self else { return }
+                for connection in self.activeConnections {
+                    await self.synchronizeApplications(on: connection)
+                }
             }
         }
     }
 
-    private func synchronizeApplications(with device: PebbleDevice) async {
+    /// Reconciles the local application library with every connected watch.
+    /// The library is the source of truth; each watch gets the compatible
+    /// subset registered in order.
+    private func synchronizeAllWatches() async throws {
+        for connection in activeConnections {
+            try await performApplicationSynchronization(on: connection)
+        }
+    }
+
+    private func synchronizeApplications(on connection: WatchConnection) async {
+        guard connection.isConnected else { return }
         guard beginApplicationOperation(.synchronizing) else {
             needsApplicationSynchronization = true
             return
@@ -1076,28 +1108,33 @@ public final class AppModel {
         defer { finishApplicationOperation(.synchronizing) }
 
         do {
-            let applications = try await applicationLibrary.applications()
-            let synchronizedIDs = try await applicationLibrary.synchronizedApplicationIDs(deviceID: device.id)
-            let compatibleApplications = compatibleApplications(applications, with: device.model)
-            let localIDs = Set(compatibleApplications.map(\.id))
-            for applicationID in synchronizedIDs where !localIDs.contains(applicationID) {
-                try await client.unregisterApplication(applicationID: applicationID)
-            }
-            for application in compatibleApplications {
-                guard let packageURL = await applicationLibrary.storedPackageURL(applicationID: application.id) else {
-                    throw ApplicationManagementError.missingStoredPackage(application.displayName)
-                }
-                let package = try await loadPackage(from: packageURL, for: device.model)
-                try await client.registerApplication(package.appMetadata)
-            }
-            try await client.reorderApplications(compatibleApplications.map(\.id))
-            try await recordSynchronizedApplications(applications, device: device)
-            updateApplications(applications)
+            try await performApplicationSynchronization(on: connection)
             applicationLibraryErrorMessage = nil
         } catch {
             needsApplicationSynchronization = true
             applicationLibraryErrorMessage = applicationErrorMessage(error)
         }
+    }
+
+    private func performApplicationSynchronization(on connection: WatchConnection) async throws {
+        let device = connection.device
+        let applications = try await applicationLibrary.applications()
+        let synchronizedIDs = try await applicationLibrary.synchronizedApplicationIDs(deviceID: device.id)
+        let compatibleApplications = compatibleApplications(applications, with: device.model)
+        let localIDs = Set(compatibleApplications.map(\.id))
+        for applicationID in synchronizedIDs where !localIDs.contains(applicationID) {
+            try await connection.client.unregisterApplication(applicationID: applicationID)
+        }
+        for application in compatibleApplications {
+            guard let packageURL = await applicationLibrary.storedPackageURL(applicationID: application.id) else {
+                throw ApplicationManagementError.missingStoredPackage(application.displayName)
+            }
+            let package = try await loadPackage(from: packageURL, for: device.model)
+            try await connection.client.registerApplication(package.appMetadata)
+        }
+        try await connection.client.reorderApplications(compatibleApplications.map(\.id))
+        try await recordSynchronizedApplications(applications, device: device)
+        updateApplications(applications)
     }
 
     private func recordSynchronizedApplications(
@@ -1126,14 +1163,15 @@ public final class AppModel {
     private func restoreWatchRegistration(
         snapshot: PebbleApplicationLibrarySnapshot,
         applicationID: UUID,
-        model: PebbleWatchModel
+        on connection: WatchConnection
     ) async throws {
         guard snapshot.packageData != nil,
               let packageURL = await applicationLibrary.storedPackageURL(applicationID: applicationID) else {
-            try await client.unregisterApplication(applicationID: applicationID)
+            try await connection.client.unregisterApplication(applicationID: applicationID)
             return
         }
-        try await client.registerApplication(try await loadPackage(from: packageURL, for: model).appMetadata)
+        let package = try await loadPackage(from: packageURL, for: connection.device.model)
+        try await connection.client.registerApplication(package.appMetadata)
     }
 
     private func expirePendingSnapshot(applicationID: UUID) {
@@ -1203,122 +1241,104 @@ public final class AppModel {
         watchfaces = applications.filter { $0.kind == .watchface }
     }
 
-    private func observeConnectionEvents() {
-        connectionEventsTask?.cancel()
-        connectionEventsTask = Task { [weak self, client] in
-            for await event in client.events() {
-                guard !Task.isCancelled else {
-                    return
+    private func handleEvent(_ event: PebbleClientEvent, from connection: WatchConnection) {
+        switch event {
+        case .deviceUpdated(let device):
+            let needsResync = connection.consumePostReconnectSync()
+            refreshConnectionState()
+            Task { [weak self] in
+                await self?.recordConnectedWatch(device)
+            }
+            guard needsResync else { return }
+            musicCoordinator.watchConnected()
+            Task { [weak self] in
+                guard let self else { return }
+                await self.synchronizeNotificationSourceApps(on: connection)
+                await self.synchronizeApplications(on: connection)
+                await self.flushPendingNotifications()
+                await self.flushPendingAppMessages()
+                await self.synchronizeTimeline()
+                await self.requestHealthSync(on: connection)
+                await self.resumePendingFirmwareUpdate(on: connection)
+            }
+        case .appFetchRequested(let request):
+            beginHandlingAppFetchRequest(request, from: connection)
+        case .appMessageReceived(let message):
+            Task { [weak self] in await self?.handleAppMessage(message, from: connection) }
+        case .transferProgress(let progress):
+            if firmwareUpdateTask != nil { firmwareUpdateProgress = progress }
+            else { installationProgress = progress }
+        case .reconnecting:
+            refreshConnectionState()
+            needsApplicationSynchronization = true
+            // Operations interrupted by the link drop would otherwise leave
+            // the app-management UI busy forever.
+            clearBusyOperationState()
+        case .disconnected(let error):
+            connections.removeAll { $0 === connection }
+            lastConnectionError = error
+            refreshConnectionState()
+            needsApplicationSynchronization = true
+            clearBusyOperationState()
+        case .healthSyncCompleted(let succeeded):
+            dataSyncStatusMessage = succeeded ? "Health synchronization completed." : "The watch rejected health synchronization."
+        case .healthSamplesReceived(let samples):
+            Task { [weak self] in
+                guard let self else { return }
+                do {
+                    self.healthSamples = try await self.healthLibrary.merge(samples)
+                    self.dataSyncStatusMessage = "Received \(samples.count) health update(s) from the watch."
+                    #if os(iOS)
+                    try await self.healthKitBridge.synchronize(self.healthSamples)
+                    #endif
+                } catch {
+                    self.dataSyncStatusMessage = "Watch health data could not be saved."
                 }
-                switch event {
-                case .deviceUpdated(let device):
-                    self?.connectionState = .connected(device)
-                    self?.musicCoordinator.watchConnected()
-                    Task { [weak self] in
-                        await self?.recordConnectedWatch(device)
-                        await self?.synchronizeNotificationSourceApps()
-                        await self?.synchronizeApplications(with: device)
-                        await self?.flushPendingNotifications()
-                        await self?.flushPendingAppMessages()
-                        await self?.synchronizeTimeline()
-                        await self?.requestHealthSync()
-                        await self?.resumePendingFirmwareUpdate()
-                    }
-                case .appFetchRequested(let request):
-                    self?.beginHandlingAppFetchRequest(request)
-                case .appMessageReceived(let message):
-                    Task { [weak self] in await self?.handleAppMessage(message) }
-                case .transferProgress(let progress):
-                    if self?.firmwareUpdateTask != nil { self?.firmwareUpdateProgress = progress }
-                    else { self?.installationProgress = progress }
-                case .reconnecting(let deviceID):
-                    self?.connectionState = .reconnecting(deviceID: deviceID)
-                    self?.needsApplicationSynchronization = true
-                    // Operations interrupted by the link drop would otherwise
-                    // leave the app-management UI busy forever.
-                    self?.isHandlingAppFetch = false
-                    self?.applicationManagementOperation = nil
-                    self?.applicationManagementStatusMessage = nil
-                    self?.installingApplicationID = nil
-                    self?.installingApplicationName = nil
-                    self?.installationProgress = nil
-                    self?.synchronizedNotificationAppRecords = [:]
-                case .disconnected(let error):
-                    self?.connectionState = .failed(error)
-                    self?.needsApplicationSynchronization = true
-                    self?.isHandlingAppFetch = false
-                    self?.applicationManagementOperation = nil
-                    self?.applicationManagementStatusMessage = nil
-                    self?.installingApplicationID = nil
-                    self?.installingApplicationName = nil
-                    self?.installationProgress = nil
-                    self?.synchronizedNotificationAppRecords = [:]
-                    self?.voiceCoordinator.reset()
-                    // Keep consuming: the client can come back on its own
-                    // (for example after a Bluetooth power cycle).
-                case .healthSyncCompleted(let succeeded):
-                    self?.dataSyncStatusMessage = succeeded ? "Health synchronization completed." : "The watch rejected health synchronization."
-                case .healthSamplesReceived(let samples):
-                    Task { [weak self] in
-                        guard let self else { return }
-                        do {
-                            self.healthSamples = try await self.healthLibrary.merge(samples)
-                            self.dataSyncStatusMessage = "Received \(samples.count) health update(s) from the watch."
-                            #if os(iOS)
-                            try await self.healthKitBridge.synchronize(self.healthSamples)
-                            #endif
-                        } catch {
-                            self.dataSyncStatusMessage = "Watch health data could not be saved."
-                        }
-                    }
-                case .appRunStateChanged(let event):
-                    switch event {
-                    case .started(let id):
-                        if self?.watchfaces.contains(where: { $0.id == id }) == true {
-                            self?.activeWatchfaceID = id
-                            UserDefaults.standard.set(id.uuidString, forKey: "activeWatchfaceID")
-                        }
-                    case .stopped(let id):
-                        if self?.activeWatchfaceID == id { self?.activeWatchfaceID = nil }
-                    }
-                case .timelineActionInvoked(let invocation):
-                    Task { [weak self] in
-                        guard let self, let index = self.timelinePins.firstIndex(where: { $0.id == invocation.itemID }) else { return }
-                        self.timelinePins.remove(at: index)
-                        try? await self.timelineLibrary.save(self.timelinePins)
-                        self.timelineActionStatusMessage = "Timeline action completed."
-                    }
+            }
+        case .appRunStateChanged(let event):
+            switch event {
+            case .started(let id):
+                if watchfaces.contains(where: { $0.id == id }) {
+                    activeWatchfaceID = id
+                    UserDefaults.standard.set(id.uuidString, forKey: "activeWatchfaceID")
                 }
+            case .stopped(let id):
+                if activeWatchfaceID == id { activeWatchfaceID = nil }
+            }
+        case .timelineActionInvoked(let invocation):
+            Task { [weak self] in
+                guard let self, let index = self.timelinePins.firstIndex(where: { $0.id == invocation.itemID }) else { return }
+                self.timelinePins.remove(at: index)
+                try? await self.timelineLibrary.save(self.timelinePins)
+                self.timelineActionStatusMessage = "Timeline action completed."
             }
         }
     }
 
-    private func observeCompanionFrames() {
-        companionFramesTask?.cancel()
-        companionFramesTask = Task { [weak self, client] in
-            for await frame in client.frames() {
-                guard !Task.isCancelled, let self else {
-                    return
-                }
-                switch frame.endpoint {
-                case MusicControlCodec.endpoint:
-                    self.musicCoordinator.handleFrame(frame)
-                case PhoneControlCodec.endpoint:
-                    self.phoneCallCoordinator.handleFrame(frame)
-                case VoiceControlCodec.endpoint:
-                    await self.voiceCoordinator.handleVoiceFrame(frame)
-                case AudioStreamCodec.endpoint:
-                    await self.voiceCoordinator.handleAudioFrame(frame)
-                case BlobDB2Codec.endpoint:
-                    await self.handleWatchDatabaseWrite(frame)
-                default:
-                    continue
-                }
-            }
+    private func handleCompanionFrame(
+        _ frame: PebbleProtocolFrame,
+        from connection: WatchConnection
+    ) async {
+        switch frame.endpoint {
+        case MusicControlCodec.endpoint:
+            musicCoordinator.handleFrame(frame)
+        case PhoneControlCodec.endpoint:
+            phoneCallCoordinator.handleFrame(frame)
+        case VoiceControlCodec.endpoint:
+            await connection.voiceCoordinator.handleVoiceFrame(frame)
+        case AudioStreamCodec.endpoint:
+            await connection.voiceCoordinator.handleAudioFrame(frame)
+        case BlobDB2Codec.endpoint:
+            await handleWatchDatabaseWrite(frame, on: connection)
+        default:
+            return
         }
     }
 
-    private func handleWatchDatabaseWrite(_ frame: PebbleProtocolFrame) async {
+    private func handleWatchDatabaseWrite(
+        _ frame: PebbleProtocolFrame,
+        on connection: WatchConnection
+    ) async {
         guard let message = try? BlobDB2Codec.decode(frame) else {
             return
         }
@@ -1334,27 +1354,33 @@ public final class AppModel {
                let apps = try? await notificationSourceAppLibrary.merge(app) {
                 notificationSourceApps = apps
                 // The watch already holds this record; skip echoing it back.
-                synchronizedNotificationAppRecords[app.bundleID] = NotificationAppsCodec.value(
+                connection.synchronizedNotificationAppRecords[app.bundleID] = NotificationAppsCodec.value(
                     for: apps.first { $0.bundleID == app.bundleID } ?? app
                 )
                 succeeded = true
+                // Other connected watches still need the updated record.
+                for other in activeConnections where other !== connection {
+                    await synchronizeNotificationSourceApps(on: other)
+                }
             }
-            try? await client.send(BlobDB2Codec.responseFrame(to: message, succeeded: succeeded))
+            try? await connection.client.send(BlobDB2Codec.responseFrame(to: message, succeeded: succeeded))
         case .syncDone:
-            try? await client.send(BlobDB2Codec.responseFrame(to: message, succeeded: true))
+            try? await connection.client.send(BlobDB2Codec.responseFrame(to: message, succeeded: true))
         }
     }
 
-    private func synchronizeNotificationSourceApps() async {
+    private func synchronizeNotificationSourceApps(on connection: WatchConnection) async {
         for app in notificationSourceApps {
             let value = NotificationAppsCodec.value(for: app)
-            guard synchronizedNotificationAppRecords[app.bundleID] != value else {
+            guard connection.synchronizedNotificationAppRecords[app.bundleID] != value else {
                 continue
             }
-            blobDBTokenCounter &+= 1
+            connection.blobDBTokenCounter &+= 1
             do {
-                try await client.send(NotificationAppsCodec.insertFrame(app: app, token: blobDBTokenCounter))
-                synchronizedNotificationAppRecords[app.bundleID] = value
+                try await connection.client.send(
+                    NotificationAppsCodec.insertFrame(app: app, token: connection.blobDBTokenCounter)
+                )
+                connection.synchronizedNotificationAppRecords[app.bundleID] = value
             } catch {
                 return
             }
@@ -1371,7 +1397,9 @@ public final class AppModel {
         if let apps = try? await notificationSourceAppLibrary.merge(app) {
             notificationSourceApps = apps
         }
-        await synchronizeNotificationSourceApps()
+        for connection in activeConnections {
+            await synchronizeNotificationSourceApps(on: connection)
+        }
     }
 
     public func removeNotificationSourceApps(at offsets: IndexSet) async {
@@ -1382,9 +1410,13 @@ public final class AppModel {
         try? await notificationSourceAppLibrary.save(apps)
         notificationSourceApps = (try? await notificationSourceAppLibrary.apps()) ?? apps
         for app in removed {
-            blobDBTokenCounter &+= 1
-            synchronizedNotificationAppRecords[app.bundleID] = nil
-            try? await client.send(NotificationAppsCodec.deleteFrame(bundleID: app.bundleID, token: blobDBTokenCounter))
+            for connection in activeConnections {
+                connection.blobDBTokenCounter &+= 1
+                connection.synchronizedNotificationAppRecords[app.bundleID] = nil
+                try? await connection.client.send(
+                    NotificationAppsCodec.deleteFrame(bundleID: app.bundleID, token: connection.blobDBTokenCounter)
+                )
+            }
         }
     }
 
@@ -1397,14 +1429,14 @@ public final class AppModel {
         }
     }
 
-    private func handleAppMessage(_ message: AppMessageData) async {
+    private func handleAppMessage(_ message: AppMessageData, from connection: WatchConnection) async {
         do {
             guard let application = (watchApplications + watchfaces).first(where: {
                 $0.id == message.applicationID
             }), let source = try await applicationLibrary.companionJavaScript(
                 applicationID: application.id
             ) else {
-                try await client.respondToAppMessage(
+                try await connection.client.respondToAppMessage(
                     transactionID: message.transactionID,
                     acknowledged: false
                 )
@@ -1412,12 +1444,12 @@ public final class AppModel {
             }
             try await companionRuntime.load(source: source, application: application)
             try await companionRuntime.deliver(message)
-            try await client.respondToAppMessage(
+            try await connection.client.respondToAppMessage(
                 transactionID: message.transactionID,
                 acknowledged: true
             )
         } catch {
-            try? await client.respondToAppMessage(
+            try? await connection.client.respondToAppMessage(
                 transactionID: message.transactionID,
                 acknowledged: false
             )
@@ -1430,12 +1462,15 @@ public final class AppModel {
     }
 
     private func flushPendingNotifications() async {
-        guard connectedDevice != nil, !pendingNotifications.isEmpty else { return }
+        guard !activeConnections.isEmpty, !pendingNotifications.isEmpty else { return }
         var remaining: [PebbleTimelineNotification] = []
         for (index, notification) in pendingNotifications.enumerated() {
             do {
-                try await PebbleRetryPolicy().execute { [client] in
-                    try await client.sendNotification(notification)
+                for connection in activeConnections {
+                    let client = connection.client
+                    try await PebbleRetryPolicy().execute {
+                        try await client.sendNotification(notification)
+                    }
                 }
             } catch {
                 remaining.append(contentsOf: pendingNotifications[index...])
@@ -1459,29 +1494,32 @@ public final class AppModel {
     }
 
     private func sendOrQueueAppMessage(applicationID: UUID, tuples: [AppMessageTuple]) async throws {
-        guard connectedDevice != nil else {
+        guard let connection = activeConnections.first else {
             pendingAppMessages.append(StoredAppMessage(applicationID: applicationID, tuples: tuples))
             if pendingAppMessages.count > 50 { pendingAppMessages.removeFirst(pendingAppMessages.count - 50) }
             try await pendingAppMessageLibrary.save(pendingAppMessages)
             return
         }
-        try await client.sendAppMessage(applicationID: applicationID, tuples: tuples)
+        try await connection.client.sendAppMessage(applicationID: applicationID, tuples: tuples)
     }
 
     private func flushPendingAppMessages() async {
-        guard connectedDevice != nil else { return }
+        guard let connection = activeConnections.first else { return }
         while let message = pendingAppMessages.first {
             do {
-                try await client.sendAppMessage(applicationID: message.applicationID, tuples: message.tuples)
+                try await connection.client.sendAppMessage(
+                    applicationID: message.applicationID,
+                    tuples: message.tuples
+                )
                 pendingAppMessages.removeFirst()
             } catch { break }
         }
         try? await pendingAppMessageLibrary.save(pendingAppMessages)
     }
 
-    private func resumePendingFirmwareUpdate() async {
-        guard let device = connectedDevice,
-              UserDefaults.standard.object(forKey: "autoResumeFirmwareUpdate") as? Bool ?? true,
+    private func resumePendingFirmwareUpdate(on connection: WatchConnection) async {
+        let device = connection.device
+        guard UserDefaults.standard.object(forKey: "autoResumeFirmwareUpdate") as? Bool ?? true,
               let package = try? await pendingFirmwareUpdateLibrary.package(),
               let journal = try? await pendingFirmwareUpdateLibrary.journal(),
               journal.deviceID == device.id,
@@ -1496,19 +1534,22 @@ public final class AppModel {
         }
         do {
             firmwareUpdateStatusMessage = "Resuming interrupted firmware update…"
-            try await performFirmwareUpdate(package)
+            try await performFirmwareUpdate(package, on: connection)
             firmwareUpdateStatusMessage = "Firmware update resumed successfully."
         } catch {
             firmwareUpdateStatusMessage = "Firmware update remains queued for reconnection."
         }
     }
 
-    private func beginHandlingAppFetchRequest(_ request: AppFetchRequest) {
+    private func beginHandlingAppFetchRequest(
+        _ request: AppFetchRequest,
+        from connection: WatchConnection
+    ) {
         let operationAllowsFetch = applicationManagementOperation == nil
             || applicationManagementOperation == .synchronizing
             || pendingImportSnapshots[request.applicationID] != nil
         guard appFetchTask == nil, operationAllowsFetch else {
-            Task { try? await client.respondToAppFetch(with: .busy) }
+            Task { try? await connection.client.respondToAppFetch(with: .busy) }
             return
         }
         let ownsOperation = applicationManagementOperation == nil
@@ -1522,7 +1563,7 @@ public final class AppModel {
             guard let self else {
                 return
             }
-            await self.handleAppFetchRequest(request)
+            await self.handleAppFetchRequest(request, from: connection)
             self.appFetchTask = nil
             self.isHandlingAppFetch = false
             if ownsOperation {
@@ -1531,12 +1572,14 @@ public final class AppModel {
         }
     }
 
-    private func handleAppFetchRequest(_ request: AppFetchRequest) async {
-        guard let connectedDevice,
-              let packageURL = await applicationLibrary.storedPackageURL(
-                applicationID: request.applicationID
-              ) else {
-            try? await client.respondToAppFetch(with: .noData)
+    private func handleAppFetchRequest(
+        _ request: AppFetchRequest,
+        from connection: WatchConnection
+    ) async {
+        guard let packageURL = await applicationLibrary.storedPackageURL(
+            applicationID: request.applicationID
+        ) else {
+            try? await connection.client.respondToAppFetch(with: .noData)
             return
         }
 
@@ -1552,29 +1595,29 @@ public final class AppModel {
         }
 
         do {
-            let model = connectedDevice.model
+            let model = connection.device.model
             let package = try await Task.detached(priority: .userInitiated) {
                 try PBWPackageImporter.load(from: packageURL, for: model)
             }.value
             guard package.application.id == request.applicationID else {
-                try await client.respondToAppFetch(with: .invalidApplicationID)
+                try await connection.client.respondToAppFetch(with: .invalidApplicationID)
                 throw ApplicationManagementError.applicationIDMismatch
             }
 
-            try await client.respondToAppFetch(with: .start)
+            try await connection.client.respondToAppFetch(with: .start)
             for object in package.objects {
-                try await client.installApplicationObject(
+                try await connection.client.installApplicationObject(
                     [UInt8](object.data),
                     objectType: object.installationObject.objectType,
                     appBankID: request.appBankID
                 )
             }
-            try await client.registerApplication(package.appMetadata)
+            try await connection.client.registerApplication(package.appMetadata)
             let applications = try await applicationLibrary.applications()
-            try await client.reorderApplications(
-                compatibleApplications(applications, with: connectedDevice.model).map(\.id)
+            try await connection.client.reorderApplications(
+                compatibleApplications(applications, with: model).map(\.id)
             )
-            try await recordSynchronizedApplications(applications, device: connectedDevice)
+            try await recordSynchronizedApplications(applications, device: connection.device)
             pendingImportSnapshots[request.applicationID] = nil
             applicationLibraryErrorMessage = nil
         } catch {
@@ -1585,11 +1628,11 @@ public final class AppModel {
                 try? await restoreWatchRegistration(
                     snapshot: snapshot,
                     applicationID: request.applicationID,
-                    model: connectedDevice.model
+                    on: connection
                 )
             }
             applicationLibraryErrorMessage = applicationErrorMessage(error)
-            try? await client.respondToAppFetch(with: .noData)
+            try? await connection.client.respondToAppFetch(with: .noData)
         }
     }
 }

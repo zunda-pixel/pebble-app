@@ -80,12 +80,12 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var appMessageTimeoutTask: Task<Void, Never>?
     private var healthDataLoggingProcessor = HealthDataLoggingProcessor()
 
-    public override init() {
+    public init(restoreIdentifier: String = "dev.pebble.central") {
         super.init()
         centralManager = CBCentralManager(
             delegate: self,
             queue: .main,
-            options: [CBCentralManagerOptionRestoreIdentifierKey: "dev.pebble.central"]
+            options: [CBCentralManagerOptionRestoreIdentifierKey: restoreIdentifier]
         )
         observeSystemTimeChanges()
     }

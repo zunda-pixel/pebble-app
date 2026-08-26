@@ -20,6 +20,16 @@ public func makeDefaultPebbleClient() -> any PebbleClient {
     CoreBluetoothPebbleClient()
 }
 
+/// Creates one Bluetooth client per watch so several watches can stay
+/// connected at the same time. The restoration identifier must be stable and
+/// unique per watch for CoreBluetooth state restoration.
+@MainActor
+public func makeDefaultPebbleClientFactory() -> @MainActor (String) -> any PebbleClient {
+    { deviceID in
+        CoreBluetoothPebbleClient(restoreIdentifier: "dev.pebble.central.watch.\(deviceID)")
+    }
+}
+
 #if os(macOS)
 @MainActor
 public func makeQEMUPebbleClient() -> any PebbleClient {
@@ -32,7 +42,10 @@ public struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     public init() {
-        self.init(client: CoreBluetoothPebbleClient())
+        _model = State(initialValue: AppModel(
+            client: CoreBluetoothPebbleClient(),
+            clientFactory: makeDefaultPebbleClientFactory()
+        ))
     }
 
     public init(client: any PebbleClient) {
@@ -965,13 +978,13 @@ private struct DevicesView: View {
 
     var body: some View {
         List {
-            if let device = model.connectedDevice {
+            if !model.connections.isEmpty {
                 Section("Connected") {
-                    ConnectedDeviceRow(device: device)
-
-                    Button("Disconnect", role: .destructive) {
-                        Task {
-                            await model.disconnect()
+                    ForEach(model.connections) { connection in
+                        NavigationLink {
+                            WatchDetailView(model: model, connection: connection)
+                        } label: {
+                            ConnectedWatchRow(connection: connection)
                         }
                     }
                 }
@@ -1006,7 +1019,7 @@ private struct DevicesView: View {
                     ForEach(model.savedWatches) { watch in
                         SavedWatchRow(
                             watch: watch,
-                            isConnected: model.connectedDevice?.id == watch.id,
+                            isConnected: model.connections.contains { $0.device.id == watch.id },
                             isBusy: model.isScanningOrConnecting,
                             connect: {
                                 Task { await model.connect(to: watch) }
@@ -1070,7 +1083,7 @@ private struct DevicesView: View {
 
     private var isBusy: Bool {
         switch model.connectionState {
-        case .scanning, .connecting, .negotiating, .reconnecting:
+        case .scanning, .connecting, .negotiating:
             true
         default:
             false
@@ -1085,10 +1098,104 @@ private struct DevicesView: View {
             "Connecting…"
         case .negotiating:
             "Setting Up…"
-        case .reconnecting:
-            "Reconnecting…"
         default:
             "Working…"
+        }
+    }
+}
+
+private struct ConnectedWatchRow: View {
+    var connection: WatchConnection
+
+    var body: some View {
+        LabeledContent {
+            if let batteryLevel = connection.device.batteryLevel {
+                Text("\(batteryLevel)%")
+                    .foregroundStyle(.secondary)
+            }
+        } label: {
+            VStack(alignment: .leading) {
+                Text(connection.device.name)
+                Text(connection.device.model.displayName)
+                    .foregroundStyle(.secondary)
+                if connection.phase == .reconnecting {
+                    Label("Reconnecting…", systemImage: "arrow.triangle.2.circlepath")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
+        }
+    }
+}
+
+private struct WatchDetailView: View {
+    var model: AppModel
+    var connection: WatchConnection
+    @State private var isConfirmingForget = false
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        Form {
+            Section("Watch") {
+                LabeledContent("Model", value: connection.device.model.displayName)
+                if let firmwareVersion = connection.device.firmwareVersion {
+                    LabeledContent("Firmware", value: firmwareVersion)
+                }
+                if let serialNumber = connection.device.serialNumber {
+                    LabeledContent("Serial Number", value: serialNumber)
+                }
+                if let batteryLevel = connection.device.batteryLevel {
+                    LabeledContent("Battery", value: "\(batteryLevel)%")
+                }
+                LabeledContent("Status") {
+                    switch connection.phase {
+                    case .connected:
+                        Text("Connected")
+                    case .reconnecting:
+                        Text("Reconnecting…")
+                    case .disconnected:
+                        Text("Not connected")
+                    }
+                }
+            }
+            Section("Notifications") {
+                Button("Send Test Notification", systemImage: "bell.badge") {
+                    Task { await model.sendTestNotification(deviceID: connection.device.id) }
+                }
+                .disabled(!connection.isConnected)
+                if let notificationStatusMessage = model.notificationStatusMessage {
+                    Label(notificationStatusMessage, systemImage: "info.circle")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Section {
+                Button("Disconnect", role: .destructive) {
+                    Task {
+                        await model.disconnect(deviceID: connection.device.id)
+                        dismiss()
+                    }
+                }
+                Button("Forget Watch", role: .destructive) {
+                    isConfirmingForget = true
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle(connection.device.name)
+        .confirmationDialog(
+            "Forget \(connection.device.name)?",
+            isPresented: $isConfirmingForget,
+            titleVisibility: .visible
+        ) {
+            Button("Forget Watch", role: .destructive) {
+                Task {
+                    await model.forgetWatch(id: connection.device.id)
+                    dismiss()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Automatic reconnection information for this Pebble will be removed.")
         }
     }
 }
@@ -1129,39 +1236,6 @@ private struct SavedWatchRow: View {
             Button("Forget Watch", role: .destructive, action: forget)
         }
         .padding(.vertical, 4)
-    }
-}
-
-private struct ConnectedDeviceRow: View {
-    var device: PebbleDevice
-
-    var body: some View {
-        LabeledContent {
-            VStack(alignment: .trailing) {
-                if let firmwareVersion = device.firmwareVersion {
-                    Text(firmwareVersion)
-                }
-                if let batteryLevel = device.batteryLevel {
-                    Label("\(batteryLevel)%", systemImage: "battery.75percent")
-                        .foregroundStyle(.secondary)
-                }
-                if let serialNumber = device.serialNumber {
-                    Text(serialNumber)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        } label: {
-            Label {
-                VStack(alignment: .leading) {
-                    Text(device.name)
-                    Text(device.model.displayName)
-                        .foregroundStyle(.secondary)
-                }
-            } icon: {
-                Image(systemName: "applewatch")
-            }
-        }
     }
 }
 
@@ -1267,18 +1341,10 @@ private struct SettingsView: View {
                         }
                     }
                 }
-                Button("Send Test Notification", systemImage: "bell.badge") {
-                    Task { await model.sendTestNotification() }
-                }
-                .disabled(model.connectedDevice == nil)
-                if let notificationStatusMessage = model.notificationStatusMessage {
-                    Label(notificationStatusMessage, systemImage: "info.circle")
-                        .foregroundStyle(.secondary)
-                }
             } header: {
                 Text("Notifications")
             } footer: {
-                Text("System notifications are delivered directly to a paired Pebble using Apple Notification Center Service. This switch controls notifications created by installed watch apps.")
+                Text("System notifications are delivered directly to a paired Pebble using Apple Notification Center Service. This switch controls notifications created by installed watch apps. Test notifications can be sent from each watch's detail page.")
             }
             if !model.notificationSourceApps.isEmpty {
                 Section {

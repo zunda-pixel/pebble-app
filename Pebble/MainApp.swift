@@ -9,9 +9,15 @@ struct MainApp: App {
 #if os(macOS)
     let useQEMU = ProcessInfo.processInfo.environment["PEBBLE_QEMU"] == "1"
       || CommandLine.arguments.contains("--qemu")
-    _model = State(initialValue: AppModel(client: useQEMU ? makeQEMUPebbleClient() : makeDefaultPebbleClient()))
+    _model = State(initialValue: AppModel(
+      client: useQEMU ? makeQEMUPebbleClient() : makeDefaultPebbleClient(),
+      clientFactory: useQEMU ? nil : makeDefaultPebbleClientFactory()
+    ))
 #else
-    _model = State(initialValue: AppModel(client: makeDefaultPebbleClient()))
+    _model = State(initialValue: AppModel(
+      client: makeDefaultPebbleClient(),
+      clientFactory: makeDefaultPebbleClientFactory()
+    ))
 #endif
   }
 

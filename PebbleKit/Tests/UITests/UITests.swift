@@ -93,8 +93,9 @@ struct UITests {
 
         await model.scan()
 
-        #expect(model.discoveredDevices.contains { $0.id == "saved-bonded-watch" })
         #expect(model.connectedDevice?.id == "saved-bonded-watch")
+        // Connected watches move out of the Nearby list.
+        #expect(!model.discoveredDevices.contains { $0.id == "saved-bonded-watch" })
     }
 
     @Test
@@ -118,13 +119,23 @@ struct UITests {
     }
 
     @Test
-    func connectingToAnotherWatchDisconnectsThePreviousOne() async throws {
-        let client = MockPebbleClient()
+    func connectingToAnotherWatchKeepsBothConnected() async throws {
+        let scanner = MockPebbleClient()
+        var connectionClients: [String: MockPebbleClient] = [:]
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+        let model = AppModel(
+            client: scanner,
+            applicationLibrary: library,
+            watchLibrary: watchLibrary,
+            clientFactory: { deviceID in
+                let client = MockPebbleClient()
+                connectionClients[deviceID] = client
+                return client
+            }
+        )
 
         await model.scan()
         let devices = model.discoveredDevices
@@ -133,8 +144,18 @@ struct UITests {
         await model.connect(to: first)
         await model.connect(to: second)
 
-        #expect(model.connectedDevice?.id == second.id)
-        #expect(client.disconnectedDevices.map(\.id) == [first.id])
+        #expect(model.connectedDevices.map(\.id) == [first.id, second.id])
+        #expect(model.connections.count == 2)
+        #expect(connectionClients.count == 2)
+
+        // A test notification targeted at the second watch only reaches it.
+        await model.sendTestNotification(deviceID: second.id)
+        #expect(connectionClients[second.id]?.sentNotifications.count == 1)
+        #expect(connectionClients[first.id]?.sentNotifications.isEmpty == true)
+
+        await model.disconnect(deviceID: first.id)
+        #expect(model.connectedDevices.map(\.id) == [second.id])
+        #expect(connectionClients[first.id]?.disconnectedDevices.map(\.id) == [first.id])
     }
 
     @Test
@@ -187,20 +208,19 @@ struct UITests {
         let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
-        try await watchLibrary.record(PebbleDevice(
-            id: "saved-bonded-watch",
-            name: "My Pebble",
-            model: .pebbleTime2,
-            firmwareVersion: "v5.0.0",
-            batteryLevel: 60
-        ))
         let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
-        await model.loadSavedWatches()
 
-        await model.forgetWatch(id: "saved-bonded-watch")
+        await model.scan()
+        let discovered = try #require(model.discoveredDevices.first)
+        await model.connect(to: discovered)
+        client.emit(.reconnecting(deviceID: discovered.id))
+        try await Task.sleep(for: .milliseconds(20))
 
-        #expect(client.disconnectedDevices.map(\.id) == ["saved-bonded-watch"])
-        #expect(!model.savedWatches.contains { $0.id == "saved-bonded-watch" })
+        await model.forgetWatch(id: discovered.id)
+
+        #expect(client.disconnectedDevices.map(\.id) == [discovered.id])
+        #expect(model.connections.isEmpty)
+        #expect(!model.savedWatches.contains { $0.id == discovered.id })
     }
 
     @Test

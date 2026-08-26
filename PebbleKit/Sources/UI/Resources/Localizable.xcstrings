@@ -153,6 +153,16 @@
         }
       }
     },
+    "Battery" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "バッテリー"
+          }
+        }
+      }
+    },
     "Best Day" : {
       "localizations" : {
         "ja" : {
@@ -723,6 +733,16 @@
         }
       }
     },
+    "Model" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "モデル"
+          }
+        }
+      }
+    },
     "My Watches" : {
       "localizations" : {
         "ja" : {
@@ -779,6 +799,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチが見つかりません"
+          }
+        }
+      }
+    },
+    "Not connected" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "未接続"
           }
         }
       }
@@ -913,6 +943,16 @@
         }
       }
     },
+    "Reconnecting…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "再接続中…"
+          }
+        }
+      }
+    },
     "Refresh" : {
       "localizations" : {
         "ja" : {
@@ -1033,6 +1073,16 @@
         }
       }
     },
+    "Serial Number" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "シリアル番号"
+          }
+        }
+      }
+    },
     "Settings" : {
       "localizations" : {
         "ja" : {
@@ -1103,6 +1153,16 @@
         }
       }
     },
+    "Status" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "状態"
+          }
+        }
+      }
+    },
     "Steps" : {
       "localizations" : {
         "ja" : {
@@ -1164,11 +1224,22 @@
       }
     },
     "System notifications are delivered directly to a paired Pebble using Apple Notification Center Service. This switch controls notifications created by installed watch apps." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "システム通知は、Apple Notification Center Serviceを使用してペアリング済みのPebbleに直接配信されます。このスイッチでは、インストール済みのウォッチアプリが作成する通知を制御できます。"
+          }
+        }
+      }
+    },
+    "System notifications are delivered directly to a paired Pebble using Apple Notification Center Service. This switch controls notifications created by installed watch apps. Test notifications can be sent from each watch's detail page." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "システム通知は、Apple Notification Center Serviceを使用してペアリング済みのPebbleに直接配信されます。このスイッチでは、インストール済みのウォッチアプリが作成する通知を制御できます。テスト通知は各ウォッチの詳細ページから送信できます。"
           }
         }
       }
@@ -1299,6 +1370,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "アップデートの状態"
+          }
+        }
+      }
+    },
+    "Watch" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチ"
           }
         }
       }
