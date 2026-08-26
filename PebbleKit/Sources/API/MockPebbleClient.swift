@@ -12,6 +12,7 @@ public final class MockPebbleClient: PebbleClient {
     public private(set) var installedFirmwarePackages: [PBZFirmwarePackage] = []
     public private(set) var registeredApplications: [PebbleAppMetadata] = []
     public private(set) var unregisteredApplicationIDs: [UUID] = []
+    public private(set) var disconnectedDevices: [PebbleDevice] = []
     private var nextTransactionID: UInt8 = 0
     private var frameContinuation: AsyncStream<PebbleProtocolFrame>.Continuation?
     private var eventContinuation: AsyncStream<PebbleClientEvent>.Continuation?
@@ -61,6 +62,7 @@ public final class MockPebbleClient: PebbleClient {
     }
 
     public func disconnect(from device: PebbleDevice) async {
+        disconnectedDevices.append(device)
         await Task.yield()
     }
 

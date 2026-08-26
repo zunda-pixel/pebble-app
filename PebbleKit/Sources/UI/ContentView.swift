@@ -136,7 +136,9 @@ private struct MacRootView: View {
         } detail: {
             NavigationStack {
                 VStack(spacing: 0) {
-                    ConnectionStatusBanner(state: model.connectionState)
+                    ConnectionStatusBanner(state: model.connectionState) {
+                        Task { await model.disconnect() }
+                    }
                     SectionContent(section: selection ?? .devices, model: model)
                 }
             }
@@ -165,7 +167,9 @@ private struct IOSRootView: View {
                         SectionContent(section: section, model: model)
                         .toolbar {
                             ToolbarItem(placement: .status) {
-                                ConnectionStatusBanner(state: model.connectionState)
+                                ConnectionStatusBanner(state: model.connectionState) {
+                                    Task { await model.disconnect() }
+                                }
                             }
                         }
                     }
@@ -206,16 +210,23 @@ private struct OnboardingView: View {
 
 private struct ConnectionStatusBanner: View {
     var state: PebbleConnectionState
+    var cancelReconnect: (() -> Void)? = nil
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
-        Label(title, systemImage: systemImage)
-            .font(.callout)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-            .background(reduceTransparency ? AnyShapeStyle(.background) : AnyShapeStyle(.regularMaterial))
-            .accessibilityLabel("Connection status: \(title)")
+        HStack {
+            Label(title, systemImage: systemImage)
+                .font(.callout)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if case .reconnecting = state, let cancelReconnect {
+                Button("Cancel", action: cancelReconnect)
+                    .font(.callout)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(reduceTransparency ? AnyShapeStyle(.background) : AnyShapeStyle(.regularMaterial))
+        .accessibilityLabel("Connection status: \(title)")
     }
 
     private var title: String {

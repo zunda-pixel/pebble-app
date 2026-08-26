@@ -98,6 +98,112 @@ struct UITests {
     }
 
     @Test
+    func scanWhileConnectedPreservesConnection() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+
+        await model.scan()
+        let discovered = try #require(model.discoveredDevices.first)
+        await model.connect(to: discovered)
+        #expect(model.connectedDevice?.id == discovered.id)
+
+        await model.scan()
+
+        #expect(model.connectedDevice?.id == discovered.id)
+        #expect(!model.discoveredDevices.contains { $0.id == discovered.id })
+    }
+
+    @Test
+    func connectingToAnotherWatchDisconnectsThePreviousOne() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+
+        await model.scan()
+        let devices = model.discoveredDevices
+        let first = try #require(devices.first)
+        let second = try #require(devices.dropFirst().first)
+        await model.connect(to: first)
+        await model.connect(to: second)
+
+        #expect(model.connectedDevice?.id == second.id)
+        #expect(client.disconnectedDevices.map(\.id) == [first.id])
+    }
+
+    @Test
+    func connectingToTheConnectedWatchIsANoOp() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+
+        await model.scan()
+        let discovered = try #require(model.discoveredDevices.first)
+        await model.connect(to: discovered)
+        await model.connect(to: discovered)
+
+        #expect(model.connectedDevice?.id == discovered.id)
+        #expect(client.disconnectedDevices.isEmpty)
+    }
+
+    @Test
+    func disconnectCancelsAnOngoingReconnect() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+
+        await model.scan()
+        let discovered = try #require(model.discoveredDevices.first)
+        await model.connect(to: discovered)
+        client.emit(.reconnecting(deviceID: discovered.id))
+        try await Task.sleep(for: .milliseconds(20))
+        guard case .reconnecting = model.connectionState else {
+            Issue.record("Expected the model to enter the reconnecting state")
+            return
+        }
+
+        await model.disconnect()
+
+        #expect(model.connectionState == .idle)
+        #expect(client.disconnectedDevices.map(\.id) == [discovered.id])
+    }
+
+    @Test
+    func forgettingAWatchStopsItsReconnectLoop() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        try await watchLibrary.record(PebbleDevice(
+            id: "saved-bonded-watch",
+            name: "My Pebble",
+            model: .pebbleTime2,
+            firmwareVersion: "v5.0.0",
+            batteryLevel: 60
+        ))
+        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+        await model.loadSavedWatches()
+
+        await model.forgetWatch(id: "saved-bonded-watch")
+
+        #expect(client.disconnectedDevices.map(\.id) == ["saved-bonded-watch"])
+        #expect(!model.savedWatches.contains { $0.id == "saved-bonded-watch" })
+    }
+
+    @Test
     func appModelRejectsAppMessageForUnknownApplication() async throws {
         let client = MockPebbleClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)

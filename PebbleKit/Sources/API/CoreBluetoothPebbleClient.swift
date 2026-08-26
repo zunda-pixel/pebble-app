@@ -155,6 +155,20 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         guard connectionContinuation == nil else {
             throw PebbleConnectionError.connectionAlreadyInProgress
         }
+        if let connectedDevice, connectedDevice.id == device.id {
+            return connectedDevice
+        }
+        // A manual connect supersedes any automatic reconnection in flight.
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        reconnectDevice = nil
+        isAutomaticReconnect = false
+        reconnectBackoff.reset()
+        if let previousPeripheral = connectedPeripheral {
+            intentionalDisconnectIdentifiers.insert(previousPeripheral.identifier.uuidString)
+            centralManager.cancelPeripheralConnection(previousPeripheral)
+            clearTransportState()
+        }
         if discoveredPeripherals[device.id] == nil {
             _ = try await retrieveKnownDevices([device])
         }
@@ -181,13 +195,24 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     }
 
     public func disconnect(from device: PebbleDevice) async {
+        // Stop the reconnection machinery first: a scheduled retry captured
+        // its peripheral by value and would otherwise undo this disconnect.
+        if reconnectDevice == nil || reconnectDevice?.id == device.id {
+            reconnectTask?.cancel()
+            reconnectTask = nil
+            reconnectDevice = nil
+            isAutomaticReconnect = false
+            reconnectBackoff.reset()
+        }
         guard let peripheral = discoveredPeripherals[device.id]
             ?? (connectedPeripheral?.identifier.uuidString == device.id ? connectedPeripheral : nil) else {
             return
         }
-        intentionalDisconnectIdentifiers.insert(device.id)
-        reconnectDevice = nil
-        reconnectBackoff.reset()
+        if peripheral.state != .disconnected {
+            // Only expect a disconnect callback when a link actually exists;
+            // a stale marker would suppress reconnection after a later drop.
+            intentionalDisconnectIdentifiers.insert(device.id)
+        }
         stopHealthChecks()
         centralManager.cancelPeripheralConnection(peripheral)
     }
@@ -482,11 +507,30 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         startNextAppMessageIfPossible()
     }
 
+    /// Routes a transport failure on a specific peripheral: an in-flight
+    /// initial connect fails immediately, while an established (or
+    /// automatically reconnecting) link is torn down at the Bluetooth level so
+    /// that didDisconnectPeripheral drives the reconnect/backoff flow.
+    private func abortLink(_ peripheral: CBPeripheral, error: PebbleConnectionError) {
+        if connectionContinuation != nil {
+            failConnection(error)
+            return
+        }
+        centralManager.cancelPeripheralConnection(peripheral)
+    }
+
     private func failConnection(_ error: PebbleConnectionError) {
         connectionTimeoutTask?.cancel()
         connectionTimeoutTask = nil
         connectionContinuation?.resume(throwing: error)
         connectionContinuation = nil
+        // Withdraw the pending connect request: CoreBluetooth otherwise keeps
+        // it queued forever and a late didConnect would create a session the
+        // app no longer expects.
+        if let pending = pendingDevice,
+           let peripheral = discoveredPeripherals[pending.id] {
+            centralManager.cancelPeripheralConnection(peripheral)
+        }
         pendingDevice = nil
         activeWriteCharacteristic = nil
         activeBatteryCharacteristic = nil
@@ -989,10 +1033,23 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         peripheral.delegate = self
         eventContinuation?.yield(.reconnecting(deviceID: device.id))
         centralManager.connect(peripheral)
+
+        // A stalled handshake would otherwise sit in "reconnecting" forever:
+        // drop the link after a while so the backoff loop retries.
+        connectionTimeoutTask?.cancel()
+        connectionTimeoutTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(30))
+            guard !Task.isCancelled else {
+                return
+            }
+            self?.centralManager.cancelPeripheralConnection(peripheral)
+        }
     }
 
     private func scheduleReconnect(to device: DiscoveredPebble, using peripheral: CBPeripheral) {
         reconnectTask?.cancel()
+        connectionTimeoutTask?.cancel()
+        connectionTimeoutTask = nil
         let delay = reconnectBackoff.nextDelay()
         reconnectTask = Task { [weak self] in
             try? await Task.sleep(for: delay)
@@ -1000,6 +1057,26 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
                 return
             }
             self?.reconnect(to: device, using: peripheral)
+        }
+    }
+
+    private func resumeReconnectAfterPowerOn() {
+        guard let device = reconnectDevice,
+              connectedDevice == nil,
+              connectionContinuation == nil else {
+            return
+        }
+        Task { [weak self] in
+            guard let self else { return }
+            // The pre-power-cycle CBPeripheral may be invalid; look it up again.
+            _ = try? await self.retrieveKnownDevices([device])
+            guard self.reconnectDevice?.id == device.id,
+                  self.connectedDevice == nil,
+                  self.connectionContinuation == nil,
+                  let peripheral = self.discoveredPeripherals[device.id] else {
+                return
+            }
+            self.reconnect(to: device, using: peripheral)
         }
     }
 
@@ -1065,8 +1142,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             try handle(actions, peripheral: peripheral)
             updateAcknowledgementTimeout(for: peripheral)
         } catch {
-            centralManager.cancelPeripheralConnection(peripheral)
-            failConnection(.connectionTimedOut)
+            abortLink(peripheral, error: .connectionTimedOut)
         }
     }
 }
@@ -1083,6 +1159,7 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
         switch central.state {
         case .poweredOn:
             waiters.forEach { $0.resume() }
+            resumeReconnectAfterPowerOn()
         case .unauthorized:
             waiters.forEach { $0.resume(throwing: PebbleConnectionError.permissionDenied) }
             failScan(.permissionDenied)
@@ -1094,7 +1171,20 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
         case .poweredOff, .resetting:
             waiters.forEach { $0.resume(throwing: PebbleConnectionError.bluetoothUnavailable) }
             failScan(.bluetoothUnavailable)
-            failConnection(.bluetoothUnavailable)
+            if connectionContinuation != nil {
+                failConnection(.bluetoothUnavailable)
+            } else if connectedDevice != nil || isAutomaticReconnect {
+                // Keep reconnectDevice so the link resumes when power returns.
+                reconnectTask?.cancel()
+                reconnectTask = nil
+                connectionTimeoutTask?.cancel()
+                connectionTimeoutTask = nil
+                pendingDevice = nil
+                clearTransportState()
+                if let device = reconnectDevice {
+                    eventContinuation?.yield(.reconnecting(deviceID: device.id))
+                }
+            }
         case .unknown:
             bluetoothWaiters.append(contentsOf: waiters)
         @unknown default:
@@ -1124,6 +1214,12 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
     }
 
     public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+        guard pendingDevice?.id == peripheral.identifier.uuidString else {
+            // A connect request that already timed out or was abandoned; do
+            // not let it become a session the app does not know about.
+            centralManager.cancelPeripheralConnection(peripheral)
+            return
+        }
         peripheral.discoverServices([Self.ppogService, Self.batteryService])
     }
 
@@ -1164,7 +1260,12 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
             return
         }
         if (wasConnected || isAutomaticReconnect), let deviceToReconnect {
-            reconnect(to: deviceToReconnect, using: peripheral)
+            if wasConnected {
+                reconnect(to: deviceToReconnect, using: peripheral)
+            } else {
+                // The reconnect handshake itself failed; back off before retrying.
+                scheduleReconnect(to: deviceToReconnect, using: peripheral)
+            }
             return
         }
         if wasConnected && !wasIntentional {
@@ -1188,7 +1289,7 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
     public func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: (any Error)?) {
         guard error == nil,
               let service = peripheral.services?.first(where: { $0.uuid == Self.ppogService }) else {
-            failConnection(.protocolNegotiationFailed)
+            abortLink(peripheral, error: .protocolNegotiationFailed)
             return
         }
 
@@ -1231,7 +1332,7 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
               let characteristics = service.characteristics,
               let notifyCharacteristic = characteristics.first(where: { $0.uuid == Self.ppogNotifyCharacteristic }),
               let writeCharacteristic = characteristics.first(where: { $0.uuid == Self.ppogWriteCharacteristic }) else {
-            failConnection(.protocolNegotiationFailed)
+            abortLink(peripheral, error: .protocolNegotiationFailed)
             return
         }
 
@@ -1251,14 +1352,14 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
         guard characteristic.uuid == Self.ppogNotifyCharacteristic,
               error == nil,
               characteristic.isNotifying else {
-            failConnection(.protocolNegotiationFailed)
+            abortLink(peripheral, error: .protocolNegotiationFailed)
             return
         }
 
         do {
             try write(.resetRequest(sequence: 0, version: .one), to: peripheral)
         } catch {
-            failConnection(.protocolNegotiationFailed)
+            abortLink(peripheral, error: .protocolNegotiationFailed)
         }
     }
 
@@ -1278,7 +1379,7 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
         guard characteristic.uuid == Self.ppogNotifyCharacteristic,
               error == nil,
               let value = characteristic.value else {
-            failConnection(.protocolNegotiationFailed)
+            abortLink(peripheral, error: .protocolNegotiationFailed)
             return
         }
 
@@ -1314,7 +1415,7 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
                 updateAcknowledgementTimeout(for: peripheral)
             }
         } catch {
-            failConnection(.protocolNegotiationFailed)
+            abortLink(peripheral, error: .protocolNegotiationFailed)
         }
     }
 

@@ -100,6 +100,7 @@ public final class AppModel {
         provider: nil,
         send: { [client] frame in try await client.send(frame) }
     )
+    @ObservationIgnored private var isPerformingScan = false
     @ObservationIgnored private var connectionEventsTask: Task<Void, Never>?
     @ObservationIgnored private var firmwareUpdateTask: Task<Void, any Error>?
     @ObservationIgnored private var appFetchTask: Task<Void, Never>?
@@ -213,23 +214,37 @@ public final class AppModel {
     }
 
     public func scan() async {
-        connectionState = .scanning
+        guard !isPerformingScan else { return }
+        isPerformingScan = true
+        defer { isPerformingScan = false }
+        // Scanning must not displace an existing connection: connectedDevice
+        // is derived from connectionState, so overwriting it would make the
+        // whole app treat a live link as disconnected.
+        if connectedDevice == nil {
+            connectionState = .scanning
+        }
 
         do {
             await loadSavedWatches()
-            discoveredDevices = try await client.scan()
+            var devices = try await client.scan()
             // Bonded watches do not advertise, so scanning alone never finds
             // them again; look the saved ones up by identifier as well.
             let missingSavedWatches = savedWatches
-                .filter { saved in !discoveredDevices.contains { $0.id == saved.id } }
+                .filter { saved in
+                    saved.id != connectedDevice?.id && !devices.contains { $0.id == saved.id }
+                }
                 .map { saved in
                     DiscoveredPebble(id: saved.id, name: saved.name, model: saved.model, signalStrength: 0)
                 }
             if !missingSavedWatches.isEmpty,
                let retrieved = try? await client.retrieveKnownDevices(missingSavedWatches) {
-                discoveredDevices.append(contentsOf: retrieved)
+                devices.append(contentsOf: retrieved)
             }
-            connectionState = .idle
+            discoveredDevices = devices.filter { $0.id != connectedDevice?.id }
+            if case .scanning = connectionState {
+                connectionState = .idle
+            }
+            guard case .idle = connectionState else { return }
             if let device = discoveredDevices.first(where: { discovered in
                 savedWatches.contains {
                     $0.id == discovered.id && $0.automaticallyConnects
@@ -238,9 +253,13 @@ public final class AppModel {
                 await connect(to: device)
             }
         } catch let error as PebbleConnectionError {
-            connectionState = .failed(error)
+            if case .scanning = connectionState {
+                connectionState = .failed(error)
+            }
         } catch {
-            connectionState = .failed(.bluetoothUnavailable)
+            if case .scanning = connectionState {
+                connectionState = .failed(.bluetoothUnavailable)
+            }
         }
     }
 
@@ -254,6 +273,15 @@ public final class AppModel {
     }
 
     public func connect(to device: DiscoveredPebble) async {
+        switch connectionState {
+        case .connecting, .negotiating, .reconnecting:
+            return
+        case .connected(let current):
+            guard current.id != device.id else { return }
+            await disconnect()
+        case .idle, .scanning, .failed:
+            break
+        }
         connectionState = .connecting(deviceID: device.id)
 
         do {
@@ -624,6 +652,19 @@ public final class AppModel {
     public func forgetWatch(id: String) async {
         if connectedDevice?.id == id {
             await disconnect()
+        } else if let watch = savedWatches.first(where: { $0.id == id }) {
+            // The client may still be trying to reconnect to this watch in the
+            // background; a successful reconnect would re-save the entry.
+            await client.disconnect(from: PebbleDevice(
+                id: watch.id,
+                name: watch.name,
+                model: watch.model,
+                firmwareVersion: watch.firmwareVersion,
+                batteryLevel: nil
+            ))
+            if case .reconnecting(let deviceID) = connectionState, deviceID == id {
+                connectionState = .idle
+            }
         }
         do {
             savedWatches = try await watchLibrary.remove(watchID: id)
@@ -634,20 +675,44 @@ public final class AppModel {
     }
 
     public func disconnect() async {
-        guard let device = connectedDevice else {
+        let device: PebbleDevice
+        switch connectionState {
+        case .connected(let connected):
+            device = connected
+        case .reconnecting(let deviceID):
+            let saved = savedWatches.first { $0.id == deviceID }
+            device = PebbleDevice(
+                id: deviceID,
+                name: saved?.name ?? deviceID,
+                model: saved?.model ?? .pebbleTime2,
+                firmwareVersion: saved?.firmwareVersion,
+                batteryLevel: nil
+            )
+        default:
             return
         }
 
         await client.disconnect(from: device)
+        resetSessionState()
+        connectionState = .idle
+    }
+
+    private func resetSessionState() {
         connectionEventsTask?.cancel()
         connectionEventsTask = nil
+        companionFramesTask?.cancel()
+        companionFramesTask = nil
         appFetchTask?.cancel()
         appFetchTask = nil
         isHandlingAppFetch = false
         applicationManagementOperation = nil
         applicationManagementStatusMessage = nil
+        installingApplicationID = nil
+        installingApplicationName = nil
+        installationProgress = nil
         needsApplicationSynchronization = true
-        connectionState = .idle
+        synchronizedNotificationAppRecords = [:]
+        voiceCoordinator.reset()
     }
 
     public func loadApplications() async {
@@ -1169,15 +1234,28 @@ public final class AppModel {
                 case .reconnecting(let deviceID):
                     self?.connectionState = .reconnecting(deviceID: deviceID)
                     self?.needsApplicationSynchronization = true
+                    // Operations interrupted by the link drop would otherwise
+                    // leave the app-management UI busy forever.
+                    self?.isHandlingAppFetch = false
+                    self?.applicationManagementOperation = nil
+                    self?.applicationManagementStatusMessage = nil
+                    self?.installingApplicationID = nil
+                    self?.installingApplicationName = nil
+                    self?.installationProgress = nil
+                    self?.synchronizedNotificationAppRecords = [:]
                 case .disconnected(let error):
                     self?.connectionState = .failed(error)
                     self?.needsApplicationSynchronization = true
                     self?.isHandlingAppFetch = false
                     self?.applicationManagementOperation = nil
                     self?.applicationManagementStatusMessage = nil
+                    self?.installingApplicationID = nil
+                    self?.installingApplicationName = nil
+                    self?.installationProgress = nil
                     self?.synchronizedNotificationAppRecords = [:]
                     self?.voiceCoordinator.reset()
-                    return
+                    // Keep consuming: the client can come back on its own
+                    // (for example after a Bluetooth power cycle).
                 case .healthSyncCompleted(let succeeded):
                     self?.dataSyncStatusMessage = succeeded ? "Health synchronization completed." : "The watch rejected health synchronization."
                 case .healthSamplesReceived(let samples):
