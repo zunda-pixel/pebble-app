@@ -163,12 +163,14 @@ private struct IOSRootView: View {
                 Tab(section.title, systemImage: section.systemImage) {
                     NavigationStack {
                         SectionContent(section: section, model: model)
+                        .toolbar {
+                            ToolbarItem(placement: .status) {
+                                ConnectionStatusBanner(state: model.connectionState)
+                            }
+                        }
                     }
                 }
             }
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            ConnectionStatusBanner(state: model.connectionState)
         }
     }
 }
@@ -1164,21 +1166,6 @@ private struct DiscoveredDeviceRow: View {
         }
         .buttonStyle(.plain)
         .accessibilityHint("Connects to this watch")
-    }
-}
-
-private struct PlaceholderView: View {
-    var title: String
-    var description: String
-    var systemImage: String
-
-    var body: some View {
-        ContentUnavailableView(
-            title,
-            systemImage: systemImage,
-            description: Text(description)
-        )
-        .navigationTitle(title)
     }
 }
 
