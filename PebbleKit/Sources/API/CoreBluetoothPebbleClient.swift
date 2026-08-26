@@ -117,11 +117,46 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
     }
 
+    public func retrieveKnownDevices(_ hints: [DiscoveredPebble]) async throws -> [DiscoveredPebble] {
+        try await waitForBluetooth()
+
+        // A bonded Pebble stays connected at the system level and stops
+        // advertising, so it has to be looked up instead of scanned for.
+        let hintsByID = Dictionary(hints.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var peripherals = centralManager.retrieveConnectedPeripherals(withServices: [Self.ppogService])
+        peripherals += centralManager.retrievePeripherals(
+            withIdentifiers: hints.compactMap { UUID(uuidString: $0.id) }
+        )
+
+        var retrieved: [DiscoveredPebble] = []
+        for peripheral in peripherals {
+            let id = peripheral.identifier.uuidString
+            // The model is not recoverable without advertisement data, so only
+            // hinted watches can be returned.
+            guard let hint = hintsByID[id], !retrieved.contains(where: { $0.id == id }) else {
+                continue
+            }
+            discoveredPeripherals[id] = peripheral
+            let device = DiscoveredPebble(
+                id: id,
+                name: peripheral.name ?? hint.name,
+                model: hint.model,
+                signalStrength: hint.signalStrength
+            )
+            scanResults[id] = device
+            retrieved.append(device)
+        }
+        return retrieved
+    }
+
     public func connect(to device: DiscoveredPebble) async throws -> PebbleDevice {
         try await waitForBluetooth()
 
         guard connectionContinuation == nil else {
             throw PebbleConnectionError.connectionAlreadyInProgress
+        }
+        if discoveredPeripherals[device.id] == nil {
+            _ = try await retrieveKnownDevices([device])
         }
         guard let peripheral = discoveredPeripherals[device.id] else {
             throw PebbleConnectionError.deviceNotFound
@@ -146,7 +181,8 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     }
 
     public func disconnect(from device: PebbleDevice) async {
-        guard let peripheral = discoveredPeripherals[device.id] else {
+        guard let peripheral = discoveredPeripherals[device.id]
+            ?? (connectedPeripheral?.identifier.uuidString == device.id ? connectedPeripheral : nil) else {
             return
         }
         intentionalDisconnectIdentifiers.insert(device.id)

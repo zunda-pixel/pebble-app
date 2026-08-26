@@ -313,6 +313,16 @@
         }
       }
     },
+    "Connect" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "接続"
+          }
+        }
+      }
+    },
     "Connect Automatically" : {
       "localizations" : {
         "ja" : {

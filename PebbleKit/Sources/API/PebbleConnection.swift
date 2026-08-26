@@ -58,6 +58,11 @@ public enum PebbleConnectionError: Error, Equatable, Sendable {
 @MainActor
 public protocol PebbleClient: Sendable {
     func scan() async throws -> [DiscoveredPebble]
+    /// Makes previously paired watches connectable again without a scan.
+    /// A bonded Pebble usually does not advertise, so scanning alone can
+    /// never rediscover it; implementations look the watches up by their
+    /// stored identifiers instead. Returns the hints that were found.
+    func retrieveKnownDevices(_ hints: [DiscoveredPebble]) async throws -> [DiscoveredPebble]
     func connect(to device: DiscoveredPebble) async throws -> PebbleDevice
     func disconnect(from device: PebbleDevice) async
     func send(_ frame: PebbleProtocolFrame) async throws
@@ -80,6 +85,12 @@ public protocol PebbleClient: Sendable {
     func installFirmware(_ package: PBZFirmwarePackage) async throws
     func registerApplication(_ metadata: PebbleAppMetadata) async throws
     func unregisterApplication(applicationID: UUID) async throws
+}
+
+public extension PebbleClient {
+    func retrieveKnownDevices(_ hints: [DiscoveredPebble]) async throws -> [DiscoveredPebble] {
+        []
+    }
 }
 
 public enum BlobDBClientError: Error, Equatable, Sendable {

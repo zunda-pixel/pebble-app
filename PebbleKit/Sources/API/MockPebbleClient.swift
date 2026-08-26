@@ -43,6 +43,10 @@ public final class MockPebbleClient: PebbleClient {
         ]
     }
 
+    public func retrieveKnownDevices(_ hints: [DiscoveredPebble]) async throws -> [DiscoveredPebble] {
+        hints
+    }
+
     public func connect(to device: DiscoveredPebble) async throws -> PebbleDevice {
         try await Task.sleep(for: .milliseconds(500))
 

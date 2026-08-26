@@ -74,6 +74,30 @@ struct UITests {
     }
 
     @Test
+    func scanReconnectsToSavedWatchThatDoesNotAdvertise() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        // A previously paired watch that no longer advertises: it is absent
+        // from the mock's scan results and only reachable via retrieval.
+        try await watchLibrary.record(PebbleDevice(
+            id: "saved-bonded-watch",
+            name: "My Pebble",
+            model: .pebbleTime2,
+            firmwareVersion: "v5.0.0",
+            batteryLevel: 60
+        ))
+        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+
+        await model.scan()
+
+        #expect(model.discoveredDevices.contains { $0.id == "saved-bonded-watch" })
+        #expect(model.connectedDevice?.id == "saved-bonded-watch")
+    }
+
+    @Test
     func appModelRejectsAppMessageForUnknownApplication() async throws {
         let client = MockPebbleClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)

@@ -995,6 +995,11 @@ private struct DevicesView: View {
                     ForEach(model.savedWatches) { watch in
                         SavedWatchRow(
                             watch: watch,
+                            isConnected: model.connectedDevice?.id == watch.id,
+                            isBusy: model.isScanningOrConnecting,
+                            connect: {
+                                Task { await model.connect(to: watch) }
+                            },
                             setAutomaticallyConnects: { enabled in
                                 Task {
                                     await model.setAutomaticallyConnects(enabled, watchID: watch.id)
@@ -1079,6 +1084,9 @@ private struct DevicesView: View {
 
 private struct SavedWatchRow: View {
     var watch: SavedPebbleWatch
+    var isConnected: Bool
+    var isBusy: Bool
+    var connect: () -> Void
     var setAutomaticallyConnects: (Bool) -> Void
     var forget: () -> Void
 
@@ -1098,6 +1106,10 @@ private struct SavedWatchRow: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+            }
+            if !isConnected {
+                Button("Connect", systemImage: "applewatch.radiowaves.left.and.right", action: connect)
+                    .disabled(isBusy)
             }
             Toggle("Connect Automatically", isOn: Binding(
                 get: { watch.automaticallyConnects },

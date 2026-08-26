@@ -216,9 +216,20 @@ public final class AppModel {
         connectionState = .scanning
 
         do {
-            discoveredDevices = try await client.scan()
-            connectionState = .idle
             await loadSavedWatches()
+            discoveredDevices = try await client.scan()
+            // Bonded watches do not advertise, so scanning alone never finds
+            // them again; look the saved ones up by identifier as well.
+            let missingSavedWatches = savedWatches
+                .filter { saved in !discoveredDevices.contains { $0.id == saved.id } }
+                .map { saved in
+                    DiscoveredPebble(id: saved.id, name: saved.name, model: saved.model, signalStrength: 0)
+                }
+            if !missingSavedWatches.isEmpty,
+               let retrieved = try? await client.retrieveKnownDevices(missingSavedWatches) {
+                discoveredDevices.append(contentsOf: retrieved)
+            }
+            connectionState = .idle
             if let device = discoveredDevices.first(where: { discovered in
                 savedWatches.contains {
                     $0.id == discovered.id && $0.automaticallyConnects
@@ -231,6 +242,15 @@ public final class AppModel {
         } catch {
             connectionState = .failed(.bluetoothUnavailable)
         }
+    }
+
+    public func connect(to watch: SavedPebbleWatch) async {
+        await connect(to: DiscoveredPebble(
+            id: watch.id,
+            name: watch.name,
+            model: watch.model,
+            signalStrength: 0
+        ))
     }
 
     public func connect(to device: DiscoveredPebble) async {
