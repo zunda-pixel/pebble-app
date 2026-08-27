@@ -159,7 +159,6 @@ private struct MacRootView: View {
         .frame(minWidth: 680, minHeight: 480)
         .onReceive(NotificationCenter.default.publisher(for: .pebbleScanRequested)) { _ in
             selection = .devices
-            Task { await model.scan() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .pebbleSectionRequested)) { notification in
             guard let rawValue = notification.object as? String,
@@ -975,6 +974,7 @@ private struct ApplicationPlaceholderRow: View {
 private struct DevicesView: View {
     var model: AppModel
     @State private var pendingForgottenWatch: SavedPebbleWatch?
+    @State private var isAddingWatch = false
 
     var body: some View {
         List {
@@ -990,27 +990,16 @@ private struct DevicesView: View {
                 }
             }
 
-            Section("Nearby") {
-                if case .failed(let error) = model.connectionState {
-                    Label(error.message, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                        .accessibilityLabel("Bluetooth error: \(error.message)")
-                }
-
-                if model.discoveredDevices.isEmpty {
-                    ContentUnavailableView(
-                        "No Watches Found",
-                        systemImage: "applewatch.radiowaves.left.and.right",
-                        description: Text("Scan for a Pebble 2 Duo, Pebble Time 2, or Pebble Round 2.")
-                    )
-                } else {
-                    ForEach(model.discoveredDevices) { device in
-                        DiscoveredDeviceRow(device: device) {
-                            Task {
-                                await model.connect(to: device)
-                            }
-                        }
+            if model.connections.isEmpty, model.savedWatches.isEmpty {
+                ContentUnavailableView {
+                    Label("No Devices", systemImage: "applewatch")
+                } description: {
+                    Text("Add a Pebble 2 Duo, Pebble Time 2, or Pebble Round 2.")
+                } actions: {
+                    Button("Add Watch", systemImage: "plus") {
+                        isAddingWatch = true
                     }
+                    .buttonStyle(.borderedProminent)
                 }
             }
 
@@ -1046,14 +1035,17 @@ private struct DevicesView: View {
         .task { await model.loadSavedWatches() }
         .toolbar {
             ToolbarItem {
-                Button("Scan", systemImage: "arrow.clockwise") {
-                    Task {
-                        await model.scan()
-                    }
+                Button("Add Watch", systemImage: "plus") {
+                    isAddingWatch = true
                 }
-                .disabled(isBusy)
                 .keyboardShortcut("r", modifiers: .command)
             }
+        }
+        .sheet(isPresented: $isAddingWatch) {
+            AddWatchSheet(model: model)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .pebbleScanRequested)) { _ in
+            isAddingWatch = true
         }
         .confirmationDialog(
             "Forget \(pendingForgottenWatch?.name ?? "this watch")?",
@@ -1101,6 +1093,78 @@ private struct DevicesView: View {
         default:
             "Working…"
         }
+    }
+}
+
+private struct AddWatchSheet: View {
+    var model: AppModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if case .failed(let error) = model.connectionState {
+                    Label(error.message, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                        .accessibilityLabel("Bluetooth error: \(error.message)")
+                }
+                if let errorMessage = model.watchManagementErrorMessage {
+                    Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                }
+
+                Section {
+                    ForEach(model.discoveredDevices) { device in
+                        DiscoveredDeviceRow(device: device) {
+                            Task {
+                                await model.connect(to: device)
+                                if model.connections.contains(where: { $0.device.id == device.id }) {
+                                    dismiss()
+                                }
+                            }
+                        }
+                        .disabled(isConnecting)
+                    }
+                } header: {
+                    HStack {
+                        Text("Nearby")
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                }
+            }
+            .navigationTitle("Add Watch")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            .overlay {
+                if isConnecting {
+                    ProgressView("Connecting…")
+                        .padding()
+                        .background(.regularMaterial, in: .rect(cornerRadius: 12))
+                }
+            }
+        }
+        #if os(macOS)
+        .frame(minWidth: 420, minHeight: 420)
+        #endif
+        .task {
+            // Scan for the whole lifetime of the sheet; the task is cancelled
+            // when the sheet closes and the loop ends after the current pass.
+            while !Task.isCancelled {
+                await model.scan()
+                if model.connections.isEmpty, case .failed = model.connectionState {
+                    // Bluetooth is unavailable; retry slowly instead of spinning.
+                    try? await Task.sleep(for: .seconds(2))
+                }
+            }
+        }
+    }
+
+    private var isConnecting: Bool {
+        !model.connectingDeviceIDs.isEmpty
     }
 }
 

@@ -73,12 +73,43 @@
         }
       }
     },
+    "Add a Pebble 2 Duo, Pebble Time 2, or Pebble Round 2 with the plus button." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "＋ボタンでPebble 2 Duo、Pebble Time 2、またはPebble Round 2を追加してください。"
+          }
+        }
+      }
+    },
+    "Add a Pebble 2 Duo, Pebble Time 2, or Pebble Round 2." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Pebble 2 Duo、Pebble Time 2、またはPebble Round 2を追加してください。"
+          }
+        }
+      }
+    },
     "Add to Timeline" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "タイムラインに追加"
+          }
+        }
+      }
+    },
+    "Add Watch" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチを追加"
           }
         }
       }
@@ -359,6 +390,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "接続済み"
+          }
+        }
+      }
+    },
+    "Connecting…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "接続中…"
           }
         }
       }
@@ -793,7 +834,18 @@
         }
       }
     },
+    "No Devices" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "デバイスなし"
+          }
+        }
+      }
+    },
     "No Watches Found" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -1024,6 +1076,7 @@
       }
     },
     "Scan" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -1034,11 +1087,22 @@
       }
     },
     "Scan for a Pebble 2 Duo, Pebble Time 2, or Pebble Round 2." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "Pebble 2 Duo、Pebble Time 2、またはPebble Round 2をスキャンしてください。"
+          }
+        }
+      }
+    },
+    "Scanning…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "スキャン中…"
           }
         }
       }

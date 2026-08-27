@@ -23,6 +23,7 @@ public final class AppModel {
     public private(set) var connectionState: PebbleConnectionState = .idle
     public private(set) var connections: [WatchConnection] = []
     public private(set) var connectingDeviceIDs: Set<String> = []
+    public private(set) var isScanning = false
     public private(set) var discoveredDevices: [DiscoveredPebble] = []
     public private(set) var watchApplications: [PebbleApplication] = []
     public private(set) var watchfaces: [PebbleApplication] = []
@@ -118,7 +119,6 @@ public final class AppModel {
         source: makeSystemCallSource(),
         send: { [weak self] frame in try await self?.broadcast(frame) }
     )
-    @ObservationIgnored private var isPerformingScan = false
     @ObservationIgnored private var lastConnectionError: PebbleConnectionError?
     @ObservationIgnored private var firmwareUpdateTask: Task<Void, any Error>?
     @ObservationIgnored private var appFetchTask: Task<Void, Never>?
@@ -220,7 +220,7 @@ public final class AppModel {
             await flushPendingNotifications()
             await flushPendingAppMessages()
             await synchronizeTimeline()
-        } else if !isPerformingScan, connectingDeviceIDs.isEmpty, connections.isEmpty {
+        } else if !isScanning, connectingDeviceIDs.isEmpty, connections.isEmpty {
             if savedWatches.contains(where: \.automaticallyConnects) {
                 await scan()
             }
@@ -228,13 +228,13 @@ public final class AppModel {
     }
 
     public func scan() async {
-        guard !isPerformingScan else { return }
-        isPerformingScan = true
+        guard !isScanning else { return }
+        isScanning = true
         if connections.isEmpty, connectingDeviceIDs.isEmpty {
             connectionState = .scanning
         }
         defer {
-            isPerformingScan = false
+            isScanning = false
             refreshConnectionState()
         }
 
@@ -341,7 +341,7 @@ public final class AppModel {
             connectionState = .connected(primary.device)
         } else if let reconnecting = connections.first(where: { $0.phase == .reconnecting }) {
             connectionState = .reconnecting(deviceID: reconnecting.device.id)
-        } else if isPerformingScan {
+        } else if isScanning {
             connectionState = .scanning
         } else if let error = lastConnectionError {
             connectionState = .failed(error)
