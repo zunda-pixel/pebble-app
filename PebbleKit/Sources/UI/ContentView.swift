@@ -1030,35 +1030,6 @@ private struct DevicesView: View {
         .onReceive(NotificationCenter.default.publisher(for: .pebbleScanRequested)) { _ in
             isAddingWatch = true
         }
-        .overlay {
-            if isBusy {
-                ProgressView(progressTitle)
-                    .padding()
-                    .background(.regularMaterial, in: .rect(cornerRadius: 12))
-            }
-        }
-    }
-
-    private var isBusy: Bool {
-        switch model.connectionState {
-        case .scanning, .connecting, .negotiating:
-            true
-        default:
-            false
-        }
-    }
-
-    private var progressTitle: String {
-        switch model.connectionState {
-        case .scanning:
-            "Scanning…"
-        case .connecting:
-            "Connecting…"
-        case .negotiating:
-            "Setting Up…"
-        default:
-            "Working…"
-        }
     }
 }
 
@@ -1103,13 +1074,6 @@ private struct AddWatchSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
-                }
-            }
-            .overlay {
-                if isConnecting {
-                    ProgressView("Connecting…")
-                        .padding()
-                        .background(.regularMaterial, in: .rect(cornerRadius: 12))
                 }
             }
         }
