@@ -60,6 +60,8 @@ public final class AppModel {
     public private(set) var timelineActionStatusMessage: String?
     public private(set) var healthExportURL: URL?
     public private(set) var notificationSourceApps: [NotificationSourceApp] = []
+    /// Application IDs known to be registered on each watch, keyed by watch ID.
+    public private(set) var installedApplicationIDsByWatch: [String: Set<UUID>] = [:]
 
     public var isScanningOrConnecting: Bool {
         switch connectionState {
@@ -694,6 +696,10 @@ public final class AppModel {
         do {
             savedWatches = try await watchLibrary.allWatches()
             watchManagementErrorMessage = nil
+            for watch in savedWatches where installedApplicationIDsByWatch[watch.id] == nil {
+                let ids = (try? await applicationLibrary.synchronizedApplicationIDs(deviceID: watch.id)) ?? []
+                installedApplicationIDsByWatch[watch.id] = Set(ids)
+            }
         } catch {
             watchManagementErrorMessage = "Saved watches could not be loaded."
         }
@@ -716,6 +722,7 @@ public final class AppModel {
         }
         do {
             savedWatches = try await watchLibrary.remove(watchID: id)
+            installedApplicationIDsByWatch[id] = nil
             watchManagementErrorMessage = nil
         } catch {
             watchManagementErrorMessage = "The watch could not be forgotten."
@@ -1137,14 +1144,20 @@ public final class AppModel {
         updateApplications(applications)
     }
 
+    public func installedApplicationIDs(on deviceID: String) -> Set<UUID> {
+        installedApplicationIDsByWatch[deviceID] ?? []
+    }
+
     private func recordSynchronizedApplications(
         _ applications: [PebbleApplication],
         device: PebbleDevice
     ) async throws {
+        let synchronizedIDs = compatibleApplications(applications, with: device.model).map(\.id)
         try await applicationLibrary.setSynchronizedApplicationIDs(
-            compatibleApplications(applications, with: device.model).map(\.id),
+            synchronizedIDs,
             deviceID: device.id
         )
+        installedApplicationIDsByWatch[device.id] = Set(synchronizedIDs)
     }
 
     private func compatibleApplications(

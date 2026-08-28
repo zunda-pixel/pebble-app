@@ -865,6 +865,16 @@
         }
       }
     },
+    "Not installed on this watch" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このウォッチには未インストール"
+          }
+        }
+      }
+    },
     "Notifications" : {
       "localizations" : {
         "ja" : {

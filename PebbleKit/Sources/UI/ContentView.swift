@@ -609,13 +609,44 @@ private struct ApplicationsView: View {
     @Environment(\.undoManager) private var undoManager
     @State private var isChoosingPackage = false
     @State private var pendingRemovalID: UUID?
+    @State private var selectedWatchID: String?
+
+    // The watch whose install state is shown: the picked one while it stays
+    // connected, otherwise the primary connection.
+    private var displayedWatchID: String? {
+        if let selectedWatchID,
+           model.connectedDevices.contains(where: { $0.id == selectedWatchID }) {
+            return selectedWatchID
+        }
+        return model.connectedDevice?.id
+    }
 
     var body: some View {
+        VStack(spacing: 0) {
+            if model.connectedDevices.count > 1 {
+                Picker("Watch", selection: Binding(
+                    get: { displayedWatchID ?? "" },
+                    set: { selectedWatchID = $0 }
+                )) {
+                    ForEach(model.connectedDevices) { device in
+                        Text(device.name).tag(device.id)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+            }
+            applicationsContent
+        }
+    }
+
+    private var applicationsContent: some View {
         ApplicationsContent(
             watchApplications: model.watchApplications,
             watchfaces: model.watchfaces,
             activeWatchfaceID: model.activeWatchfaceID,
             favoriteWatchfaceIDs: model.favoriteWatchfaceIDs,
+            installedApplicationIDs: displayedWatchID.map { model.installedApplicationIDs(on: $0) },
             isLoading: model.isLoadingApplications,
             errorMessage: model.applicationLibraryErrorMessage,
             operationStatusMessage: model.applicationManagementStatusMessage,
@@ -733,6 +764,8 @@ private struct ApplicationsContent: View {
     var watchfaces: [PebbleApplication]
     var activeWatchfaceID: UUID?
     var favoriteWatchfaceIDs: Set<UUID>
+    /// nil when no watch is connected: install state is unknown, not shown.
+    var installedApplicationIDs: Set<UUID>?
     var isLoading: Bool
     var errorMessage: String?
     var operationStatusMessage: String?
@@ -783,6 +816,7 @@ private struct ApplicationsContent: View {
                         applications: watchApplications,
                         activeWatchfaceID: activeWatchfaceID,
                         favoriteWatchfaceIDs: favoriteWatchfaceIDs,
+                        installedApplicationIDs: installedApplicationIDs,
                         isOperationInProgress: isOperationInProgress,
                         removeApplication: removeApplication,
                         configureApplication: configureApplication,
@@ -799,6 +833,7 @@ private struct ApplicationsContent: View {
                         applications: watchfaces,
                         activeWatchfaceID: activeWatchfaceID,
                         favoriteWatchfaceIDs: favoriteWatchfaceIDs,
+                        installedApplicationIDs: installedApplicationIDs,
                         isOperationInProgress: isOperationInProgress,
                         removeApplication: removeApplication,
                         configureApplication: configureApplication,
@@ -847,6 +882,7 @@ private struct ApplicationSection: View {
     var applications: [PebbleApplication]
     var activeWatchfaceID: UUID?
     var favoriteWatchfaceIDs: Set<UUID>
+    var installedApplicationIDs: Set<UUID>?
     var isOperationInProgress: Bool
     var removeApplication: (UUID) -> Void
     var configureApplication: (PebbleApplication) -> Void
@@ -864,6 +900,7 @@ private struct ApplicationSection: View {
                     kind: application.kind,
                     isActive: activeWatchfaceID == application.id,
                     isFavorite: favoriteWatchfaceIDs.contains(application.id),
+                    isInstalled: installedApplicationIDs.map { $0.contains(application.id) },
                     isConfigurable: application.isConfigurable,
                     configure: { configureApplication(application) },
                     activate: { activateWatchface(application) },
@@ -910,6 +947,8 @@ private struct ApplicationRow: View {
     var kind: PebbleApplicationKind
     var isActive: Bool
     var isFavorite: Bool
+    /// nil when no watch is connected.
+    var isInstalled: Bool?
     var isConfigurable: Bool
     var configure: () -> Void
     var activate: () -> Void
@@ -928,6 +967,17 @@ private struct ApplicationRow: View {
                     Text(companyName)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                }
+                if let isInstalled {
+                    if isInstalled {
+                        Label("Installed", systemImage: "checkmark.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    } else {
+                        Label("Not installed on this watch", systemImage: "circle.dashed")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
             Spacer()
