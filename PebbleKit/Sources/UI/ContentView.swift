@@ -973,24 +973,20 @@ private struct ApplicationPlaceholderRow: View {
 
 private struct DevicesView: View {
     var model: AppModel
-    @State private var pendingForgottenWatch: SavedPebbleWatch?
     @State private var isAddingWatch = false
+
+    // Saved watches plus any connected watch that has not been saved yet.
+    private var listedWatchIDs: [String] {
+        let savedIDs = model.savedWatches.map(\.id)
+        let unsavedConnected = model.connections
+            .map(\.device.id)
+            .filter { !savedIDs.contains($0) }
+        return unsavedConnected + savedIDs
+    }
 
     var body: some View {
         List {
-            if !model.connections.isEmpty {
-                Section("Connected") {
-                    ForEach(model.connections) { connection in
-                        NavigationLink {
-                            WatchDetailView(model: model, connection: connection)
-                        } label: {
-                            ConnectedWatchRow(connection: connection)
-                        }
-                    }
-                }
-            }
-
-            if model.connections.isEmpty, model.savedWatches.isEmpty {
+            if listedWatchIDs.isEmpty {
                 ContentUnavailableView {
                     Label("No Devices", systemImage: "applewatch")
                 } description: {
@@ -1001,27 +997,14 @@ private struct DevicesView: View {
                     }
                     .buttonStyle(.borderedProminent)
                 }
-            }
-
-            if !model.savedWatches.isEmpty {
+            } else {
                 Section("My Watches") {
-                    ForEach(model.savedWatches) { watch in
-                        SavedWatchRow(
-                            watch: watch,
-                            isConnected: model.connections.contains { $0.device.id == watch.id },
-                            isBusy: model.isScanningOrConnecting,
-                            connect: {
-                                Task { await model.connect(to: watch) }
-                            },
-                            setAutomaticallyConnects: { enabled in
-                                Task {
-                                    await model.setAutomaticallyConnects(enabled, watchID: watch.id)
-                                }
-                            },
-                            forget: {
-                                pendingForgottenWatch = watch
-                            }
-                        )
+                    ForEach(listedWatchIDs, id: \.self) { watchID in
+                        NavigationLink {
+                            WatchDetailView(model: model, watchID: watchID)
+                        } label: {
+                            WatchListRow(model: model, watchID: watchID)
+                        }
                     }
                 }
             }
@@ -1046,23 +1029,6 @@ private struct DevicesView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .pebbleScanRequested)) { _ in
             isAddingWatch = true
-        }
-        .confirmationDialog(
-            "Forget \(pendingForgottenWatch?.name ?? "this watch")?",
-            isPresented: Binding(
-                get: { pendingForgottenWatch != nil },
-                set: { if !$0 { pendingForgottenWatch = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Forget Watch", role: .destructive) {
-                guard let watch = pendingForgottenWatch else { return }
-                pendingForgottenWatch = nil
-                Task { await model.forgetWatch(id: watch.id) }
-            }
-            Button("Cancel", role: .cancel) { pendingForgottenWatch = nil }
-        } message: {
-            Text("Automatic reconnection information for this Pebble will be removed.")
         }
         .overlay {
             if isBusy {
@@ -1168,24 +1134,47 @@ private struct AddWatchSheet: View {
     }
 }
 
-private struct ConnectedWatchRow: View {
-    var connection: WatchConnection
+private struct WatchListRow: View {
+    var model: AppModel
+    var watchID: String
+
+    private var connection: WatchConnection? {
+        model.connections.first { $0.device.id == watchID }
+    }
+
+    private var savedWatch: SavedPebbleWatch? {
+        model.savedWatches.first { $0.id == watchID }
+    }
 
     var body: some View {
         LabeledContent {
-            if let batteryLevel = connection.device.batteryLevel {
-                Text("\(batteryLevel)%")
+            if let connection {
+                if let batteryLevel = connection.device.batteryLevel {
+                    Text("\(batteryLevel)%")
+                        .foregroundStyle(.secondary)
+                }
+            } else if let savedWatch {
+                Text(savedWatch.lastConnectedAt, format: .relative(presentation: .named))
                     .foregroundStyle(.secondary)
             }
         } label: {
             VStack(alignment: .leading) {
-                Text(connection.device.name)
-                Text(connection.device.model.displayName)
+                Text(connection?.device.name ?? savedWatch?.name ?? watchID)
+                Text((connection?.device.model ?? savedWatch?.model)?.displayName ?? "")
                     .foregroundStyle(.secondary)
-                if connection.phase == .reconnecting {
+                switch connection?.phase {
+                case .connected:
+                    Label("Connected", systemImage: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                case .reconnecting:
                     Label("Reconnecting…", systemImage: "arrow.triangle.2.circlepath")
                         .font(.caption)
                         .foregroundStyle(.orange)
+                case .disconnected, nil:
+                    Label("Not connected", systemImage: "applewatch.slash")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -1194,66 +1183,95 @@ private struct ConnectedWatchRow: View {
 
 private struct WatchDetailView: View {
     var model: AppModel
-    var connection: WatchConnection
+    var watchID: String
     @State private var isConfirmingForget = false
     @Environment(\.dismiss) private var dismiss
+
+    private var connection: WatchConnection? {
+        model.connections.first { $0.device.id == watchID }
+    }
+
+    private var savedWatch: SavedPebbleWatch? {
+        model.savedWatches.first { $0.id == watchID }
+    }
+
+    private var watchName: String {
+        connection?.device.name ?? savedWatch?.name ?? watchID
+    }
 
     var body: some View {
         Form {
             Section("Watch") {
-                LabeledContent("Model", value: connection.device.model.displayName)
-                if let firmwareVersion = connection.device.firmwareVersion {
+                if let model = connection?.device.model ?? savedWatch?.model {
+                    LabeledContent("Model", value: model.displayName)
+                }
+                if let firmwareVersion = connection?.device.firmwareVersion ?? savedWatch?.firmwareVersion {
                     LabeledContent("Firmware", value: firmwareVersion)
                 }
-                if let serialNumber = connection.device.serialNumber {
+                if let serialNumber = connection?.device.serialNumber ?? savedWatch?.serialNumber {
                     LabeledContent("Serial Number", value: serialNumber)
                 }
-                if let batteryLevel = connection.device.batteryLevel {
+                if let batteryLevel = connection?.device.batteryLevel ?? savedWatch?.lastBatteryLevel {
                     LabeledContent("Battery", value: "\(batteryLevel)%")
                 }
                 LabeledContent("Status") {
-                    switch connection.phase {
+                    switch connection?.phase {
                     case .connected:
                         Text("Connected")
                     case .reconnecting:
                         Text("Reconnecting…")
-                    case .disconnected:
+                    case .disconnected, nil:
                         Text("Not connected")
+                    }
+                }
+            }
+            Section("Connection") {
+                if connection == nil, let savedWatch {
+                    Button("Connect", systemImage: "applewatch.radiowaves.left.and.right") {
+                        Task { await model.connect(to: savedWatch) }
+                    }
+                    .disabled(model.connectingDeviceIDs.contains(watchID))
+                }
+                if savedWatch != nil {
+                    Toggle("Connect Automatically", isOn: Binding(
+                        get: { savedWatch?.automaticallyConnects ?? false },
+                        set: { enabled in
+                            Task { await model.setAutomaticallyConnects(enabled, watchID: watchID) }
+                        }
+                    ))
+                }
+                if connection != nil {
+                    Button("Disconnect", role: .destructive) {
+                        Task { await model.disconnect(deviceID: watchID) }
                     }
                 }
             }
             Section("Notifications") {
                 Button("Send Test Notification", systemImage: "bell.badge") {
-                    Task { await model.sendTestNotification(deviceID: connection.device.id) }
+                    Task { await model.sendTestNotification(deviceID: watchID) }
                 }
-                .disabled(!connection.isConnected)
+                .disabled(connection?.isConnected != true)
                 if let notificationStatusMessage = model.notificationStatusMessage {
                     Label(notificationStatusMessage, systemImage: "info.circle")
                         .foregroundStyle(.secondary)
                 }
             }
             Section {
-                Button("Disconnect", role: .destructive) {
-                    Task {
-                        await model.disconnect(deviceID: connection.device.id)
-                        dismiss()
-                    }
-                }
                 Button("Forget Watch", role: .destructive) {
                     isConfirmingForget = true
                 }
             }
         }
         .formStyle(.grouped)
-        .navigationTitle(connection.device.name)
+        .navigationTitle(watchName)
         .confirmationDialog(
-            "Forget \(connection.device.name)?",
+            "Forget \(watchName)?",
             isPresented: $isConfirmingForget,
             titleVisibility: .visible
         ) {
             Button("Forget Watch", role: .destructive) {
                 Task {
-                    await model.forgetWatch(id: connection.device.id)
+                    await model.forgetWatch(id: watchID)
                     dismiss()
                 }
             }
@@ -1261,45 +1279,6 @@ private struct WatchDetailView: View {
         } message: {
             Text("Automatic reconnection information for this Pebble will be removed.")
         }
-    }
-}
-
-private struct SavedWatchRow: View {
-    var watch: SavedPebbleWatch
-    var isConnected: Bool
-    var isBusy: Bool
-    var connect: () -> Void
-    var setAutomaticallyConnects: (Bool) -> Void
-    var forget: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            LabeledContent {
-                Text(watch.lastConnectedAt, format: .relative(presentation: .named))
-                    .foregroundStyle(.secondary)
-            } label: {
-                VStack(alignment: .leading) {
-                    Text(watch.name)
-                    Text(watch.model.displayName)
-                        .foregroundStyle(.secondary)
-                    if let firmwareVersion = watch.firmwareVersion {
-                        Text(firmwareVersion)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            if !isConnected {
-                Button("Connect", systemImage: "applewatch.radiowaves.left.and.right", action: connect)
-                    .disabled(isBusy)
-            }
-            Toggle("Connect Automatically", isOn: Binding(
-                get: { watch.automaticallyConnects },
-                set: setAutomaticallyConnects
-            ))
-            Button("Forget Watch", role: .destructive, action: forget)
-        }
-        .padding(.vertical, 4)
     }
 }
 
