@@ -184,42 +184,10 @@ struct WatchListRow: View {
     }
 }
 
-/// A firmware action that is confirmed before it runs.
-enum FirmwareDestructiveAction: Identifiable {
-    case installRecovery
-    case discardRecovery
-
-    var id: Self { self }
-
-    var title: String {
-        switch self {
-        case .installRecovery: "Install recovery firmware?"
-        case .discardRecovery: "Discard recovery data?"
-        }
-    }
-
-    var buttonTitle: String {
-        switch self {
-        case .installRecovery: "Install Recovery Firmware"
-        case .discardRecovery: "Discard Recovery Data"
-        }
-    }
-
-    var message: String {
-        switch self {
-        case .installRecovery: "Installing recovery firmware can make the watch temporarily unavailable. Keep it connected until the update completes."
-        case .discardRecovery: "The interrupted update can no longer be resumed after its recovery data is discarded."
-        }
-    }
-}
-
 struct WatchDetailView: View {
     var model: AppModel
     var watchID: String
-    @State private var isConfirmingForget = false
     @State private var isChoosingFirmware = false
-    @State private var pendingReset: PebbleResetKind?
-    @State private var destructiveFirmwareAction: FirmwareDestructiveAction?
     @Environment(\.dismiss) private var dismiss
 
     private var connection: WatchConnection? {
@@ -324,15 +292,27 @@ struct WatchDetailView: View {
                     // Recovery firmware leaves the watch unusable until the
                     // transfer finishes, so it is never started unasked.
                     if model.firmwareRequiresConfirmation {
-                        Button("Install Recovery Firmware", role: .destructive) {
-                            destructiveFirmwareAction = .installRecovery
+                        ConfirmingButton(
+                            title: "Install Recovery Firmware",
+                            role: .destructive,
+                            question: "Install recovery firmware?",
+                            explanation: "Installing recovery firmware can make the watch temporarily unavailable. Keep it connected until the update completes.",
+                            confirmationTitle: "Install Recovery Firmware"
+                        ) {
+                            Task { await model.confirmRecoveryFirmwareUpdate() }
                         }
                     }
                     Button("Cancel Update", role: .destructive) {
                         Task { await model.cancelFirmwareUpdate() }
                     }
-                    Button("Discard Recovery Data", role: .destructive) {
-                        destructiveFirmwareAction = .discardRecovery
+                    ConfirmingButton(
+                        title: "Discard Recovery Data",
+                        role: .destructive,
+                        question: "Discard recovery data?",
+                        explanation: "The interrupted update can no longer be resumed after its recovery data is discarded.",
+                        confirmationTitle: "Discard Recovery Data"
+                    ) {
+                        Task { await model.discardPendingFirmwareUpdate() }
                     }
                 }
                 if let firmwareUpdateStatusMessage = model.firmwareUpdateStatusMessage {
@@ -345,16 +325,37 @@ struct WatchDetailView: View {
                 Text("Firmware published for this watch is downloaded from PebbleOS. A PBZ file can also be chosen while the watch is away; either way the transfer starts as soon as it connects.")
             }
             Section {
-                Button("Restart Watch", systemImage: "arrow.clockwise") {
-                    pendingReset = .restart
+                ConfirmingButton(
+                    title: "Restart Watch",
+                    systemImage: "arrow.clockwise",
+                    question: "Restart \(watchName)?",
+                    explanation: "The watch disconnects while it restarts.",
+                    confirmationTitle: "Restart Watch",
+                    confirmationRole: nil
+                ) {
+                    Task { await model.resetWatch(.restart, deviceID: watchID) }
                 }
                 .disabled(connection?.isConnected != true)
-                Button("Restart into Recovery Firmware", systemImage: "lifepreserver") {
-                    pendingReset = .recoveryFirmware
+                ConfirmingButton(
+                    title: "Restart into Recovery Firmware",
+                    systemImage: "lifepreserver",
+                    question: "Restart \(watchName) into recovery firmware?",
+                    explanation: "The watch restarts into recovery firmware, where only firmware updates are available.",
+                    confirmationTitle: "Restart into Recovery Firmware",
+                    confirmationRole: nil
+                ) {
+                    Task { await model.resetWatch(.recoveryFirmware, deviceID: watchID) }
                 }
                 .disabled(connection?.isConnected != true)
-                Button("Factory Reset", systemImage: "trash", role: .destructive) {
-                    pendingReset = .factoryReset
+                ConfirmingButton(
+                    title: "Factory Reset",
+                    systemImage: "trash",
+                    role: .destructive,
+                    question: "Erase \(watchName)?",
+                    explanation: "Every app, watchface, and setting stored on the watch is erased. This cannot be undone.",
+                    confirmationTitle: "Erase Watch"
+                ) {
+                    Task { await model.resetWatch(.factoryReset, deviceID: watchID) }
                 }
                 .disabled(connection?.isConnected != true)
                 if let watchResetStatusMessage = model.watchResetStatusMessage {
@@ -367,8 +368,17 @@ struct WatchDetailView: View {
                 Text("The watch restarts without answering, so it disconnects immediately. A factory reset erases everything stored on the watch.")
             }
             Section {
-                Button("Forget Watch", role: .destructive) {
-                    isConfirmingForget = true
+                ConfirmingButton(
+                    title: "Forget Watch",
+                    role: .destructive,
+                    question: "Forget \(watchName)?",
+                    explanation: "Automatic reconnection information for this Pebble will be removed.",
+                    confirmationTitle: "Forget Watch"
+                ) {
+                    Task {
+                        await model.forgetWatch(id: watchID)
+                        dismiss()
+                    }
                 }
             }
         }
@@ -384,79 +394,6 @@ struct WatchDetailView: View {
             }
             Task { await model.installFirmware(from: firmwareURL, deviceID: watchID) }
             return true
-        }
-        .confirmationDialog(
-            destructiveFirmwareAction?.title ?? "Confirm firmware action",
-            isPresented: Binding(
-                get: { destructiveFirmwareAction != nil },
-                set: { if !$0 { destructiveFirmwareAction = nil } }
-            ),
-            titleVisibility: .visible,
-            presenting: destructiveFirmwareAction
-        ) { action in
-            Button(action.buttonTitle, role: .destructive) {
-                destructiveFirmwareAction = nil
-                Task {
-                    switch action {
-                    case .installRecovery: await model.confirmRecoveryFirmwareUpdate()
-                    case .discardRecovery: await model.discardPendingFirmwareUpdate()
-                    }
-                }
-            }
-            Button("Cancel", role: .cancel) { destructiveFirmwareAction = nil }
-        } message: { action in
-            Text(action.message)
-        }
-        .confirmationDialog(
-            "Forget \(watchName)?",
-            isPresented: $isConfirmingForget,
-            titleVisibility: .visible
-        ) {
-            Button("Forget Watch", role: .destructive) {
-                Task {
-                    await model.forgetWatch(id: watchID)
-                    dismiss()
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Automatic reconnection information for this Pebble will be removed.")
-        }
-        .confirmationDialog(
-            "Reset \(watchName)?",
-            isPresented: Binding(
-                get: { pendingReset != nil },
-                set: { if !$0 { pendingReset = nil } }
-            ),
-            titleVisibility: .visible,
-            presenting: pendingReset
-        ) { kind in
-            Button(actionTitle(for: kind), role: kind == .factoryReset ? .destructive : nil) {
-                pendingReset = nil
-                Task { await model.resetWatch(kind, deviceID: watchID) }
-            }
-            Button("Cancel", role: .cancel) { pendingReset = nil }
-        } message: { kind in
-            Text(confirmationMessage(for: kind))
-        }
-    }
-
-    private func actionTitle(for kind: PebbleResetKind) -> LocalizedStringKey {
-        switch kind {
-        case .restart: "Restart Watch"
-        case .recoveryFirmware: "Restart into Recovery Firmware"
-        case .factoryReset: "Erase Watch"
-        }
-    }
-
-    private func confirmationMessage(for kind: PebbleResetKind) -> LocalizedStringKey {
-        switch kind {
-        case .restart:
-            "The watch disconnects while it restarts."
-        case .recoveryFirmware:
-            "The watch restarts into recovery firmware, where only firmware updates are available."
-        case .factoryReset:
-            "Every app, watchface, and setting stored on the watch is erased. This cannot be undone."
         }
     }
 }

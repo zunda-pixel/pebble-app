@@ -6,7 +6,6 @@ struct ApplicationsView: View {
     @Environment(\.undoManager) private var undoManager
     @State private var isChoosingPackage = false
     @State private var isShowingCatalog = false
-    @State private var pendingRemovalID: UUID?
     @State private var selectedWatchID: String?
 
     // The watch whose install state is shown: the picked one while it stays
@@ -52,7 +51,7 @@ struct ApplicationsView: View {
             installingApplicationName: model.installingApplicationName,
             installationProgress: model.installationProgress,
             removeApplication: { applicationID in
-                pendingRemovalID = applicationID
+                Task { await model.removeApplication(id: applicationID) }
             },
             reorderApplications: { kind, offsets, destination in
                 Task {
@@ -109,23 +108,6 @@ struct ApplicationsView: View {
             }
             Task { await model.importApplication(from: packageURL) }
             return true
-        }
-        .confirmationDialog(
-            "Remove this watch application?",
-            isPresented: Binding(
-                get: { pendingRemovalID != nil },
-                set: { if !$0 { pendingRemovalID = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Remove Application", role: .destructive) {
-                guard let applicationID = pendingRemovalID else { return }
-                pendingRemovalID = nil
-                Task { await model.removeApplication(id: applicationID) }
-            }
-            Button("Cancel", role: .cancel) { pendingRemovalID = nil }
-        } message: {
-            Text("The application and its settings will be removed from the connected Pebble.")
         }
         .sheet(isPresented: Binding(
             get: { model.configurationURL != nil },
@@ -286,49 +268,87 @@ struct ApplicationSection: View {
     var body: some View {
         Section(title) {
             ForEach(applications) { application in
-                ApplicationRow(
-                    name: application.displayName,
-                    companyName: application.companyName,
-                    versionLabel: application.versionLabel,
-                    kind: application.kind,
+                ApplicationListRow(
+                    application: application,
                     isActive: activeWatchfaceID == application.id,
                     isFavorite: favoriteWatchfaceIDs.contains(application.id),
                     isInstalled: installedApplicationIDs.map { $0.contains(application.id) },
-                    isConfigurable: application.isConfigurable,
-                    configure: { configureApplication(application) },
-                    activate: { activateWatchface(application) },
-                    toggleFavorite: { toggleFavoriteWatchface(application) }
+                    isOperationInProgress: isOperationInProgress,
+                    removeApplication: { removeApplication(application.id) },
+                    configureApplication: { configureApplication(application) },
+                    activateWatchface: { activateWatchface(application) },
+                    toggleFavoriteWatchface: { toggleFavoriteWatchface(application) }
                 )
-                .swipeActions {
-                    Button("Remove", role: .destructive) {
-                        removeApplication(application.id)
-                    }
-                    .disabled(isOperationInProgress)
-                }
-                .contextMenu {
-                    if application.isConfigurable {
-                        Button("Configure", systemImage: "gearshape") {
-                            configureApplication(application)
-                        }
-                    }
-                    if application.kind == .watchface {
-                        Button(activeWatchfaceID == application.id ? "Active" : "Activate", systemImage: "play.circle") {
-                            activateWatchface(application)
-                        }
-                        .disabled(activeWatchfaceID == application.id)
-                        Button(favoriteWatchfaceIDs.contains(application.id) ? "Remove Favorite" : "Favorite", systemImage: "star") {
-                            toggleFavoriteWatchface(application)
-                        }
-                    }
-                    Divider()
-                    Button("Remove", systemImage: "trash", role: .destructive) {
-                        removeApplication(application.id)
-                    }
-                    .disabled(isOperationInProgress)
-                }
             }
             .onMove(perform: moveApplications)
             .moveDisabled(isOperationInProgress)
+        }
+    }
+}
+
+/// One row of the application list, with the swipe action, the context menu and
+/// the removal confirmation that belong to it.
+struct ApplicationListRow: View {
+    var application: PebbleApplication
+    var isActive: Bool
+    var isFavorite: Bool
+    var isInstalled: Bool?
+    var isOperationInProgress: Bool
+    var removeApplication: () -> Void
+    var configureApplication: () -> Void
+    var activateWatchface: () -> Void
+    var toggleFavoriteWatchface: () -> Void
+
+    @State private var isConfirmingRemoval = false
+
+    var body: some View {
+        ApplicationRow(
+            name: application.displayName,
+            companyName: application.companyName,
+            versionLabel: application.versionLabel,
+            kind: application.kind,
+            isActive: isActive,
+            isFavorite: isFavorite,
+            isInstalled: isInstalled,
+            isConfigurable: application.isConfigurable,
+            configure: configureApplication,
+            activate: activateWatchface,
+            toggleFavorite: toggleFavoriteWatchface
+        )
+        .swipeActions {
+            Button("Remove", role: .destructive) {
+                isConfirmingRemoval = true
+            }
+            .disabled(isOperationInProgress)
+        }
+        .contextMenu {
+            if application.isConfigurable {
+                Button("Configure", systemImage: "gearshape", action: configureApplication)
+            }
+            if application.kind == .watchface {
+                Button(isActive ? "Active" : "Activate", systemImage: "play.circle", action: activateWatchface)
+                    .disabled(isActive)
+                Button(
+                    isFavorite ? "Remove Favorite" : "Favorite",
+                    systemImage: "star",
+                    action: toggleFavoriteWatchface
+                )
+            }
+            Divider()
+            Button("Remove", systemImage: "trash", role: .destructive) {
+                isConfirmingRemoval = true
+            }
+            .disabled(isOperationInProgress)
+        }
+        .confirmationDialog(
+            "Remove \(application.displayName)?",
+            isPresented: $isConfirmingRemoval,
+            titleVisibility: .visible
+        ) {
+            Button("Remove Application", role: .destructive, action: removeApplication)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The application and its settings will be removed from the connected Pebble.")
         }
     }
 }

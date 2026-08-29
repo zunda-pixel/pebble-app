@@ -536,6 +536,16 @@
         }
       }
     },
+    "Discard recovery data?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リカバリデータを破棄しますか?"
+          }
+        }
+      }
+    },
     "Disconnect" : {
       "localizations" : {
         "ja" : {
@@ -572,6 +582,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "終了: %lld:00"
+          }
+        }
+      }
+    },
+    "Erase %@?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“%@”を消去しますか?"
           }
         }
       }
@@ -786,6 +806,16 @@
         }
       }
     },
+    "Install recovery firmware?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リカバリファームウェアをインストールしますか?"
+          }
+        }
+      }
+    },
     "Installed" : {
       "localizations" : {
         "ja" : {
@@ -802,6 +832,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "インストール中"
+          }
+        }
+      }
+    },
+    "Installing recovery firmware can make the watch temporarily unavailable. Keep it connected until the update completes." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リカバリファームウェアをインストールすると、ウォッチが一時的に使用できなくなることがあります。アップデートが完了するまで接続したままにしてください。"
           }
         }
       }
@@ -1106,6 +1146,16 @@
         }
       }
     },
+    "Remove %@?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“%@”を削除しますか?"
+          }
+        }
+      }
+    },
     "Remove Application" : {
       "localizations" : {
         "ja" : {
@@ -1127,6 +1177,7 @@
       }
     },
     "Remove this watch application?" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -1147,11 +1198,32 @@
       }
     },
     "Reset %@?" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "“%@”をリセットしますか?"
+          }
+        }
+      }
+    },
+    "Restart %@ into recovery firmware?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“%@”をリカバリファームウェアで再起動しますか?"
+          }
+        }
+      }
+    },
+    "Restart %@?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“%@”を再起動しますか?"
           }
         }
       }
@@ -1393,6 +1465,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "接続中のPebbleからアプリケーションとその設定が削除されます。"
+          }
+        }
+      }
+    },
+    "The interrupted update can no longer be resumed after its recovery data is discarded." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リカバリデータを破棄すると、中断されたアップデートを再開できなくなります。"
           }
         }
       }

@@ -6,7 +6,6 @@ struct HealthView: View {
     var model: AppModel
     @State private var period: HealthAnalysisPeriod = .week
     @State private var isImportingArchive = false
-    @State private var isConfirmingHealthDeletion = false
 
     var body: some View {
         List {
@@ -54,8 +53,14 @@ struct HealthView: View {
             Button("Import Health Archive", systemImage: "square.and.arrow.down.on.square") {
                 isImportingArchive = true
             }
-            Button("Delete Local Health Data", role: .destructive) {
-                isConfirmingHealthDeletion = true
+            ConfirmingButton(
+                title: "Delete Local Health Data",
+                role: .destructive,
+                question: "Delete all local health data?",
+                explanation: "This removes locally stored step and sleep history. This action cannot be undone.",
+                confirmationTitle: "Delete Health Data"
+            ) {
+                Task { await model.deleteHealthData() }
             }
             if let message = model.dataSyncStatusMessage { Text(message).foregroundStyle(.secondary) }
         }
@@ -64,18 +69,6 @@ struct HealthView: View {
         .fileImporter(isPresented: $isImportingArchive, allowedContentTypes: [.json]) { result in
             guard case .success(let url) = result else { return }
             Task { await model.importHealthData(from: url) }
-        }
-        .confirmationDialog(
-            "Delete all local health data?",
-            isPresented: $isConfirmingHealthDeletion,
-            titleVisibility: .visible
-        ) {
-            Button("Delete Health Data", role: .destructive) {
-                Task { await model.deleteHealthData() }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This removes locally stored step and sleep history. This action cannot be undone.")
         }
     }
 
