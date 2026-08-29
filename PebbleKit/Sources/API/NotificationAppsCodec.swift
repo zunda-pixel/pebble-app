@@ -138,12 +138,6 @@ public enum NotificationAppsCodecError: Error, Equatable, Sendable {
     case invalidRecord
 }
 
-private extension FixedWidthInteger {
-    var littleEndianBytes: [UInt8] {
-        withUnsafeBytes(of: littleEndian) { Array($0) }
-    }
-}
-
 public enum BlobDB2Message: Equatable, Sendable {
     case write(BlobDB2Write)
     case writeBack(BlobDB2Write)

@@ -1,5 +1,5 @@
 public import CoreBluetooth
-public import Foundation
+import Foundation
 
 /// Hosts the protocol service on the phone so a watch that does not publish
 /// one of its own can talk to it as a GATT client ("forward" transport).

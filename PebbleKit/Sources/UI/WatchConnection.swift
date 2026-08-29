@@ -21,7 +21,7 @@ public final class WatchConnection: Identifiable {
     @ObservationIgnored var synchronizedNotificationAppRecords: [String: [UInt8]] = [:]
     @ObservationIgnored var blobDBTokenCounter: UInt16 = 0x4000
     @ObservationIgnored private var needsPostReconnectSync = false
-    @ObservationIgnored private(set) var voiceCoordinator: VoiceSessionCoordinator!
+    @ObservationIgnored let voiceCoordinator: VoiceSessionCoordinator
     @ObservationIgnored private var eventsTask: Task<Void, Never>?
     @ObservationIgnored private var framesTask: Task<Void, Never>?
 

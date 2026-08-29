@@ -58,9 +58,3 @@ public enum PhoneVersionCodec {
         return bytes
     }
 }
-
-private extension FixedWidthInteger {
-    var bigEndianBytes: [UInt8] {
-        withUnsafeBytes(of: bigEndian) { Array($0) }
-    }
-}

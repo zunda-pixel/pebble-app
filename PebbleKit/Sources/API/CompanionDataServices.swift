@@ -120,7 +120,12 @@ public actor PebbleHealthLibrary {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: sample.timeZoneIdentifier) ?? .current
         let components = calendar.dateComponents([.year, .month, .day], from: sample.date)
-        return String(format: "%04d-%02d-%02d", components.year ?? 0, components.month ?? 0, components.day ?? 0)
+        let year = String(components.year ?? 0)
+        let month = String(components.month ?? 0)
+        let day = String(components.day ?? 0)
+        return "\(String(repeating: "0", count: max(0, 4 - year.count)))\(year)"
+            + "-\(String(repeating: "0", count: max(0, 2 - month.count)))\(month)"
+            + "-\(String(repeating: "0", count: max(0, 2 - day.count)))\(day)"
     }
 }
 
@@ -237,7 +242,7 @@ public actor PebbleAppCatalog {
         }
         let data = try Data(contentsOf: temporaryURL, options: .mappedIfSafe)
         if let expected = application.sha256?.lowercased() {
-            let actual = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+            let actual = SHA256.hash(data: data).hexadecimalString
             guard actual == expected else { throw AppCatalogError.checksumMismatch }
         }
         let output = FileManager.default.temporaryDirectory.appending(path: "catalog-\(application.id.uuidString).pbw")
@@ -524,10 +529,6 @@ enum PersistentJSON {
         let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
         guard size <= maximumFileSize else { throw CocoaError(.fileReadTooLarge) }
     }
-}
-
-private extension FixedWidthInteger {
-    var littleEndianBytes: [UInt8] { withUnsafeBytes(of: littleEndian) { Array($0) } }
 }
 
 func applicationSupportURL(_ name: String) -> URL {

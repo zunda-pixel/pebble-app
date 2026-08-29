@@ -1,4 +1,4 @@
-public import Foundation
+import Foundation
 import MemberwiseInit
 
 public enum PhoneCallAction: Equatable, Sendable {
@@ -46,19 +46,6 @@ public enum PhoneControlCodec {
         )
     }
 
-    public static func missedCallFrame(
-        cookie: UInt32,
-        callerNumber: String,
-        callerName: String?
-    ) -> PebbleProtocolFrame {
-        callFrame(
-            command: 0x06,
-            cookie: cookie,
-            callerNumber: callerNumber,
-            callerName: callerName
-        )
-    }
-
     public static func callStartFrame(cookie: UInt32) -> PebbleProtocolFrame {
         PebbleProtocolFrame(endpoint: endpoint, payload: [0x08] + cookie.bigEndianBytes)
     }
@@ -91,10 +78,4 @@ public enum PhoneControlCodecError: Error, Equatable, Sendable {
     case unexpectedEndpoint
     case invalidPayload
     case unknownCommand
-}
-
-private extension FixedWidthInteger {
-    var bigEndianBytes: [UInt8] {
-        withUnsafeBytes(of: bigEndian) { Array($0) }
-    }
 }

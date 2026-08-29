@@ -35,7 +35,7 @@ public enum AppRunStateCodec {
 
     private static func uuid(_ bytes: [UInt8]) throws -> UUID {
         guard bytes.count == 16 else { throw AppRunStateCodecError.invalidPayload }
-        let hex = bytes.map { String(format: "%02x", $0) }.joined()
+        let hex = bytes.hexadecimalString
         let value = "\(hex.prefix(8))-\(hex.dropFirst(8).prefix(4))-\(hex.dropFirst(12).prefix(4))-\(hex.dropFirst(16).prefix(4))-\(hex.dropFirst(20))"
         guard let id = UUID(uuidString: value) else { throw AppRunStateCodecError.invalidPayload }
         return id

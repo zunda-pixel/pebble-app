@@ -325,29 +325,7 @@ public final class AppModel {
             await recordConnectedWatch(connectedDevice)
             await restorePendingNotifications()
             await PebbleDiagnostics.shared.record(category: "connection", message: "Watch connected")
-            if connectedDevice.isRunningRecoveryFirmware {
-                // The recovery firmware rejects every endpoint the sync below
-                // uses, and drops the link a few seconds after being flooded
-                // with them. A firmware install is the only thing it accepts.
-                watchManagementErrorMessage =
-                    "This watch started its recovery firmware. Install firmware to finish setting it up."
-                await PebbleDiagnostics.shared.record(
-                    .error,
-                    category: "connection",
-                    message: "Skipping synchronization: the watch is in recovery firmware"
-                )
-                await resumePendingFirmwareUpdate(on: connection)
-                return
-            }
-            musicCoordinator.watchConnected()
-            await synchronizeNotificationSourceApps(on: connection)
-            await synchronizeApplications(on: connection)
-            try? await connectionClient.send(AppRunStateCodec.requestFrame())
-            await flushPendingNotifications()
-            await flushPendingAppMessages()
-            await synchronizeTimeline()
-            await requestHealthSync(on: connection)
-            await resumePendingFirmwareUpdate(on: connection)
+            await synchronizeEverything(on: connection)
         } catch let error as PebbleConnectionError {
             lastConnectionError = error
             if !connections.isEmpty {
@@ -1389,16 +1367,8 @@ public final class AppModel {
                 await self?.recordConnectedWatch(device)
             }
             guard needsResync else { return }
-            musicCoordinator.watchConnected()
             Task { [weak self] in
-                guard let self else { return }
-                await self.synchronizeNotificationSourceApps(on: connection)
-                await self.synchronizeApplications(on: connection)
-                await self.flushPendingNotifications()
-                await self.flushPendingAppMessages()
-                await self.synchronizeTimeline()
-                await self.requestHealthSync(on: connection)
-                await self.resumePendingFirmwareUpdate(on: connection)
+                await self?.synchronizeEverything(on: connection)
             }
         case .appFetchRequested(let request):
             beginHandlingAppFetchRequest(request, from: connection)
@@ -1452,6 +1422,35 @@ public final class AppModel {
                 self.timelineActionStatusMessage = "Timeline action completed."
             }
         }
+    }
+
+    /// Brings a watch up to date once it is connected, whether that is the
+    /// first connection or a reconnect.
+    ///
+    /// A watch running its recovery firmware rejects every endpoint this uses
+    /// and drops the link a few seconds after being flooded with them, so it is
+    /// only offered a firmware install.
+    private func synchronizeEverything(on connection: WatchConnection) async {
+        if connection.device.isRunningRecoveryFirmware {
+            watchManagementErrorMessage =
+                "This watch started its recovery firmware. Install firmware to finish setting it up."
+            await PebbleDiagnostics.shared.record(
+                .error,
+                category: "connection",
+                message: "Skipping synchronization: the watch is in recovery firmware"
+            )
+            await resumePendingFirmwareUpdate(on: connection)
+            return
+        }
+        musicCoordinator.watchConnected()
+        await synchronizeNotificationSourceApps(on: connection)
+        await synchronizeApplications(on: connection)
+        try? await connection.client.send(AppRunStateCodec.requestFrame())
+        await flushPendingNotifications()
+        await flushPendingAppMessages()
+        await synchronizeTimeline()
+        await requestHealthSync(on: connection)
+        await resumePendingFirmwareUpdate(on: connection)
     }
 
     private func handleCompanionFrame(

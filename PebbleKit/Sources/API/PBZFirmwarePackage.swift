@@ -40,7 +40,7 @@ public struct PBZFirmwarePackage: Codable, Equatable, Sendable {
     public var resources: Data?
 
     public var sha256: String {
-        SHA256.hash(data: firmware + (resources ?? Data())).map { String(format: "%02x", $0) }.joined()
+        SHA256.hash(data: firmware + (resources ?? Data())).hexadecimalString
     }
 
     public func validateIntegrity() throws {

@@ -229,12 +229,6 @@ public enum VoiceCodecError: Error, Equatable, Sendable {
     case unknownCommand
 }
 
-private extension FixedWidthInteger {
-    var littleEndianBytes: [UInt8] {
-        withUnsafeBytes(of: littleEndian) { Array($0) }
-    }
-}
-
 public enum VoiceTranscriptionOutcome: Equatable, Sendable {
     case transcribed([VoiceTranscriptionWord])
     case failed(VoiceSessionResult)

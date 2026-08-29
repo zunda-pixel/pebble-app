@@ -283,12 +283,14 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
 
     public func frames() -> AsyncStream<PebbleProtocolFrame> {
         AsyncStream { continuation in
+            frameContinuation?.finish()
             frameContinuation = continuation
         }
     }
 
     public func events() -> AsyncStream<PebbleClientEvent> {
         AsyncStream { continuation in
+            eventContinuation?.finish()
             eventContinuation = continuation
         }
     }
@@ -333,6 +335,9 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     }
 
     public func sendAppMessage(applicationID: UUID, tuples: [AppMessageTuple]) async throws {
+        guard connectedPeripheral != nil, ppogSession != nil else {
+            throw PebbleConnectionError.disconnected
+        }
         try await withCheckedThrowingContinuation { continuation in
             queuedAppMessages.append(PendingAppMessage(
                 applicationID: applicationID,
@@ -738,7 +743,6 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             return
         }
 
-
         if frame.endpoint == AppRunStateCodec.endpoint {
             eventContinuation?.yield(.appRunStateChanged(try AppRunStateCodec.decode(frame)))
             return
@@ -788,7 +792,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
                 await PebbleDiagnostics.shared.record(
                     category: "packet",
                     message: "[\(tag)] nothing handles endpoint \(endpoint): "
-                        + payload.map { String(format: "%02X", $0) }.joined()
+                        + payload.hexadecimalString
                 )
             }
             return
@@ -922,6 +926,12 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
 
     private func sendHealthCheck(on peripheral: CBPeripheral) {
         guard pendingPingCookie == nil else {
+            return
+        }
+        // A transfer in flight already proves the link is alive, and it can
+        // keep the watch busy for longer than the pong deadline — a firmware
+        // install is megabytes. Pinging through one only risks dropping it.
+        guard activeTransferSession == nil else {
             return
         }
         let cookie = nextPingCookie

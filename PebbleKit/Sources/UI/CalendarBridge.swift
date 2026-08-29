@@ -34,7 +34,7 @@ final class CalendarBridge {
                     id: stableID(reminder.identifier),
                     parentApplicationID: Self.calendarApplicationID,
                     timestamp: dueDate,
-                    title: reminder.title ?? "Reminder",
+                    title: reminder.title,
                     subtitle: reminder.calendarTitle,
                     body: reminder.notes
                 )

@@ -55,7 +55,13 @@ public actor PebbleApplicationLibrary {
         do {
             return try upsert(application)
         } catch {
-            try? restore(snapshot)
+            // The snapshot is the only way back to a consistent library; if
+            // even that fails the original error is still the useful one.
+            do {
+                try restore(snapshot)
+            } catch let restoreError {
+                assertionFailure("Could not restore the application library: \(restoreError)")
+            }
             throw error
         }
     }

@@ -75,9 +75,3 @@ public enum TimelineNotificationCodecError: Error, Equatable, Sendable {
     case invalidTimestamp
     case payloadTooLarge
 }
-
-private extension FixedWidthInteger {
-    var littleEndianBytes: [UInt8] {
-        withUnsafeBytes(of: littleEndian) { Array($0) }
-    }
-}

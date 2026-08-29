@@ -3,7 +3,7 @@ import Foundation
 import WebKit
 
 @MainActor
-final class PebbleCompanionRuntime: NSObject, @preconcurrency WKScriptMessageHandler, WKNavigationDelegate {
+final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
     private var webView: WKWebView
     private var application: PebbleApplication?
     private var openURLHandler: (URL) -> Void

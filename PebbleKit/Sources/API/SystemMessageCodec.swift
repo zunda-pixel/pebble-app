@@ -15,6 +15,3 @@ public enum SystemMessageCodec {
     }
 }
 public enum SystemMessageCodecError: Error, Equatable, Sendable { case invalidResponse, updateRejected }
-private extension FixedWidthInteger {
-    var littleEndianBytes: [UInt8] { withUnsafeBytes(of: littleEndian) { Array($0) } }
-}

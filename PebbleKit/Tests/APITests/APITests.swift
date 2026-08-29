@@ -1260,6 +1260,22 @@ struct CompanionDataTests {
         #expect(PebbleOSFirmwareCatalog.asset(for: .asterix, in: assets) == nil)
     }
 
+    @Test func integerBytesMatchTheProtocolByteOrder() {
+        #expect(UInt32(0x1234_5678).bigEndianBytes == [0x12, 0x34, 0x56, 0x78])
+        #expect(UInt32(0x1234_5678).littleEndianBytes == [0x78, 0x56, 0x34, 0x12])
+        #expect(UInt16(0xABCD).bigEndianBytes == [0xAB, 0xCD])
+        #expect(UInt16(0xABCD).littleEndianBytes == [0xCD, 0xAB])
+        #expect(UInt8(0x0F).bigEndianBytes == [0x0F])
+        // A signed value keeps its two's-complement representation.
+        #expect(Int32(-2).littleEndianBytes == [0xFE, 0xFF, 0xFF, 0xFF])
+        #expect(Int16(-1).bigEndianBytes == [0xFF, 0xFF])
+    }
+
+    @Test func hexadecimalStringPadsEveryByte() {
+        #expect([UInt8(0x00), 0x0F, 0xA0, 0xFF].hexadecimalString == "000fa0ff")
+        #expect([UInt8]().hexadecimalString.isEmpty)
+    }
+
     @Test func officialCatalogResponseMapsToInstallableApplication() throws {
         let json = """
         {

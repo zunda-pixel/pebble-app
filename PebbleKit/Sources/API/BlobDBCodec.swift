@@ -147,12 +147,6 @@ public enum BlobDBCodecError: Error, Equatable, Sendable {
     case unknownStatus
 }
 
-private extension FixedWidthInteger {
-    var littleEndianBytes: [UInt8] {
-        withUnsafeBytes(of: littleEndian) { Array($0) }
-    }
-}
-
 private extension String {
     func strideChunks(ofCount count: Int) -> [Substring] {
         var chunks: [Substring] = []

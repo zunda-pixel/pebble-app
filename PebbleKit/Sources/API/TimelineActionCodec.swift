@@ -13,7 +13,7 @@ public enum TimelineActionCodec {
         guard frame.endpoint == endpoint, frame.payload.count >= 19, frame.payload[0] == 0x02 else {
             throw TimelineActionCodecError.invalidPayload
         }
-        let hex = frame.payload[1..<17].map { String(format: "%02x", $0) }.joined()
+        let hex = frame.payload[1..<17].hexadecimalString
         let formatted = "\(hex.prefix(8))-\(hex.dropFirst(8).prefix(4))-\(hex.dropFirst(12).prefix(4))-\(hex.dropFirst(16).prefix(4))-\(hex.dropFirst(20))"
         guard let id = UUID(uuidString: formatted) else { throw TimelineActionCodecError.invalidPayload }
         return TimelineActionInvocation(itemID: id, actionID: frame.payload[17])

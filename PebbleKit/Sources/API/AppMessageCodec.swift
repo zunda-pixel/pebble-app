@@ -186,12 +186,6 @@ public enum AppMessageCodecError: Error, Equatable, Sendable {
     case invalidNumberSize
 }
 
-private extension FixedWidthInteger {
-    var littleEndianBytes: [UInt8] {
-        withUnsafeBytes(of: littleEndian) { Array($0) }
-    }
-}
-
 private extension String {
     func appMessageChunks(ofCount count: Int) -> [Substring] {
         var chunks: [Substring] = []

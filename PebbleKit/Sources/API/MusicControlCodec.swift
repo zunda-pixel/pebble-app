@@ -1,4 +1,4 @@
-public import Foundation
+import Foundation
 import MemberwiseInit
 
 public enum MusicAction: UInt8, Equatable, Sendable, CaseIterable {
@@ -136,10 +136,4 @@ public enum MusicControlCodecError: Error, Equatable, Sendable {
     case unexpectedEndpoint
     case invalidPayload
     case unknownCommand
-}
-
-private extension FixedWidthInteger {
-    var littleEndianBytes: [UInt8] {
-        withUnsafeBytes(of: littleEndian) { Array($0) }
-    }
 }
