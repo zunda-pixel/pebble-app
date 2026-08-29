@@ -495,6 +495,60 @@ struct APITests {
     }
 
     @Test
+    func advertisementDecodesTheHardwarePlatform() {
+        // Company identifier, payload type, 12-byte serial, then the extended
+        // record whose first byte is the hardware platform.
+        var manufacturerData: [UInt8] = [0x54, 0x01, 0x00]
+        manufacturerData.append(contentsOf: Array("EMERY1234567".utf8.prefix(12)))
+        manufacturerData.append(contentsOf: [18, 0x00, 5, 1, 0, 0])
+
+        #expect(PebbleAdvertisement.model(
+            advertisesPebbleService: false,
+            localName: "Pebble 1A2B",
+            manufacturerData: manufacturerData
+        ) == .pebbleTime2)
+    }
+
+    @Test
+    func advertisementKeepsWatchesWithoutAnExtendedScanRecord() {
+        // A watch that was just reset advertises a generic name and may omit
+        // the extended record; it still has to appear in the scan results.
+        var manufacturerData: [UInt8] = [0xEA, 0x0E, 0x00]
+        manufacturerData.append(contentsOf: Array("GABBRO123456".utf8.prefix(12)))
+
+        #expect(PebbleAdvertisement.model(
+            advertisesPebbleService: false,
+            localName: "Pebble 1A2B",
+            manufacturerData: manufacturerData
+        ) != nil)
+        // The pairing service alone is enough, without any manufacturer data.
+        #expect(PebbleAdvertisement.model(
+            advertisesPebbleService: true,
+            localName: "Pebble 1A2B",
+            manufacturerData: []
+        ) != nil)
+    }
+
+    @Test
+    func advertisementIgnoresUnsupportedAndForeignDevices() {
+        var chalkWatch: [UInt8] = [0x54, 0x01, 0x00]
+        chalkWatch.append(contentsOf: Array("CHALK1234567".utf8.prefix(12)))
+        chalkWatch.append(contentsOf: [11, 0x00, 3, 0, 0, 0])
+        // Platform 11 is a Pebble Time Round, which this app cannot drive.
+        #expect(PebbleAdvertisement.model(
+            advertisesPebbleService: false,
+            localName: "Pebble Time Round 1A2B",
+            manufacturerData: chalkWatch
+        ) == nil)
+
+        #expect(PebbleAdvertisement.model(
+            advertisesPebbleService: false,
+            localName: "Someone's Headphones",
+            manufacturerData: [0x4C, 0x00, 0x01, 0x02]
+        ) == nil)
+    }
+
+    @Test
     func mockClientDiscoversOnlySupportedModels() async throws {
         let client = MockPebbleClient()
         let devices = try await client.scan()

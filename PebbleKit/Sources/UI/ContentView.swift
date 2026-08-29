@@ -1155,11 +1155,15 @@ private struct AddWatchSheet: View {
         .task {
             // Scan for the whole lifetime of the sheet; the task is cancelled
             // when the sheet closes and the loop ends after the current pass.
+            // Every pass has to suspend, including the ones that return early
+            // because a scan from a previous sheet is still running, otherwise
+            // the loop starves the main actor and the app stops responding.
             while !Task.isCancelled {
                 await model.scan()
-                if model.connections.isEmpty, case .failed = model.connectionState {
-                    // Bluetooth is unavailable; retry slowly instead of spinning.
-                    try? await Task.sleep(for: .seconds(2))
+                do {
+                    try await Task.sleep(for: .seconds(1))
+                } catch {
+                    return
                 }
             }
         }

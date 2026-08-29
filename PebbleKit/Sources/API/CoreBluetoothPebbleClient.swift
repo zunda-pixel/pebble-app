@@ -22,11 +22,12 @@ private final class NotificationObserverStorage: @unchecked Sendable {
 @MainActor
 public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private static var ppogService = CBUUID(string: "40000000-328E-0FBB-C642-1AA6699BDADA")
+    /// Advertised by watches that are not bonded yet, including after a reset.
+    private static var pairingService = CBUUID(string: "0000FED9-0000-1000-8000-00805F9B34FB")
     private static var ppogNotifyCharacteristic = CBUUID(string: "40000001-328E-0FBB-C642-1AA6699BDADA")
     private static var ppogWriteCharacteristic = CBUUID(string: "40000003-328E-0FBB-C642-1AA6699BDADA")
     private static var batteryService = CBUUID(string: "180F")
     private static var batteryLevelCharacteristic = CBUUID(string: "2A19")
-    private static var vendorIdentifiers: Set<UInt16> = [0x0154, 0x0EEA]
 
     private var centralManager: CBCentralManager!
     private var discoveredPeripherals: [String: CBPeripheral] = [:]
@@ -552,47 +553,14 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
 
     private func model(from advertisementData: [String: Any]) -> PebbleWatchModel? {
         let serviceUUIDs = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] ?? []
-        let advertisesPPoG = serviceUUIDs.contains(Self.ppogService)
-
-        guard let manufacturerData = advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data else {
-            return advertisesPPoG ? model(fromName: advertisementData[CBAdvertisementDataLocalNameKey] as? String) : nil
-        }
-
-        let bytes = [UInt8](manufacturerData)
-        let containsCompanyIdentifier = bytes.count >= 2
-            && Self.vendorIdentifiers.contains(UInt16(bytes[0]) | UInt16(bytes[1]) << 8)
-        guard containsCompanyIdentifier || advertisesPPoG else {
-            return nil
-        }
-
-        let payloadOffset = containsCompanyIdentifier ? 2 : 0
-        let hardwarePlatformOffset = payloadOffset + 13
-        guard bytes.indices.contains(hardwarePlatformOffset) else {
-            return model(fromName: advertisementData[CBAdvertisementDataLocalNameKey] as? String)
-        }
-
-        return model(fromHardwarePlatform: bytes[hardwarePlatformOffset])
-            ?? model(fromName: advertisementData[CBAdvertisementDataLocalNameKey] as? String)
-    }
-
-    private func model(fromHardwarePlatform value: UInt8) -> PebbleWatchModel? {
-        PebbleWatchModel(hardwarePlatform: value)
-    }
-
-    private func model(fromName name: String?) -> PebbleWatchModel? {
-        guard let normalizedName = name?.lowercased() else {
-            return nil
-        }
-        if normalizedName.contains("duo") {
-            return .pebble2Duo
-        }
-        if normalizedName.contains("round 2") {
-            return .pebbleRound2
-        }
-        if normalizedName.contains("time 2") {
-            return .pebbleTime2
-        }
-        return nil
+        return PebbleAdvertisement.model(
+            advertisesPebbleService: serviceUUIDs.contains(Self.ppogService)
+                || serviceUUIDs.contains(Self.pairingService),
+            localName: advertisementData[CBAdvertisementDataLocalNameKey] as? String,
+            manufacturerData: [UInt8](
+                advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data ?? Data()
+            )
+        )
     }
 
     private func write(_ packet: PPoGPacket, to peripheral: CBPeripheral) throws {
