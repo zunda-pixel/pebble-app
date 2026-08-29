@@ -210,5 +210,5 @@ struct CatalogApplicationDetailView: View {
 
     private var state: CatalogInstallationState { model.catalogInstallationState(for: application) }
     private var canInstall: Bool { state == .available || state == .updateAvailable }
-    private var installButtonTitle: String { state == .updateAvailable ? "Update" : "Install" }
+    private var installButtonTitle: LocalizedStringKey { state == .updateAvailable ? "Update" : "Install" }
 }

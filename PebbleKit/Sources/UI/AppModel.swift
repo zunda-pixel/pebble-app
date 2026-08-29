@@ -2,6 +2,7 @@ public import API
 import Defaults
 public import Foundation
 import Observation
+public import SwiftUI
 
 public enum ApplicationManagementOperation: Equatable, Sendable {
     case importing
@@ -32,35 +33,35 @@ public final class AppModel {
     public internal(set) var favoriteWatchfaceIDs: Set<UUID> = []
     public internal(set) var isLoadingApplications = false
     public internal(set) var isImportingApplication = false
-    public internal(set) var applicationLibraryErrorMessage: String?
+    public internal(set) var applicationLibraryErrorMessage: LocalizedStringKey?
     public internal(set) var installingApplicationID: UUID?
     public internal(set) var installingApplicationName: String?
     public internal(set) var installationProgress: PutBytesTransferProgress?
     public internal(set) var applicationManagementOperation: ApplicationManagementOperation?
-    public internal(set) var applicationManagementStatusMessage: String?
+    public internal(set) var applicationManagementStatusMessage: LocalizedStringKey?
     public internal(set) var isHandlingAppFetch = false
     public internal(set) var configurationApplication: PebbleApplication?
     public internal(set) var configurationURL: URL?
     public internal(set) var diagnosticReportURL: URL?
     public internal(set) var companionNotificationsEnabled = true
-    public internal(set) var notificationStatusMessage: String?
+    public internal(set) var notificationStatusMessage: LocalizedStringKey?
     public internal(set) var notificationPreferences = NotificationDeliveryPreferences()
     public internal(set) var savedWatches: [SavedPebbleWatch] = []
-    public internal(set) var watchManagementErrorMessage: String?
-    public internal(set) var watchResetStatusMessage: String?
+    public internal(set) var watchManagementErrorMessage: LocalizedStringKey?
+    public internal(set) var watchResetStatusMessage: LocalizedStringKey?
     public internal(set) var timelinePins: [PebbleTimelinePin] = []
     public internal(set) var healthSamples: [PebbleHealthSample] = []
     public internal(set) var catalogApplications: [PebbleCatalogApplication] = []
     public internal(set) var catalogLastUpdated: Date?
     public internal(set) var isUpdatingCatalog = false
     public internal(set) var installingCatalogApplicationID: UUID?
-    public internal(set) var firmwareUpdateStatusMessage: String?
+    public internal(set) var firmwareUpdateStatusMessage: LocalizedStringKey?
     public internal(set) var firmwareUpdateJournal: FirmwareUpdateJournal?
     public internal(set) var firmwareRequiresConfirmation = false
     public internal(set) var firmwareUpdateProgress: PutBytesTransferProgress?
     public internal(set) var availableFirmwareRelease: PebbleOSFirmwareRelease?
-    public internal(set) var dataSyncStatusMessage: String?
-    public internal(set) var timelineActionStatusMessage: String?
+    public internal(set) var dataSyncStatusMessage: LocalizedStringKey?
+    public internal(set) var timelineActionStatusMessage: LocalizedStringKey?
     public internal(set) var healthExportURL: URL?
     public internal(set) var notificationSourceApps: [NotificationSourceApp] = []
     /// Application IDs known to be registered on each watch, keyed by watch ID.
@@ -306,7 +307,7 @@ public final class AppModel {
             if !connections.isEmpty {
                 watchManagementErrorMessage = error.message
             }
-            await PebbleDiagnostics.shared.record(.error, category: "connection", message: error.message)
+            await PebbleDiagnostics.shared.record(.error, category: "connection", message: error.logDescription)
         } catch {
             lastConnectionError = .protocolNegotiationFailed
         }

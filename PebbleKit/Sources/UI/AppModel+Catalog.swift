@@ -1,6 +1,7 @@
 import API
 import Defaults
 import Foundation
+import SwiftUI
 
 /// The remote application catalog.
 extension AppModel {

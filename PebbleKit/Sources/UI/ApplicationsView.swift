@@ -142,8 +142,8 @@ struct ApplicationsContent: View {
     /// nil when no watch is connected: install state is unknown, not shown.
     var installedApplicationIDs: Set<UUID>?
     var isLoading: Bool
-    var errorMessage: String?
-    var operationStatusMessage: String?
+    var errorMessage: LocalizedStringKey?
+    var operationStatusMessage: LocalizedStringKey?
     var isOperationInProgress: Bool
     var installingApplicationName: String?
     var installationProgress: PutBytesTransferProgress?

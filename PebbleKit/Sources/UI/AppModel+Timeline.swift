@@ -3,6 +3,7 @@ import API
 import AsyncAlgorithms
 import EventKit
 import Foundation
+import SwiftUI
 
 /// Timeline pins, and the calendar they are drawn from.
 extension AppModel {

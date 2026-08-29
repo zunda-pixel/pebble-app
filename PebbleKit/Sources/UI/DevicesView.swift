@@ -72,7 +72,8 @@ struct AddWatchSheet: View {
                 if case .failed(let error) = model.connectionState {
                     Label(error.message, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.red)
-                        .accessibilityLabel("Bluetooth error: \(error.message)")
+                        .accessibilityLabel("Bluetooth error")
+                        .accessibilityValue(error.message)
                 }
                 if let errorMessage = model.watchManagementErrorMessage {
                     Label(errorMessage, systemImage: "exclamationmark.triangle.fill")

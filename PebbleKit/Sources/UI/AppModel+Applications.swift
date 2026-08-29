@@ -3,6 +3,7 @@ import API
 import AsyncOperations
 import Defaults
 import Foundation
+import SwiftUI
 
 /// The installed application library and its transfers to a watch.
 extension AppModel {
@@ -39,7 +40,7 @@ extension AppModel {
             updateApplications(try await applicationLibrary.applications())
             applicationLibraryErrorMessage = nil
         } catch {
-            applicationLibraryErrorMessage = error.localizedDescription
+            applicationLibraryErrorMessage = "The application library could not be read: \(error.localizedDescription)"
         }
     }
 
@@ -331,7 +332,7 @@ extension AppModel {
         }
     }
 
-    func statusMessage(for operation: ApplicationManagementOperation) -> String {
+    func statusMessage(for operation: ApplicationManagementOperation) -> LocalizedStringKey {
         switch operation {
         case .importing:
             "Preparing application…"
@@ -346,7 +347,7 @@ extension AppModel {
         }
     }
 
-    func applicationErrorMessage(_ error: any Error) -> String {
+    func applicationErrorMessage(_ error: any Error) -> LocalizedStringKey {
         switch error {
         case let error as PebbleConnectionError:
             error.message

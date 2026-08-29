@@ -243,10 +243,11 @@ struct ConnectionStatusBanner: View {
         .padding(.horizontal)
         .padding(.vertical, 8)
         .background(reduceTransparency ? AnyShapeStyle(.background) : AnyShapeStyle(.regularMaterial))
-        .accessibilityLabel("Connection status: \(title)")
+        .accessibilityLabel("Connection status")
+        .accessibilityValue(title)
     }
 
-    private var title: String {
+    private var title: LocalizedStringKey {
         switch state {
         case .idle: "Not connected"
         case .scanning: "Scanning for watches…"

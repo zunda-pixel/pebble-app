@@ -2,6 +2,7 @@ import Algorithms
 import API
 import Defaults
 import Foundation
+import SwiftUI
 
 /// Notifications sent to a watch, and messages coming back.
 extension AppModel {

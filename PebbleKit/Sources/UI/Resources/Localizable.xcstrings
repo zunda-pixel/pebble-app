@@ -17,6 +17,36 @@
         }
       }
     },
+    "%@ installed." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“%@”をインストールしました。"
+          }
+        }
+      }
+    },
+    "%@ is active." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“%@”を使用中です。"
+          }
+        }
+      }
+    },
+    "%@ is not compatible with this watch." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“%@”はこのウォッチに対応していません。"
+          }
+        }
+      }
+    },
     "%@ of %@ bytes" : {
       "localizations" : {
         "en" : {
@@ -50,6 +80,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチが接続されていなくてもPBZファイルを選択できます。転送は接続され次第、自動的に始まります。"
+          }
+        }
+      }
+    },
+    "A watch scan is already in progress." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチのスキャンはすでに実行中です。"
           }
         }
       }
@@ -124,12 +164,42 @@
         }
       }
     },
+    "Another application operation is already in progress." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "別のアプリケーション操作がすでに実行中です。"
+          }
+        }
+      }
+    },
+    "Another watch connection is already in progress." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "別のウォッチへの接続がすでに進行中です。"
+          }
+        }
+      }
+    },
     "App Catalog" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "アプリカタログ"
+          }
+        }
+      }
+    },
+    "App catalog updated with %lld apps." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリカタログを更新しました（%lld個のアプリ）。"
           }
         }
       }
@@ -214,12 +284,53 @@
         }
       }
     },
+    "Bluetooth access is not allowed. Enable it in System Settings." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Bluetoothへのアクセスが許可されていません。“システム設定”で有効にしてください。"
+          }
+        }
+      }
+    },
+    "Bluetooth error" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Bluetoothエラー"
+          }
+        }
+      }
+    },
     "Bluetooth error: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "Bluetoothエラー: %@"
+          }
+        }
+      }
+    },
+    "Bluetooth is turned off or temporarily unavailable." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Bluetoothがオフか、一時的に利用できません。"
+          }
+        }
+      }
+    },
+    "Bluetooth Low Energy is not supported on this device." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このデバイスはBluetooth Low Energyに対応していません。"
           }
         }
       }
@@ -240,6 +351,26 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "カレンダー"
+          }
+        }
+      }
+    },
+    "Calendar access or synchronization failed." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "カレンダーへのアクセスまたは同期に失敗しました。"
+          }
+        }
+      }
+    },
+    "Calendar synchronized with Timeline." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "カレンダーをタイムラインと同期しました。"
           }
         }
       }
@@ -280,6 +411,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "カタログのJSON URL"
+          }
+        }
+      }
+    },
+    "Catalog refresh failed; showing the offline cache." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "カタログを更新できなかったため、オフラインのキャッシュを表示しています。"
           }
         }
       }
@@ -365,12 +506,52 @@
         }
       }
     },
+    "Connect a Pebble before sending a test notification." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "テスト通知を送信する前にPebbleを接続してください。"
+          }
+        }
+      }
+    },
     "Connect Automatically" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "自動的に接続"
+          }
+        }
+      }
+    },
+    "Connect the target Pebble once so its board is known, then check for firmware." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "対象のPebbleを一度接続してボードを確認してから、ファームウェアを確認してください。"
+          }
+        }
+      }
+    },
+    "Connect the target Pebble once so its board is known, then choose firmware." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "対象のPebbleを一度接続してボードを確認してから、ファームウェアを選択してください。"
+          }
+        }
+      }
+    },
+    "Connect the watch before resetting it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リセットする前にウォッチを接続してください。"
           }
         }
       }
@@ -395,6 +576,16 @@
         }
       }
     },
+    "Connected to %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“%@”に接続しました"
+          }
+        }
+      }
+    },
     "Connecting…" : {
       "localizations" : {
         "ja" : {
@@ -415,7 +606,38 @@
         }
       }
     },
+    "Connection failed: %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "接続に失敗しました: %@"
+          }
+        }
+      }
+    },
+    "Connection lost — reconnecting…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "接続が切断されました。再接続中…"
+          }
+        }
+      }
+    },
+    "Connection status" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "接続状況"
+          }
+        }
+      }
+    },
     "Connection status: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -576,12 +798,42 @@
         }
       }
     },
+    "Downloading %@…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“%@”をダウンロード中…"
+          }
+        }
+      }
+    },
+    "Downloading PebbleOS %@…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "PebbleOS %@をダウンロード中…"
+          }
+        }
+      }
+    },
     "Ends at %lld:00" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "終了: %lld:00"
+          }
+        }
+      }
+    },
+    "Enter a valid HTTPS catalog URL." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "有効なHTTPSのカタログURLを入力してください。"
           }
         }
       }
@@ -666,12 +918,82 @@
         }
       }
     },
+    "Firmware could not be downloaded right now." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "現在ファームウェアをダウンロードできません。"
+          }
+        }
+      }
+    },
+    "Firmware installed. Waiting for the watch to restart." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ファームウェアをインストールしました。ウォッチの再起動を待っています。"
+          }
+        }
+      }
+    },
     "Firmware published for this watch is downloaded from PebbleOS. A PBZ file can also be chosen while the watch is away; either way the transfer starts as soon as it connects." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このウォッチ向けに公開されているファームウェアをPebbleOSからダウンロードします。ウォッチが接続されていなくてもPBZファイルを選択できます。いずれの場合も、転送は接続され次第、自動的に始まります。"
+          }
+        }
+      }
+    },
+    "Firmware ready. It installs as soon as the watch connects." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ファームウェアの準備ができました。ウォッチが接続され次第インストールされます。"
+          }
+        }
+      }
+    },
+    "Firmware update cancelled; recovery data was retained." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ファームウェアのアップデートをキャンセルしました。リカバリデータは保持されています。"
+          }
+        }
+      }
+    },
+    "Firmware update remains queued for reconnection." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ファームウェアのアップデートは再接続時まで保留されます。"
+          }
+        }
+      }
+    },
+    "Firmware update resumed successfully." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ファームウェアのアップデートを再開しました。"
+          }
+        }
+      }
+    },
+    "Firmware update stopped safely: %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ファームウェアのアップデートを安全に停止しました: %@"
           }
         }
       }
@@ -712,6 +1034,66 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ヘルスケア"
+          }
+        }
+      }
+    },
+    "Health archive imported and reconciled." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ヘルスケアのアーカイブを読み込んで統合しました。"
+          }
+        }
+      }
+    },
+    "Health data could not be exported." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ヘルスケアデータを書き出せませんでした。"
+          }
+        }
+      }
+    },
+    "Health data could not be loaded." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ヘルスケアデータを読み込めませんでした。"
+          }
+        }
+      }
+    },
+    "Health synchronization completed." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ヘルスケアデータの同期が完了しました。"
+          }
+        }
+      }
+    },
+    "Health synchronization requested." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ヘルスケアデータの同期を要求しました。"
+          }
+        }
+      }
+    },
+    "Health synchronization will retry after reconnection." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ヘルスケアデータの同期は再接続後に再試行されます。"
           }
         }
       }
@@ -786,6 +1168,26 @@
         }
       }
     },
+    "Install" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "インストール"
+          }
+        }
+      }
+    },
+    "Install and activate another watchface before removing the active one." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "使用中のウォッチフェイスを削除する前に、別のウォッチフェイスをインストールして使用してください。"
+          }
+        }
+      }
+    },
     "Install Firmware…" : {
       "localizations" : {
         "ja" : {
@@ -826,12 +1228,42 @@
         }
       }
     },
+    "Installed %lld catalog update(s)." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "カタログのアップデート%lld件をインストールしました。"
+          }
+        }
+      }
+    },
+    "Installed apps are up to date." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "インストール済みのアプリは最新です。"
+          }
+        }
+      }
+    },
     "Installing" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "インストール中"
+          }
+        }
+      }
+    },
+    "Installing application…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリケーションをインストール中…"
           }
         }
       }
@@ -846,12 +1278,42 @@
         }
       }
     },
+    "Interrupted recovery update requires confirmation." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "中断されたリカバリアップデートには確認が必要です。"
+          }
+        }
+      }
+    },
     "Loading applications" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "アプリケーションを読み込み中"
+          }
+        }
+      }
+    },
+    "Local Pebble health data deleted." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ローカルのPebbleヘルスケアデータを削除しました。"
+          }
+        }
+      }
+    },
+    "Looking for published firmware…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "公開されているファームウェアを検索中…"
           }
         }
       }
@@ -976,6 +1438,26 @@
         }
       }
     },
+    "Notifications enabled for this app." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このアプリの通知を有効にしました。"
+          }
+        }
+      }
+    },
+    "Notifications muted for this app." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このアプリの通知をミュートしました。"
+          }
+        }
+      }
+    },
     "Open Privacy Settings" : {
       "localizations" : {
         "ja" : {
@@ -1002,6 +1484,26 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "Pebble"
+          }
+        }
+      }
+    },
+    "PebbleOS %@ is available." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "PebbleOS %@が利用できます。"
+          }
+        }
+      }
+    },
+    "Pending firmware update removed." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "保留中のファームウェアアップデートを削除しました。"
           }
         }
       }
@@ -1076,12 +1578,32 @@
         }
       }
     },
+    "Preparing application…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリケーションを準備中…"
+          }
+        }
+      }
+    },
     "Preparing installation" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "インストールを準備中"
+          }
+        }
+      }
+    },
+    "Published firmware could not be checked right now." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "現在、公開されているファームウェアを確認できません。"
           }
         }
       }
@@ -1106,12 +1628,42 @@
         }
       }
     },
+    "Received %lld health update(s) from the watch." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチからヘルスケアの更新%lld件を受信しました。"
+          }
+        }
+      }
+    },
     "Reconnecting…" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "再接続中…"
+          }
+        }
+      }
+    },
+    "Recovery firmware validated. Confirm to continue." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リカバリファームウェアを検証しました。続けるには確認してください。"
+          }
+        }
+      }
+    },
+    "Recovery update stopped safely: %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リカバリアップデートを安全に停止しました: %@"
           }
         }
       }
@@ -1183,6 +1735,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このウォッチアプリケーションを削除しますか?"
+          }
+        }
+      }
+    },
+    "Removing application…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリケーションを削除中…"
           }
         }
       }
@@ -1259,6 +1821,36 @@
         }
       }
     },
+    "Resuming interrupted firmware update…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "中断されたファームウェアのアップデートを再開中…"
+          }
+        }
+      }
+    },
+    "Saved watches could not be loaded." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "保存されたウォッチを読み込めませんでした。"
+          }
+        }
+      }
+    },
+    "Scanning for watches…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチを検索中…"
+          }
+        }
+      }
+    },
     "Screenshot of %@" : {
       "localizations" : {
         "ja" : {
@@ -1295,6 +1887,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "シリアル番号"
+          }
+        }
+      }
+    },
+    "Setting up connection…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "接続を設定中…"
           }
         }
       }
@@ -1439,6 +2041,16 @@
         }
       }
     },
+    "Synchronizing applications…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリケーションを同期中…"
+          }
+        }
+      }
+    },
     "System notifications are delivered directly to a paired Pebble using Apple Notification Center Service. This switch controls notifications created by installed watch apps. Test notifications can be sent from each watch's detail page." : {
       "localizations" : {
         "ja" : {
@@ -1459,12 +2071,132 @@
         }
       }
     },
+    "Test notification sent." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "テスト通知を送信しました。"
+          }
+        }
+      }
+    },
+    "The app catalog cache could not be loaded." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリカタログのキャッシュを読み込めませんでした。"
+          }
+        }
+      }
+    },
+    "The app catalog could not be updated." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリカタログを更新できませんでした。"
+          }
+        }
+      }
+    },
     "The application and its settings will be removed from the connected Pebble." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "接続中のPebbleからアプリケーションとその設定が削除されます。"
+          }
+        }
+      }
+    },
+    "The application library could not be read: %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリケーションライブラリを読み込めませんでした: %@"
+          }
+        }
+      }
+    },
+    "The application operation could not be completed. %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリケーションの操作を完了できませんでした。%@"
+          }
+        }
+      }
+    },
+    "The application requested an unsafe settings URL." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリケーションが安全でない設定URLを要求しました。"
+          }
+        }
+      }
+    },
+    "The application settings could not be opened." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリケーションの設定を開けませんでした。"
+          }
+        }
+      }
+    },
+    "The application transfer was interrupted. The previous version was restored." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリケーションの転送が中断されました。以前のバージョンに戻しました。"
+          }
+        }
+      }
+    },
+    "The automatic connection preference could not be saved." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "自動接続の設定を保存できませんでした。"
+          }
+        }
+      }
+    },
+    "The catalog package was rejected: %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "カタログのパッケージが拒否されました: %@"
+          }
+        }
+      }
+    },
+    "The catalog provided an unsafe download URL." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "カタログが安全でないダウンロードURLを返しました。"
+          }
+        }
+      }
+    },
+    "The diagnostic report could not be created." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "診断レポートを作成できませんでした。"
           }
         }
       }
@@ -1479,12 +2211,282 @@
         }
       }
     },
+    "The PBW package contains mismatched application identifiers." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "PBWパッケージ内のアプリケーション識別子が一致していません。"
+          }
+        }
+      }
+    },
+    "The PBW package does not contain an application executable." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "PBWパッケージにアプリケーションの実行ファイルが含まれていません。"
+          }
+        }
+      }
+    },
+    "The reset command could not be sent." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リセットコマンドを送信できませんでした。"
+          }
+        }
+      }
+    },
+    "The selected health archive is invalid or unsupported." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "選択したヘルスケアのアーカイブは無効か、対応していません。"
+          }
+        }
+      }
+    },
+    "The selected PBW package is invalid or incomplete." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "選択したPBWパッケージは無効か、不完全です。"
+          }
+        }
+      }
+    },
+    "The selected watch is no longer available. Scan again." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "選択したウォッチは利用できなくなりました。もう一度スキャンしてください。"
+          }
+        }
+      }
+    },
+    "The stored package for %@ is missing. Import it again." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“%@”の保存済みパッケージが見つかりません。もう一度読み込んでください。"
+          }
+        }
+      }
+    },
+    "The test notification could not be sent." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "テスト通知を送信できませんでした。"
+          }
+        }
+      }
+    },
+    "The watch connection failed. Move the watch closer and try again." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチへの接続に失敗しました。ウォッチを近づけて、やり直してみてください。"
+          }
+        }
+      }
+    },
+    "The watch connection history could not be saved." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチの接続履歴を保存できませんでした。"
+          }
+        }
+      }
+    },
+    "The watch could not be forgotten." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチの登録を解除できませんでした。"
+          }
+        }
+      }
+    },
+    "The watch did not respond in time." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチが時間内に応答しませんでした。"
+          }
+        }
+      }
+    },
+    "The watch disconnected." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチの接続が解除されました。"
+          }
+        }
+      }
+    },
     "The watch disconnects while it restarts." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "再起動中は、ウォッチの接続が解除されます。"
+          }
+        }
+      }
+    },
+    "The watch does not expose the expected Pebble connection service." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチが想定されるPebbleの接続サービスを提供していません。"
+          }
+        }
+      }
+    },
+    "The watch does not have enough space for this application." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチにこのアプリケーション用の空き容量がありません。"
+          }
+        }
+      }
+    },
+    "The watch is already processing another application change. Please try again." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチは別のアプリケーションの変更を処理中です。やり直してみてください。"
+          }
+        }
+      }
+    },
+    "The watch is already updating the application order." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチはすでにアプリケーションの並び順を更新しています。"
+          }
+        }
+      }
+    },
+    "The watch is busy. Please try changing the application order again." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチがビジー状態です。アプリケーションの並び順の変更をやり直してみてください。"
+          }
+        }
+      }
+    },
+    "The watch is busy. Please wait and try again." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチがビジー状態です。しばらく待ってからやり直してみてください。"
+          }
+        }
+      }
+    },
+    "The watch is performing a factory reset." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチを工場出荷時の状態にリセットしています。"
+          }
+        }
+      }
+    },
+    "The watch is restarting into recovery firmware." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチをリカバリファームウェアで再起動しています。"
+          }
+        }
+      }
+    },
+    "The watch is restarting." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチを再起動しています。"
+          }
+        }
+      }
+    },
+    "The watch rejected health synchronization." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチがヘルスケアデータの同期を拒否しました。"
+          }
+        }
+      }
+    },
+    "The watch rejected the application change." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチがアプリケーションの変更を拒否しました。"
+          }
+        }
+      }
+    },
+    "The watch rejected the application data. The previous version was restored." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチがアプリケーションのデータを拒否しました。以前のバージョンに戻しました。"
+          }
+        }
+      }
+    },
+    "The watch rejected the application order. The previous order was restored." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチがアプリケーションの並び順を拒否しました。以前の並び順に戻しました。"
+          }
+        }
+      }
+    },
+    "The watch requested an application that does not match the stored PBW package." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチが、保存されているPBWパッケージと一致しないアプリケーションを要求しました。"
           }
         }
       }
@@ -1505,6 +2507,26 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチは応答を返さずに再起動するため、接続はすぐに解除されます。工場出荷時の状態にリセットすると、ウォッチに保存されているすべてのデータが消去されます。"
+          }
+        }
+      }
+    },
+    "The watchface could not be activated." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチフェイスを使用できませんでした。"
+          }
+        }
+      }
+    },
+    "This application does not support the connected Pebble model." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このアプリケーションは接続中のPebbleのモデルに対応していません。"
           }
         }
       }
@@ -1539,6 +2561,46 @@
         }
       }
     },
+    "Timeline action completed." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "タイムラインの操作が完了しました。"
+          }
+        }
+      }
+    },
+    "Timeline could not be loaded." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "タイムラインを読み込めませんでした。"
+          }
+        }
+      }
+    },
+    "Timeline pin queued for the next connection." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "タイムラインのピンは次回の接続時に送信されます。"
+          }
+        }
+      }
+    },
+    "Timeline pin saved." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "タイムラインのピンを保存しました。"
+          }
+        }
+      }
+    },
     "Title" : {
       "localizations" : {
         "ja" : {
@@ -1565,6 +2627,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "記録日数"
+          }
+        }
+      }
+    },
+    "Transferring verified firmware…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "検証済みのファームウェアを転送中…"
           }
         }
       }
@@ -1629,6 +2701,26 @@
         }
       }
     },
+    "Updating application order…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリケーションの並び順を更新中…"
+          }
+        }
+      }
+    },
+    "Validating firmware…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ファームウェアを検証中…"
+          }
+        }
+      }
+    },
     "Watch" : {
       "localizations" : {
         "ja" : {
@@ -1649,12 +2741,42 @@
         }
       }
     },
+    "Watch app notifications are disabled." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチアプリの通知は無効です。"
+          }
+        }
+      }
+    },
+    "Watch app notifications are enabled." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチアプリの通知は有効です。"
+          }
+        }
+      }
+    },
     "Watch Apps" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチアプリ"
+          }
+        }
+      }
+    },
+    "Watch health data could not be saved." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチのヘルスケアデータを保存できませんでした。"
           }
         }
       }

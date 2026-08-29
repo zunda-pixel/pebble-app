@@ -586,7 +586,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             failConnection(error)
             return
         }
-        cancelLink(peripheral, reason: "transport failure: \(error.message)")
+        cancelLink(peripheral, reason: "transport failure: \(error.logDescription)")
     }
 
     private func failConnection(_ error: PebbleConnectionError) {
@@ -606,7 +606,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         // app no longer expects.
         if let pending = pendingDevice,
            let peripheral = discoveredPeripherals[pending.id] {
-            cancelLink(peripheral, reason: "the connect attempt failed: \(error.message)")
+            cancelLink(peripheral, reason: "the connect attempt failed: \(error.logDescription)")
         }
         pendingDevice = nil
         activeWriteCharacteristic = nil

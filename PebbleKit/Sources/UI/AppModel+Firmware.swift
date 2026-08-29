@@ -1,5 +1,6 @@
 import API
 import Foundation
+import SwiftUI
 
 /// Choosing, downloading and transferring watch firmware.
 extension AppModel {

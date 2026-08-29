@@ -1,6 +1,7 @@
 import API
 import AsyncOperations
 import Foundation
+import SwiftUI
 
 /// Remembered watches and per-watch actions.
 extension AppModel {

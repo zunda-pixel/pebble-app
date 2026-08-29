@@ -1,5 +1,6 @@
 import API
 import Foundation
+import SwiftUI
 
 /// Health samples, and their exchange with HealthKit.
 extension AppModel {
