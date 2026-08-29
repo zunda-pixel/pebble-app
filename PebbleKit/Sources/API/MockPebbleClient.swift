@@ -13,6 +13,7 @@ public final class MockPebbleClient: PebbleClient {
     public private(set) var registeredApplications: [PebbleAppMetadata] = []
     public private(set) var unregisteredApplicationIDs: [UUID] = []
     public private(set) var disconnectedDevices: [PebbleDevice] = []
+    private var latestScanResults: [DiscoveredPebble] = []
     private var nextTransactionID: UInt8 = 0
     private var frameContinuation: AsyncStream<PebbleProtocolFrame>.Continuation?
     private var eventContinuation: AsyncStream<PebbleClientEvent>.Continuation?
@@ -46,6 +47,18 @@ public final class MockPebbleClient: PebbleClient {
 
     public func retrieveKnownDevices(_ hints: [DiscoveredPebble]) async throws -> [DiscoveredPebble] {
         hints
+    }
+
+    public func startScanning() async throws {
+        latestScanResults = try await scan()
+    }
+
+    public func stopScanning() {
+        latestScanResults = []
+    }
+
+    public func currentScanResults() -> [DiscoveredPebble] {
+        latestScanResults
     }
 
     public func connect(to device: DiscoveredPebble) async throws -> PebbleDevice {

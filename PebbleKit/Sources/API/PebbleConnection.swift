@@ -58,6 +58,11 @@ public enum PebbleConnectionError: Error, Equatable, Sendable {
 @MainActor
 public protocol PebbleClient: Sendable {
     func scan() async throws -> [DiscoveredPebble]
+    /// Keeps the radio scanning until every caller has stopped, so results can
+    /// be observed continuously instead of in short bursts.
+    func startScanning() async throws
+    func stopScanning()
+    func currentScanResults() -> [DiscoveredPebble]
     /// Makes previously paired watches connectable again without a scan.
     /// A bonded Pebble usually does not advertise, so scanning alone can
     /// never rediscover it; implementations look the watches up by their
@@ -91,6 +96,10 @@ public extension PebbleClient {
     func retrieveKnownDevices(_ hints: [DiscoveredPebble]) async throws -> [DiscoveredPebble] {
         []
     }
+
+    func startScanning() async throws {}
+    func stopScanning() {}
+    func currentScanResults() -> [DiscoveredPebble] { [] }
 }
 
 public enum BlobDBClientError: Error, Equatable, Sendable {

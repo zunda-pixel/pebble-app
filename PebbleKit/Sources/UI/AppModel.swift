@@ -277,6 +277,48 @@ public final class AppModel {
         }
     }
 
+    /// Starts a scan that keeps running until `stopScanning()`; call
+    /// `refreshDiscoveredDevices()` to observe what it finds.
+    public func startScanning() async {
+        do {
+            try await scannerClient.startScanning()
+            isScanning = true
+            lastConnectionError = nil
+        } catch let error as PebbleConnectionError {
+            lastConnectionError = error
+        } catch {
+            lastConnectionError = .bluetoothUnavailable
+        }
+        refreshConnectionState()
+    }
+
+    public func stopScanning() {
+        guard isScanning else { return }
+        scannerClient.stopScanning()
+        isScanning = false
+        refreshConnectionState()
+    }
+
+    public func refreshDiscoveredDevices() async {
+        await loadSavedWatches()
+        var devices = scannerClient.currentScanResults()
+        let connectedIDs = Set(connections.map(\.device.id))
+        // Bonded watches do not advertise, so scanning alone never finds them
+        // again; look the saved ones up by identifier as well.
+        let missingSavedWatches = savedWatches
+            .filter { saved in
+                !connectedIDs.contains(saved.id) && !devices.contains { $0.id == saved.id }
+            }
+            .map { saved in
+                DiscoveredPebble(id: saved.id, name: saved.name, model: saved.model, signalStrength: 0)
+            }
+        if !missingSavedWatches.isEmpty,
+           let retrieved = try? await scannerClient.retrieveKnownDevices(missingSavedWatches) {
+            devices.append(contentsOf: retrieved)
+        }
+        discoveredDevices = devices.filter { !connectedIDs.contains($0.id) }
+    }
+
     public func connect(to watch: SavedPebbleWatch) async {
         await connect(to: DiscoveredPebble(
             id: watch.id,

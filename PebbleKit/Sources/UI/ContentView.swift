@@ -1153,13 +1153,13 @@ private struct AddWatchSheet: View {
         .frame(minWidth: 420, minHeight: 420)
         #endif
         .task {
-            // Scan for the whole lifetime of the sheet; the task is cancelled
-            // when the sheet closes and the loop ends after the current pass.
-            // Every pass has to suspend, including the ones that return early
-            // because a scan from a previous sheet is still running, otherwise
-            // the loop starves the main actor and the app stops responding.
+            // One continuous scan for the whole lifetime of the sheet: the
+            // radio keeps running while the list refreshes, instead of being
+            // restarted every few seconds, which barely discovers anything.
+            await model.startScanning()
+            defer { model.stopScanning() }
             while !Task.isCancelled {
-                await model.scan()
+                await model.refreshDiscoveredDevices()
                 do {
                     try await Task.sleep(for: .seconds(1))
                 } catch {
