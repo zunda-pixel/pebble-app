@@ -370,6 +370,40 @@ struct APITests {
         #expect(try session.receive(PutBytesResponse(result: .acknowledgement, cookie: 42)) == [.finished])
     }
 
+    @Test func putBytesInstallAcknowledgementIgnoresTheReturnedCookie() throws {
+        // Real watches answer the install command with a different cookie;
+        // rejecting it used to abort the transfer at the very last step.
+        var session = PutBytesTransferSession(
+            bytes: [0x01],
+            objectType: .appExecutable,
+            appBankID: 1,
+            chunkSize: 4
+        )
+        _ = try session.start()
+        _ = try session.receive(PutBytesResponse(result: .acknowledgement, cookie: 42))
+        _ = try session.receive(PutBytesResponse(result: .acknowledgement, cookie: 42))
+        #expect(try session.receive(PutBytesResponse(result: .acknowledgement, cookie: 42)) == [
+            .send(PutBytesCodec.installFrame(cookie: 42)),
+        ])
+
+        #expect(try session.receive(PutBytesResponse(result: .acknowledgement, cookie: 0)) == [.finished])
+        #expect(session.completedCookie == 42)
+    }
+
+    @Test func putBytesRejectsAMismatchedCookieBeforeInstall() throws {
+        var session = PutBytesTransferSession(
+            bytes: [0x01],
+            objectType: .appExecutable,
+            appBankID: 1,
+            chunkSize: 4
+        )
+        _ = try session.start()
+        _ = try session.receive(PutBytesResponse(result: .acknowledgement, cookie: 42))
+        #expect(throws: PutBytesTransferError.unexpectedCookie) {
+            try session.receive(PutBytesResponse(result: .acknowledgement, cookie: 43))
+        }
+    }
+
     @Test func pebbleCRC32MatchesSTMWordAlgorithm() {
         #expect(PebbleCRC32.calculate([0x01, 0x02, 0x03, 0x04]) == 0x1DABE74F)
     }

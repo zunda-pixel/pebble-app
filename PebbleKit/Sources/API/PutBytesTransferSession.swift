@@ -90,9 +90,8 @@ public struct PutBytesTransferSession: Sendable {
             completedCookie = cookie
             return [.finished]
         case .awaitingInstall(let cookie):
-            guard response.cookie == cookie else {
-                throw PutBytesTransferError.unexpectedCookie
-            }
+            // The watch does not echo the transfer cookie in the install
+            // acknowledgement, so only the ACK itself is meaningful here.
             state = .finished
             completedCookie = cookie
             return [.finished]
