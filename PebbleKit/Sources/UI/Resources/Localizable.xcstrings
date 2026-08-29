@@ -44,6 +44,7 @@
       }
     },
     "A PBZ file can be chosen while the watch is away; the transfer starts as soon as it connects." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -553,6 +554,16 @@
         }
       }
     },
+    "Download Latest Firmware" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "最新のファームウェアをダウンロード"
+          }
+        }
+      }
+    },
     "Ends at %lld:00" : {
       "localizations" : {
         "ja" : {
@@ -629,6 +640,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ファームウェア"
+          }
+        }
+      }
+    },
+    "Firmware published for this watch is downloaded from PebbleOS. A PBZ file can also be chosen while the watch is away; either way the transfer starts as soon as it connects." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このウォッチ向けに公開されているファームウェアをPebbleOSからダウンロードします。ウォッチが接続されていなくてもPBZファイルを選択できます。いずれの場合も、転送は接続され次第、自動的に始まります。"
           }
         }
       }
@@ -1019,6 +1040,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "インストールを準備中"
+          }
+        }
+      }
+    },
+    "Published Version" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "公開バージョン"
           }
         }
       }

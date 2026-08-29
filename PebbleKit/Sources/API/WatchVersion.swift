@@ -12,6 +12,11 @@ public struct WatchVersionInformation: Equatable, Sendable {
     /// Which of a dual-slot watch's two firmware slots is running, or nil on a
     /// watch with a single slot. An update goes to the other slot.
     public var runningFirmwareSlot: Int? = nil
+
+    /// The board revision firmware packages are named after.
+    public var board: PebbleWatchBoard? {
+        PebbleWatchBoard(hardwarePlatform: hardwarePlatform)
+    }
 }
 
 /// The bits of the running firmware's flags byte.

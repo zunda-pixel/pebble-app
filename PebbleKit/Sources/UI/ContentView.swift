@@ -1314,6 +1314,12 @@ private struct WatchDetailView: View {
                 }
             }
             Section {
+                Button("Download Latest Firmware", systemImage: "arrow.down.circle") {
+                    Task { await model.installAvailableFirmware(deviceID: watchID) }
+                }
+                if let release = model.availableFirmwareRelease {
+                    LabeledContent("Published Version", value: release.versionTag)
+                }
                 Button("Install Firmware…", systemImage: "externaldrive.badge.timemachine") {
                     isChoosingFirmware = true
                 }
@@ -1330,7 +1336,7 @@ private struct WatchDetailView: View {
             } header: {
                 Text("Firmware")
             } footer: {
-                Text("A PBZ file can be chosen while the watch is away; the transfer starts as soon as it connects.")
+                Text("Firmware published for this watch is downloaded from PebbleOS. A PBZ file can also be chosen while the watch is away; either way the transfer starts as soon as it connects.")
             }
             Section {
                 Button("Restart Watch", systemImage: "arrow.clockwise") {

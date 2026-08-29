@@ -57,6 +57,7 @@ public final class AppModel {
     public private(set) var firmwareUpdateJournal: FirmwareUpdateJournal?
     public private(set) var firmwareRequiresConfirmation = false
     public private(set) var firmwareUpdateProgress: PutBytesTransferProgress?
+    public private(set) var availableFirmwareRelease: PebbleOSFirmwareRelease?
     public private(set) var dataSyncStatusMessage: String?
     public private(set) var timelineActionStatusMessage: String?
     public private(set) var healthExportURL: URL?
@@ -107,6 +108,7 @@ public final class AppModel {
     private let pendingTimelineOperationLibrary = PendingTimelineOperationLibrary()
     private let pendingAppMessageLibrary = PendingAppMessageLibrary()
     private let pendingFirmwareUpdateLibrary = PendingFirmwareUpdateLibrary()
+    private let firmwareCatalog = PebbleOSFirmwareCatalog()
     private var pendingAppMessages: [StoredAppMessage] = []
     private let calendarBridge = CalendarBridge()
     @ObservationIgnored private var calendarChangesTask: Task<Void, Never>?
@@ -382,16 +384,17 @@ public final class AppModel {
     /// as the watch appears.
     public func installFirmware(from url: URL, deviceID: String? = nil) async {
         let connection = connection(for: deviceID).flatMap { $0.isConnected ? $0 : nil }
-        let target: (id: String, model: PebbleWatchModel, firmwareVersion: String?, slot: Int?)
-        if let connection {
+        let target: (id: String, board: PebbleWatchBoard, firmwareVersion: String?, slot: Int?)
+        if let connection, let board = connection.device.board {
             let device = connection.device
-            target = (device.id, device.model, device.firmwareVersion, device.firmwareUpdateSlot)
-        } else if let saved = savedWatch(for: deviceID) {
+            target = (device.id, board, device.firmwareVersion, device.firmwareUpdateSlot)
+        } else if let saved = savedWatch(for: deviceID), let board = saved.board {
             // The slot is only known while connected; without it any manifest
-            // for this hardware is accepted and the watch has the last word.
-            target = (saved.id, saved.model, saved.firmwareVersion, nil)
+            // for this board is accepted and the watch has the last word.
+            target = (saved.id, board, saved.firmwareVersion, nil)
         } else {
-            firmwareUpdateStatusMessage = "Add the target Pebble before selecting firmware."
+            firmwareUpdateStatusMessage =
+                "Connect the target Pebble once so its board is known, then choose firmware."
             return
         }
 
@@ -399,13 +402,13 @@ public final class AppModel {
         defer { if accessed { url.stopAccessingSecurityScopedResource() } }
         do {
             firmwareUpdateStatusMessage = "Validating firmware…"
-            let package = try await Task.detached { [model = target.model, slot = target.slot] in
-                try PBZFirmwareImporter.load(from: url, for: model, targetSlot: slot)
+            let package = try await Task.detached { [board = target.board, slot = target.slot] in
+                try PBZFirmwareImporter.load(from: url, board: board, targetSlot: slot)
             }.value
             try package.validateIntegrity()
             let journal = FirmwareUpdateJournal(
                 deviceID: target.id,
-                hardwareRevision: target.model.rawValue,
+                hardwareRevision: target.board.rawValue,
                 previousVersion: target.firmwareVersion,
                 targetVersion: package.manifest.firmware.versionTag,
                 packageSHA256: package.sha256
@@ -426,6 +429,53 @@ public final class AppModel {
         } catch {
             firmwareUpdateStatusMessage = "Firmware update stopped safely: \(error.localizedDescription)"
         }
+    }
+
+    /// Looks up the newest firmware published for a watch's board.
+    public func checkForFirmwareUpdate(deviceID: String? = nil) async {
+        guard let board = board(for: deviceID) else {
+            firmwareUpdateStatusMessage =
+                "Connect the target Pebble once so its board is known, then check for firmware."
+            return
+        }
+        do {
+            firmwareUpdateStatusMessage = "Looking for published firmware…"
+            let release = try await firmwareCatalog.latestRelease(for: board)
+            availableFirmwareRelease = release
+            firmwareUpdateStatusMessage = "PebbleOS \(release.versionTag) is available."
+        } catch {
+            availableFirmwareRelease = nil
+            firmwareUpdateStatusMessage = "Published firmware could not be checked right now."
+        }
+    }
+
+    /// Downloads the firmware found by `checkForFirmwareUpdate` and hands it to
+    /// the same path a chosen file takes.
+    public func installAvailableFirmware(deviceID: String? = nil) async {
+        guard let release = availableFirmwareRelease else {
+            await checkForFirmwareUpdate(deviceID: deviceID)
+            guard availableFirmwareRelease != nil else { return }
+            await installAvailableFirmware(deviceID: deviceID)
+            return
+        }
+        let url: URL
+        do {
+            firmwareUpdateStatusMessage = "Downloading PebbleOS \(release.versionTag)…"
+            url = try await firmwareCatalog.download(release)
+        } catch {
+            firmwareUpdateStatusMessage = "Firmware could not be downloaded right now."
+            return
+        }
+        defer { try? FileManager.default.removeItem(at: url) }
+        await installFirmware(from: url, deviceID: deviceID)
+    }
+
+    /// The board of the watch a firmware action targets, connected or not.
+    private func board(for deviceID: String?) -> PebbleWatchBoard? {
+        if let connection = connection(for: deviceID), let board = connection.device.board {
+            return board
+        }
+        return savedWatch(for: deviceID)?.board
     }
 
     /// The saved watch a firmware action targets when none is connected.
@@ -1612,7 +1662,7 @@ public final class AppModel {
               let package = try? await pendingFirmwareUpdateLibrary.package(),
               let journal = try? await pendingFirmwareUpdateLibrary.journal(),
               journal.deviceID == device.id,
-              journal.hardwareRevision == device.model.rawValue,
+              journal.hardwareRevision == device.board?.rawValue,
               journal.packageSHA256 == package.sha256,
               journal.phase != .cancelled else { return }
         firmwareUpdateJournal = journal

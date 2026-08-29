@@ -1162,19 +1162,19 @@ struct CompanionDataTests {
         let url = try makeDualSlotFirmwareArchive(firmware: firmware)
         defer { try? FileManager.default.removeItem(at: url) }
 
-        let forSlotOne = try PBZFirmwareImporter.load(from: url, for: .pebbleTime2, targetSlot: 1)
+        let forSlotOne = try PBZFirmwareImporter.load(from: url, board: .obelixPVT, targetSlot: 1)
         #expect(forSlotOne.manifest.firmware.slot == 1)
 
-        let forSlotZero = try PBZFirmwareImporter.load(from: url, for: .pebbleTime2, targetSlot: 0)
+        let forSlotZero = try PBZFirmwareImporter.load(from: url, board: .obelixPVT, targetSlot: 0)
         #expect(forSlotZero.manifest.firmware.slot == 0)
 
         // Without a known slot the first matching manifest is good enough.
         #expect(throws: Never.self) {
-            try PBZFirmwareImporter.load(from: url, for: .pebbleTime2)
+            try PBZFirmwareImporter.load(from: url, board: .obelixPVT)
         }
         // A package holding only the running slot is reported as such.
         #expect(throws: PBZFirmwareError.wrongFirmwareSlot) {
-            try PBZFirmwareImporter.load(from: url, for: .pebbleTime2, targetSlot: 2)
+            try PBZFirmwareImporter.load(from: url, board: .obelixPVT, targetSlot: 2)
         }
     }
 
@@ -1192,7 +1192,7 @@ struct CompanionDataTests {
               "firmware": {
                 "name": "firmware.bin",
                 "type": "normal",
-                "hwrev": "\(PebbleWatchModel.pebbleTime2.rawValue)",
+                "hwrev": "\(PebbleWatchBoard.obelixPVT.rawValue)",
                 "size": \(firmware.count),
                 "crc": \(crc),
                 "slot": \(slot)
@@ -1218,6 +1218,46 @@ struct CompanionDataTests {
             )
         }
         return url
+    }
+
+    @Test func firmwareImporterRejectsAnotherBoardsPackage() throws {
+        let firmware = Data([9, 8, 7, 6])
+        let url = try makeDualSlotFirmwareArchive(firmware: firmware)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        // Boards sharing a watch model still run their own firmware, so a
+        // package built for one must not be accepted for another.
+        #expect(throws: PBZFirmwareError.incompatibleHardware) {
+            try PBZFirmwareImporter.load(from: url, board: .obelixDVT)
+        }
+    }
+
+    @Test(arguments: [
+        (UInt8(15), PebbleWatchBoard?.some(.asterix)),
+        (UInt8(18), PebbleWatchBoard?.some(.obelixPVT)),
+        (UInt8(21), PebbleWatchBoard?.some(.getafixDVT2)),
+        (UInt8(243), PebbleWatchBoard?.some(.obelixBigboard2)),
+        (UInt8(200), PebbleWatchBoard?.none),
+    ])
+    func boardIsReadFromTheHardwarePlatform(platform: UInt8, board: PebbleWatchBoard?) {
+        #expect(PebbleWatchBoard(hardwarePlatform: platform) == board)
+    }
+
+    @Test func firmwareCatalogPicksThePackageCoveringEverySlot() {
+        let assets = [
+            GitHubReleaseAsset(name: "firmware_obelix_pvt_v4.36.2_slot0.bin", size: 1, browserDownloadURL: URL(string: "https://example.invalid/a")!),
+            GitHubReleaseAsset(name: "normal_obelix_pvt_v4.36.2_slot0.pbz", size: 2, browserDownloadURL: URL(string: "https://example.invalid/b")!),
+            GitHubReleaseAsset(name: "normal_obelix_pvt_v4.36.2_slot1.pbz", size: 3, browserDownloadURL: URL(string: "https://example.invalid/c")!),
+            GitHubReleaseAsset(name: "normal_obelix_pvt_v4.36.2.pbz", size: 4, browserDownloadURL: URL(string: "https://example.invalid/d")!),
+            GitHubReleaseAsset(name: "recovery_obelix_pvt_v4.36.2.pbz", size: 5, browserDownloadURL: URL(string: "https://example.invalid/e")!),
+        ]
+
+        let chosen = PebbleOSFirmwareCatalog.asset(for: .obelixPVT, in: assets)
+
+        #expect(chosen?.name == "normal_obelix_pvt_v4.36.2.pbz")
+        // A board whose name is a prefix of another must not match it.
+        #expect(PebbleOSFirmwareCatalog.asset(for: .obelixDVT, in: assets) == nil)
+        #expect(PebbleOSFirmwareCatalog.asset(for: .asterix, in: assets) == nil)
     }
 
     @Test func officialCatalogResponseMapsToInstallableApplication() throws {

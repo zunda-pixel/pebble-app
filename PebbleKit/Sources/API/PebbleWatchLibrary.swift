@@ -11,6 +11,9 @@ public struct SavedPebbleWatch: Codable, Equatable, Identifiable, Sendable {
     public var lastBatteryLevel: Int?
     public var lastConnectedAt: Date
     public var automaticallyConnects: Bool
+    /// The board revision, remembered so firmware can be chosen for this watch
+    /// while it is away.
+    public var board: PebbleWatchBoard? = nil
 }
 
 public actor PebbleWatchLibrary {
@@ -39,7 +42,8 @@ public actor PebbleWatchLibrary {
             serialNumber: device.serialNumber,
             lastBatteryLevel: device.batteryLevel,
             lastConnectedAt: Date(),
-            automaticallyConnects: previous?.automaticallyConnects ?? true
+            automaticallyConnects: previous?.automaticallyConnects ?? true,
+            board: device.board ?? previous?.board
         )
         updated.removeAll { $0.id == device.id }
         updated.insert(watch, at: 0)

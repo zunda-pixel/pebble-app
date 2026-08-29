@@ -552,7 +552,8 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             batteryLevel: latestBatteryLevel,
             serialNumber: information.serialNumber,
             isRunningRecoveryFirmware: information.isRunningRecoveryFirmware,
-            runningFirmwareSlot: information.runningFirmwareSlot
+            runningFirmwareSlot: information.runningFirmwareSlot,
+            board: information.board
         )
         self.connectedDevice = connectedDevice
         let initialConnectionContinuation = connectionContinuation
@@ -796,12 +797,13 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         Task { [
             tag = clientTag,
             version = information.firmwareVersion,
+            board = information.board?.rawValue ?? "platform \(information.hardwarePlatform)",
             recovery = information.isRunningRecoveryFirmware
         ] in
             await PebbleDiagnostics.shared.record(
                 recovery ? .error : .info,
                 category: "connection",
-                message: "[\(tag)] firmware \(version)"
+                message: "[\(tag)] firmware \(version) on \(board)"
                     + (recovery ? " (recovery firmware: only a firmware install will work)" : "")
             )
         }

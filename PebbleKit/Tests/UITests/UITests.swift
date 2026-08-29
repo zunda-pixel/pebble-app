@@ -88,7 +88,8 @@ struct UITests {
             name: "My Pebble",
             model: .pebbleTime2,
             firmwareVersion: "v4.9.142",
-            batteryLevel: nil
+            batteryLevel: nil,
+            board: .obelixPVT
         ))
         let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
         await model.loadSavedWatches()
@@ -112,7 +113,7 @@ struct UITests {
           "firmware": {
             "name": "firmware.bin",
             "type": "normal",
-            "hwrev": "\(PebbleWatchModel.pebbleTime2.rawValue)",
+            "hwrev": "\(PebbleWatchBoard.obelixPVT.rawValue)",
             "size": \(firmware.count),
             "crc": \(PebbleCRC32.calculate([UInt8](firmware)))
           }

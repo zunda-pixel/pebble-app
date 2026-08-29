@@ -54,13 +54,16 @@ public struct PBZFirmwarePackage: Codable, Equatable, Sendable {
 public enum PBZFirmwareImporter {
     /// Reads the firmware for one watch out of a PBZ archive.
     ///
+    /// Packages name their hardware by board revision — "obelix_pvt", not the
+    /// watch model — so that is what a manifest is matched against.
+    ///
     /// A package for a dual-slot watch carries one manifest per slot, and the
     /// watch only accepts the one for the slot it is not running from. Pass
     /// that slot as `targetSlot`; recovery firmware has no slot of its own and
     /// ignores it.
     public static func load(
         from url: URL,
-        for model: PebbleWatchModel,
+        board: PebbleWatchBoard,
         targetSlot: Int? = nil
     ) throws -> PBZFirmwarePackage {
         let archive = try Archive(url: url, accessMode: .read)
@@ -71,7 +74,7 @@ public enum PBZFirmwareImporter {
                 PBZFirmwareManifest.self,
                 from: data(entry: entry, archive: archive)
             )
-            guard manifest.firmware.hardwareRevision.caseInsensitiveCompare(model.rawValue) == .orderedSame else {
+            guard manifest.firmware.hardwareRevision.caseInsensitiveCompare(board.rawValue) == .orderedSame else {
                 continue
             }
             if let targetSlot,
