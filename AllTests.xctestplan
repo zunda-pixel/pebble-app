@@ -13,19 +13,24 @@
   },
   "testTargets" : [
     {
-      "parallelizable" : true,
       "target" : {
-        "containerPath" : "container:",
-        "identifier" : "APITests",
-        "name" : "APITests"
+        "containerPath" : "container:Pebble.xcodeproj",
+        "identifier" : "2E784079303D37E4003810DA",
+        "name" : "PebbleUIAutomationTests"
       }
     },
     {
-      "parallelizable" : true,
       "target" : {
-        "containerPath" : "container:",
+        "containerPath" : "container:PebbleKit",
         "identifier" : "UITests",
         "name" : "UITests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:PebbleKit",
+        "identifier" : "APITests",
+        "name" : "APITests"
       }
     }
   ],
