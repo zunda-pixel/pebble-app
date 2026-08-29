@@ -73,17 +73,6 @@
         }
       }
     },
-    "A PBZ file can be chosen while the watch is away; the transfer starts as soon as it connects." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチが接続されていなくてもPBZファイルを選択できます。転送は接続され次第、自動的に始まります。"
-          }
-        }
-      }
-    },
     "A watch scan is already in progress." : {
       "localizations" : {
         "ja" : {
@@ -304,17 +293,6 @@
         }
       }
     },
-    "Bluetooth error: %@" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "Bluetoothエラー: %@"
-          }
-        }
-      }
-    },
     "Bluetooth is turned off or temporarily unavailable." : {
       "localizations" : {
         "ja" : {
@@ -461,17 +439,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "“デバイス”を選択してから“スキャン”で接続します。"
-          }
-        }
-      }
-    },
-    "Choose PBZ Firmware" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "PBZファームウェアを選択"
           }
         }
       }
@@ -636,34 +603,12 @@
         }
       }
     },
-    "Connection status: %@" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "接続状態: %@"
-          }
-        }
-      }
-    },
     "Connects to this watch" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このウォッチに接続します"
-          }
-        }
-      }
-    },
-    "Current Version" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "現在のバージョン"
           }
         }
       }
@@ -1728,17 +1673,6 @@
         }
       }
     },
-    "Remove this watch application?" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "このウォッチアプリケーションを削除しますか?"
-          }
-        }
-      }
-    },
     "Removing application…" : {
       "localizations" : {
         "ja" : {
@@ -1755,17 +1689,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "リセット"
-          }
-        }
-      }
-    },
-    "Reset %@?" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "“%@”をリセットしますか?"
           }
         }
       }
@@ -1806,17 +1729,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチを再起動"
-          }
-        }
-      }
-    },
-    "Resume Interrupted Updates" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "中断されたアップデートを再開"
           }
         }
       }
