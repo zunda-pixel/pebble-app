@@ -31,6 +31,7 @@ let package = Package(
       name: "UI",
       dependencies: [
         .target(name: "API"),
+        .product(name: "Algorithms", package: "swift-algorithms"),
         .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
         .product(name: "AsyncOperations", package: "swift-async-operations"),
         .product(name: "Defaults", package: "Defaults"),

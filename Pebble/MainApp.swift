@@ -38,11 +38,11 @@ struct MainApp: App {
 
         Divider()
 
-        ForEach(Array(AppSection.windowSections.enumerated()), id: \.element) { index, section in
+        ForEach(AppSection.windowSections) { section in
           Button(section.title) {
             NotificationCenter.default.post(PebbleSectionRequest(section: section), subject: model)
           }
-          .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
+          .keyboardShortcut(section.keyboardShortcut, modifiers: .command)
         }
 
       }

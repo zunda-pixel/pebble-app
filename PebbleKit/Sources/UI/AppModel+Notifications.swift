@@ -1,3 +1,4 @@
+import Algorithms
 import API
 import Defaults
 import Foundation
@@ -265,7 +266,7 @@ extension AppModel {
     func flushPendingNotifications() async {
         guard !activeConnections.isEmpty, !pendingNotifications.isEmpty else { return }
         var remaining: [PebbleTimelineNotification] = []
-        for (index, notification) in pendingNotifications.enumerated() {
+        for (index, notification) in pendingNotifications.indexed() {
             do {
                 for connection in activeConnections {
                     let client = connection.client

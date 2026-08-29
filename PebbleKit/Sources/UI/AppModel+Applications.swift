@@ -1,3 +1,4 @@
+import Algorithms
 import API
 import AsyncOperations
 import Defaults
@@ -198,7 +199,7 @@ extension AppModel {
             return false
         }
         let movingApplications = fromOffsets.map { applications[$0] }
-        applications = applications.enumerated().compactMap { index, application in
+        applications = applications.indexed().compactMap { index, application in
             fromOffsets.contains(index) ? nil : application
         }
         let removedBeforeDestination = fromOffsets.count { $0 < toOffset }

@@ -1,3 +1,4 @@
+import Algorithms
 import API
 import AsyncAlgorithms
 import EventKit
@@ -41,7 +42,7 @@ extension AppModel {
         })
         operations += timelinePins.filter { !queuedUpserts.contains($0.id) }.map(PendingTimelineOperation.upsert)
         var remaining: [PendingTimelineOperation] = []
-        for (index, operation) in operations.enumerated() {
+        for (index, operation) in operations.indexed() {
             do {
                 for connection in activeConnections {
                     let client = connection.client

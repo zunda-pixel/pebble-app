@@ -76,7 +76,7 @@ public enum AppSection: String, CaseIterable, Identifiable {
 
     public var id: Self { self }
 
-    public var title: String {
+    public var title: LocalizedStringKey {
         switch self {
         case .devices:
             "Devices"
@@ -88,6 +88,17 @@ public enum AppSection: String, CaseIterable, Identifiable {
             "Health"
         case .settings:
             "Settings"
+        }
+    }
+
+    /// The Command-number shortcut that picks this section from the menu bar.
+    public var keyboardShortcut: KeyEquivalent {
+        switch self {
+        case .devices: "1"
+        case .apps: "2"
+        case .timeline: "3"
+        case .health: "4"
+        case .settings: ","
         }
     }
 
