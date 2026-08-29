@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import ZIPFoundation
 @testable import API
 
 @Suite
@@ -743,6 +744,51 @@ struct APITests {
         #expect(information.hardwarePlatform == 15)
     }
 
+    @Test(arguments: [
+        // flags, expected recovery, expected running slot
+        (UInt8(0b0000), false, Int?.none),
+        (UInt8(0b0001), true, Int?.none),
+        // Dual slot without the slot-0 bit means slot 1 is running.
+        (UInt8(0b0100), false, Int?.some(1)),
+        (UInt8(0b1100), false, Int?.some(0)),
+        // A normal dual-slot firmware must not read as recovery.
+        (UInt8(0b1110), false, Int?.some(0)),
+    ])
+    func watchVersionCodecReadsFirmwareFlags(
+        flags: UInt8,
+        isRecovery: Bool,
+        runningSlot: Int?
+    ) throws {
+        var payload = [UInt8](repeating: 0, count: 120)
+        payload[0] = 0x01
+        payload[45] = flags
+        let frame = PebbleProtocolFrame(endpoint: 16, payload: payload)
+
+        let information = try WatchVersionCodec.decode(frame)
+
+        #expect(information.isRunningRecoveryFirmware == isRecovery)
+        #expect(information.runningFirmwareSlot == runningSlot)
+    }
+
+    @Test
+    func firmwareUpdateTargetsTheSlotThatIsNotRunning() {
+        let slot0 = PebbleDevice(
+            id: "a", name: "P", model: .pebbleTime2, firmwareVersion: nil, batteryLevel: nil,
+            runningFirmwareSlot: 0
+        )
+        let slot1 = PebbleDevice(
+            id: "b", name: "P", model: .pebbleTime2, firmwareVersion: nil, batteryLevel: nil,
+            runningFirmwareSlot: 1
+        )
+        let single = PebbleDevice(
+            id: "c", name: "P", model: .pebbleTime2, firmwareVersion: nil, batteryLevel: nil
+        )
+
+        #expect(slot0.firmwareUpdateSlot == 1)
+        #expect(slot1.firmwareUpdateSlot == 0)
+        #expect(single.firmwareUpdateSlot == nil)
+    }
+
     @Test
     func pingPongCodecAcceptsTrailingBytesFromNewerFirmware() throws {
         let frame = PebbleProtocolFrame(
@@ -1109,6 +1155,69 @@ struct CompanionDataTests {
         #expect(try await library.journal() == journal)
         try await library.updatePhase(.transferring)
         #expect(try await library.journal()?.phase == .transferring)
+    }
+
+    @Test func firmwareImporterPicksTheManifestForTheTargetSlot() throws {
+        let firmware = Data([9, 8, 7, 6])
+        let url = try makeDualSlotFirmwareArchive(firmware: firmware)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let forSlotOne = try PBZFirmwareImporter.load(from: url, for: .pebbleTime2, targetSlot: 1)
+        #expect(forSlotOne.manifest.firmware.slot == 1)
+
+        let forSlotZero = try PBZFirmwareImporter.load(from: url, for: .pebbleTime2, targetSlot: 0)
+        #expect(forSlotZero.manifest.firmware.slot == 0)
+
+        // Without a known slot the first matching manifest is good enough.
+        #expect(throws: Never.self) {
+            try PBZFirmwareImporter.load(from: url, for: .pebbleTime2)
+        }
+        // A package holding only the running slot is reported as such.
+        #expect(throws: PBZFirmwareError.wrongFirmwareSlot) {
+            try PBZFirmwareImporter.load(from: url, for: .pebbleTime2, targetSlot: 2)
+        }
+    }
+
+    /// Builds a PBZ holding one manifest per slot, as a dual-slot watch's
+    /// firmware package does.
+    private func makeDualSlotFirmwareArchive(firmware: Data) throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appending(path: "\(UUID().uuidString).pbz")
+        let archive = try Archive(url: url, accessMode: .create)
+        let crc = PebbleCRC32.calculate([UInt8](firmware))
+        for slot in 0...1 {
+            let manifest = """
+            {
+              "manifestVersion": 1,
+              "firmware": {
+                "name": "firmware.bin",
+                "type": "normal",
+                "hwrev": "\(PebbleWatchModel.pebbleTime2.rawValue)",
+                "size": \(firmware.count),
+                "crc": \(crc),
+                "slot": \(slot)
+              }
+            }
+            """
+            let manifestBytes = Data(manifest.utf8)
+            try archive.addEntry(
+                with: "slot\(slot)/manifest.json",
+                type: .file,
+                uncompressedSize: Int64(manifestBytes.count),
+                provider: { position, size in
+                    manifestBytes.subdata(in: Int(position)..<Int(position) + size)
+                }
+            )
+            try archive.addEntry(
+                with: "slot\(slot)/firmware.bin",
+                type: .file,
+                uncompressedSize: Int64(firmware.count),
+                provider: { position, size in
+                    firmware.subdata(in: Int(position)..<Int(position) + size)
+                }
+            )
+        }
+        return url
     }
 
     @Test func officialCatalogResponseMapsToInstallableApplication() throws {

@@ -52,15 +52,33 @@ public struct PBZFirmwarePackage: Codable, Equatable, Sendable {
 }
 
 public enum PBZFirmwareImporter {
-    public static func load(from url: URL, for model: PebbleWatchModel) throws -> PBZFirmwarePackage {
+    /// Reads the firmware for one watch out of a PBZ archive.
+    ///
+    /// A package for a dual-slot watch carries one manifest per slot, and the
+    /// watch only accepts the one for the slot it is not running from. Pass
+    /// that slot as `targetSlot`; recovery firmware has no slot of its own and
+    /// ignores it.
+    public static func load(
+        from url: URL,
+        for model: PebbleWatchModel,
+        targetSlot: Int? = nil
+    ) throws -> PBZFirmwarePackage {
         let archive = try Archive(url: url, accessMode: .read)
         let manifestEntries = archive.filter { $0.path.hasSuffix("manifest.json") }
+        var sawWrongSlot = false
         for entry in manifestEntries {
             let manifest = try JSONDecoder().decode(
                 PBZFirmwareManifest.self,
                 from: data(entry: entry, archive: archive)
             )
             guard manifest.firmware.hardwareRevision.caseInsensitiveCompare(model.rawValue) == .orderedSame else {
+                continue
+            }
+            if let targetSlot,
+               manifest.firmware.type != "recovery",
+               let slot = manifest.firmware.slot,
+               slot != targetSlot {
+                sawWrongSlot = true
                 continue
             }
             guard ["normal", "recovery"].contains(manifest.firmware.type),
@@ -84,7 +102,9 @@ public enum PBZFirmwareImporter {
             }
             return PBZFirmwarePackage(manifest: manifest, firmware: firmware, resources: resources)
         }
-        throw PBZFirmwareError.incompatibleHardware
+        // A package built for the running slot would be rejected by the watch,
+        // which is worth saying plainly rather than reporting as wrong hardware.
+        throw sawWrongSlot ? PBZFirmwareError.wrongFirmwareSlot : PBZFirmwareError.incompatibleHardware
     }
 
     private static func joined(_ directory: String, _ name: String) -> String {
@@ -114,6 +134,7 @@ public enum PBZFirmwareImporter {
 public enum PBZFirmwareError: Error, Equatable, Sendable {
     case unsafeManifest
     case incompatibleHardware
+    case wrongFirmwareSlot
     case missingEntry(String)
     case entryTooLarge
     case sizeMismatch(String)

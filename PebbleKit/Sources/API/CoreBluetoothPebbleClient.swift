@@ -415,7 +415,11 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             SystemMessageCodec.firmwareUpdateStartFrame(bytesToSend: byteCount),
             waitingForStart: true
         )
-        try await installApplicationObject([UInt8](package.firmware), objectType: package.manifest.firmware.type == "recovery" ? .recovery : .firmware, appBankID: UInt32(package.manifest.firmware.slot ?? 0))
+        try await installApplicationObject(
+            [UInt8](package.firmware),
+            objectType: package.manifest.firmware.type == "recovery" ? .recovery : .firmware,
+            appBankID: 0
+        )
         guard let firmwareCookie = completedTransferCookie else { throw PutBytesTransferError.invalidState }
         var cookies = [firmwareCookie]
         if let resources = package.resources {
@@ -547,7 +551,8 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             firmwareVersion: information.firmwareVersion,
             batteryLevel: latestBatteryLevel,
             serialNumber: information.serialNumber,
-            isRunningRecoveryFirmware: information.isRunningRecoveryFirmware
+            isRunningRecoveryFirmware: information.isRunningRecoveryFirmware,
+            runningFirmwareSlot: information.runningFirmwareSlot
         )
         self.connectedDevice = connectedDevice
         let initialConnectionContinuation = connectionContinuation

@@ -373,24 +373,40 @@ public final class AppModel {
         }
     }
 
+    /// Validates a firmware package and either installs it right away or keeps
+    /// it for the watch's next connection.
+    ///
+    /// Staging matters for a watch running its recovery firmware: it stays
+    /// connected for only a few seconds at a time, which is not long enough to
+    /// pick a file, so the file is chosen first and the transfer starts as soon
+    /// as the watch appears.
     public func installFirmware(from url: URL, deviceID: String? = nil) async {
-        guard let connection = connection(for: deviceID), connection.isConnected else {
-            firmwareUpdateStatusMessage = "Connect the target Pebble before selecting firmware."
+        let connection = connection(for: deviceID).flatMap { $0.isConnected ? $0 : nil }
+        let target: (id: String, model: PebbleWatchModel, firmwareVersion: String?, slot: Int?)
+        if let connection {
+            let device = connection.device
+            target = (device.id, device.model, device.firmwareVersion, device.firmwareUpdateSlot)
+        } else if let saved = savedWatch(for: deviceID) {
+            // The slot is only known while connected; without it any manifest
+            // for this hardware is accepted and the watch has the last word.
+            target = (saved.id, saved.model, saved.firmwareVersion, nil)
+        } else {
+            firmwareUpdateStatusMessage = "Add the target Pebble before selecting firmware."
             return
         }
-        let device = connection.device
+
         let accessed = url.startAccessingSecurityScopedResource()
         defer { if accessed { url.stopAccessingSecurityScopedResource() } }
         do {
             firmwareUpdateStatusMessage = "Validating firmware…"
-            let package = try await Task.detached {
-                try PBZFirmwareImporter.load(from: url, for: device.model)
+            let package = try await Task.detached { [model = target.model, slot = target.slot] in
+                try PBZFirmwareImporter.load(from: url, for: model, targetSlot: slot)
             }.value
             try package.validateIntegrity()
             let journal = FirmwareUpdateJournal(
-                deviceID: device.id,
-                hardwareRevision: device.model.rawValue,
-                previousVersion: device.firmwareVersion,
+                deviceID: target.id,
+                hardwareRevision: target.model.rawValue,
+                previousVersion: target.firmwareVersion,
                 targetVersion: package.manifest.firmware.versionTag,
                 packageSHA256: package.sha256
             )
@@ -401,10 +417,23 @@ public final class AppModel {
                 firmwareUpdateStatusMessage = "Recovery firmware validated. Confirm to continue."
                 return
             }
+            guard let connection else {
+                firmwareUpdateStatusMessage =
+                    "Firmware ready. It installs as soon as the watch connects."
+                return
+            }
             try await performFirmwareUpdate(package, on: connection)
         } catch {
             firmwareUpdateStatusMessage = "Firmware update stopped safely: \(error.localizedDescription)"
         }
+    }
+
+    /// The saved watch a firmware action targets when none is connected.
+    private func savedWatch(for deviceID: String?) -> SavedPebbleWatch? {
+        guard let deviceID else {
+            return savedWatches.count == 1 ? savedWatches.first : nil
+        }
+        return savedWatches.first { $0.id == deviceID }
     }
 
     public func confirmRecoveryFirmwareUpdate() async {

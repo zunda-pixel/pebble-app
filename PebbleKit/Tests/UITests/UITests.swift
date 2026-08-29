@@ -1,6 +1,7 @@
 import API
 import Foundation
 import Testing
+import ZIPFoundation
 @testable import UI
 
 @Suite
@@ -71,6 +72,69 @@ struct UITests {
         #expect(model.connectedDevice?.id == discovered.id)
         #expect(model.applicationManagementOperation == nil)
         #expect(client.reorderedApplicationIDs.last == [])
+    }
+
+    @Test
+    func firmwareChosenWhileDisconnectedWaitsForTheWatch() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        // A watch running recovery firmware stays connected for only a few
+        // seconds, so the file has to be accepted while it is away.
+        try await watchLibrary.record(PebbleDevice(
+            id: "recovery-watch",
+            name: "My Pebble",
+            model: .pebbleTime2,
+            firmwareVersion: "v4.9.142",
+            batteryLevel: nil
+        ))
+        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+        await model.loadSavedWatches()
+        let firmwareURL = try makeFirmwareArchive(in: directory)
+
+        await model.installFirmware(from: firmwareURL, deviceID: "recovery-watch")
+
+        let journal = try #require(model.firmwareUpdateJournal)
+        #expect(journal.deviceID == "recovery-watch")
+        #expect(client.installedFirmwarePackages.isEmpty)
+    }
+
+    private func makeFirmwareArchive(in directory: URL) throws -> URL {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appending(path: "firmware.pbz")
+        let archive = try Archive(url: url, accessMode: .create)
+        let firmware = Data([4, 3, 2, 1])
+        let manifest = Data("""
+        {
+          "manifestVersion": 1,
+          "firmware": {
+            "name": "firmware.bin",
+            "type": "normal",
+            "hwrev": "\(PebbleWatchModel.pebbleTime2.rawValue)",
+            "size": \(firmware.count),
+            "crc": \(PebbleCRC32.calculate([UInt8](firmware)))
+          }
+        }
+        """.utf8)
+        try archive.addEntry(
+            with: "manifest.json",
+            type: .file,
+            uncompressedSize: Int64(manifest.count),
+            provider: { position, size in
+                manifest.subdata(in: Int(position)..<Int(position) + size)
+            }
+        )
+        try archive.addEntry(
+            with: "firmware.bin",
+            type: .file,
+            uncompressedSize: Int64(firmware.count),
+            provider: { position, size in
+                firmware.subdata(in: Int(position)..<Int(position) + size)
+            }
+        )
+        return url
     }
 
     @Test

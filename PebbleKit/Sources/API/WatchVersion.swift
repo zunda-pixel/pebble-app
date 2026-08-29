@@ -9,6 +9,21 @@ public struct WatchVersionInformation: Equatable, Sendable {
     /// answers version and ping requests but rejects every other endpoint, so
     /// it can only be talked to for a firmware install.
     public var isRunningRecoveryFirmware: Bool = false
+    /// Which of a dual-slot watch's two firmware slots is running, or nil on a
+    /// watch with a single slot. An update goes to the other slot.
+    public var runningFirmwareSlot: Int? = nil
+}
+
+/// The bits of the running firmware's flags byte.
+enum FirmwareFlag: UInt8 {
+    case recovery = 0
+    case bluetooth = 1
+    case dualSlot = 2
+    case slot0 = 3
+
+    func isSet(in flags: UInt8) -> Bool {
+        flags & (1 << rawValue) != 0
+    }
 }
 
 public enum WatchVersionCodec {
@@ -29,11 +44,18 @@ public enum WatchVersionCodec {
             throw WatchVersionCodecError.unexpectedMessage
         }
 
+        // The running firmware's metadata is timestamp, version tag, git hash,
+        // a flags byte, the hardware platform and a metadata version.
+        let flags = frame.payload[45]
+        let slot: Int? = FirmwareFlag.dualSlot.isSet(in: flags)
+            ? (FirmwareFlag.slot0.isSet(in: flags) ? 0 : 1)
+            : nil
         return WatchVersionInformation(
             firmwareVersion: fixedString(frame.payload[5..<37]),
             serialNumber: fixedString(frame.payload[108..<120]),
             hardwarePlatform: frame.payload[46],
-            isRunningRecoveryFirmware: frame.payload[45] != 0
+            isRunningRecoveryFirmware: FirmwareFlag.recovery.isSet(in: flags),
+            runningFirmwareSlot: slot
         )
     }
 

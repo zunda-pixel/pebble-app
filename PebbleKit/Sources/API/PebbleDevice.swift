@@ -37,4 +37,16 @@ public struct PebbleDevice: Identifiable, Hashable, Sendable {
     /// every endpoint except version and ping, so the companion app can only
     /// offer it a firmware install.
     public var isRunningRecoveryFirmware: Bool = false
+    /// Which firmware slot is running on a dual-slot watch, or nil when it has
+    /// only one. Firmware is installed into the other slot.
+    public var runningFirmwareSlot: Int? = nil
+
+    /// The slot a firmware update targets: the one that is not running.
+    public var firmwareUpdateSlot: Int? {
+        switch runningFirmwareSlot {
+        case 0: 1
+        case 1: 0
+        default: nil
+        }
+    }
 }

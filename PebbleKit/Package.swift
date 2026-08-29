@@ -72,7 +72,11 @@ let package = Package(
     ),
     .testTarget(
       name: "UITests",
-      dependencies: ["UI", "API"],
+      dependencies: [
+        "UI",
+        "API",
+        .product(name: "ZIPFoundation", package: "ZIPFoundation"),
+      ],
       swiftSettings: [
         .enableUpcomingFeature("ExistentialAny"),
         .enableUpcomingFeature("InternalImportsByDefault"),

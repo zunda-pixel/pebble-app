@@ -1,9 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "" : {
-
-    },
     "%@ · %@" : {
       "localizations" : {
         "en" : {
@@ -42,6 +39,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "%lld dBm"
+          }
+        }
+      }
+    },
+    "A PBZ file can be chosen while the watch is away; the transfer starts as soon as it connects." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチが接続されていなくてもPBZファイルを選択できます。転送は接続され次第、自動的に始まります。"
           }
         }
       }
@@ -732,6 +739,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "非対応"
+          }
+        }
+      }
+    },
+    "Install Firmware…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ファームウェアをインストール…"
           }
         }
       }

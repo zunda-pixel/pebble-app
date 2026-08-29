@@ -1231,6 +1231,7 @@ private struct WatchDetailView: View {
     var model: AppModel
     var watchID: String
     @State private var isConfirmingForget = false
+    @State private var isChoosingFirmware = false
     @State private var pendingReset: PebbleResetKind?
     @Environment(\.dismiss) private var dismiss
 
@@ -1313,6 +1314,25 @@ private struct WatchDetailView: View {
                 }
             }
             Section {
+                Button("Install Firmware…", systemImage: "externaldrive.badge.timemachine") {
+                    isChoosingFirmware = true
+                }
+                if let journal = model.firmwareUpdateJournal, journal.deviceID == watchID {
+                    LabeledContent("Update State", value: journal.phase.rawValue)
+                    if let progress = model.firmwareUpdateProgress, progress.totalBytes > 0 {
+                        ProgressView(value: Double(progress.bytesSent), total: Double(progress.totalBytes))
+                    }
+                }
+                if let firmwareUpdateStatusMessage = model.firmwareUpdateStatusMessage {
+                    Label(firmwareUpdateStatusMessage, systemImage: "info.circle")
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Firmware")
+            } footer: {
+                Text("A PBZ file can be chosen while the watch is away; the transfer starts as soon as it connects.")
+            }
+            Section {
                 Button("Restart Watch", systemImage: "arrow.clockwise") {
                     pendingReset = .restart
                 }
@@ -1342,6 +1362,10 @@ private struct WatchDetailView: View {
         }
         .formStyle(.grouped)
         .navigationTitle(watchName)
+        .fileImporter(isPresented: $isChoosingFirmware, allowedContentTypes: [.pebbleFirmware]) { result in
+            guard case .success(let url) = result else { return }
+            Task { await model.installFirmware(from: url, deviceID: watchID) }
+        }
         .confirmationDialog(
             "Forget \(watchName)?",
             isPresented: $isConfirmingForget,
@@ -1542,7 +1566,9 @@ private struct SettingsView: View {
                 Button("Choose PBZ Firmware", systemImage: "externaldrive.badge.timemachine") {
                     isChoosingFirmware = true
                 }
-                .disabled(model.connectedDevice == nil)
+                // A watch that only stays connected for a few seconds cannot be
+                // handed a file in time, so a saved watch is target enough.
+                .disabled(model.connectedDevice == nil && model.savedWatches.count != 1)
                 if model.firmwareRequiresConfirmation {
                     Button("Install Recovery Firmware", role: .destructive) {
                         destructiveFirmwareAction = .installRecovery
