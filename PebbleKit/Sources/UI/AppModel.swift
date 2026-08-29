@@ -1,4 +1,5 @@
 public import API
+import Defaults
 public import Foundation
 import Observation
 
@@ -162,13 +163,9 @@ public final class AppModel {
         self.clientFactory = clientFactory ?? { _ in client }
         self.applicationLibrary = applicationLibrary
         self.watchLibrary = watchLibrary
-        companionNotificationsEnabled = UserDefaults.standard.object(
-            forKey: "companionNotificationsEnabled"
-        ) as? Bool ?? true
-        activeWatchfaceID = UserDefaults.standard.string(forKey: "activeWatchfaceID").flatMap(UUID.init(uuidString:))
-        favoriteWatchfaceIDs = Set(
-            UserDefaults.standard.stringArray(forKey: "favoriteWatchfaceIDs")?.compactMap(UUID.init(uuidString:)) ?? []
-        )
+        companionNotificationsEnabled = Defaults[.companionNotificationsEnabled]
+        activeWatchfaceID = Defaults[.activeWatchfaceID]
+        favoriteWatchfaceIDs = Set(Defaults[.favoriteWatchfaceIDs])
     }
 
     public func start() async {
@@ -397,7 +394,7 @@ public final class AppModel {
             case .started(let id):
                 if watchfaces.contains(where: { $0.id == id }) {
                     activeWatchfaceID = id
-                    UserDefaults.standard.set(id.uuidString, forKey: "activeWatchfaceID")
+                    Defaults[.activeWatchfaceID] = id
                 }
             case .stopped(let id):
                 if activeWatchfaceID == id { activeWatchfaceID = nil }

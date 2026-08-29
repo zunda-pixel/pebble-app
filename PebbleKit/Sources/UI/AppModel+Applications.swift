@@ -1,4 +1,5 @@
 import API
+import Defaults
 import Foundation
 
 /// The installed application library and its transfers to a watch.
@@ -69,7 +70,7 @@ extension AppModel {
                 }
             }
             activeWatchfaceID = application.id
-            UserDefaults.standard.set(application.id.uuidString, forKey: "activeWatchfaceID")
+            Defaults[.activeWatchfaceID] = application.id
             applicationManagementStatusMessage = "\(application.displayName) is active."
         } catch {
             applicationLibraryErrorMessage = "The watchface could not be activated."
@@ -80,7 +81,7 @@ extension AppModel {
         guard application.kind == .watchface else { return }
         if favoriteWatchfaceIDs.contains(application.id) { favoriteWatchfaceIDs.remove(application.id) }
         else { favoriteWatchfaceIDs.insert(application.id) }
-        UserDefaults.standard.set(favoriteWatchfaceIDs.map(\.uuidString), forKey: "favoriteWatchfaceIDs")
+        Defaults[.favoriteWatchfaceIDs] = Array(favoriteWatchfaceIDs)
     }
 
     public func closeConfiguration(response: String? = nil) async {

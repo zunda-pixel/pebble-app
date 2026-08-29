@@ -1,4 +1,5 @@
 import API
+import Defaults
 import Foundation
 
 /// The remote application catalog.
@@ -24,7 +25,7 @@ extension AppModel {
             let snapshot = try await appCatalog.update(from: url, model: connectedDevice?.model)
             catalogApplications = snapshot.applications
             catalogLastUpdated = snapshot.fetchedAt
-            UserDefaults.standard.set(source, forKey: "appCatalogSource")
+            Defaults[.catalogSource] = source
             dataSyncStatusMessage = "App catalog updated with \(catalogApplications.count) apps."
         } catch {
             dataSyncStatusMessage = catalogApplications.isEmpty
@@ -34,8 +35,7 @@ extension AppModel {
     }
 
     public func refreshCatalog() async {
-        let source = UserDefaults.standard.string(forKey: "appCatalogSource")
-            ?? "https://appstore-api.repebble.com/api"
+        let source = Defaults[.catalogSource] ?? PebbleAppCatalog.defaultSourceURL.absoluteString
         await updateCatalog(source: source)
     }
 

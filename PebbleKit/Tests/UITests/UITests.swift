@@ -1,4 +1,5 @@
 import API
+import Defaults
 import Foundation
 import Testing
 import ZIPFoundation
@@ -72,6 +73,32 @@ struct UITests {
         #expect(model.connectedDevice?.id == discovered.id)
         #expect(model.applicationManagementOperation == nil)
         #expect(client.reorderedApplicationIDs.last == [])
+    }
+
+    @Test
+    func tokenNamesSeparateTheAccountFromEachWatch() {
+        // A configuration page sees one token for the user and one per watch;
+        // mixing them up would leak one watch's identity into another's page.
+        #expect(PebbleTokenStore.accountTokenName == "pebbleAccountToken")
+        #expect(PebbleTokenStore.watchTokenName(watchID: "abc") == "pebbleWatchToken.abc")
+        #expect(
+            PebbleTokenStore.watchTokenName(watchID: "abc")
+                != PebbleTokenStore.watchTokenName(watchID: "def")
+        )
+        #expect(PebbleTokenStore.watchTokenName(watchID: "abc") != PebbleTokenStore.accountTokenName)
+    }
+
+    @Test
+    func storedPreferencesUseOneTypedKeyEach() {
+        // The keys were string literals repeated across the files that read
+        // them, which is how the same preference came to be read two ways.
+        #expect(Defaults.Keys.autoResumeFirmwareUpdate.defaultValue)
+        #expect(Defaults.Keys.companionNotificationsEnabled.defaultValue)
+        #expect(!Defaults.Keys.hasCompletedOnboarding.defaultValue)
+        #expect(Defaults.Keys.favoriteWatchfaceIDs.defaultValue.isEmpty)
+        #expect(Defaults.Keys.activeWatchfaceID.defaultValue == nil)
+        #expect(Defaults.Keys.catalogSource.defaultValue == nil)
+        #expect(Defaults.Keys.healthKitLastExportDate.defaultValue == .distantPast)
     }
 
     @Test

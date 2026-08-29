@@ -1,11 +1,12 @@
 import API
+import Defaults
 import Foundation
 
 /// Notifications sent to a watch, and messages coming back.
 extension AppModel {
     public func setCompanionNotificationsEnabled(_ enabled: Bool) {
         companionNotificationsEnabled = enabled
-        UserDefaults.standard.set(enabled, forKey: "companionNotificationsEnabled")
+        Defaults[.companionNotificationsEnabled] = enabled
         notificationStatusMessage = enabled
             ? "Watch app notifications are enabled."
             : "Watch app notifications are disabled."

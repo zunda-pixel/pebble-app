@@ -1,3 +1,4 @@
+import Defaults
 public import SwiftUI
 import API
 
@@ -19,9 +20,9 @@ public struct PebbleSettingsView: View {
 struct SettingsView: View {
     var model: AppModel
     @State private var isChoosingFirmware = false
-    @State private var catalogSource = UserDefaults.standard.string(forKey: "appCatalogSource")
-        ?? "https://appstore-api.repebble.com/api"
-    @AppStorage("autoResumeFirmwareUpdate") private var autoResumeFirmwareUpdate = true
+    @State private var catalogSource = Defaults[.catalogSource]
+        ?? PebbleAppCatalog.defaultSourceURL.absoluteString
+    @Default(.autoResumeFirmwareUpdate) private var autoResumeFirmwareUpdate
     @State private var destructiveFirmwareAction: FirmwareDestructiveAction?
 
     var body: some View {

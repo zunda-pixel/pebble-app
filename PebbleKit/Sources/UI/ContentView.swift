@@ -1,3 +1,4 @@
+import Defaults
 public import SwiftUI
 public import API
 import Charts
@@ -108,7 +109,7 @@ enum AppSection: String, CaseIterable, Identifiable {
 
 struct AppRootView: View {
     var model: AppModel
-    @AppStorage("hasCompletedPebbleOnboarding") private var hasCompletedOnboarding = false
+    @Default(.hasCompletedOnboarding) private var hasCompletedOnboarding
 
     var body: some View {
         Group {

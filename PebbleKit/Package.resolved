@@ -1,6 +1,15 @@
 {
-  "originHash" : "072c5d356b2196eb4f9357945f70850233325a99e9e7d23836ecc8c47d4659a3",
+  "originHash" : "5cfd8a699a788337b8b1647564afb249ad1f6b0707e6149c51e9b904107f6734",
   "pins" : [
+    {
+      "identity" : "defaults",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/sindresorhus/Defaults.git",
+      "state" : {
+        "revision" : "00a7465a0668a87fa159e779b9d80f1f9652357e",
+        "version" : "9.0.9"
+      }
+    },
     {
       "identity" : "swift-memberwise-init-macro",
       "kind" : "remoteSourceControl",
@@ -17,6 +26,15 @@
       "state" : {
         "revision" : "79e4b74a295b6eb74a8b585e3a39d29e70c1dbd1",
         "version" : "603.0.2"
+      }
+    },
+    {
+      "identity" : "valet",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/square/Valet.git",
+      "state" : {
+        "revision" : "246baf6be3f9e3ff116dc05251a08f69dd7c7b9d",
+        "version" : "5.1.0"
       }
     },
     {

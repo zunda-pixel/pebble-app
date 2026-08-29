@@ -12,6 +12,7 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
     private var activeWatchHandler: () -> PebbleDevice?
     private var loadContinuation: CheckedContinuation<Void, any Error>?
     private var loadedApplicationID: UUID?
+    private let tokenStore = PebbleTokenStore()
 
     init(
         openURLHandler: @escaping (URL) -> Void,
@@ -40,8 +41,12 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
         let platformLiteral = try javaScriptLiteral(watch?.model.platformName ?? "unknown")
         let modelLiteral = try javaScriptLiteral(watch?.model.rawValue ?? "unknown")
         let firmwareLiteral = try javaScriptLiteral(watch?.firmwareVersion ?? "unknown")
-        let accountTokenLiteral = try javaScriptLiteral(stableToken(key: "pebbleAccountToken"))
-        let watchTokenLiteral = try javaScriptLiteral(stableToken(key: "pebbleWatchToken.\(watch?.id ?? "unknown")"))
+        let accountTokenLiteral = try javaScriptLiteral(
+            tokenStore.token(named: PebbleTokenStore.accountTokenName)
+        )
+        let watchTokenLiteral = try javaScriptLiteral(
+            tokenStore.token(named: PebbleTokenStore.watchTokenName(watchID: watch?.id ?? "unknown"))
+        )
         let html = """
         <!doctype html><meta charset="utf-8"><script>
         const listeners = {};
@@ -209,12 +214,6 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
         return literal
     }
 
-    private func stableToken(key: String) -> String {
-        if let token = UserDefaults.standard.string(forKey: key) { return token }
-        let token = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
-        UserDefaults.standard.set(token, forKey: key)
-        return token
-    }
 }
 
 private extension PebbleWatchModel {

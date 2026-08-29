@@ -61,6 +61,11 @@ public struct PebbleCatalogSnapshot: Codable, Equatable, Sendable {
 }
 
 public actor PebbleAppCatalog {
+    /// Where applications are fetched from unless the user points elsewhere.
+    public static var defaultSourceURL: URL {
+        URL(string: "https://appstore-api.repebble.com/api")!
+    }
+
     private var cacheURL: URL
 
     public init(cacheURL: URL? = nil) {
@@ -72,7 +77,7 @@ public actor PebbleAppCatalog {
         let data = try Data(contentsOf: cacheURL)
         if let snapshot = try? JSONDecoder().decode(PebbleCatalogSnapshot.self, from: data) { return snapshot }
         if let applications = try? JSONDecoder().decode([PebbleCatalogApplication].self, from: data) {
-            return PebbleCatalogSnapshot(sourceURL: URL(string: "https://appstore-api.repebble.com/api")!, applications: applications)
+            return PebbleCatalogSnapshot(sourceURL: Self.defaultSourceURL, applications: applications)
         }
         try PersistentJSON.quarantine(cacheURL)
         return nil

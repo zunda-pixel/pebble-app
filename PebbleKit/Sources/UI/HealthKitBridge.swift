@@ -1,5 +1,6 @@
 #if os(iOS)
 import API
+import Defaults
 import Foundation
 import HealthKit
 
@@ -7,8 +8,8 @@ import HealthKit
 final class HealthKitBridge {
     private var store = HKHealthStore()
     private var lastExportDate: Date {
-        get { UserDefaults.standard.object(forKey: "healthKitLastExportDate") as? Date ?? .distantPast }
-        set { UserDefaults.standard.set(newValue, forKey: "healthKitLastExportDate") }
+        get { Defaults[.healthKitLastExportDate] }
+        set { Defaults[.healthKitLastExportDate] = newValue }
     }
 
     func synchronize(_ samples: [PebbleHealthSample]) async throws {

@@ -16,6 +16,8 @@ let package = Package(
     ),
   ],
   dependencies: [
+    .package(url: "https://github.com/square/Valet.git", from: "5.0.0"),
+    .package(url: "https://github.com/sindresorhus/Defaults.git", from: "9.0.0"),
     .package(url: "https://github.com/gohanlon/swift-memberwise-init-macro.git", from: "0.6.0"),
     .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.20"),
   ],
@@ -24,6 +26,8 @@ let package = Package(
       name: "UI",
       dependencies: [
         .target(name: "API"),
+        .product(name: "Defaults", package: "Defaults"),
+        .product(name: "Valet", package: "Valet"),
       ]
     ),
     .target(
