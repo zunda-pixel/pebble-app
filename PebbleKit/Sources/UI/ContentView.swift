@@ -1221,6 +1221,7 @@ private struct WatchDetailView: View {
     var model: AppModel
     var watchID: String
     @State private var isConfirmingForget = false
+    @State private var pendingReset: PebbleResetKind?
     @Environment(\.dismiss) private var dismiss
 
     private var connection: WatchConnection? {
@@ -1293,6 +1294,28 @@ private struct WatchDetailView: View {
                 }
             }
             Section {
+                Button("Restart Watch", systemImage: "arrow.clockwise") {
+                    pendingReset = .restart
+                }
+                .disabled(connection?.isConnected != true)
+                Button("Restart into Recovery Firmware", systemImage: "lifepreserver") {
+                    pendingReset = .recoveryFirmware
+                }
+                .disabled(connection?.isConnected != true)
+                Button("Factory Reset", systemImage: "trash", role: .destructive) {
+                    pendingReset = .factoryReset
+                }
+                .disabled(connection?.isConnected != true)
+                if let watchResetStatusMessage = model.watchResetStatusMessage {
+                    Label(watchResetStatusMessage, systemImage: "info.circle")
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Reset")
+            } footer: {
+                Text("The watch restarts without answering, so it disconnects immediately. A factory reset erases everything stored on the watch.")
+            }
+            Section {
                 Button("Forget Watch", role: .destructive) {
                     isConfirmingForget = true
                 }
@@ -1314,6 +1337,42 @@ private struct WatchDetailView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Automatic reconnection information for this Pebble will be removed.")
+        }
+        .confirmationDialog(
+            "Reset \(watchName)?",
+            isPresented: Binding(
+                get: { pendingReset != nil },
+                set: { if !$0 { pendingReset = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingReset
+        ) { kind in
+            Button(actionTitle(for: kind), role: kind == .factoryReset ? .destructive : nil) {
+                pendingReset = nil
+                Task { await model.resetWatch(kind, deviceID: watchID) }
+            }
+            Button("Cancel", role: .cancel) { pendingReset = nil }
+        } message: { kind in
+            Text(confirmationMessage(for: kind))
+        }
+    }
+
+    private func actionTitle(for kind: PebbleResetKind) -> LocalizedStringKey {
+        switch kind {
+        case .restart: "Restart Watch"
+        case .recoveryFirmware: "Restart into Recovery Firmware"
+        case .factoryReset: "Erase Watch"
+        }
+    }
+
+    private func confirmationMessage(for kind: PebbleResetKind) -> LocalizedStringKey {
+        switch kind {
+        case .restart:
+            "The watch disconnects while it restarts."
+        case .recoveryFirmware:
+            "The watch restarts into recovery firmware, where only firmware updates are available."
+        case .factoryReset:
+            "Every app, watchface, and setting stored on the watch is erased. This cannot be undone."
         }
     }
 }

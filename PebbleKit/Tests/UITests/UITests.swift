@@ -224,6 +224,44 @@ struct UITests {
     }
 
     @Test
+    func resettingAWatchSendsTheCommandAndClosesTheConnection() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+
+        await model.scan()
+        let discovered = try #require(model.discoveredDevices.first)
+        await model.connect(to: discovered)
+
+        await model.resetWatch(.factoryReset, deviceID: discovered.id)
+
+        #expect(client.sentFrames.contains(ResetCodec.frame(.factoryReset)))
+        // The watch reboots without answering, so the link is closed locally.
+        #expect(model.connections.isEmpty)
+        #expect(client.disconnectedDevices.map(\.id) == [discovered.id])
+        #expect(model.installedApplicationIDs(on: discovered.id).isEmpty)
+        #expect(model.watchResetStatusMessage != nil)
+    }
+
+    @Test
+    func resettingWithoutAConnectionReportsAnError() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+
+        await model.resetWatch(.restart, deviceID: "missing-watch")
+
+        #expect(client.sentFrames.isEmpty)
+        #expect(model.watchManagementErrorMessage != nil)
+    }
+
+    @Test
     func appModelRejectsAppMessageForUnknownApplication() async throws {
         let client = MockPebbleClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)

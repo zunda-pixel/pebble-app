@@ -133,6 +133,16 @@ struct PhoneControlTests {
 
 @Suite
 @MainActor
+struct ResetTests {
+    @Test func resetFramesUseTheOfficialWireValues() {
+        #expect(ResetCodec.frame(.restart) == PebbleProtocolFrame(endpoint: 2_003, payload: [0x00]))
+        #expect(ResetCodec.frame(.recoveryFirmware) == PebbleProtocolFrame(endpoint: 2_003, payload: [0xFF]))
+        #expect(ResetCodec.frame(.factoryReset) == PebbleProtocolFrame(endpoint: 2_003, payload: [0xFE]))
+    }
+}
+
+@Suite
+@MainActor
 struct PhoneVersionTests {
     @Test func recognizesVersionRequests() {
         #expect(PhoneVersionCodec.isRequest(PebbleProtocolFrame(endpoint: 17, payload: [0x00])))

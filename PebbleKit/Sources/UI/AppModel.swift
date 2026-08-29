@@ -46,6 +46,7 @@ public final class AppModel {
     public private(set) var notificationPreferences = NotificationDeliveryPreferences()
     public private(set) var savedWatches: [SavedPebbleWatch] = []
     public private(set) var watchManagementErrorMessage: String?
+    public private(set) var watchResetStatusMessage: String?
     public private(set) var timelinePins: [PebbleTimelinePin] = []
     public private(set) var healthSamples: [PebbleHealthSample] = []
     public private(set) var catalogApplications: [PebbleCatalogApplication] = []
@@ -857,6 +858,40 @@ public final class AppModel {
         if let start { notificationPreferences.quietHoursStart = min(23, max(0, start)) }
         if let end { notificationPreferences.quietHoursEnd = min(23, max(0, end)) }
         try? await notificationPreferenceLibrary.save(notificationPreferences)
+    }
+
+    /// Sends a reset command to a watch. The watch reboots without answering,
+    /// so the connection is closed locally and the app reconnects afterwards
+    /// if the watch is set to connect automatically.
+    public func resetWatch(_ kind: PebbleResetKind, deviceID: String? = nil) async {
+        guard let connection = connection(for: deviceID), connection.isConnected else {
+            watchManagementErrorMessage = "Connect the watch before resetting it."
+            return
+        }
+        let device = connection.device
+        do {
+            try await connection.client.send(ResetCodec.frame(kind))
+            if kind == .factoryReset {
+                // Everything the watch held is gone; drop our record of it too.
+                try? await applicationLibrary.setSynchronizedApplicationIDs([], deviceID: device.id)
+                installedApplicationIDsByWatch[device.id] = []
+            }
+            await PebbleDiagnostics.shared.record(
+                .warning,
+                category: "reset",
+                message: "Sent reset command \(kind) to the watch"
+            )
+            watchManagementErrorMessage = nil
+            await close(connection)
+            watchResetStatusMessage = switch kind {
+            case .restart: "The watch is restarting."
+            case .recoveryFirmware: "The watch is restarting into recovery firmware."
+            case .factoryReset: "The watch is performing a factory reset."
+            }
+        } catch {
+            watchResetStatusMessage = nil
+            watchManagementErrorMessage = "The reset command could not be sent."
+        }
     }
 
     public func sendTestNotification(deviceID: String? = nil) async {

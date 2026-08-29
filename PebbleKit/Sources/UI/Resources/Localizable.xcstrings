@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "" : {
+
+    },
     "%@ · %@" : {
       "localizations" : {
         "en" : {
@@ -574,12 +577,42 @@
         }
       }
     },
+    "Erase Watch" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチを消去"
+          }
+        }
+      }
+    },
+    "Every app, watchface, and setting stored on the watch is erased. This cannot be undone." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチに保存されているすべてのアプリ、ウォッチフェイス、および設定が消去されます。この操作は取り消せません。"
+          }
+        }
+      }
+    },
     "Export Health Data" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ヘルスケアデータを書き出す"
+          }
+        }
+      }
+    },
+    "Factory Reset" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "工場出荷時の状態にリセット"
           }
         }
       }
@@ -1085,6 +1118,46 @@
         }
       }
     },
+    "Reset" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リセット"
+          }
+        }
+      }
+    },
+    "Reset %@?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“%@”をリセットしますか?"
+          }
+        }
+      }
+    },
+    "Restart into Recovery Firmware" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リカバリファームウェアで再起動"
+          }
+        }
+      }
+    },
+    "Restart Watch" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチを再起動"
+          }
+        }
+      }
+    },
     "Resume Interrupted Updates" : {
       "localizations" : {
         "ja" : {
@@ -1345,6 +1418,36 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "接続中のPebbleからアプリケーションとその設定が削除されます。"
+          }
+        }
+      }
+    },
+    "The watch disconnects while it restarts." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "再起動中は、ウォッチの接続が解除されます。"
+          }
+        }
+      }
+    },
+    "The watch restarts into recovery firmware, where only firmware updates are available." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチがリカバリファームウェアで再起動します。この状態では、ファームウェアのアップデートのみ利用できます。"
+          }
+        }
+      }
+    },
+    "The watch restarts without answering, so it disconnects immediately. A factory reset erases everything stored on the watch." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチは応答を返さずに再起動するため、接続はすぐに解除されます。工場出荷時の状態にリセットすると、ウォッチに保存されているすべてのデータが消去されます。"
           }
         }
       }
