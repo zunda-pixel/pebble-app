@@ -1,3 +1,5 @@
+import Algorithms
+import DequeModule
 import MemberwiseInit
 
 @MemberwiseInit
@@ -19,8 +21,8 @@ public struct PPoGSession: Sendable {
 
     @Init(.ignore) private var nextOutboundSequence = 0
     @Init(.ignore) private var expectedInboundSequence = 0
-    @Init(.ignore) private var queuedTransmissions: [PPoGTransmission] = []
-    @Init(.ignore) private var inFlightTransmissions: [PPoGTransmission] = []
+    @Init(.ignore) private var queuedTransmissions: Deque<PPoGTransmission> = []
+    @Init(.ignore) private var inFlightTransmissions: Deque<PPoGTransmission> = []
     @Init(.ignore) private var lastSentAcknowledgement: PPoGPacket?
     @Init(.ignore) private var lastReceivedAcknowledgementSequence: Int?
 
@@ -28,6 +30,10 @@ public struct PPoGSession: Sendable {
     /// receive buffers to the negotiated packet size minus this much, so a
     /// smaller allowance here produces packets it quietly drops.
     static let headerOverhead = 4
+
+    /// The sequence numbers a packet header can carry, which the counters wrap
+    /// around.
+    static let sequenceCount = 32
 
     public var hasPendingAcknowledgements: Bool {
         !inFlightTransmissions.isEmpty
@@ -42,18 +48,15 @@ public struct PPoGSession: Sendable {
         }
 
         let maximumPayloadSize = maximumPacketSize - Self.headerOverhead
-        var offset = 0
-        while offset < bytes.count {
-            let end = min(offset + maximumPayloadSize, bytes.count)
+        for chunk in bytes.chunks(ofCount: maximumPayloadSize) {
             let packet = PPoGPacket.data(
                 sequence: nextOutboundSequence,
-                payload: Array(bytes[offset..<end])
+                payload: Array(chunk)
             )
             queuedTransmissions.append(
                 PPoGTransmission(packet: packet, attemptCount: 0)
             )
-            nextOutboundSequence = (nextOutboundSequence + 1) % 32
-            offset = end
+            nextOutboundSequence = (nextOutboundSequence + 1) % Self.sequenceCount
         }
 
         return drainSendWindow()
@@ -84,7 +87,7 @@ public struct PPoGSession: Sendable {
                 return [.send(lastSentAcknowledgement)]
             }
 
-            expectedInboundSequence = (expectedInboundSequence + 1) % 32
+            expectedInboundSequence = (expectedInboundSequence + 1) % Self.sequenceCount
             let acknowledgement = PPoGPacket.acknowledgement(sequence: sequence)
             lastSentAcknowledgement = acknowledgement
             return [.deliver(payload), .send(acknowledgement)]

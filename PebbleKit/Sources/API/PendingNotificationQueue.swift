@@ -1,4 +1,5 @@
 public import Foundation
+import DequeModule
 
 /// PPoG packets waiting for CoreBluetooth to drain its transmit queue.
 ///
@@ -6,7 +7,7 @@ public import Foundation
 /// overtaking another stalls the session until the watch times out. So once a
 /// packet for a watch is waiting, every later packet for that watch waits too.
 struct PendingNotificationQueue: Equatable, Sendable {
-    private var packets: [(centralID: String, value: Data)] = []
+    private var packets: Deque<(centralID: String, value: Data)> = []
 
     var isEmpty: Bool {
         packets.isEmpty

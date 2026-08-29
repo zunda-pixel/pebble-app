@@ -16,6 +16,9 @@ let package = Package(
     ),
   ],
   dependencies: [
+    .package(url: "https://github.com/apple/swift-algorithms.git", from: "1.2.0"),
+    .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.0.0"),
+    .package(url: "https://github.com/apple/swift-collections.git", from: "1.1.0"),
     .package(url: "https://github.com/apple/swift-http-types.git", from: "1.0.0"),
     .package(url: "https://github.com/square/Valet.git", from: "5.0.0"),
     .package(url: "https://github.com/sindresorhus/Defaults.git", from: "9.0.0"),
@@ -27,6 +30,7 @@ let package = Package(
       name: "UI",
       dependencies: [
         .target(name: "API"),
+        .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
         .product(name: "Defaults", package: "Defaults"),
         .product(name: "Valet", package: "Valet"),
       ]
@@ -34,6 +38,8 @@ let package = Package(
     .target(
       name: "API",
       dependencies: [
+        .product(name: "Algorithms", package: "swift-algorithms"),
+        .product(name: "DequeModule", package: "swift-collections"),
         .product(name: "HTTPTypes", package: "swift-http-types"),
         .product(name: "HTTPTypesFoundation", package: "swift-http-types"),
         .product(name: "MemberwiseInit", package: "swift-memberwise-init-macro"),

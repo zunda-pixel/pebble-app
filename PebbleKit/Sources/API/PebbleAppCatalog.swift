@@ -1,4 +1,5 @@
 public import Foundation
+import Algorithms
 import HTTPTypes
 import HTTPTypesFoundation
 import CryptoKit
@@ -104,8 +105,10 @@ public actor PebbleAppCatalog {
             async let watchfaces = fetchOfficialHome(sourceURL, kind: .watchface, model: model)
             applications = try await watchapps + watchfaces
         }
-        let unique = Dictionary(applications.map { ($0.id, $0) }, uniquingKeysWith: { _, newer in newer })
-            .values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        // Later entries win, so the newest description of an application is
+        // the one kept.
+        let unique = applications.reversed().uniqued(on: \.id)
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         let snapshot = PebbleCatalogSnapshot(sourceURL: sourceURL, applications: unique)
         try PersistentJSON.save(snapshot, to: cacheURL)
         return snapshot

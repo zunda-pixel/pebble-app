@@ -1,4 +1,5 @@
 public import CoreBluetooth
+import DequeModule
 public import Foundation
 import MemberwiseInit
 
@@ -78,7 +79,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var frameDecoder = PebbleProtocolFrameDecoder()
     private var frameContinuation: AsyncStream<PebbleProtocolFrame>.Continuation?
     private var eventContinuation: AsyncStream<PebbleClientEvent>.Continuation?
-    private var pendingGattWrites: [Data] = []
+    private var pendingGattWrites: Deque<Data> = []
     private var intentionalDisconnectIdentifiers: Set<String> = []
     private var timeChangeObservers = NotificationObserverStorage()
     private var scanTimeoutTask: Task<Void, Never>?
@@ -108,7 +109,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var appReorderContinuation: CheckedContinuation<Void, any Error>?
     private var appReorderTimeoutTask: Task<Void, Never>?
     private var nextAppMessageTransactionID: UInt8 = 0
-    private var queuedAppMessages: [PendingAppMessage] = []
+    private var queuedAppMessages: Deque<PendingAppMessage> = []
     private var activeAppMessage: PendingAppMessage?
     private var activeAppMessageTransactionID: UInt8?
     private var appMessageTimeoutTask: Task<Void, Never>?

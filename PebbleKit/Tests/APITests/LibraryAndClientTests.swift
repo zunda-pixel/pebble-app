@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 import ZIPFoundation
 @testable import API
@@ -500,16 +501,23 @@ struct CompanionStorageTests {
 }
 
 /// A stubbed HTTP server, so the network clients can be exercised without one.
+///
+/// Responses are keyed by URL rather than held in one slot, so cases running in
+/// parallel cannot overwrite each other's setup.
 final class StubURLProtocol: URLProtocol {
     struct Exchange: Sendable {
         var status: Int
         var body: Data
     }
 
-    nonisolated(unsafe) static var exchange = Exchange(status: 200, body: Data())
-    /// The headers the client actually sent, to check what the typed request
-    /// produced on the wire.
-    nonisolated(unsafe) static var sentHeaders: [String: String] = [:]
+    private struct State: Sendable {
+        var exchanges: [URL: Exchange] = [:]
+        var requestHeaders: [URL: [String: String]] = [:]
+    }
+
+    // `startLoading()` is synchronous, so the shared state is guarded rather
+    // than isolated to an actor.
+    private static let state = Mutex(State())
 
     static func session() -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral
@@ -517,27 +525,41 @@ final class StubURLProtocol: URLProtocol {
         return URLSession(configuration: configuration)
     }
 
+    static func stub(_ url: URL, status: Int, body: Data = Data()) {
+        state.withLock { $0.exchanges[url] = Exchange(status: status, body: body) }
+    }
+
+    /// The headers the client actually sent, to check what the typed request
+    /// produced on the wire.
+    static func sentHeaders(for url: URL) -> [String: String] {
+        state.withLock { $0.requestHeaders[url] ?? [:] }
+    }
+
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
-        Self.sentHeaders = request.allHTTPHeaderFields ?? [:]
+        let url = request.url!
+        let headers = request.allHTTPHeaderFields ?? [:]
+        let exchange = Self.state.withLock { state -> Exchange in
+            state.requestHeaders[url] = headers
+            return state.exchanges[url] ?? Exchange(status: 404, body: Data())
+        }
         let response = HTTPURLResponse(
-            url: request.url!,
-            statusCode: Self.exchange.status,
+            url: url,
+            statusCode: exchange.status,
             httpVersion: nil,
             headerFields: nil
         )!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: Self.exchange.body)
+        client?.urlProtocol(self, didLoad: exchange.body)
         client?.urlProtocolDidFinishLoading(self)
     }
 
     override func stopLoading() {}
 }
 
-// The stub is shared process-wide, so these cases cannot overlap.
-@Suite(.serialized)
+@Suite
 struct FirmwareCatalogNetworkTests {
     private static let releaseJSON = """
     {
@@ -553,31 +575,38 @@ struct FirmwareCatalogNetworkTests {
     }
     """
 
-    @Test func aSuccessfulReplyYieldsThePackageForTheBoard() async throws {
-        StubURLProtocol.exchange = .init(status: 200, body: Data(Self.releaseJSON.utf8))
-        let catalog = PebbleOSFirmwareCatalog(
-            releasesURL: URL(string: "https://example.invalid/releases/latest")!,
-            session: StubURLProtocol.session()
-        )
+    private func catalog(_ url: URL) -> PebbleOSFirmwareCatalog {
+        PebbleOSFirmwareCatalog(releasesURL: url, session: StubURLProtocol.session())
+    }
 
-        let release = try await catalog.latestRelease(for: .obelixPVT)
+    @Test func aSuccessfulReplyYieldsThePackageForTheBoard() async throws {
+        let url = URL(string: "https://example.invalid/successful/releases")!
+        StubURLProtocol.stub(url, status: 200, body: Data(Self.releaseJSON.utf8))
+
+        let release = try await catalog(url).latestRelease(for: .obelixPVT)
 
         #expect(release.versionTag == "v4.36.2")
         #expect(release.board == .obelixPVT)
         #expect(release.sizeInBytes == 3_126_600)
         // The typed header name has to survive the bridge to URLRequest.
-        #expect(StubURLProtocol.sentHeaders["Accept"] == "application/vnd.github+json")
+        #expect(StubURLProtocol.sentHeaders(for: url)["Accept"] == "application/vnd.github+json")
     }
 
-    @Test func anUnsuccessfulStatusIsReported() async throws {
-        StubURLProtocol.exchange = .init(status: 404, body: Data())
-        let catalog = PebbleOSFirmwareCatalog(
-            releasesURL: URL(string: "https://example.invalid/releases/latest")!,
-            session: StubURLProtocol.session()
-        )
+    @Test func anUnsuccessfulStatusIsReported() async {
+        let url = URL(string: "https://example.invalid/unsuccessful/releases")!
+        StubURLProtocol.stub(url, status: 404)
 
         await #expect(throws: PebbleOSFirmwareCatalogError.releasesUnavailable) {
-            try await catalog.latestRelease(for: .obelixPVT)
+            try await catalog(url).latestRelease(for: .obelixPVT)
+        }
+    }
+
+    @Test func aBoardWithoutAPackageIsReported() async {
+        let url = URL(string: "https://example.invalid/other-board/releases")!
+        StubURLProtocol.stub(url, status: 200, body: Data(Self.releaseJSON.utf8))
+
+        await #expect(throws: PebbleOSFirmwareCatalogError.noFirmwareForBoard(.asterix)) {
+            try await catalog(url).latestRelease(for: .asterix)
         }
     }
 
@@ -592,25 +621,11 @@ struct FirmwareCatalogNetworkTests {
     }
 
     @Test func anUnsuccessfulDownloadReplyIsRefused() async {
-        StubURLProtocol.exchange = .init(status: 500, body: Data())
+        let url = URL(string: "https://example.invalid/refused/firmware.pbz")!
+        StubURLProtocol.stub(url, status: 500)
 
         await #expect(throws: HTTPFileDownloadError.unsuccessfulReply) {
-            try await downloadFile(
-                from: URL(string: "https://example.invalid/firmware.pbz")!,
-                using: StubURLProtocol.session()
-            )
-        }
-    }
-
-    @Test func aBoardWithoutAPackageIsReported() async throws {
-        StubURLProtocol.exchange = .init(status: 200, body: Data(Self.releaseJSON.utf8))
-        let catalog = PebbleOSFirmwareCatalog(
-            releasesURL: URL(string: "https://example.invalid/releases/latest")!,
-            session: StubURLProtocol.session()
-        )
-
-        await #expect(throws: PebbleOSFirmwareCatalogError.noFirmwareForBoard(.asterix)) {
-            try await catalog.latestRelease(for: .asterix)
+            try await downloadFile(from: url, using: StubURLProtocol.session())
         }
     }
 }

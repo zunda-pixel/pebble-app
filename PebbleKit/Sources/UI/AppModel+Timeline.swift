@@ -1,4 +1,5 @@
 import API
+import AsyncAlgorithms
 import EventKit
 import Foundation
 
@@ -99,7 +100,21 @@ extension AppModel {
     func observeCalendarChanges() {
         calendarChangesTask?.cancel()
         calendarChangesTask = Task { [weak self] in
-            for await _ in NotificationCenter.default.notifications(named: .EKEventStoreChanged) {
+            // EventKit reports a change per store write, so editing one event
+            // arrives as a burst. Each one would otherwise re-read every
+            // calendar and rewrite the watch's timeline, so wait for the burst
+            // to settle. Only the fact that something changed matters, which is
+            // also what makes these ticks safe to hand to `debounce`.
+            let ticks = AsyncStream<Void> { continuation in
+                let observation = Task {
+                    for await _ in NotificationCenter.default.notifications(named: .EKEventStoreChanged) {
+                        continuation.yield(())
+                    }
+                    continuation.finish()
+                }
+                continuation.onTermination = { _ in observation.cancel() }
+            }
+            for await _ in ticks.debounce(for: .seconds(2)) {
                 guard !Task.isCancelled else { return }
                 await self?.synchronizeCalendar()
             }
