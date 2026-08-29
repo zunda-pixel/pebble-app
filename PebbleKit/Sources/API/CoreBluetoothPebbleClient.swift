@@ -32,11 +32,8 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var centralManager: CBCentralManager!
     private var discoveredPeripherals: [String: CBPeripheral] = [:]
     private var scanResults: [String: DiscoveredPebble] = [:]
-    /// Every advertisement seen during the current scan, for diagnostics.
-    private var observedAdvertisements: [String: String] = [:]
-    /// How many callers currently want the radio scanning.
-    private var scanRequestCount = 0
     private var bluetoothWaiters: [CheckedContinuation<Void, any Error>] = []
+    private var scanContinuation: CheckedContinuation<[DiscoveredPebble], any Error>?
     private var connectionContinuation: CheckedContinuation<PebbleDevice, any Error>?
     private var pendingDevice: DiscoveredPebble?
     private var activeWriteCharacteristic: CBCharacteristic?
@@ -51,6 +48,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var pendingGattWrites: [Data] = []
     private var intentionalDisconnectIdentifiers: Set<String> = []
     private var timeChangeObservers = NotificationObserverStorage()
+    private var scanTimeoutTask: Task<Void, Never>?
     private var connectionTimeoutTask: Task<Void, Never>?
     private var acknowledgementTimeoutTask: Task<Void, Never>?
     private var healthCheckTask: Task<Void, Never>?
@@ -93,61 +91,31 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         observeSystemTimeChanges()
     }
 
-    /// Begins scanning, or joins a scan that is already running. Restarting a
-    /// scan every few seconds barely discovers anything, so the radio is left
-    /// running until every caller has asked to stop.
-    public func startScanning() async throws {
+    public func scan() async throws -> [DiscoveredPebble] {
         try await waitForBluetooth()
-        scanRequestCount += 1
-        guard scanRequestCount == 1 else {
-            return
+
+        guard scanContinuation == nil else {
+            throw PebbleConnectionError.scanAlreadyInProgress
         }
+
         scanResults.removeAll()
         discoveredPeripherals.removeAll()
-        observedAdvertisements.removeAll()
-        centralManager.scanForPeripherals(
-            withServices: nil,
-            // Duplicates keep signal strength fresh and let a watch that
-            // starts advertising later still be seen.
-            options: [CBCentralManagerScanOptionAllowDuplicatesKey: true]
-        )
-    }
 
-    public func stopScanning() {
-        guard scanRequestCount > 0 else {
-            return
-        }
-        scanRequestCount -= 1
-        guard scanRequestCount == 0 else {
-            return
-        }
-        centralManager.stopScan()
-        if scanResults.isEmpty {
-            // Report what the radio actually saw: without this it is
-            // impossible to tell a filtered-out watch from a scan that
-            // received nothing at all.
-            let summary = observedAdvertisements.isEmpty
-                ? "nothing"
-                : observedAdvertisements.values.prefix(12).joined(separator: " | ")
-            Task { [count = observedAdvertisements.count] in
-                await PebbleDiagnostics.shared.record(
-                    .warning,
-                    category: "scan",
-                    message: "No watches found; saw \(count) device(s): \(summary)"
-                )
+        return try await withCheckedThrowingContinuation { continuation in
+            scanContinuation = continuation
+            centralManager.scanForPeripherals(
+                withServices: nil,
+                options: [CBCentralManagerScanOptionAllowDuplicatesKey: false]
+            )
+
+            scanTimeoutTask = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(8))
+                guard !Task.isCancelled else {
+                    return
+                }
+                self?.finishScan()
             }
         }
-    }
-
-    public func currentScanResults() -> [DiscoveredPebble] {
-        scanResults.values.sorted { $0.signalStrength > $1.signalStrength }
-    }
-
-    public func scan() async throws -> [DiscoveredPebble] {
-        try await startScanning()
-        defer { stopScanning() }
-        try? await Task.sleep(for: .seconds(6))
-        return currentScanResults()
     }
 
     public func retrieveKnownDevices(_ hints: [DiscoveredPebble]) async throws -> [DiscoveredPebble] {
@@ -487,12 +455,24 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
     }
 
-    private func abandonScanning() {
-        guard scanRequestCount > 0 else {
-            return
-        }
-        scanRequestCount = 0
+    private func finishScan() {
         centralManager.stopScan()
+        scanTimeoutTask?.cancel()
+        scanTimeoutTask = nil
+
+        let devices = scanResults.values.sorted { lhs, rhs in
+            lhs.signalStrength > rhs.signalStrength
+        }
+        scanContinuation?.resume(returning: devices)
+        scanContinuation = nil
+    }
+
+    private func failScan(_ error: PebbleConnectionError) {
+        centralManager.stopScan()
+        scanTimeoutTask?.cancel()
+        scanTimeoutTask = nil
+        scanContinuation?.resume(throwing: error)
+        scanContinuation = nil
     }
 
     private func finishConnection(
@@ -1152,15 +1132,15 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
             resumeReconnectAfterPowerOn()
         case .unauthorized:
             waiters.forEach { $0.resume(throwing: PebbleConnectionError.permissionDenied) }
-            abandonScanning()
+            failScan(.permissionDenied)
             failConnection(.permissionDenied)
         case .unsupported:
             waiters.forEach { $0.resume(throwing: PebbleConnectionError.bluetoothUnsupported) }
-            abandonScanning()
+            failScan(.bluetoothUnsupported)
             failConnection(.bluetoothUnsupported)
         case .poweredOff, .resetting:
             waiters.forEach { $0.resume(throwing: PebbleConnectionError.bluetoothUnavailable) }
-            abandonScanning()
+            failScan(.bluetoothUnavailable)
             if connectionContinuation != nil {
                 failConnection(.bluetoothUnavailable)
             } else if connectedDevice != nil || isAutomaticReconnect {
@@ -1188,23 +1168,12 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
         advertisementData: [String: Any],
         rssi RSSI: NSNumber
     ) {
-        let advertisedName = advertisementData[CBAdvertisementDataLocalNameKey] as? String
-        let id = peripheral.identifier.uuidString
-        let serviceUUIDs = (advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] ?? [])
-            .map(\.uuidString)
-            .joined(separator: ",")
-        let manufacturerData = [UInt8](
-            advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data ?? Data()
-        )
-            .map { String(format: "%02X", $0) }
-            .joined()
-        observedAdvertisements[id] = "\(advertisedName ?? peripheral.name ?? "?")"
-            + " services=[\(serviceUUIDs)] mfg=\(manufacturerData.isEmpty ? "-" : manufacturerData)"
-
         guard let model = model(from: advertisementData) else {
             return
         }
 
+        let id = peripheral.identifier.uuidString
+        let advertisedName = advertisementData[CBAdvertisementDataLocalNameKey] as? String
         discoveredPeripherals[id] = peripheral
         scanResults[id] = DiscoveredPebble(
             id: id,
