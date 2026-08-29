@@ -83,18 +83,12 @@ public struct PebbleOSFirmwareCatalog: Sendable {
 
     /// Downloads a package to a file the firmware importer can read.
     public func download(_ release: PebbleOSFirmwareRelease) async throws -> URL {
-        guard release.downloadURL.scheme?.lowercased() == "https" else {
+        let temporaryURL: URL
+        do {
+            temporaryURL = try await downloadFile(from: release.downloadURL, using: session)
+        } catch HTTPFileDownloadError.insecureURL {
             throw PebbleOSFirmwareCatalogError.insecureURL
-        }
-        // URLSession has no HTTPRequest-based download, so the request is
-        // still built as typed HTTP and bridged for this one call.
-        guard let request = URLRequest(
-            httpRequest: HTTPRequest(method: .get, url: release.downloadURL)
-        ) else {
-            throw PebbleOSFirmwareCatalogError.releasesUnavailable
-        }
-        let (temporaryURL, response) = try await session.download(for: request)
-        guard response.httpTypesResponse?.status == .ok else {
+        } catch {
             throw PebbleOSFirmwareCatalogError.releasesUnavailable
         }
         let output = FileManager.default.temporaryDirectory

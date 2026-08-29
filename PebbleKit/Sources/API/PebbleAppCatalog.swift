@@ -112,16 +112,14 @@ public actor PebbleAppCatalog {
     }
 
     public func download(_ application: PebbleCatalogApplication) async throws -> URL {
-        guard application.downloadURL.scheme?.lowercased() == "https" else { throw AppCatalogError.insecureURL }
-        // URLSession has no HTTPRequest-based download, so the request is
-        // still built as typed HTTP and bridged for this one call.
-        guard let request = URLRequest(
-            httpRequest: HTTPRequest(method: .get, url: application.downloadURL)
-        ) else {
+        let temporaryURL: URL
+        do {
+            temporaryURL = try await downloadFile(from: application.downloadURL, using: session)
+        } catch HTTPFileDownloadError.insecureURL {
+            throw AppCatalogError.insecureURL
+        } catch {
             throw AppCatalogError.invalidResponse
         }
-        let (temporaryURL, response) = try await session.download(for: request)
-        guard response.httpTypesResponse?.status == .ok else { throw AppCatalogError.invalidResponse }
         let attributes = try FileManager.default.attributesOfItem(atPath: temporaryURL.path)
         guard (attributes[.size] as? NSNumber)?.intValue ?? 0 <= 64 * 1_024 * 1_024 else {
             throw AppCatalogError.packageTooLarge

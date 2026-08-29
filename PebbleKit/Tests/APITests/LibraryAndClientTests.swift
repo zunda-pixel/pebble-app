@@ -581,6 +581,27 @@ struct FirmwareCatalogNetworkTests {
         }
     }
 
+    @Test func aPlainHTTPURLIsRefusedBeforeAnyRequest() async {
+        // Both callers rely on this guard rather than repeating it.
+        await #expect(throws: HTTPFileDownloadError.insecureURL) {
+            try await downloadFile(
+                from: URL(string: "http://example.invalid/firmware.pbz")!,
+                using: StubURLProtocol.session()
+            )
+        }
+    }
+
+    @Test func anUnsuccessfulDownloadReplyIsRefused() async {
+        StubURLProtocol.exchange = .init(status: 500, body: Data())
+
+        await #expect(throws: HTTPFileDownloadError.unsuccessfulReply) {
+            try await downloadFile(
+                from: URL(string: "https://example.invalid/firmware.pbz")!,
+                using: StubURLProtocol.session()
+            )
+        }
+    }
+
     @Test func aBoardWithoutAPackageIsReported() async throws {
         StubURLProtocol.exchange = .init(status: 200, body: Data(Self.releaseJSON.utf8))
         let catalog = PebbleOSFirmwareCatalog(
