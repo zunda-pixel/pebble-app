@@ -46,16 +46,6 @@
         }
       }
     },
-    "%lld%%" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "%lld%%"
-          }
-        }
-      }
-    },
     "Activate" : {
       "localizations" : {
         "ja" : {
@@ -72,17 +62,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "適用中"
-          }
-        }
-      }
-    },
-    "Add a Pebble 2 Duo, Pebble Time 2, or Pebble Round 2 with the plus button." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "＋ボタンでPebble 2 Duo、Pebble Time 2、またはPebble Round 2を追加してください。"
           }
         }
       }
@@ -887,17 +866,6 @@
         }
       }
     },
-    "No Watches Found" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチが見つかりません"
-          }
-        }
-      }
-    },
     "Not connected" : {
       "localizations" : {
         "ja" : {
@@ -1168,39 +1136,6 @@
         }
       }
     },
-    "Scan" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "スキャン"
-          }
-        }
-      }
-    },
-    "Scan for a Pebble 2 Duo, Pebble Time 2, or Pebble Round 2." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "Pebble 2 Duo、Pebble Time 2、またはPebble Round 2をスキャンしてください。"
-          }
-        }
-      }
-    },
-    "Scanning…" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "スキャン中…"
-          }
-        }
-      }
-    },
     "Screenshot of %@" : {
       "localizations" : {
         "ja" : {
@@ -1377,17 +1312,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "“ヘルスケア”と同期"
-          }
-        }
-      }
-    },
-    "System notifications are delivered directly to a paired Pebble using Apple Notification Center Service. This switch controls notifications created by installed watch apps." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "システム通知は、Apple Notification Center Serviceを使用してペアリング済みのPebbleに直接配信されます。このスイッチでは、インストール済みのウォッチアプリが作成する通知を制御できます。"
           }
         }
       }

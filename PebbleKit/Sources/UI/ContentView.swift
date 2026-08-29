@@ -1184,34 +1184,40 @@ private struct WatchListRow: View {
 
     var body: some View {
         LabeledContent {
-            if let connection {
-                if let batteryLevel = connection.device.batteryLevel {
-                    Text("\(batteryLevel)%")
-                        .foregroundStyle(.secondary)
+            VStack(alignment: .trailing) {
+                if let connection {
+                    if let batteryLevel = connection.device.batteryLevel {
+                        Text(batteryLevel, format: .percent)
+                    }
+                } else if let savedWatch {
+                    Text(savedWatch.lastConnectedAt, format: .relative(presentation: .named))
                 }
-            } else if let savedWatch {
-                Text(savedWatch.lastConnectedAt, format: .relative(presentation: .named))
-                    .foregroundStyle(.secondary)
-            }
-        } label: {
-            VStack(alignment: .leading) {
-                Text(connection?.device.name ?? savedWatch?.name ?? watchID)
-                Text((connection?.device.model ?? savedWatch?.model)?.displayName ?? "")
-                    .foregroundStyle(.secondary)
+                
                 switch connection?.phase {
                 case .connected:
-                    Label("Connected", systemImage: "checkmark.circle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.green)
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text("Connected")
+                    }
+                    .foregroundStyle(.green)
                 case .reconnecting:
-                    Label("Reconnecting…", systemImage: "arrow.triangle.2.circlepath")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
+                    HStack {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                        Text("Reconnecting…")
+                    }
+                    .foregroundStyle(.orange)
                 case .disconnected, nil:
-                    Label("Not connected", systemImage: "applewatch.slash")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    HStack {
+                        Image(systemName: "applewatch.slash")
+                        Text("Not connected")
+                    }
+                    .foregroundStyle(.secondary)
                 }
+            }
+        } label: {
+            Text(connection?.device.name ?? savedWatch?.name ?? watchID)
+            if let displayName = (connection?.device.model ?? savedWatch?.model)?.displayName {
+                Text(displayName)
             }
         }
     }
@@ -1249,7 +1255,7 @@ private struct WatchDetailView: View {
                     LabeledContent("Serial Number", value: serialNumber)
                 }
                 if let batteryLevel = connection?.device.batteryLevel ?? savedWatch?.lastBatteryLevel {
-                    LabeledContent("Battery", value: "\(batteryLevel)%")
+                    LabeledContent("Battery", value: batteryLevel, format: .percent)
                 }
                 LabeledContent("Status") {
                     switch connection?.phase {
