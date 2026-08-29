@@ -73,6 +73,26 @@
         }
       }
     },
+    "%lld min" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%lld分"
+          }
+        }
+      }
+    },
+    "3 models" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "3モデル"
+          }
+        }
+      }
+    },
     "A watch scan is already in progress." : {
       "localizations" : {
         "ja" : {
@@ -139,6 +159,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチを追加"
+          }
+        }
+      }
+    },
+    "All" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "すべて"
           }
         }
       }
@@ -303,6 +333,16 @@
         }
       }
     },
+    "Bluetooth LE" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Bluetooth LE"
+          }
+        }
+      }
+    },
     "Bluetooth Low Energy is not supported on this device." : {
       "localizations" : {
         "ja" : {
@@ -369,6 +409,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "アップデートをキャンセル"
+          }
+        }
+      }
+    },
+    "Cancelled" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "キャンセル済み"
           }
         }
       }
@@ -1013,6 +1063,16 @@
         }
       }
     },
+    "Health data synchronized with HealthKit." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ヘルスケアデータを“ヘルスケア”と同期しました。"
+          }
+        }
+      }
+    },
     "Health synchronization completed." : {
       "localizations" : {
         "ja" : {
@@ -1039,6 +1099,36 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ヘルスケアデータの同期は再接続後に再試行されます。"
+          }
+        }
+      }
+    },
+    "HealthKit access or synchronization failed." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“ヘルスケア”へのアクセスまたは同期に失敗しました。"
+          }
+        }
+      }
+    },
+    "HealthKit data could not be read." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“ヘルスケア”のデータを読み取れませんでした。"
+          }
+        }
+      }
+    },
+    "HealthKit data imported and deduplicated." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“ヘルスケア”のデータを読み込んで重複を除去しました。"
           }
         }
       }
@@ -1293,12 +1383,32 @@
         }
       }
     },
+    "Month" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "月"
+          }
+        }
+      }
+    },
     "My Watches" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "マイウォッチ"
+          }
+        }
+      }
+    },
+    "Name" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "名前"
           }
         }
       }
@@ -1563,6 +1673,16 @@
         }
       }
     },
+    "Quarter" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "四半期"
+          }
+        }
+      }
+    },
     "Quiet Hours" : {
       "localizations" : {
         "ja" : {
@@ -1679,6 +1799,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "アプリケーションを削除中…"
+          }
+        }
+      }
+    },
+    "Required to connect to Pebble" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Pebbleへの接続に必要です"
           }
         }
       }
@@ -2543,6 +2673,16 @@
         }
       }
     },
+    "Transferring" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "転送中"
+          }
+        }
+      }
+    },
     "Transferring verified firmware…" : {
       "localizations" : {
         "ja" : {
@@ -2623,12 +2763,52 @@
         }
       }
     },
+    "Used only when you sync timeline events" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "タイムラインのイベントを同期するときのみ使用します"
+          }
+        }
+      }
+    },
+    "Validated" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "検証済み"
+          }
+        }
+      }
+    },
     "Validating firmware…" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ファームウェアを検証中…"
+          }
+        }
+      }
+    },
+    "Version" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "バージョン"
+          }
+        }
+      }
+    },
+    "Waiting for restart" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "再起動を待機中"
           }
         }
       }
@@ -2699,6 +2879,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチフェイス"
+          }
+        }
+      }
+    },
+    "Week" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "週"
           }
         }
       }

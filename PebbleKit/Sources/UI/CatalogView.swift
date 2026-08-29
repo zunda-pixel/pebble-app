@@ -4,11 +4,27 @@ import API
 enum CatalogKindFilter: String, CaseIterable, Identifiable {
     case all, watchapps, watchfaces
     var id: Self { self }
+
+    var title: LocalizedStringKey {
+        switch self {
+        case .all: "All"
+        case .watchapps: "Watch Apps"
+        case .watchfaces: "Watchfaces"
+        }
+    }
 }
 
 enum CatalogSort: String, CaseIterable, Identifiable {
     case name, category, version
     var id: Self { self }
+
+    var title: LocalizedStringKey {
+        switch self {
+        case .name: "Name"
+        case .category: "Category"
+        case .version: "Version"
+        }
+    }
 }
 
 /// The app catalog, presented as a sheet from the Apps tab's plus button.
@@ -36,14 +52,14 @@ struct CatalogView: View {
         List {
             Section("Browse") {
                 Picker("Type", selection: $kind) {
-                    ForEach(CatalogKindFilter.allCases) { Text($0.rawValue.capitalized).tag($0) }
+                    ForEach(CatalogKindFilter.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
                 Picker("Category", selection: $category) {
                     ForEach(categories, id: \.self) { Text($0).tag($0) }
                 }
                 Picker("Sort", selection: $sort) {
-                    ForEach(CatalogSort.allCases) { Text($0.rawValue.capitalized).tag($0) }
+                    ForEach(CatalogSort.allCases) { Text($0.title).tag($0) }
                 }
             }
             Section("Applications") {

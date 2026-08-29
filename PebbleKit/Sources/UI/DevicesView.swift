@@ -280,7 +280,7 @@ struct WatchDetailView: View {
                     isChoosingFirmware = true
                 }
                 if let journal = model.firmwareUpdateJournal, journal.deviceID == watchID {
-                    LabeledContent("Update State", value: journal.phase.rawValue)
+                    LabeledContent("Update State") { Text(journal.phase.title) }
                     if let targetVersion = journal.targetVersion {
                         LabeledContent("Target Version", value: targetVersion)
                     }

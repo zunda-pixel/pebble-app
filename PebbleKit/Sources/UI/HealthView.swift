@@ -10,29 +10,33 @@ struct HealthView: View {
     var body: some View {
         List {
             Picker("Period", selection: $period) {
-                ForEach(HealthAnalysisPeriod.allCases) { period in Text(period.rawValue.capitalized).tag(period) }
+                ForEach(HealthAnalysisPeriod.allCases) { period in Text(period.title).tag(period) }
             }
             .pickerStyle(.segmented)
             Section("Today") {
-                LabeledContent("Steps", value: "\(model.healthSamples.last?.steps ?? 0)")
-                LabeledContent("Sleep", value: "\(model.healthSamples.last?.sleepMinutes ?? 0) min")
+                LabeledContent("Steps", value: model.healthSamples.last?.steps ?? 0, format: .number)
+                LabeledContent("Sleep") {
+                    Text("\(model.healthSamples.last?.sleepMinutes ?? 0) min")
+                }
             }
             Section("Steps") {
                 Chart(filteredSamples) { sample in
                     BarMark(x: .value("Date", sample.date), y: .value("Steps", sample.steps))
                 }
                 .frame(minHeight: 180)
-                LabeledContent("Daily Average", value: "\(averageSteps)")
-                LabeledContent("Period Total", value: "\(totalSteps)")
-                LabeledContent("Best Day", value: "\(bestStepCount)")
+                LabeledContent("Daily Average", value: averageSteps, format: .number)
+                LabeledContent("Period Total", value: totalSteps, format: .number)
+                LabeledContent("Best Day", value: bestStepCount, format: .number)
             }
             Section("Sleep") {
                 Chart(filteredSamples) { sample in
                     LineMark(x: .value("Date", sample.date), y: .value("Minutes", sample.sleepMinutes))
                 }
                 .frame(minHeight: 180)
-                LabeledContent("Daily Average", value: "\(averageSleep) min")
-                LabeledContent("Tracked Days", value: "\(trackedSleepDays)")
+                LabeledContent("Daily Average") {
+                    Text("\(averageSleep) min")
+                }
+                LabeledContent("Tracked Days", value: trackedSleepDays, format: .number)
             }
             Button("Sync Health Data", systemImage: "arrow.triangle.2.circlepath") {
                 Task { await model.requestHealthSync() }

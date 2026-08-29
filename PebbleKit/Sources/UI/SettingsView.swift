@@ -25,12 +25,12 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("Support") {
-                LabeledContent("Supported Watches", value: "3 models")
-                LabeledContent("Connection", value: "Bluetooth LE")
+                LabeledContent("Supported Watches") { Text("3 models") }
+                LabeledContent("Connection") { Text("Bluetooth LE") }
             }
             Section("Permissions") {
-                LabeledContent("Bluetooth", value: "Required to connect to Pebble")
-                LabeledContent("Calendar", value: "Used only when you sync timeline events")
+                LabeledContent("Bluetooth") { Text("Required to connect to Pebble") }
+                LabeledContent("Calendar") { Text("Used only when you sync timeline events") }
                 Button("Open Privacy Settings", systemImage: "gear") {
                     openPrivacySettings()
                 }
