@@ -4,16 +4,12 @@ import Foundation
 /// Every preference the app stores, in one place and with its type.
 ///
 /// These were string literals repeated across the files that read and wrote
-/// them, which is how `autoResumeFirmwareUpdate` came to be read two different
-/// ways and how the watchface identifiers ended up converted to and from
-/// strings by hand at each site.
+/// them, which is how the same preference came to be read two different ways
+/// and how the watchface identifiers ended up converted to and from strings by
+/// hand at each site.
 extension Defaults.Keys {
     /// Where the application catalog is fetched from.
     static let catalogSource = Key<String?>("appCatalogSource")
-
-    /// Whether a firmware transfer interrupted by a disconnect resumes on the
-    /// next connection.
-    static let autoResumeFirmwareUpdate = Key<Bool>("autoResumeFirmwareUpdate", default: true)
 
     /// Whether notifications raised by installed watch apps are delivered.
     static let companionNotificationsEnabled = Key<Bool>("companionNotificationsEnabled", default: true)

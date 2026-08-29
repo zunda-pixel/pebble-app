@@ -19,11 +19,8 @@ public struct PebbleSettingsView: View {
 
 struct SettingsView: View {
     var model: AppModel
-    @State private var isChoosingFirmware = false
     @State private var catalogSource = Defaults[.catalogSource]
         ?? PebbleAppCatalog.defaultSourceURL.absoluteString
-    @Default(.autoResumeFirmwareUpdate) private var autoResumeFirmwareUpdate
-    @State private var destructiveFirmwareAction: FirmwareDestructiveAction?
 
     var body: some View {
         Form {
@@ -116,42 +113,6 @@ struct SettingsView: View {
                     }
                 }
             }
-            Section("Firmware") {
-                Toggle("Resume Interrupted Updates", isOn: $autoResumeFirmwareUpdate)
-                Button("Choose PBZ Firmware", systemImage: "externaldrive.badge.timemachine") {
-                    isChoosingFirmware = true
-                }
-                // A watch that only stays connected for a few seconds cannot be
-                // handed a file in time, so a saved watch is target enough.
-                .disabled(model.connectedDevice == nil && model.savedWatches.count != 1)
-                if model.firmwareRequiresConfirmation {
-                    Button("Install Recovery Firmware", role: .destructive) {
-                        destructiveFirmwareAction = .installRecovery
-                    }
-                }
-                if let journal = model.firmwareUpdateJournal {
-                    LabeledContent("Update State", value: journal.phase.rawValue)
-                    if let previousVersion = journal.previousVersion {
-                        LabeledContent("Current Version", value: previousVersion)
-                    }
-                    if let targetVersion = journal.targetVersion {
-                        LabeledContent("Target Version", value: targetVersion)
-                    }
-                    if let progress = model.firmwareUpdateProgress, progress.totalBytes > 0 {
-                        ProgressView(value: Double(progress.bytesSent), total: Double(progress.totalBytes))
-                        Text("\(progress.bytesSent, format: .number) of \(progress.totalBytes, format: .number) bytes")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Button("Cancel Update", role: .destructive) {
-                        Task { await model.cancelFirmwareUpdate() }
-                    }
-                    Button("Discard Recovery Data", role: .destructive) {
-                        destructiveFirmwareAction = .discardRecovery
-                    }
-                }
-                if let message = model.firmwareUpdateStatusMessage { Text(message).foregroundStyle(.secondary) }
-            }
             Section("App Catalog") {
                 TextField("Catalog JSON URL", text: $catalogSource)
                 Button("Update Catalog", systemImage: "arrow.clockwise") {
@@ -160,40 +121,6 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("Settings")
-        .fileImporter(isPresented: $isChoosingFirmware, allowedContentTypes: [.pebbleFirmware]) { result in
-            guard case .success(let url) = result else { return }
-            Task { await model.installFirmware(from: url) }
-        }
-        .dropDestination(for: URL.self) { urls, _ in
-            guard let firmwareURL = urls.first(where: { $0.pathExtension.lowercased() == "pbz" }) else {
-                return false
-            }
-            Task { await model.installFirmware(from: firmwareURL) }
-            return true
-        }
-        .confirmationDialog(
-            destructiveFirmwareAction?.title ?? "Confirm firmware action",
-            isPresented: Binding(
-                get: { destructiveFirmwareAction != nil },
-                set: { if !$0 { destructiveFirmwareAction = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button(destructiveFirmwareAction?.buttonTitle ?? "Continue", role: .destructive) {
-                let action = destructiveFirmwareAction
-                destructiveFirmwareAction = nil
-                Task {
-                    switch action {
-                    case .installRecovery: await model.confirmRecoveryFirmwareUpdate()
-                    case .discardRecovery: await model.discardPendingFirmwareUpdate()
-                    case nil: break
-                    }
-                }
-            }
-            Button("Cancel", role: .cancel) { destructiveFirmwareAction = nil }
-        } message: {
-            Text(destructiveFirmwareAction?.message ?? "Review this action before continuing.")
-        }
     }
 
     private func openPrivacySettings() {
@@ -204,33 +131,5 @@ struct SettingsView: View {
         guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
         UIApplication.shared.open(url)
 #endif
-    }
-}
-
-enum FirmwareDestructiveAction: Identifiable {
-    case installRecovery
-    case discardRecovery
-
-    var id: Self { self }
-
-    var title: String {
-        switch self {
-        case .installRecovery: "Install recovery firmware?"
-        case .discardRecovery: "Discard recovery data?"
-        }
-    }
-
-    var buttonTitle: String {
-        switch self {
-        case .installRecovery: "Install Recovery Firmware"
-        case .discardRecovery: "Discard Recovery Data"
-        }
-    }
-
-    var message: String {
-        switch self {
-        case .installRecovery: "Installing recovery firmware can make the watch temporarily unavailable. Keep it connected until the update completes."
-        case .discardRecovery: "The interrupted update can no longer be resumed after its recovery data is discarded."
-        }
     }
 }

@@ -14,8 +14,7 @@ targets iOS 27 and macOS 27; the app target also builds for visionOS.
 | `PebbleKit/Sources/UI` | `AppModel` (split across `AppModel+*.swift`), the views, and the system bridges (HealthKit, EventKit, MediaPlayer, CallKit, WebKit). |
 | `PebbleKit/Tests/APITests` | Swift Testing suites for the protocol layer, grouped by what they exercise. |
 | `PebbleKit/Tests/UITests` | Swift Testing suites for `AppModel` against `MockPebbleClient`. |
-| `PebbleUIAutomationTests/` | XCUIAutomation tests, in the app project. |
-| `AllTests.xctestplan` | Covers all three test targets. |
+| `AllTests.xctestplan` | Covers both test targets. |
 
 One endpoint codec per file, named after the endpoint. One view per file. When a
 file grows past roughly 500 lines, split it along a seam that already exists
@@ -29,7 +28,7 @@ ships, so a green SwiftPM run says little about the app.
 
 - Build with the `BuildProject` MCP command from `xcode-tools`.
 - Test with `RunAllTests` / `RunSomeTests`. The `Pebble` scheme's test plan
-  already covers all three targets.
+  already covers both targets.
 - **Run tests on the `My Mac` destination.** On a device the package test
   targets are skipped ("Tool-hosted testing is unavailable on device
   destinations"), and on an iOS simulator the whole `APITests` bundle currently

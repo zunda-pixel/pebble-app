@@ -25,7 +25,6 @@ struct DevicesView: View {
                     Button("Add Watch", systemImage: "plus") {
                         isAddingWatch = true
                     }
-                    .buttonStyle(.borderedProminent)
                 }
             } else {
                 Section("My Watches") {
@@ -185,12 +184,42 @@ struct WatchListRow: View {
     }
 }
 
+/// A firmware action that is confirmed before it runs.
+enum FirmwareDestructiveAction: Identifiable {
+    case installRecovery
+    case discardRecovery
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .installRecovery: "Install recovery firmware?"
+        case .discardRecovery: "Discard recovery data?"
+        }
+    }
+
+    var buttonTitle: String {
+        switch self {
+        case .installRecovery: "Install Recovery Firmware"
+        case .discardRecovery: "Discard Recovery Data"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .installRecovery: "Installing recovery firmware can make the watch temporarily unavailable. Keep it connected until the update completes."
+        case .discardRecovery: "The interrupted update can no longer be resumed after its recovery data is discarded."
+        }
+    }
+}
+
 struct WatchDetailView: View {
     var model: AppModel
     var watchID: String
     @State private var isConfirmingForget = false
     @State private var isChoosingFirmware = false
     @State private var pendingReset: PebbleResetKind?
+    @State private var destructiveFirmwareAction: FirmwareDestructiveAction?
     @Environment(\.dismiss) private var dismiss
 
     private var connection: WatchConnection? {
@@ -283,8 +312,27 @@ struct WatchDetailView: View {
                 }
                 if let journal = model.firmwareUpdateJournal, journal.deviceID == watchID {
                     LabeledContent("Update State", value: journal.phase.rawValue)
+                    if let targetVersion = journal.targetVersion {
+                        LabeledContent("Target Version", value: targetVersion)
+                    }
                     if let progress = model.firmwareUpdateProgress, progress.totalBytes > 0 {
                         ProgressView(value: Double(progress.bytesSent), total: Double(progress.totalBytes))
+                        Text("\(progress.bytesSent, format: .number) of \(progress.totalBytes, format: .number) bytes")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    // Recovery firmware leaves the watch unusable until the
+                    // transfer finishes, so it is never started unasked.
+                    if model.firmwareRequiresConfirmation {
+                        Button("Install Recovery Firmware", role: .destructive) {
+                            destructiveFirmwareAction = .installRecovery
+                        }
+                    }
+                    Button("Cancel Update", role: .destructive) {
+                        Task { await model.cancelFirmwareUpdate() }
+                    }
+                    Button("Discard Recovery Data", role: .destructive) {
+                        destructiveFirmwareAction = .discardRecovery
                     }
                 }
                 if let firmwareUpdateStatusMessage = model.firmwareUpdateStatusMessage {
@@ -329,6 +377,35 @@ struct WatchDetailView: View {
         .fileImporter(isPresented: $isChoosingFirmware, allowedContentTypes: [.pebbleFirmware]) { result in
             guard case .success(let url) = result else { return }
             Task { await model.installFirmware(from: url, deviceID: watchID) }
+        }
+        .dropDestination(for: URL.self) { urls, _ in
+            guard let firmwareURL = urls.first(where: { $0.pathExtension.lowercased() == "pbz" }) else {
+                return false
+            }
+            Task { await model.installFirmware(from: firmwareURL, deviceID: watchID) }
+            return true
+        }
+        .confirmationDialog(
+            destructiveFirmwareAction?.title ?? "Confirm firmware action",
+            isPresented: Binding(
+                get: { destructiveFirmwareAction != nil },
+                set: { if !$0 { destructiveFirmwareAction = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: destructiveFirmwareAction
+        ) { action in
+            Button(action.buttonTitle, role: .destructive) {
+                destructiveFirmwareAction = nil
+                Task {
+                    switch action {
+                    case .installRecovery: await model.confirmRecoveryFirmwareUpdate()
+                    case .discardRecovery: await model.discardPendingFirmwareUpdate()
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) { destructiveFirmwareAction = nil }
+        } message: { action in
+            Text(action.message)
         }
         .confirmationDialog(
             "Forget \(watchName)?",

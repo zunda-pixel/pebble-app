@@ -92,7 +92,6 @@ struct UITests {
     func storedPreferencesUseOneTypedKeyEach() {
         // The keys were string literals repeated across the files that read
         // them, which is how the same preference came to be read two ways.
-        #expect(Defaults.Keys.autoResumeFirmwareUpdate.defaultValue)
         #expect(Defaults.Keys.companionNotificationsEnabled.defaultValue)
         #expect(!Defaults.Keys.hasCompletedOnboarding.defaultValue)
         #expect(Defaults.Keys.favoriteWatchfaceIDs.defaultValue.isEmpty)

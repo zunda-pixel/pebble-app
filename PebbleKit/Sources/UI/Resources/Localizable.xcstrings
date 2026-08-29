@@ -325,6 +325,7 @@
       }
     },
     "Choose PBZ Firmware" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -435,6 +436,7 @@
       }
     },
     "Current Version" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -1175,6 +1177,7 @@
       }
     },
     "Resume Interrupted Updates" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {

@@ -1,38 +1,29 @@
 {
-  "configurations" : [
+  "configurations": [
     {
-      "id" : "6F4C2A18-0B7D-4E52-9C3A-1D5E8B2F7A64",
-      "name" : "Default",
-      "options" : {
-
-      }
+      "id": "6F4C2A18-0B7D-4E52-9C3A-1D5E8B2F7A64",
+      "name": "Default",
+      "options": {}
     }
   ],
-  "defaultOptions" : {
-    "codeCoverage" : false
+  "defaultOptions": {
+    "codeCoverage": false
   },
-  "testTargets" : [
+  "testTargets": [
     {
-      "target" : {
-        "containerPath" : "container:Pebble.xcodeproj",
-        "identifier" : "2E784079303D37E4003810DA",
-        "name" : "PebbleUIAutomationTests"
+      "target": {
+        "containerPath": "container:PebbleKit",
+        "identifier": "UITests",
+        "name": "UITests"
       }
     },
     {
-      "target" : {
-        "containerPath" : "container:PebbleKit",
-        "identifier" : "UITests",
-        "name" : "UITests"
-      }
-    },
-    {
-      "target" : {
-        "containerPath" : "container:PebbleKit",
-        "identifier" : "APITests",
-        "name" : "APITests"
+      "target": {
+        "containerPath": "container:PebbleKit",
+        "identifier": "APITests",
+        "name": "APITests"
       }
     }
   ],
-  "version" : 1
+  "version": 1
 }

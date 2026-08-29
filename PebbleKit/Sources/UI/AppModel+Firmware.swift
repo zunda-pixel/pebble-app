@@ -1,5 +1,4 @@
 import API
-import Defaults
 import Foundation
 
 /// Choosing, downloading and transferring watch firmware.
@@ -174,8 +173,7 @@ extension AppModel {
 
     func resumePendingFirmwareUpdate(on connection: WatchConnection) async {
         let device = connection.device
-        guard Defaults[.autoResumeFirmwareUpdate],
-              let package = try? await pendingFirmwareUpdateLibrary.package(),
+        guard let package = try? await pendingFirmwareUpdateLibrary.package(),
               let journal = try? await pendingFirmwareUpdateLibrary.journal(),
               journal.deviceID == device.id,
               journal.hardwareRevision == device.board?.rawValue,
