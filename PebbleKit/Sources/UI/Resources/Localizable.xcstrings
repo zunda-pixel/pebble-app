@@ -1386,6 +1386,16 @@
         }
       }
     },
+    "This watch started its recovery firmware. Install firmware to finish setting it up." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このウォッチはリカバリファームウェアで起動しています。セットアップを完了するには、ファームウェアをインストールしてください。"
+          }
+        }
+      }
+    },
     "Timeline" : {
       "localizations" : {
         "ja" : {

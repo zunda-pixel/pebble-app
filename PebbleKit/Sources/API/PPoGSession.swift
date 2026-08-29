@@ -24,6 +24,11 @@ public struct PPoGSession: Sendable {
     @Init(.ignore) private var lastSentAcknowledgement: PPoGPacket?
     @Init(.ignore) private var lastReceivedAcknowledgementSequence: Int?
 
+    /// Bytes each data packet spends on its own header. The watch sizes its
+    /// receive buffers to the negotiated packet size minus this much, so a
+    /// smaller allowance here produces packets it quietly drops.
+    static let headerOverhead = 4
+
     public var hasPendingAcknowledgements: Bool {
         !inFlightTransmissions.isEmpty
     }
@@ -32,11 +37,11 @@ public struct PPoGSession: Sendable {
         _ bytes: [UInt8],
         maximumPacketSize: Int
     ) throws -> [PPoGSessionAction] {
-        guard maximumPacketSize > 1 else {
+        guard maximumPacketSize > Self.headerOverhead else {
             throw PPoGSessionError.invalidMaximumPacketSize
         }
 
-        let maximumPayloadSize = maximumPacketSize - 1
+        let maximumPayloadSize = maximumPacketSize - Self.headerOverhead
         var offset = 0
         while offset < bytes.count {
             let end = min(offset + maximumPayloadSize, bytes.count)

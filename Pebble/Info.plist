@@ -11,6 +11,9 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-central</string>
+		<!-- Watches without a protocol service of their own connect to one
+		     hosted by the phone, which has to keep serving in the background. -->
+		<string>bluetooth-peripheral</string>
 	</array>
 </dict>
 </plist>

@@ -1,3 +1,4 @@
+import CoreBluetooth
 import Foundation
 import Testing
 @testable import API
@@ -128,6 +129,26 @@ struct PhoneControlTests {
         #expect(try PhoneControlCodec.decode(
             PebbleProtocolFrame(endpoint: 33, payload: [0x02, 0x00, 0x00, 0x00, 0x07])
         ) == .hangup(cookie: 7))
+    }
+}
+
+@Suite
+@MainActor
+struct GattServerTests {
+    @Test func serviceUsesTheForwardTransportUUIDs() {
+        // The phone hosts these when the watch has no protocol service of its
+        // own; the values have to match what the watch looks for.
+        #expect(PebbleGattServer.serviceUUID.uuidString == "10000000-328E-0FBB-C642-1AA6699BDADA")
+        #expect(PebbleGattServer.dataCharacteristicUUID.uuidString == "10000001-328E-0FBB-C642-1AA6699BDADA")
+        #expect(PebbleGattServer.metaCharacteristicUUID.uuidString == "10000002-328E-0FBB-C642-1AA6699BDADA")
+    }
+
+    @Test func sendingWithoutASubscribedWatchFails() {
+        let server = PebbleGattServer.shared
+        #expect(!server.isSubscribed(centralID: "unknown-watch"))
+        #expect(!server.send([0x01, 0x02], to: "unknown-watch"))
+        // An unsubscribed watch falls back to the smallest possible payload.
+        #expect(server.maximumPacketSize(centralID: "unknown-watch") == 20)
     }
 }
 

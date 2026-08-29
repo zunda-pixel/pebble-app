@@ -34,7 +34,10 @@ public enum PingPongCodec {
         guard frame.endpoint == endpoint else {
             throw PingPongCodecError.unexpectedEndpoint
         }
-        guard frame.payload.count == 5 else {
+        // Some firmware appends fields after the cookie, so only the leading
+        // command and cookie are required. The watch drops a link it gets no
+        // pong on, which makes rejecting a longer payload fatal.
+        guard frame.payload.count >= 5 else {
             throw PingPongCodecError.invalidPayload
         }
 

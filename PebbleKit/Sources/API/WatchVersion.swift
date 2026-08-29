@@ -5,6 +5,10 @@ public struct WatchVersionInformation: Equatable, Sendable {
     public var firmwareVersion: String
     public var serialNumber: String
     public var hardwarePlatform: UInt8
+    /// Whether the watch booted the recovery firmware (PRF). Such a watch
+    /// answers version and ping requests but rejects every other endpoint, so
+    /// it can only be talked to for a firmware install.
+    public var isRunningRecoveryFirmware: Bool = false
 }
 
 public enum WatchVersionCodec {
@@ -28,7 +32,8 @@ public enum WatchVersionCodec {
         return WatchVersionInformation(
             firmwareVersion: fixedString(frame.payload[5..<37]),
             serialNumber: fixedString(frame.payload[108..<120]),
-            hardwarePlatform: frame.payload[46]
+            hardwarePlatform: frame.payload[46],
+            isRunningRecoveryFirmware: frame.payload[45] != 0
         )
     }
 

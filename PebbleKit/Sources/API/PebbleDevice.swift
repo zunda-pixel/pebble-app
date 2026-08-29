@@ -33,4 +33,8 @@ public struct PebbleDevice: Identifiable, Hashable, Sendable {
     public var firmwareVersion: String?
     public var batteryLevel: Int?
     public var serialNumber: String? = nil
+    /// Whether the watch booted its recovery firmware. Such a watch rejects
+    /// every endpoint except version and ping, so the companion app can only
+    /// offer it a firmware install.
+    public var isRunningRecoveryFirmware: Bool = false
 }

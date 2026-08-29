@@ -293,6 +293,12 @@ public final class AppModel {
         }
         connectingDeviceIDs.insert(device.id)
         refreshConnectionState()
+        Task { [id = device.id] in
+            await PebbleDiagnostics.shared.record(
+                category: "connection",
+                message: "connect requested for \(id)"
+            )
+        }
         defer {
             connectingDeviceIDs.remove(device.id)
             refreshConnectionState()
@@ -317,6 +323,20 @@ public final class AppModel {
             await recordConnectedWatch(connectedDevice)
             await restorePendingNotifications()
             await PebbleDiagnostics.shared.record(category: "connection", message: "Watch connected")
+            if connectedDevice.isRunningRecoveryFirmware {
+                // The recovery firmware rejects every endpoint the sync below
+                // uses, and drops the link a few seconds after being flooded
+                // with them. A firmware install is the only thing it accepts.
+                watchManagementErrorMessage =
+                    "This watch started its recovery firmware. Install firmware to finish setting it up."
+                await PebbleDiagnostics.shared.record(
+                    .error,
+                    category: "connection",
+                    message: "Skipping synchronization: the watch is in recovery firmware"
+                )
+                await resumePendingFirmwareUpdate(on: connection)
+                return
+            }
             musicCoordinator.watchConnected()
             await synchronizeNotificationSourceApps(on: connection)
             await synchronizeApplications(on: connection)

@@ -48,6 +48,9 @@ public final class MockPebbleClient: PebbleClient {
         hints
     }
 
+    /// Makes the next connection report a watch running recovery firmware.
+    public var connectsAsRecoveryFirmware = false
+
     public func connect(to device: DiscoveredPebble) async throws -> PebbleDevice {
         try await Task.sleep(for: .milliseconds(500))
 
@@ -57,7 +60,8 @@ public final class MockPebbleClient: PebbleClient {
             model: device.model,
             firmwareVersion: "v5.0.0-mock",
             batteryLevel: 84,
-            serialNumber: "MOCK00000001"
+            serialNumber: "MOCK00000001",
+            isRunningRecoveryFirmware: connectsAsRecoveryFirmware
         )
     }
 

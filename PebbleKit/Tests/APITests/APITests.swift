@@ -600,9 +600,10 @@ struct APITests {
     @Test
     func ppogSessionHonorsTransmitWindow() throws {
         var session = PPoGSession(receiveWindow: 2, transmitWindow: 2)
+        // Three payload bytes per packet once the header allowance is taken off.
         let initialActions = try session.enqueue(
             Array(0..<10),
-            maximumPacketSize: 4
+            maximumPacketSize: 3 + PPoGSession.headerOverhead
         )
 
         #expect(initialActions == [
@@ -726,6 +727,30 @@ struct APITests {
         )
 
         #expect(try PingPongCodec.decode(frame) == .pong(cookie: 42))
+    }
+
+    @Test
+    func watchVersionCodecReportsRecoveryFirmware() throws {
+        var payload = [UInt8](repeating: 0, count: 120)
+        payload[0] = 0x01
+        payload[45] = 0x01
+        payload[46] = 15
+        let frame = PebbleProtocolFrame(endpoint: 16, payload: payload)
+
+        let information = try WatchVersionCodec.decode(frame)
+
+        #expect(information.isRunningRecoveryFirmware)
+        #expect(information.hardwarePlatform == 15)
+    }
+
+    @Test
+    func pingPongCodecAcceptsTrailingBytesFromNewerFirmware() throws {
+        let frame = PebbleProtocolFrame(
+            endpoint: 2_001,
+            payload: [0x00, 0x00, 0x00, 0x00, 0x2A, 0x00]
+        )
+
+        #expect(try PingPongCodec.decode(frame) == .ping(cookie: 42))
     }
 
     @Test

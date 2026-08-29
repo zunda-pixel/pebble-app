@@ -74,6 +74,27 @@ struct UITests {
     }
 
     @Test
+    func connectingToRecoveryFirmwareSkipsSynchronization() async throws {
+        let client = MockPebbleClient()
+        client.connectsAsRecoveryFirmware = true
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+
+        await model.scan()
+        let discovered = try #require(model.discoveredDevices.first)
+        await model.connect(to: discovered)
+
+        #expect(model.connectedDevice?.isRunningRecoveryFirmware == true)
+        // The recovery firmware rejects these endpoints and drops the link
+        // when it is flooded with them.
+        #expect(client.reorderedApplicationIDs.isEmpty)
+        #expect(model.watchManagementErrorMessage != nil)
+    }
+
+    @Test
     func scanReconnectsToSavedWatchThatDoesNotAdvertise() async throws {
         let client = MockPebbleClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)

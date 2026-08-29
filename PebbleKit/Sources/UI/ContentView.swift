@@ -1248,6 +1248,15 @@ private struct WatchDetailView: View {
 
     var body: some View {
         Form {
+            if connection?.device.isRunningRecoveryFirmware == true {
+                Section {
+                    Label(
+                        "This watch started its recovery firmware. Install firmware to finish setting it up.",
+                        systemImage: "exclamationmark.triangle"
+                    )
+                }
+            }
+
             Section("Watch") {
                 if let model = connection?.device.model ?? savedWatch?.model {
                     LabeledContent("Model", value: model.displayName)
