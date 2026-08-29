@@ -81,9 +81,15 @@ Not `NSLock`, and not `nonisolated(unsafe)`.
 
 Reach for what is already in `PebbleKit/Package.swift` before adding anything:
 swift-algorithms, swift-async-algorithms, swift-collections (`DequeModule`),
-swift-http-types (typed `HTTPRequest` for every network call), Defaults (typed
-keys in `PebbleDefaults.swift`), Valet (keychain, in `PebbleTokenStore.swift`),
-MemberwiseInit, ZIPFoundation.
+swift-async-operations (`asyncMap` and friends, for concurrent work that has to
+stay in order), swift-http-types (typed `HTTPRequest` for every network call),
+Defaults (typed keys in `PebbleDefaults.swift`), Valet (keychain, in
+`PebbleTokenStore.swift`), MemberwiseInit, ZIPFoundation.
+
+Notifications between the app's own parts are typed `NotificationCenter`
+messages (`PebbleWindowMessages.swift`), not `Notification.Name` plus an
+untyped `object`. Foundation's message API needs a class as the subject, and the
+model a window shows is that class.
 
 ## Protocol reference
 

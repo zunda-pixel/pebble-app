@@ -1,4 +1,5 @@
 import API
+import AsyncOperations
 import Defaults
 import Foundation
 
@@ -270,11 +271,21 @@ extension AppModel {
         for applicationID in synchronizedIDs where !localIDs.contains(applicationID) {
             try await connection.client.unregisterApplication(applicationID: applicationID)
         }
-        for application in compatibleApplications {
-            guard let packageURL = await applicationLibrary.storedPackageURL(applicationID: application.id) else {
-                throw ApplicationManagementError.missingStoredPackage(application.displayName)
+        // Reading and unzipping a package is disk work that has nothing to do
+        // with the watch, so the packages are decoded a few at a time while
+        // `asyncMap` keeps them in library order. The watch is then handed them
+        // one by one, because the order they arrive in is the order they appear
+        // in its menu.
+        let library = applicationLibrary
+        let watchModel = device.model
+        let packages = try await compatibleApplications
+            .asyncMap(numberOfConcurrentTasks: 4) { application in
+                guard let packageURL = await library.storedPackageURL(applicationID: application.id) else {
+                    throw ApplicationManagementError.missingStoredPackage(application.displayName)
+                }
+                return try PBWPackageImporter.load(from: packageURL, for: watchModel)
             }
-            let package = try await loadPackage(from: packageURL, for: device.model)
+        for package in packages {
             try await connection.client.registerApplication(package.appMetadata)
         }
         try await connection.client.reorderApplications(compatibleApplications.map(\.id))

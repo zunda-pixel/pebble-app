@@ -56,7 +56,7 @@ struct DevicesView: View {
         .sheet(isPresented: $isAddingWatch) {
             AddWatchSheet(model: model)
         }
-        .onReceive(NotificationCenter.default.publisher(for: .pebbleScanRequested)) { _ in
+        .onPebbleMessage(PebbleScanRequest.self, from: model) { _ in
             isAddingWatch = true
         }
     }

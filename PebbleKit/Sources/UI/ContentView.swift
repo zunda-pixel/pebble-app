@@ -11,11 +11,6 @@ import AppKit
 import UIKit
 #endif
 
-public extension Notification.Name {
-    static var pebbleScanRequested: Notification.Name { Notification.Name("PebbleScanRequested") }
-    static var pebbleSectionRequested: Notification.Name { Notification.Name("PebbleSectionRequested") }
-}
-
 @MainActor
 public func makeDefaultPebbleClient() -> any PebbleClient {
     CoreBluetoothPebbleClient()
@@ -67,16 +62,21 @@ public struct ContentView: View {
     }
 }
 
-enum AppSection: String, CaseIterable, Identifiable {
+public enum AppSection: String, CaseIterable, Identifiable {
     case devices
     case apps
     case timeline
     case health
     case settings
 
-    var id: Self { self }
+    /// The sections a window can show. Settings is a separate scene.
+    public static var windowSections: [AppSection] {
+        allCases.filter { $0 != .settings }
+    }
 
-    var title: String {
+    public var id: Self { self }
+
+    public var title: String {
         switch self {
         case .devices:
             "Devices"
@@ -91,7 +91,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         }
     }
 
-    var systemImage: String {
+    public var systemImage: String {
         switch self {
         case .devices:
             "applewatch"
@@ -137,7 +137,7 @@ struct MacRootView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(AppSection.allCases.filter { $0 != .settings }, selection: $selection) { section in
+            List(AppSection.windowSections, selection: $selection) { section in
                 Label(section.title, systemImage: section.systemImage)
                     .tag(section)
             }
@@ -153,13 +153,11 @@ struct MacRootView: View {
             }
         }
         .frame(minWidth: 680, minHeight: 480)
-        .onReceive(NotificationCenter.default.publisher(for: .pebbleScanRequested)) { _ in
+        .onPebbleMessage(PebbleScanRequest.self, from: model) { _ in
             selection = .devices
         }
-        .onReceive(NotificationCenter.default.publisher(for: .pebbleSectionRequested)) { notification in
-            guard let rawValue = notification.object as? String,
-                  let requestedSection = AppSection(rawValue: rawValue) else { return }
-            selection = requestedSection
+        .onPebbleMessage(PebbleSectionRequest.self, from: model) { message in
+            selection = message.section
         }
     }
 }

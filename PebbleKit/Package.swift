@@ -20,6 +20,7 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.0.0"),
     .package(url: "https://github.com/apple/swift-collections.git", from: "1.1.0"),
     .package(url: "https://github.com/apple/swift-http-types.git", from: "1.0.0"),
+    .package(url: "https://github.com/mtj0928/swift-async-operations.git", from: "0.5.0"),
     .package(url: "https://github.com/square/Valet.git", from: "5.0.0"),
     .package(url: "https://github.com/sindresorhus/Defaults.git", from: "9.0.0"),
     .package(url: "https://github.com/gohanlon/swift-memberwise-init-macro.git", from: "0.6.0"),
@@ -31,6 +32,7 @@ let package = Package(
       dependencies: [
         .target(name: "API"),
         .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+        .product(name: "AsyncOperations", package: "swift-async-operations"),
         .product(name: "Defaults", package: "Defaults"),
         .product(name: "Valet", package: "Valet"),
       ]

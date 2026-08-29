@@ -31,16 +31,16 @@ struct MainApp: App {
     .commands {
       CommandMenu("Pebble") {
         Button("Scan for Watches") {
-          NotificationCenter.default.post(name: .pebbleScanRequested, object: nil)
+          NotificationCenter.default.post(PebbleScanRequest(), subject: model)
         }
         .keyboardShortcut("r", modifiers: .command)
         .disabled(model.isScanningOrConnecting)
 
         Divider()
 
-        ForEach(Array(["devices", "apps", "timeline", "health"].enumerated()), id: \.element) { index, section in
-          Button(section.capitalized) {
-            NotificationCenter.default.post(name: .pebbleSectionRequested, object: section)
+        ForEach(Array(AppSection.windowSections.enumerated()), id: \.element) { index, section in
+          Button(section.title) {
+            NotificationCenter.default.post(PebbleSectionRequest(section: section), subject: model)
           }
           .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
         }

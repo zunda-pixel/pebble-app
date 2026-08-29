@@ -1,4 +1,5 @@
 import API
+import AsyncOperations
 import Foundation
 
 /// Remembered watches and per-watch actions.
@@ -7,9 +8,17 @@ extension AppModel {
         do {
             savedWatches = try await watchLibrary.allWatches()
             watchManagementErrorMessage = nil
-            for watch in savedWatches where installedApplicationIDsByWatch[watch.id] == nil {
-                let ids = (try? await applicationLibrary.synchronizedApplicationIDs(deviceID: watch.id)) ?? []
-                installedApplicationIDsByWatch[watch.id] = Set(ids)
+            // One independent read per watch, so they do not have to queue up
+            // behind each other.
+            let library = applicationLibrary
+            let states = await savedWatches
+                .filter { installedApplicationIDsByWatch[$0.id] == nil }
+                .asyncMap(numberOfConcurrentTasks: 4) { watch in
+                    let ids = (try? await library.synchronizedApplicationIDs(deviceID: watch.id)) ?? []
+                    return (watch.id, Set(ids))
+                }
+            for (watchID, ids) in states {
+                installedApplicationIDsByWatch[watchID] = ids
             }
         } catch {
             watchManagementErrorMessage = "Saved watches could not be loaded."
