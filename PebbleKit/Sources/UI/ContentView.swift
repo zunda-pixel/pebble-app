@@ -71,7 +71,6 @@ private enum AppSection: String, CaseIterable, Identifiable {
     case apps
     case timeline
     case health
-    case catalog
     case settings
 
     var id: Self { self }
@@ -86,8 +85,6 @@ private enum AppSection: String, CaseIterable, Identifiable {
             "Timeline"
         case .health:
             "Health"
-        case .catalog:
-            "Catalog"
         case .settings:
             "Settings"
         }
@@ -103,8 +100,6 @@ private enum AppSection: String, CaseIterable, Identifiable {
             "calendar"
         case .health:
             "heart"
-        case .catalog:
-            "bag"
         case .settings:
             "gearshape"
         }
@@ -277,8 +272,6 @@ private struct SectionContent: View {
             TimelineView(model: model)
         case .health:
             HealthView(model: model)
-        case .catalog:
-            CatalogView(model: model)
         case .settings:
             SettingsView(model: model)
         }
@@ -429,14 +422,28 @@ private enum CatalogSort: String, CaseIterable, Identifiable {
     var id: Self { self }
 }
 
+/// The app catalog, presented as a sheet from the Apps tab's plus button.
 private struct CatalogView: View {
     var model: AppModel
+    var isImportingApplication: Bool = false
+    var isImportDisabled: Bool = false
+    var importApplication: (() -> Void)?
     @State private var query = ""
     @State private var category = "All"
     @State private var kind: CatalogKindFilter = .all
     @State private var sort: CatalogSort = .name
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
+        NavigationStack {
+            catalogList
+        }
+        #if os(macOS)
+        .frame(minWidth: 520, minHeight: 560)
+        #endif
+    }
+
+    private var catalogList: some View {
         List {
             Section("Browse") {
                 Picker("Type", selection: $kind) {
@@ -466,7 +473,20 @@ private struct CatalogView: View {
         .searchable(text: $query)
         .navigationTitle("Catalog")
         .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Done") { dismiss() }
+            }
             ToolbarItemGroup {
+                if let importApplication {
+                    if isImportingApplication {
+                        ProgressView()
+                            .accessibilityLabel("Importing Pebble application")
+                    } else {
+                        Button("Import", systemImage: "square.and.arrow.down", action: importApplication)
+                            .accessibilityHint("Choose a PBW package from Files")
+                            .disabled(isImportDisabled)
+                    }
+                }
                 Button("Update All", systemImage: "arrow.down.app") {
                     Task { await model.installCatalogUpdates() }
                 }
@@ -608,6 +628,7 @@ private struct ApplicationsView: View {
     var model: AppModel
     @Environment(\.undoManager) private var undoManager
     @State private var isChoosingPackage = false
+    @State private var isShowingCatalog = false
     @State private var pendingRemovalID: UUID?
     @State private var selectedWatchID: String?
 
@@ -683,17 +704,18 @@ private struct ApplicationsView: View {
         .task { await model.loadApplications() }
         .toolbar {
             ToolbarItem {
-                if model.isImportingApplication {
-                    ProgressView()
-                        .accessibilityLabel("Importing Pebble application")
-                } else {
-                    Button("Import", systemImage: "square.and.arrow.down") {
-                        isChoosingPackage = true
-                    }
-                    .accessibilityHint("Choose a PBW package from Files")
-                    .disabled(model.isApplicationManagementBusy)
+                Button("Add App", systemImage: "plus") {
+                    isShowingCatalog = true
                 }
             }
+        }
+        .sheet(isPresented: $isShowingCatalog) {
+            CatalogView(
+                model: model,
+                isImportingApplication: model.isImportingApplication,
+                isImportDisabled: model.isApplicationManagementBusy,
+                importApplication: { isChoosingPackage = true }
+            )
         }
         .fileImporter(
             isPresented: $isChoosingPackage,

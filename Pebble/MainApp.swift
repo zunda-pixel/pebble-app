@@ -38,7 +38,7 @@ struct MainApp: App {
 
         Divider()
 
-        ForEach(Array(["devices", "apps", "timeline", "health", "catalog"].enumerated()), id: \.element) { index, section in
+        ForEach(Array(["devices", "apps", "timeline", "health"].enumerated()), id: \.element) { index, section in
           Button(section.capitalized) {
             NotificationCenter.default.post(name: .pebbleSectionRequested, object: section)
           }

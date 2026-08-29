@@ -19,7 +19,6 @@ final class PebbleUIAutomationTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Apps"].exists)
         XCTAssertTrue(app.staticTexts["Timeline"].exists)
         XCTAssertTrue(app.staticTexts["Health"].exists)
-        XCTAssertTrue(app.staticTexts["Catalog"].exists)
     }
 
     @MainActor

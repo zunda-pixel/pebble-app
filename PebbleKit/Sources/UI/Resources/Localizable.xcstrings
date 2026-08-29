@@ -94,6 +94,16 @@
         }
       }
     },
+    "Add App" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリを追加"
+          }
+        }
+      }
+    },
     "Add to Timeline" : {
       "localizations" : {
         "ja" : {
