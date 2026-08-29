@@ -21,9 +21,23 @@ private final class NotificationObserverStorage: @unchecked Sendable {
 
 @MainActor
 public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
+    /// Where a connection stands with the watch's pairing service.
+    private enum PairingState: Equatable {
+        /// Services have not been inspected yet.
+        case unknown
+        /// Waiting for the watch to report its connectivity status.
+        case checking
+        /// The watch has been asked to pair; waiting for the user to accept.
+        case pairing
+        /// The link is bonded, or the watch has no pairing service.
+        case ready
+    }
+
     private static var ppogService = CBUUID(string: "40000000-328E-0FBB-C642-1AA6699BDADA")
     /// Advertised by watches that are not bonded yet, including after a reset.
     private static var pairingService = CBUUID(string: "0000FED9-0000-1000-8000-00805F9B34FB")
+    private static var connectivityCharacteristic = CBUUID(string: "00000001-328E-0FBB-C642-1AA6699BDADA")
+    private static var pairingTriggerCharacteristic = CBUUID(string: "00000002-328E-0FBB-C642-1AA6699BDADA")
     private static var ppogNotifyCharacteristic = CBUUID(string: "40000001-328E-0FBB-C642-1AA6699BDADA")
     private static var ppogWriteCharacteristic = CBUUID(string: "40000003-328E-0FBB-C642-1AA6699BDADA")
     private static var batteryService = CBUUID(string: "180F")
@@ -38,6 +52,14 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var pendingDevice: DiscoveredPebble?
     private var activeWriteCharacteristic: CBCharacteristic?
     private var activeBatteryCharacteristic: CBCharacteristic?
+    private var activePairingTriggerCharacteristic: CBCharacteristic?
+    private var ppogNotifyCharacteristicToSubscribe: CBCharacteristic?
+    private var pairingState = PairingState.unknown
+    private var protocolDiscoveryAttempts = 0
+    private var protocolDiscoveryTask: Task<Void, Never>?
+    private var hasReconnectedToRefreshServices = false
+    private var isRefreshingServicesAfterPairing = false
+    private var pairingTimeoutTask: Task<Void, Never>?
     private var connectedPeripheral: CBPeripheral?
     private var connectedDevice: PebbleDevice?
     private var latestBatteryLevel: Int?
@@ -525,6 +547,16 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private func failConnection(_ error: PebbleConnectionError) {
         connectionTimeoutTask?.cancel()
         connectionTimeoutTask = nil
+        pairingTimeoutTask?.cancel()
+        pairingTimeoutTask = nil
+        pairingState = .unknown
+        protocolDiscoveryAttempts = 0
+        protocolDiscoveryTask?.cancel()
+        protocolDiscoveryTask = nil
+        hasReconnectedToRefreshServices = false
+        isRefreshingServicesAfterPairing = false
+        ppogNotifyCharacteristicToSubscribe = nil
+        activePairingTriggerCharacteristic = nil
         connectionContinuation?.resume(throwing: error)
         connectionContinuation = nil
         // Withdraw the pending connect request: CoreBluetooth otherwise keeps
@@ -976,6 +1008,14 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         activeAppMessageTransactionID = nil
         activeWriteCharacteristic = nil
         activeBatteryCharacteristic = nil
+        activePairingTriggerCharacteristic = nil
+        ppogNotifyCharacteristicToSubscribe = nil
+        pairingState = .unknown
+        protocolDiscoveryAttempts = 0
+        protocolDiscoveryTask?.cancel()
+        protocolDiscoveryTask = nil
+        pairingTimeoutTask?.cancel()
+        pairingTimeoutTask = nil
         connectedPeripheral = nil
         connectedDevice = nil
         latestBatteryLevel = nil
@@ -1190,7 +1230,9 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
             centralManager.cancelPeripheralConnection(peripheral)
             return
         }
-        peripheral.discoverServices([Self.ppogService, Self.batteryService])
+        pairingState = .unknown
+        protocolDiscoveryAttempts = 0
+        peripheral.discoverServices([Self.pairingService, Self.ppogService, Self.batteryService])
     }
 
     public func centralManager(
@@ -1213,6 +1255,17 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
         isReconnecting: Bool,
         error: (any Error)?
     ) {
+        if isRefreshingServicesAfterPairing, pendingDevice != nil {
+            // A reconnect we asked for so CoreBluetooth rebuilds its service
+            // list on an encrypted link; the connect attempt is still running.
+            isRefreshingServicesAfterPairing = false
+            pairingState = .unknown
+            protocolDiscoveryAttempts = 0
+            clearTransportState()
+            centralManager.connect(peripheral)
+            return
+        }
+
         let identifier = peripheral.identifier.uuidString
         let wasConnected = connectedDevice != nil
         let wasIntentional = intentionalDisconnectIdentifiers.remove(identifier) != nil
@@ -1256,19 +1309,64 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
 }
 
 extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
+    /// The watch publishes its protocol service once the link is encrypted,
+    /// which invalidates iOS's cached service list. This is the signal that a
+    /// fresh discovery will actually return it.
+    public func peripheral(
+        _ peripheral: CBPeripheral,
+        didModifyServices invalidatedServices: [CBService]
+    ) {
+        guard pendingDevice?.id == peripheral.identifier.uuidString
+            || connectedPeripheral?.identifier == peripheral.identifier else {
+            return
+        }
+        protocolDiscoveryTask?.cancel()
+        protocolDiscoveryTask = nil
+        protocolDiscoveryAttempts = 0
+        peripheral.discoverServices([Self.pairingService, Self.ppogService, Self.batteryService])
+    }
+
     public func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: (any Error)?) {
-        guard error == nil,
-              let service = peripheral.services?.first(where: { $0.uuid == Self.ppogService }) else {
+        guard error == nil else {
             abortLink(peripheral, error: .protocolNegotiationFailed)
             return
         }
+        let services = peripheral.services ?? []
+        Task { [uuids = services.map(\.uuid.uuidString)] in
+            await PebbleDiagnostics.shared.record(
+                category: "pairing",
+                message: "discovered services [\(uuids.joined(separator: ","))]"
+            )
+        }
 
-        peripheral.discoverCharacteristics(
-            [Self.ppogNotifyCharacteristic, Self.ppogWriteCharacteristic],
-            for: service
-        )
+        // The pairing service tells us whether the link is bonded and lets us
+        // ask the watch to start pairing. A watch that is not bonded yet only
+        // exposes this one, so the protocol service is looked for again once
+        // pairing finishes.
+        if pairingState == .unknown {
+            if let pairingService = services.first(where: { $0.uuid == Self.pairingService }) {
+                pairingState = .checking
+                peripheral.discoverCharacteristics(
+                    [Self.connectivityCharacteristic, Self.pairingTriggerCharacteristic],
+                    for: pairingService
+                )
+            } else {
+                pairingState = .ready
+            }
+        }
 
-        if let batteryService = peripheral.services?.first(where: { $0.uuid == Self.batteryService }) {
+        if let service = services.first(where: { $0.uuid == Self.ppogService }) {
+            peripheral.discoverCharacteristics(
+                [Self.ppogNotifyCharacteristic, Self.ppogWriteCharacteristic],
+                for: service
+            )
+        } else if pairingState == .ready {
+            // The service is missing from what iOS cached; retry or reconnect.
+            startProtocolIfReady(on: peripheral)
+            return
+        }
+
+        if let batteryService = services.first(where: { $0.uuid == Self.batteryService }) {
             peripheral.discoverCharacteristics(
                 [Self.batteryLevelCharacteristic],
                 for: batteryService
@@ -1298,6 +1396,26 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
             return
         }
 
+        if service.uuid == Self.pairingService {
+            guard error == nil,
+                  let characteristics = service.characteristics,
+                  let connectivity = characteristics.first(where: { $0.uuid == Self.connectivityCharacteristic }) else {
+                // Without the connectivity characteristic there is nothing to
+                // wait for; a watch that needs pairing will fail later anyway.
+                pairingState = .ready
+                startProtocolIfReady(on: peripheral)
+                return
+            }
+            activePairingTriggerCharacteristic = characteristics.first {
+                $0.uuid == Self.pairingTriggerCharacteristic
+            }
+            if connectivity.properties.contains(.notify) || connectivity.properties.contains(.indicate) {
+                peripheral.setNotifyValue(true, for: connectivity)
+            }
+            peripheral.readValue(for: connectivity)
+            return
+        }
+
         guard error == nil,
               let characteristics = service.characteristics,
               let notifyCharacteristic = characteristics.first(where: { $0.uuid == Self.ppogNotifyCharacteristic }),
@@ -1307,7 +1425,116 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
         }
 
         activeWriteCharacteristic = writeCharacteristic
-        peripheral.setNotifyValue(true, for: notifyCharacteristic)
+        ppogNotifyCharacteristicToSubscribe = notifyCharacteristic
+        startProtocolIfReady(on: peripheral)
+    }
+
+    /// Subscribes to the protocol characteristic once the link is known to be
+    /// bonded. Subscribing before that fails on a watch that is not paired yet.
+    private func startProtocolIfReady(on peripheral: CBPeripheral) {
+        guard pairingState == .ready else {
+            return
+        }
+        if let notifyCharacteristic = ppogNotifyCharacteristicToSubscribe {
+            ppogNotifyCharacteristicToSubscribe = nil
+            protocolDiscoveryAttempts = 0
+            peripheral.setNotifyValue(true, for: notifyCharacteristic)
+            return
+        }
+        // The protocol service only exists on an encrypted link, and iOS keeps
+        // serving the service list it cached while the watch was unbonded, so
+        // rediscovery has to be retried after pairing.
+        if protocolDiscoveryAttempts < 3 {
+            protocolDiscoveryAttempts += 1
+            protocolDiscoveryTask?.cancel()
+            protocolDiscoveryTask = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled, let self, self.pairingState == .ready else {
+                    return
+                }
+                peripheral.discoverServices([Self.ppogService, Self.batteryService])
+            }
+            return
+        }
+        guard !hasReconnectedToRefreshServices else {
+            abortLink(peripheral, error: .protocolNegotiationFailed)
+            return
+        }
+        // Rediscovery on the same connection keeps returning the stale list;
+        // CoreBluetooth only rebuilds it for a connection that was encrypted
+        // from the start, so reconnect once now that the watch is bonded.
+        hasReconnectedToRefreshServices = true
+        Task {
+            await PebbleDiagnostics.shared.record(
+                category: "pairing",
+                message: "Reconnecting to refresh the service list after pairing"
+            )
+        }
+        isRefreshingServicesAfterPairing = true
+        centralManager.cancelPeripheralConnection(peripheral)
+    }
+
+    private func handleConnectivity(_ bytes: [UInt8], on peripheral: CBPeripheral) {
+        guard let status = PebbleConnectivityStatus(decoding: bytes) else {
+            // A watch stuck in a bad state reports a truncated value; it needs
+            // a reboot before it can be paired.
+            abortLink(peripheral, error: .protocolNegotiationFailed)
+            return
+        }
+        Task {
+            await PebbleDiagnostics.shared.record(
+                category: "pairing",
+                message: "connectivity paired=\(status.isPaired) encrypted=\(status.isEncrypted) error=\(status.pairingError)"
+            )
+        }
+        guard pairingState != .ready else {
+            return
+        }
+        if status.isReadyForProtocol {
+            pairingTimeoutTask?.cancel()
+            pairingTimeoutTask = nil
+            let wasPairing = pairingState == .pairing
+            pairingState = .ready
+            if wasPairing {
+                // Pairing replaced the connect deadline with its own; give the
+                // rest of the handshake a fresh one now that it is done.
+                connectionTimeoutTask?.cancel()
+                connectionTimeoutTask = Task { [weak self] in
+                    try? await Task.sleep(for: .seconds(30))
+                    guard !Task.isCancelled else {
+                        return
+                    }
+                    self?.failConnection(.connectionTimedOut)
+                }
+            }
+            startProtocolIfReady(on: peripheral)
+            return
+        }
+        guard pairingState != .pairing else {
+            return
+        }
+        pairingState = .pairing
+        // Only the watch can start bonding: ask it to send a security request,
+        // which is what makes iOS show its pairing prompt.
+        if let trigger = activePairingTriggerCharacteristic {
+            peripheral.writeValue(
+                Data(PebblePairingTrigger.value()),
+                for: trigger,
+                type: trigger.properties.contains(.write) ? .withResponse : .withoutResponse
+            )
+        }
+        // Pairing needs the user to accept a prompt, so it gets its own, much
+        // longer deadline than the rest of connecting.
+        connectionTimeoutTask?.cancel()
+        connectionTimeoutTask = nil
+        pairingTimeoutTask?.cancel()
+        pairingTimeoutTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(60))
+            guard !Task.isCancelled else {
+                return
+            }
+            self?.abortLink(peripheral, error: .connectionTimedOut)
+        }
     }
 
     public func peripheral(
@@ -1315,7 +1542,8 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
         didUpdateNotificationStateFor characteristic: CBCharacteristic,
         error: (any Error)?
     ) {
-        if characteristic.uuid == Self.batteryLevelCharacteristic {
+        if characteristic.uuid == Self.batteryLevelCharacteristic
+            || characteristic.uuid == Self.connectivityCharacteristic {
             return
         }
 
@@ -1343,6 +1571,14 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
                 return
             }
             updateBatteryLevel(from: [UInt8](value))
+            return
+        }
+
+        if characteristic.uuid == Self.connectivityCharacteristic {
+            guard error == nil, let value = characteristic.value else {
+                return
+            }
+            handleConnectivity([UInt8](value), on: peripheral)
             return
         }
 

@@ -1,0 +1,61 @@
+import MemberwiseInit
+
+/// The watch's view of the link, read from the pairing service's connectivity
+/// characteristic. A watch that is not bonded yet reports `isPaired` false, and
+/// a bond the phone has forgotten shows up as paired but not encrypted.
+@MemberwiseInit(.public)
+public struct PebbleConnectivityStatus: Equatable, Sendable {
+    public var isConnected: Bool
+    public var isPaired: Bool
+    public var isEncrypted: Bool
+    public var hasBondedGateway: Bool
+    public var supportsPinningWithoutSlaveSecurity: Bool
+    public var hasRemoteAttemptedToUseStalePairing: Bool
+    public var pairingError: UInt8
+
+    /// A healthy watch always reports four bytes: flags, two reserved bytes and
+    /// a pairing error code.
+    public init?(decoding bytes: [UInt8]) {
+        guard bytes.count >= 4 else {
+            return nil
+        }
+        let flags = bytes[0]
+        self.init(
+            isConnected: flags & 0b1 != 0,
+            isPaired: flags & 0b10 != 0,
+            isEncrypted: flags & 0b100 != 0,
+            hasBondedGateway: flags & 0b1000 != 0,
+            supportsPinningWithoutSlaveSecurity: flags & 0b1_0000 != 0,
+            hasRemoteAttemptedToUseStalePairing: flags & 0b10_0000 != 0,
+            pairingError: bytes[3]
+        )
+    }
+
+    /// Whether the link is usable as-is; anything else needs pairing first.
+    public var isReadyForProtocol: Bool {
+        isPaired && isEncrypted
+    }
+}
+
+public enum PebblePairingTrigger {
+    /// Builds the value written to the pairing trigger characteristic.
+    ///
+    /// The default asks the watch to start the security request itself, which
+    /// is what makes iOS show its pairing prompt: the phone cannot initiate
+    /// bonding on its own.
+    public static func value(
+        pinAddress: Bool = false,
+        noSecurityRequest: Bool = false,
+        autoAcceptFuturePairing: Bool = false,
+        watchAsGattServer: Bool = false
+    ) -> [UInt8] {
+        var flags: UInt8 = 0
+        if pinAddress { flags |= 1 << 0 }
+        if noSecurityRequest { flags |= 1 << 1 }
+        // The watch only sends a security request when explicitly told to.
+        if !noSecurityRequest { flags |= 1 << 2 }
+        if autoAcceptFuturePairing { flags |= 1 << 3 }
+        if watchAsGattServer { flags |= 1 << 4 }
+        return [flags]
+    }
+}

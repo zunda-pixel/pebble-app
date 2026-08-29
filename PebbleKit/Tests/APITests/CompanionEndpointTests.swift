@@ -133,6 +133,46 @@ struct PhoneControlTests {
 
 @Suite
 @MainActor
+struct PairingTests {
+    @Test func connectivityStatusDecodesFlags() throws {
+        // A watch that has just been reset: connected, not paired, not
+        // encrypted, and no pairing error yet.
+        let fresh = try #require(PebbleConnectivityStatus(decoding: [0b1, 0, 0, 0]))
+        #expect(fresh.isConnected)
+        #expect(!fresh.isPaired)
+        #expect(!fresh.isEncrypted)
+        #expect(!fresh.isReadyForProtocol)
+
+        let bonded = try #require(PebbleConnectivityStatus(decoding: [0b111, 0, 0, 0]))
+        #expect(bonded.isReadyForProtocol)
+
+        // Paired but unencrypted means the phone forgot the bond.
+        let stale = try #require(PebbleConnectivityStatus(decoding: [0b10_0011, 0, 0, 8]))
+        #expect(stale.isPaired)
+        #expect(!stale.isEncrypted)
+        #expect(stale.hasRemoteAttemptedToUseStalePairing)
+        #expect(stale.pairingError == 8)
+        #expect(!stale.isReadyForProtocol)
+    }
+
+    @Test func connectivityStatusRejectsTruncatedValues() {
+        // Watches wedged in a bad state report a short value.
+        #expect(PebbleConnectivityStatus(decoding: []) == nil)
+        #expect(PebbleConnectivityStatus(decoding: [0b111, 0, 0]) == nil)
+    }
+
+    @Test func pairingTriggerAsksTheWatchForASecurityRequest() {
+        // Only the watch can start bonding, so the default value sets the
+        // force-security-request bit and nothing else.
+        #expect(PebblePairingTrigger.value() == [0b100])
+        #expect(PebblePairingTrigger.value(noSecurityRequest: true) == [0b10])
+        #expect(PebblePairingTrigger.value(pinAddress: true) == [0b101])
+        #expect(PebblePairingTrigger.value(watchAsGattServer: true) == [0b1_0100])
+    }
+}
+
+@Suite
+@MainActor
 struct ResetTests {
     @Test func resetFramesUseTheOfficialWireValues() {
         #expect(ResetCodec.frame(.restart) == PebbleProtocolFrame(endpoint: 2_003, payload: [0x00]))
