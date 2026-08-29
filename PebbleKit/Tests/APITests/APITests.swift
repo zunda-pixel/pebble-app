@@ -405,7 +405,18 @@ struct APITests {
     }
 
     @Test func pebbleCRC32MatchesSTMWordAlgorithm() {
+        // Golden values from the reference implementation's CrcCalculatorTest.
+        #expect(PebbleCRC32.calculate([]) == 0xFFFFFFFF)
+        #expect(PebbleCRC32.calculate([0xAB]) == 0x1D604014)
         #expect(PebbleCRC32.calculate([0x01, 0x02, 0x03, 0x04]) == 0x1DABE74F)
+        #expect(PebbleCRC32.calculate([0x01, 0x02, 0x03, 0x04, 0x50, 0x06, 0x70, 0x08]) == 0x99F9E573)
+    }
+
+    @Test func pebbleCRC32ReversesTrailingPartialWords() {
+        // Sizes that are not a multiple of four are the common case for app
+        // binaries; packing the tail in place produced a CRC the watch NACKed.
+        #expect(PebbleCRC32.calculate([0x01, 0x02, 0x03, 0x04, 0x05, 0x06]) == 0x205DBD4F)
+        #expect(PebbleCRC32.calculate([0x01, 0x02, 0x03]) == 0x6B6DC92A)
     }
 
     @Test func putBytesAppInitializationUsesAppBitAndBigEndianValues() {

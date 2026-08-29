@@ -1037,6 +1037,12 @@ public final class AppModel {
             if !activeConnections.isEmpty {
                 pendingImportSnapshots[application.id] = snapshot
                 try await synchronizeAllWatches()
+                // The watch only asks for the binary when it tries to run the
+                // app, so launching it is what actually starts the transfer.
+                for connection in activeConnections
+                where compatibleApplications([application], with: connection.device.model).isEmpty == false {
+                    try? await connection.client.launchApplication(id: application.id)
+                }
                 expirePendingSnapshot(applicationID: application.id)
             }
             hasLoadedApplications = true
@@ -1206,20 +1212,6 @@ public final class AppModel {
         try await Task.detached(priority: .userInitiated) {
             try PBWPackageImporter.load(from: url, for: model)
         }.value
-    }
-
-    private func restoreWatchRegistration(
-        snapshot: PebbleApplicationLibrarySnapshot,
-        applicationID: UUID,
-        on connection: WatchConnection
-    ) async throws {
-        guard snapshot.packageData != nil,
-              let packageURL = await applicationLibrary.storedPackageURL(applicationID: applicationID) else {
-            try await connection.client.unregisterApplication(applicationID: applicationID)
-            return
-        }
-        let package = try await loadPackage(from: packageURL, for: connection.device.model)
-        try await connection.client.registerApplication(package.appMetadata)
     }
 
     private func expirePendingSnapshot(applicationID: UUID) {
@@ -1660,25 +1652,14 @@ public final class AppModel {
                     appBankID: request.appBankID
                 )
             }
-            try await connection.client.registerApplication(package.appMetadata)
+            // The watch installs the binary itself once the transfer commits;
+            // re-registering or reordering here only risks undoing it.
             let applications = try await applicationLibrary.applications()
-            try await connection.client.reorderApplications(
-                compatibleApplications(applications, with: model).map(\.id)
-            )
             try await recordSynchronizedApplications(applications, device: connection.device)
             pendingImportSnapshots[request.applicationID] = nil
             applicationLibraryErrorMessage = nil
         } catch {
-            if let snapshot = pendingImportSnapshots.removeValue(forKey: request.applicationID) {
-                if let restored = try? await applicationLibrary.restore(snapshot) {
-                    updateApplications(restored)
-                }
-                try? await restoreWatchRegistration(
-                    snapshot: snapshot,
-                    applicationID: request.applicationID,
-                    on: connection
-                )
-            }
+            pendingImportSnapshots[request.applicationID] = nil
             applicationLibraryErrorMessage = applicationErrorMessage(error)
             try? await connection.client.respondToAppFetch(with: .noData)
         }

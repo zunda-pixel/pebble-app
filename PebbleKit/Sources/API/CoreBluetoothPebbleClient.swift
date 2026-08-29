@@ -391,7 +391,9 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     }
 
     public func registerApplication(_ metadata: PebbleAppMetadata) async throws {
-        try await performBlobDBOperation(acceptedStatuses: [.success]) { token in
+        // A stale record means the watch already holds this entry and will
+        // never accept it again, which is as good as a successful insert.
+        try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
             BlobDBCodec.insertApplicationFrame(metadata: metadata, token: token)
         }
     }
