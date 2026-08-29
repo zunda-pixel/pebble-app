@@ -1276,6 +1276,33 @@ struct CompanionDataTests {
         #expect([UInt8]().hexadecimalString.isEmpty)
     }
 
+    @Test func pendingNotificationsStayInOrderPerWatch() {
+        var queue = PendingNotificationQueue()
+        #expect(queue.isEmpty)
+        #expect(!queue.holdsPackets(for: "watch-a"))
+
+        queue.append(Data([1]), for: "watch-a")
+
+        // Once a packet is waiting, later ones for that watch must wait too or
+        // they would overtake it and stall the session.
+        #expect(queue.holdsPackets(for: "watch-a"))
+        // A different watch has its own ordering.
+        #expect(!queue.holdsPackets(for: "watch-b"))
+
+        queue.append(Data([2]), for: "watch-a")
+        queue.append(Data([3]), for: "watch-b")
+        #expect(queue.first?.value == Data([1]))
+        queue.removeFirst()
+        #expect(queue.first?.value == Data([2]))
+
+        queue.removeAll(for: "watch-a")
+        #expect(!queue.holdsPackets(for: "watch-a"))
+        #expect(queue.first?.centralID == "watch-b")
+
+        queue.removeAll()
+        #expect(queue.isEmpty)
+    }
+
     @Test func officialCatalogResponseMapsToInstallableApplication() throws {
         let json = """
         {

@@ -39,7 +39,7 @@ public final class PebbleGattServer: NSObject {
     private var dataCharacteristic: CBMutableCharacteristic?
     private var registrations: [String: Registration] = [:]
     private var subscribedCentrals: [String: CBCentral] = [:]
-    private var pendingNotifications: [(centralID: String, value: Data)] = []
+    private var pendingNotifications = PendingNotificationQueue()
     private var isServicePublished = false
     private var didRestoreService = false
     private var hasRefreshedRestoredService = false
@@ -110,7 +110,11 @@ public final class PebbleGattServer: NSObject {
 
     func unregister(centralID: String) {
         registrations[centralID] = nil
-        pendingNotifications.removeAll { $0.centralID == centralID }
+        pendingNotifications.removeAll(for: centralID)
+        // A disconnected central holds no subscription, and iOS does not
+        // always say so; leaving the record would make the next link look
+        // ready before the watch has subscribed to it.
+        subscribedCentrals[centralID] = nil
     }
 
     func isSubscribed(centralID: String) -> Bool {
@@ -152,13 +156,17 @@ public final class PebbleGattServer: NSObject {
             return false
         }
         let value = Data(bytes)
+        guard !pendingNotifications.holdsPackets(for: centralID) else {
+            pendingNotifications.append(value, for: centralID)
+            return true
+        }
         guard peripheralManager.updateValue(
             value,
             for: dataCharacteristic,
             onSubscribedCentrals: [central]
         ) else {
             // The transmit queue is full; retry once CoreBluetooth drains it.
-            pendingNotifications.append((centralID, value))
+            pendingNotifications.append(value, for: centralID)
             return true
         }
         return true
@@ -299,7 +307,7 @@ extension PebbleGattServer: CBPeripheralManagerDelegate {
         }
         let centralID = central.identifier.uuidString
         subscribedCentrals[centralID] = nil
-        pendingNotifications.removeAll { $0.centralID == centralID }
+        pendingNotifications.removeAll(for: centralID)
         registrations[centralID]?.onUnsubscribe()
     }
 

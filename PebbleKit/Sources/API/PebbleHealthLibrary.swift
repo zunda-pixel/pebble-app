@@ -1,0 +1,138 @@
+public import Foundation
+import MemberwiseInit
+
+/// Health samples the watch reports, and the file they are kept in.
+@MemberwiseInit(.public)
+public struct PebbleHealthSample: Codable, Equatable, Identifiable, Sendable {
+    public var id: UUID = UUID()
+    public var date: Date
+    public var steps: Int
+    public var sleepMinutes: Int
+    public var timeZoneIdentifier: String = TimeZone.current.identifier
+    public var source: PebbleHealthDataSource = .watch
+    public var updatedAt: Date = Date()
+
+    private enum CodingKeys: String, CodingKey {
+        case id, date, steps, sleepMinutes, timeZoneIdentifier, source, updatedAt
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        date = try container.decode(Date.self, forKey: .date)
+        steps = try container.decode(Int.self, forKey: .steps)
+        sleepMinutes = try container.decode(Int.self, forKey: .sleepMinutes)
+        timeZoneIdentifier = try container.decodeIfPresent(String.self, forKey: .timeZoneIdentifier)
+            ?? TimeZone.current.identifier
+        source = try container.decodeIfPresent(PebbleHealthDataSource.self, forKey: .source) ?? .watch
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? date
+    }
+}
+
+public enum PebbleHealthDataSource: String, Codable, Equatable, Sendable {
+    case watch
+    case healthKit
+    case imported
+}
+
+@MemberwiseInit(.public)
+public struct PebbleHealthArchive: Codable, Equatable, Sendable {
+    public var schemaVersion: Int = 1
+    public var exportedAt: Date = Date()
+    public var samples: [PebbleHealthSample]
+}
+
+public actor PebbleHealthLibrary {
+    private var fileURL: URL
+
+    public init(fileURL: URL? = nil) {
+        self.fileURL = fileURL ?? applicationSupportURL("health.json")
+    }
+
+    public func samples() throws -> [PebbleHealthSample] { try PersistentJSON.loadRecovering([PebbleHealthSample].self, from: fileURL) ?? [] }
+    public func save(_ samples: [PebbleHealthSample]) throws { try PersistentJSON.save(samples, to: fileURL) }
+    public func merge(_ incoming: [PebbleHealthSample]) throws -> [PebbleHealthSample] {
+        var merged: [String: PebbleHealthSample] = [:]
+        for sample in try samples() + incoming {
+            let normalized = normalized(sample)
+            let key = dayKey(for: normalized)
+            guard let existing = merged[key] else {
+                merged[key] = normalized
+                continue
+            }
+            var resolved = normalized.updatedAt >= existing.updatedAt ? normalized : existing
+            resolved.steps = max(existing.steps, normalized.steps)
+            if normalized.sleepMinutes > 0 && normalized.updatedAt >= existing.updatedAt {
+                resolved.sleepMinutes = normalized.sleepMinutes
+            } else {
+                resolved.sleepMinutes = existing.sleepMinutes
+            }
+            merged[key] = resolved
+        }
+        var values = Array(merged.values)
+        values.sort { $0.date < $1.date }
+        try save(values)
+        return values
+    }
+    public func deleteAll() throws { try? FileManager.default.removeItem(at: fileURL) }
+    public func export() throws -> URL {
+        let output = FileManager.default.temporaryDirectory.appending(path: "pebble-health.json")
+        let archive = PebbleHealthArchive(samples: try samples())
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        try encoder.encode(archive).write(to: output, options: .atomic)
+        return output
+    }
+
+    public func importArchive(from url: URL) throws -> [PebbleHealthSample] {
+        let data = try Data(contentsOf: url)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        if let archive = try? decoder.decode(PebbleHealthArchive.self, from: data) {
+            guard archive.schemaVersion == 1 else { throw PebbleHealthArchiveError.unsupportedVersion }
+            return try merge(archive.samples.map { sample in
+                var value = sample
+                value.source = .imported
+                return value
+            })
+        }
+        let legacyDecoder = JSONDecoder()
+        let legacy = try legacyDecoder.decode([PebbleHealthSample].self, from: data)
+        return try merge(legacy.map { sample in
+            var value = sample
+            value.source = .imported
+            return value
+        })
+    }
+
+    private func normalized(_ sample: PebbleHealthSample) -> PebbleHealthSample {
+        var value = sample
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: sample.timeZoneIdentifier) ?? .current
+        value.date = calendar.startOfDay(for: sample.date)
+        value.steps = max(0, sample.steps)
+        value.sleepMinutes = min(24 * 60, max(0, sample.sleepMinutes))
+        return value
+    }
+
+    private func dayKey(for sample: PebbleHealthSample) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: sample.timeZoneIdentifier) ?? .current
+        let components = calendar.dateComponents([.year, .month, .day], from: sample.date)
+        let year = String(components.year ?? 0)
+        let month = String(components.month ?? 0)
+        let day = String(components.day ?? 0)
+        return "\(String(repeating: "0", count: max(0, 4 - year.count)))\(year)"
+            + "-\(String(repeating: "0", count: max(0, 2 - month.count)))\(month)"
+            + "-\(String(repeating: "0", count: max(0, 2 - day.count)))\(day)"
+    }
+}
+
+public enum PebbleHealthArchiveError: Error, Equatable, Sendable { case unsupportedVersion }
+
+public enum HealthAnalysisPeriod: String, CaseIterable, Identifiable, Sendable {
+    case week, month, quarter
+    public var id: Self { self }
+    public var days: Int { self == .week ? 7 : self == .month ? 30 : 90 }
+}
