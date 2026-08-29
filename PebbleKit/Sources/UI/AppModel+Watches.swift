@@ -1,0 +1,118 @@
+import API
+import Foundation
+
+/// Remembered watches and per-watch actions.
+extension AppModel {
+    public func loadSavedWatches() async {
+        do {
+            savedWatches = try await watchLibrary.allWatches()
+            watchManagementErrorMessage = nil
+            for watch in savedWatches where installedApplicationIDsByWatch[watch.id] == nil {
+                let ids = (try? await applicationLibrary.synchronizedApplicationIDs(deviceID: watch.id)) ?? []
+                installedApplicationIDsByWatch[watch.id] = Set(ids)
+            }
+        } catch {
+            watchManagementErrorMessage = "Saved watches could not be loaded."
+        }
+    }
+
+    public func setAutomaticallyConnects(_ enabled: Bool, watchID: String) async {
+        do {
+            savedWatches = try await watchLibrary.setAutomaticallyConnects(enabled, watchID: watchID)
+            watchManagementErrorMessage = nil
+        } catch {
+            watchManagementErrorMessage = "The automatic connection preference could not be saved."
+        }
+    }
+
+    public func forgetWatch(id: String) async {
+        // Closing the connection also stops any background reconnect loop; a
+        // successful reconnect would otherwise re-save the forgotten entry.
+        if let connection = connections.first(where: { $0.device.id == id }) {
+            await close(connection)
+        }
+        do {
+            savedWatches = try await watchLibrary.remove(watchID: id)
+            installedApplicationIDsByWatch[id] = nil
+            watchManagementErrorMessage = nil
+        } catch {
+            watchManagementErrorMessage = "The watch could not be forgotten."
+        }
+    }
+
+    public func disconnect(deviceID: String) async {
+        guard let connection = connections.first(where: { $0.device.id == deviceID }) else {
+            return
+        }
+        await close(connection)
+    }
+
+    public func disconnect() async {
+        for connection in connections {
+            await close(connection)
+        }
+    }
+
+    func close(_ connection: WatchConnection) async {
+        connections.removeAll { $0 === connection }
+        await connection.close()
+        clearBusyOperationState()
+        needsApplicationSynchronization = true
+        lastConnectionError = nil
+        refreshConnectionState()
+    }
+
+    public func prepareDiagnosticReport() async {
+        do {
+            diagnosticReportURL = try await PebbleDiagnostics.shared.exportReport(
+                device: connectedDevice,
+                applications: watchApplications + watchfaces
+            )
+        } catch {
+            applicationLibraryErrorMessage = "The diagnostic report could not be created."
+        }
+    }
+
+    /// Sends a reset command to a watch. The watch reboots without answering,
+    /// so the connection is closed locally and the app reconnects afterwards
+    /// if the watch is set to connect automatically.
+    public func resetWatch(_ kind: PebbleResetKind, deviceID: String? = nil) async {
+        guard let connection = connection(for: deviceID), connection.isConnected else {
+            watchManagementErrorMessage = "Connect the watch before resetting it."
+            return
+        }
+        let device = connection.device
+        do {
+            try await connection.client.send(ResetCodec.frame(kind))
+            if kind == .factoryReset {
+                // Everything the watch held is gone; drop our record of it too.
+                try? await applicationLibrary.setSynchronizedApplicationIDs([], deviceID: device.id)
+                installedApplicationIDsByWatch[device.id] = []
+            }
+            await PebbleDiagnostics.shared.record(
+                .warning,
+                category: "reset",
+                message: "Sent reset command \(kind) to the watch"
+            )
+            watchManagementErrorMessage = nil
+            await close(connection)
+            watchResetStatusMessage = switch kind {
+            case .restart: "The watch is restarting."
+            case .recoveryFirmware: "The watch is restarting into recovery firmware."
+            case .factoryReset: "The watch is performing a factory reset."
+            }
+        } catch {
+            watchResetStatusMessage = nil
+            watchManagementErrorMessage = "The reset command could not be sent."
+        }
+    }
+
+    func recordConnectedWatch(_ device: PebbleDevice) async {
+        do {
+            savedWatches = try await watchLibrary.record(device)
+            watchManagementErrorMessage = nil
+        } catch {
+            watchManagementErrorMessage = "The watch connection history could not be saved."
+        }
+    }
+}

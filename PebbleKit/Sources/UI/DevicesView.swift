@@ -1,0 +1,412 @@
+import SwiftUI
+import API
+
+struct DevicesView: View {
+    var model: AppModel
+    @State private var isAddingWatch = false
+
+    // Saved watches plus any connected watch that has not been saved yet.
+    private var listedWatchIDs: [String] {
+        let savedIDs = model.savedWatches.map(\.id)
+        let unsavedConnected = model.connections
+            .map(\.device.id)
+            .filter { !savedIDs.contains($0) }
+        return unsavedConnected + savedIDs
+    }
+
+    var body: some View {
+        List {
+            if listedWatchIDs.isEmpty {
+                ContentUnavailableView {
+                    Label("No Devices", systemImage: "applewatch")
+                } description: {
+                    Text("Add a Pebble 2 Duo, Pebble Time 2, or Pebble Round 2.")
+                } actions: {
+                    Button("Add Watch", systemImage: "plus") {
+                        isAddingWatch = true
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            } else {
+                Section("My Watches") {
+                    ForEach(listedWatchIDs, id: \.self) { watchID in
+                        NavigationLink {
+                            WatchDetailView(model: model, watchID: watchID)
+                        } label: {
+                            WatchListRow(model: model, watchID: watchID)
+                        }
+                    }
+                }
+            }
+
+            if let errorMessage = model.watchManagementErrorMessage {
+                Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red)
+            }
+        }
+        .navigationTitle("Devices")
+        .task { await model.loadSavedWatches() }
+        .toolbar {
+            ToolbarItem {
+                Button("Add Watch", systemImage: "plus") {
+                    isAddingWatch = true
+                }
+                .keyboardShortcut("r", modifiers: .command)
+            }
+        }
+        .sheet(isPresented: $isAddingWatch) {
+            AddWatchSheet(model: model)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .pebbleScanRequested)) { _ in
+            isAddingWatch = true
+        }
+    }
+}
+
+struct AddWatchSheet: View {
+    var model: AppModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if case .failed(let error) = model.connectionState {
+                    Label(error.message, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                        .accessibilityLabel("Bluetooth error: \(error.message)")
+                }
+                if let errorMessage = model.watchManagementErrorMessage {
+                    Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                }
+
+                Section {
+                    ForEach(model.discoveredDevices) { device in
+                        DiscoveredDeviceRow(device: device) {
+                            Task {
+                                await model.connect(to: device)
+                                if model.connections.contains(where: { $0.device.id == device.id }) {
+                                    dismiss()
+                                }
+                            }
+                        }
+                        .disabled(isConnecting)
+                    }
+                } header: {
+                    HStack {
+                        Text("Nearby")
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                }
+            }
+            .navigationTitle("Add Watch")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        #if os(macOS)
+        .frame(minWidth: 420, minHeight: 420)
+        #endif
+        .task {
+            // Scan for the whole lifetime of the sheet; the task is cancelled
+            // when the sheet closes and the loop ends after the current pass.
+            // Every pass has to suspend, including the ones that return early
+            // because a scan from a previous sheet is still running, otherwise
+            // the loop starves the main actor and the app stops responding.
+            while !Task.isCancelled {
+                await model.scan()
+                do {
+                    try await Task.sleep(for: .seconds(1))
+                } catch {
+                    return
+                }
+            }
+        }
+    }
+
+    private var isConnecting: Bool {
+        !model.connectingDeviceIDs.isEmpty
+    }
+}
+
+struct WatchListRow: View {
+    var model: AppModel
+    var watchID: String
+
+    private var connection: WatchConnection? {
+        model.connections.first { $0.device.id == watchID }
+    }
+
+    private var savedWatch: SavedPebbleWatch? {
+        model.savedWatches.first { $0.id == watchID }
+    }
+
+    var body: some View {
+        LabeledContent {
+            VStack(alignment: .trailing) {
+                if let connection {
+                    if let batteryLevel = connection.device.batteryLevel {
+                        Text(batteryLevel, format: .percent)
+                    }
+                } else if let savedWatch {
+                    Text(savedWatch.lastConnectedAt, format: .relative(presentation: .named))
+                }
+                
+                switch connection?.phase {
+                case .connected:
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text("Connected")
+                    }
+                    .foregroundStyle(.green)
+                case .reconnecting:
+                    HStack {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                        Text("Reconnecting…")
+                    }
+                    .foregroundStyle(.orange)
+                case .disconnected, nil:
+                    HStack {
+                        Image(systemName: "applewatch.slash")
+                        Text("Not connected")
+                    }
+                    .foregroundStyle(.secondary)
+                }
+            }
+        } label: {
+            Text(connection?.device.name ?? savedWatch?.name ?? watchID)
+            if let displayName = (connection?.device.model ?? savedWatch?.model)?.displayName {
+                Text(displayName)
+            }
+        }
+    }
+}
+
+struct WatchDetailView: View {
+    var model: AppModel
+    var watchID: String
+    @State private var isConfirmingForget = false
+    @State private var isChoosingFirmware = false
+    @State private var pendingReset: PebbleResetKind?
+    @Environment(\.dismiss) private var dismiss
+
+    private var connection: WatchConnection? {
+        model.connections.first { $0.device.id == watchID }
+    }
+
+    private var savedWatch: SavedPebbleWatch? {
+        model.savedWatches.first { $0.id == watchID }
+    }
+
+    private var watchName: String {
+        connection?.device.name ?? savedWatch?.name ?? watchID
+    }
+
+    var body: some View {
+        Form {
+            if connection?.device.isRunningRecoveryFirmware == true {
+                Section {
+                    Label(
+                        "This watch started its recovery firmware. Install firmware to finish setting it up.",
+                        systemImage: "exclamationmark.triangle"
+                    )
+                }
+            }
+
+            Section("Watch") {
+                if let model = connection?.device.model ?? savedWatch?.model {
+                    LabeledContent("Model", value: model.displayName)
+                }
+                if let firmwareVersion = connection?.device.firmwareVersion ?? savedWatch?.firmwareVersion {
+                    LabeledContent("Firmware", value: firmwareVersion)
+                }
+                if let serialNumber = connection?.device.serialNumber ?? savedWatch?.serialNumber {
+                    LabeledContent("Serial Number", value: serialNumber)
+                }
+                if let batteryLevel = connection?.device.batteryLevel ?? savedWatch?.lastBatteryLevel {
+                    LabeledContent("Battery", value: batteryLevel, format: .percent)
+                }
+                LabeledContent("Status") {
+                    switch connection?.phase {
+                    case .connected:
+                        Text("Connected")
+                    case .reconnecting:
+                        Text("Reconnecting…")
+                    case .disconnected, nil:
+                        Text("Not connected")
+                    }
+                }
+            }
+            Section("Connection") {
+                if connection == nil, let savedWatch {
+                    Button("Connect", systemImage: "applewatch.radiowaves.left.and.right") {
+                        Task { await model.connect(to: savedWatch) }
+                    }
+                    .disabled(model.connectingDeviceIDs.contains(watchID))
+                }
+                if savedWatch != nil {
+                    Toggle("Connect Automatically", isOn: Binding(
+                        get: { savedWatch?.automaticallyConnects ?? false },
+                        set: { enabled in
+                            Task { await model.setAutomaticallyConnects(enabled, watchID: watchID) }
+                        }
+                    ))
+                }
+                if connection != nil {
+                    Button("Disconnect", role: .destructive) {
+                        Task { await model.disconnect(deviceID: watchID) }
+                    }
+                }
+            }
+            Section("Notifications") {
+                Button("Send Test Notification", systemImage: "bell.badge") {
+                    Task { await model.sendTestNotification(deviceID: watchID) }
+                }
+                .disabled(connection?.isConnected != true)
+                if let notificationStatusMessage = model.notificationStatusMessage {
+                    Label(notificationStatusMessage, systemImage: "info.circle")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Section {
+                Button("Download Latest Firmware", systemImage: "arrow.down.circle") {
+                    Task { await model.installAvailableFirmware(deviceID: watchID) }
+                }
+                if let release = model.availableFirmwareRelease {
+                    LabeledContent("Published Version", value: release.versionTag)
+                }
+                Button("Install Firmware…", systemImage: "externaldrive.badge.timemachine") {
+                    isChoosingFirmware = true
+                }
+                if let journal = model.firmwareUpdateJournal, journal.deviceID == watchID {
+                    LabeledContent("Update State", value: journal.phase.rawValue)
+                    if let progress = model.firmwareUpdateProgress, progress.totalBytes > 0 {
+                        ProgressView(value: Double(progress.bytesSent), total: Double(progress.totalBytes))
+                    }
+                }
+                if let firmwareUpdateStatusMessage = model.firmwareUpdateStatusMessage {
+                    Label(firmwareUpdateStatusMessage, systemImage: "info.circle")
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Firmware")
+            } footer: {
+                Text("Firmware published for this watch is downloaded from PebbleOS. A PBZ file can also be chosen while the watch is away; either way the transfer starts as soon as it connects.")
+            }
+            Section {
+                Button("Restart Watch", systemImage: "arrow.clockwise") {
+                    pendingReset = .restart
+                }
+                .disabled(connection?.isConnected != true)
+                Button("Restart into Recovery Firmware", systemImage: "lifepreserver") {
+                    pendingReset = .recoveryFirmware
+                }
+                .disabled(connection?.isConnected != true)
+                Button("Factory Reset", systemImage: "trash", role: .destructive) {
+                    pendingReset = .factoryReset
+                }
+                .disabled(connection?.isConnected != true)
+                if let watchResetStatusMessage = model.watchResetStatusMessage {
+                    Label(watchResetStatusMessage, systemImage: "info.circle")
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Reset")
+            } footer: {
+                Text("The watch restarts without answering, so it disconnects immediately. A factory reset erases everything stored on the watch.")
+            }
+            Section {
+                Button("Forget Watch", role: .destructive) {
+                    isConfirmingForget = true
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle(watchName)
+        .fileImporter(isPresented: $isChoosingFirmware, allowedContentTypes: [.pebbleFirmware]) { result in
+            guard case .success(let url) = result else { return }
+            Task { await model.installFirmware(from: url, deviceID: watchID) }
+        }
+        .confirmationDialog(
+            "Forget \(watchName)?",
+            isPresented: $isConfirmingForget,
+            titleVisibility: .visible
+        ) {
+            Button("Forget Watch", role: .destructive) {
+                Task {
+                    await model.forgetWatch(id: watchID)
+                    dismiss()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Automatic reconnection information for this Pebble will be removed.")
+        }
+        .confirmationDialog(
+            "Reset \(watchName)?",
+            isPresented: Binding(
+                get: { pendingReset != nil },
+                set: { if !$0 { pendingReset = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingReset
+        ) { kind in
+            Button(actionTitle(for: kind), role: kind == .factoryReset ? .destructive : nil) {
+                pendingReset = nil
+                Task { await model.resetWatch(kind, deviceID: watchID) }
+            }
+            Button("Cancel", role: .cancel) { pendingReset = nil }
+        } message: { kind in
+            Text(confirmationMessage(for: kind))
+        }
+    }
+
+    private func actionTitle(for kind: PebbleResetKind) -> LocalizedStringKey {
+        switch kind {
+        case .restart: "Restart Watch"
+        case .recoveryFirmware: "Restart into Recovery Firmware"
+        case .factoryReset: "Erase Watch"
+        }
+    }
+
+    private func confirmationMessage(for kind: PebbleResetKind) -> LocalizedStringKey {
+        switch kind {
+        case .restart:
+            "The watch disconnects while it restarts."
+        case .recoveryFirmware:
+            "The watch restarts into recovery firmware, where only firmware updates are available."
+        case .factoryReset:
+            "Every app, watchface, and setting stored on the watch is erased. This cannot be undone."
+        }
+    }
+}
+
+struct DiscoveredDeviceRow: View {
+    var device: DiscoveredPebble
+    var connect: () -> Void
+
+    var body: some View {
+        Button(action: connect) {
+            LabeledContent {
+                Text("\(device.signalStrength) dBm")
+                    .foregroundStyle(.secondary)
+            } label: {
+                Label {
+                    VStack(alignment: .leading) {
+                        Text(device.name)
+                        Text(device.model.displayName)
+                            .foregroundStyle(.secondary)
+                    }
+                } icon: {
+                    Image(systemName: "applewatch.radiowaves.left.and.right")
+                }
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Connects to this watch")
+    }
+}
