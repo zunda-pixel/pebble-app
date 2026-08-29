@@ -1,4 +1,6 @@
 public import Foundation
+import HTTPTypes
+import HTTPTypesFoundation
 import CryptoKit
 import MemberwiseInit
 
@@ -67,9 +69,17 @@ public actor PebbleAppCatalog {
     }
 
     private var cacheURL: URL
+    private let session: URLSession
 
-    public init(cacheURL: URL? = nil) {
+    public init(cacheURL: URL? = nil, session: URLSession? = nil) {
         self.cacheURL = cacheURL ?? applicationSupportURL("catalog.json")
+        if let session {
+            self.session = session
+        } else {
+            let configuration = URLSessionConfiguration.default
+            configuration.timeoutIntervalForRequest = 60
+            self.session = URLSession(configuration: configuration)
+        }
     }
 
     public func cachedSnapshot() throws -> PebbleCatalogSnapshot? {
@@ -103,10 +113,15 @@ public actor PebbleAppCatalog {
 
     public func download(_ application: PebbleCatalogApplication) async throws -> URL {
         guard application.downloadURL.scheme?.lowercased() == "https" else { throw AppCatalogError.insecureURL }
-        var request = URLRequest(url: application.downloadURL)
-        request.timeoutInterval = 60
-        let (temporaryURL, response) = try await URLSession.shared.download(for: request)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw AppCatalogError.invalidResponse }
+        // URLSession has no HTTPRequest-based download, so the request is
+        // still built as typed HTTP and bridged for this one call.
+        guard let request = URLRequest(
+            httpRequest: HTTPRequest(method: .get, url: application.downloadURL)
+        ) else {
+            throw AppCatalogError.invalidResponse
+        }
+        let (temporaryURL, response) = try await session.download(for: request)
+        guard response.httpTypesResponse?.status == .ok else { throw AppCatalogError.invalidResponse }
         let attributes = try FileManager.default.attributesOfItem(atPath: temporaryURL.path)
         guard (attributes[.size] as? NSNumber)?.intValue ?? 0 <= 64 * 1_024 * 1_024 else {
             throw AppCatalogError.packageTooLarge
@@ -143,11 +158,9 @@ public actor PebbleAppCatalog {
     }
 
     private func responseData(from url: URL) async throws -> Data {
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 15
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard (response as? HTTPURLResponse)?.statusCode == 200, data.count <= 20 * 1_024 * 1_024 else {
+        let request = HTTPRequest(method: .get, url: url, headerFields: [.accept: "application/json"])
+        let (data, response) = try await session.data(for: request)
+        guard response.status == .ok, data.count <= 20 * 1_024 * 1_024 else {
             throw AppCatalogError.invalidResponse
         }
         return data

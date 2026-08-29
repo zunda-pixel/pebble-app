@@ -1,4 +1,6 @@
 public import Foundation
+import HTTPTypes
+import HTTPTypesFoundation
 import MemberwiseInit
 
 /// One firmware package published for a board.
@@ -27,19 +29,29 @@ public struct PebbleOSFirmwareCatalog: Sendable {
 
     public init(
         releasesURL: URL = URL(string: "https://api.github.com/repos/coredevices/PebbleOS/releases/latest")!,
-        session: URLSession = .shared
+        session: URLSession? = nil
     ) {
         self.releasesURL = releasesURL
-        self.session = session
+        if let session {
+            self.session = session
+        } else {
+            // A firmware package is megabytes; the default request timeout is
+            // not enough on a slow link.
+            let configuration = URLSessionConfiguration.default
+            configuration.timeoutIntervalForRequest = 120
+            self.session = URLSession(configuration: configuration)
+        }
     }
 
     /// The newest firmware published for a board.
     public func latestRelease(for board: PebbleWatchBoard) async throws -> PebbleOSFirmwareRelease {
-        var request = URLRequest(url: releasesURL)
-        request.timeoutInterval = 20
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        let request = HTTPRequest(
+            method: .get,
+            url: releasesURL,
+            headerFields: [.accept: "application/vnd.github+json"]
+        )
         let (data, response) = try await session.data(for: request)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+        guard response.status == .ok else {
             throw PebbleOSFirmwareCatalogError.releasesUnavailable
         }
         let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
@@ -74,10 +86,15 @@ public struct PebbleOSFirmwareCatalog: Sendable {
         guard release.downloadURL.scheme?.lowercased() == "https" else {
             throw PebbleOSFirmwareCatalogError.insecureURL
         }
-        var request = URLRequest(url: release.downloadURL)
-        request.timeoutInterval = 120
+        // URLSession has no HTTPRequest-based download, so the request is
+        // still built as typed HTTP and bridged for this one call.
+        guard let request = URLRequest(
+            httpRequest: HTTPRequest(method: .get, url: release.downloadURL)
+        ) else {
+            throw PebbleOSFirmwareCatalogError.releasesUnavailable
+        }
         let (temporaryURL, response) = try await session.download(for: request)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+        guard response.httpTypesResponse?.status == .ok else {
             throw PebbleOSFirmwareCatalogError.releasesUnavailable
         }
         let output = FileManager.default.temporaryDirectory

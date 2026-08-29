@@ -498,3 +498,98 @@ struct CompanionStorageTests {
         #expect(try await library.samples() == merged)
     }
 }
+
+/// A stubbed HTTP server, so the network clients can be exercised without one.
+final class StubURLProtocol: URLProtocol {
+    struct Exchange: Sendable {
+        var status: Int
+        var body: Data
+    }
+
+    nonisolated(unsafe) static var exchange = Exchange(status: 200, body: Data())
+    /// The headers the client actually sent, to check what the typed request
+    /// produced on the wire.
+    nonisolated(unsafe) static var sentHeaders: [String: String] = [:]
+
+    static func session() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubURLProtocol.self]
+        return URLSession(configuration: configuration)
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        Self.sentHeaders = request.allHTTPHeaderFields ?? [:]
+        let response = HTTPURLResponse(
+            url: request.url!,
+            statusCode: Self.exchange.status,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Self.exchange.body)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
+// The stub is shared process-wide, so these cases cannot overlap.
+@Suite(.serialized)
+struct FirmwareCatalogNetworkTests {
+    private static let releaseJSON = """
+    {
+      "tag_name": "v4.36.2",
+      "html_url": "https://example.invalid/release",
+      "assets": [
+        {
+          "name": "normal_obelix_pvt_v4.36.2.pbz",
+          "size": 3126600,
+          "browser_download_url": "https://example.invalid/normal_obelix_pvt_v4.36.2.pbz"
+        }
+      ]
+    }
+    """
+
+    @Test func aSuccessfulReplyYieldsThePackageForTheBoard() async throws {
+        StubURLProtocol.exchange = .init(status: 200, body: Data(Self.releaseJSON.utf8))
+        let catalog = PebbleOSFirmwareCatalog(
+            releasesURL: URL(string: "https://example.invalid/releases/latest")!,
+            session: StubURLProtocol.session()
+        )
+
+        let release = try await catalog.latestRelease(for: .obelixPVT)
+
+        #expect(release.versionTag == "v4.36.2")
+        #expect(release.board == .obelixPVT)
+        #expect(release.sizeInBytes == 3_126_600)
+        // The typed header name has to survive the bridge to URLRequest.
+        #expect(StubURLProtocol.sentHeaders["Accept"] == "application/vnd.github+json")
+    }
+
+    @Test func anUnsuccessfulStatusIsReported() async throws {
+        StubURLProtocol.exchange = .init(status: 404, body: Data())
+        let catalog = PebbleOSFirmwareCatalog(
+            releasesURL: URL(string: "https://example.invalid/releases/latest")!,
+            session: StubURLProtocol.session()
+        )
+
+        await #expect(throws: PebbleOSFirmwareCatalogError.releasesUnavailable) {
+            try await catalog.latestRelease(for: .obelixPVT)
+        }
+    }
+
+    @Test func aBoardWithoutAPackageIsReported() async throws {
+        StubURLProtocol.exchange = .init(status: 200, body: Data(Self.releaseJSON.utf8))
+        let catalog = PebbleOSFirmwareCatalog(
+            releasesURL: URL(string: "https://example.invalid/releases/latest")!,
+            session: StubURLProtocol.session()
+        )
+
+        await #expect(throws: PebbleOSFirmwareCatalogError.noFirmwareForBoard(.asterix)) {
+            try await catalog.latestRelease(for: .asterix)
+        }
+    }
+}

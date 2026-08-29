@@ -16,6 +16,7 @@ let package = Package(
     ),
   ],
   dependencies: [
+    .package(url: "https://github.com/apple/swift-http-types.git", from: "1.0.0"),
     .package(url: "https://github.com/square/Valet.git", from: "5.0.0"),
     .package(url: "https://github.com/sindresorhus/Defaults.git", from: "9.0.0"),
     .package(url: "https://github.com/gohanlon/swift-memberwise-init-macro.git", from: "0.6.0"),
@@ -33,6 +34,8 @@ let package = Package(
     .target(
       name: "API",
       dependencies: [
+        .product(name: "HTTPTypes", package: "swift-http-types"),
+        .product(name: "HTTPTypesFoundation", package: "swift-http-types"),
         .product(name: "MemberwiseInit", package: "swift-memberwise-init-macro"),
         .product(name: "ZIPFoundation", package: "ZIPFoundation"),
       ],
