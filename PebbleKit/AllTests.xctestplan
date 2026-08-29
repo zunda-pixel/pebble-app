@@ -1,0 +1,33 @@
+{
+  "configurations" : [
+    {
+      "id" : "6F4C2A18-0B7D-4E52-9C3A-1D5E8B2F7A64",
+      "name" : "Default",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "codeCoverage" : false
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "APITests",
+        "name" : "APITests"
+      }
+    },
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "UITests",
+        "name" : "UITests"
+      }
+    }
+  ],
+  "version" : 1
+}
