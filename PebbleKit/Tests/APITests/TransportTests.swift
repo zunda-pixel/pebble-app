@@ -189,6 +189,18 @@ struct TransportTests {
     }
 
     @Test
+    func aRefusalNamesTheEndpointTheWatchDoesNotImplement() {
+        // Recovery firmware answers a ping this way; reading it as a refusal
+        // is what keeps the health check from dropping the link.
+        let refusal = PebbleProtocolFrame(endpoint: 0, payload: [0xDC, 0x07, 0xD1])
+        #expect(refusal.rejectedEndpoint == PingPongCodec.endpoint)
+
+        #expect(PebbleProtocolFrame(endpoint: 0, payload: [0xDC, 0x07]).rejectedEndpoint == nil)
+        #expect(PebbleProtocolFrame(endpoint: 0, payload: [0x01, 0x07, 0xD1]).rejectedEndpoint == nil)
+        #expect(PebbleProtocolFrame(endpoint: 11, payload: [0xDC, 0x07, 0xD1]).rejectedEndpoint == nil)
+    }
+
+    @Test
     func pebbleProtocolDecoderEmitsMultipleFrames() throws {
         let first = PebbleProtocolFrame(endpoint: 16, payload: [0x00])
         let second = PebbleProtocolFrame(endpoint: 18, payload: [0x01, 0x02])

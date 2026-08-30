@@ -99,6 +99,8 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var firmwareResponseContinuation: CheckedContinuation<Void, any Error>?
     private var firmwareResponseTimeoutTask: Task<Void, Never>?
     private var waitingForFirmwareStart = false
+    /// Set for the whole of `installFirmware`, transfers and all.
+    private var isInstallingFirmware = false
     private var pendingInstallCookie: UInt32?
     private var transferContinuation: CheckedContinuation<Void, any Error>?
     private var nextBlobDBToken: UInt16 = 1
@@ -422,6 +424,8 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     }
 
     public func installFirmware(_ package: PBZFirmwarePackage) async throws {
+        isInstallingFirmware = true
+        defer { isInstallingFirmware = false }
         let total = package.firmware.count + (package.resources?.count ?? 0)
         guard let byteCount = UInt32(exactly: total) else { throw PutBytesTransferError.invalidConfiguration }
         try await sendFirmwareControl(
@@ -717,6 +721,14 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             return
         }
 
+        // "I do not know that endpoint" is still an answer: recovery firmware
+        // replies this way to a ping, and waiting for a pong that cannot come
+        // would drop a link the watch is holding up perfectly well.
+        if frame.rejectedEndpoint == PingPongCodec.endpoint {
+            clearPendingPing()
+            return
+        }
+
         if PhoneVersionCodec.isRequest(frame) {
             #if os(macOS)
             let operatingSystem = PhoneOperatingSystem.macOS
@@ -771,9 +783,12 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             return
         }
 
-        if frame.endpoint == PutBytesCodec.endpoint, let cookie = pendingInstallCookie {
+        if frame.endpoint == PutBytesCodec.endpoint, pendingInstallCookie != nil {
+            // The watch answers the install command with a cookie of its own,
+            // usually zero, so only the result means anything. Holding out for
+            // the cookie that was sent leaves the install hanging after the
+            // watch has already written the firmware and reached 100%.
             let response = try PutBytesCodec.decodeResponse(frame)
-            guard response.cookie == cookie else { return }
             pendingInstallCookie = nil
             response.result == .acknowledgement
                 ? finishFirmwareControl()
@@ -913,10 +928,14 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             guard pendingPingCookie == cookie else {
                 return
             }
-            pendingPingCookie = nil
-            pongTimeoutTask?.cancel()
-            pongTimeoutTask = nil
+            clearPendingPing()
         }
+    }
+
+    private func clearPendingPing() {
+        pendingPingCookie = nil
+        pongTimeoutTask?.cancel()
+        pongTimeoutTask = nil
     }
 
     private func startHealthChecks(on peripheral: CBPeripheral) {
@@ -939,7 +958,15 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         // A transfer in flight already proves the link is alive, and it can
         // keep the watch busy for longer than the pong deadline — a firmware
         // install is megabytes. Pinging through one only risks dropping it.
-        guard activeTransferSession == nil else {
+        // The install also has gaps between its transfers, while the watch
+        // commits what it was sent, so the whole install counts.
+        guard activeTransferSession == nil, !isInstallingFirmware else {
+            return
+        }
+        // Recovery firmware answers no ping at all. Asking can only end in a
+        // dropped link, which is the one thing a watch being recovered cannot
+        // afford.
+        guard connectedDevice?.isRunningRecoveryFirmware != true else {
             return
         }
         let cookie = nextPingCookie

@@ -5,6 +5,17 @@ public struct PebbleProtocolFrame: Equatable, Sendable {
     public var endpoint: UInt16
     public var payload: [UInt8]
 
+    /// The endpoint this frame refuses, when it is the watch saying it does not
+    /// implement one. Firmware answers on endpoint 0 with `DC` and the endpoint
+    /// that was addressed; recovery firmware refuses nearly everything this
+    /// way, so a refusal is often the only reply a request gets.
+    public var rejectedEndpoint: UInt16? {
+        guard endpoint == 0, payload.count >= 3, payload[0] == 0xDC else {
+            return nil
+        }
+        return UInt16(payload[1]) << 8 | UInt16(payload[2])
+    }
+
     public func encoded() throws -> [UInt8] {
         guard !payload.isEmpty else {
             throw PebbleProtocolFrameError.emptyPayload
