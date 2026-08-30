@@ -233,7 +233,14 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
 
         centralManager.stopScan()
-        pendingDevice = device
+        // CoreBluetooth knows the name of a bonded watch even when the caller
+        // only had a stored one, or none at all.
+        pendingDevice = DiscoveredPebble(
+            id: device.id,
+            name: peripheral.name ?? device.name,
+            model: device.model,
+            signalStrength: device.signalStrength
+        )
         peripheral.delegate = self
 
         return try await withCheckedThrowingContinuation { continuation in

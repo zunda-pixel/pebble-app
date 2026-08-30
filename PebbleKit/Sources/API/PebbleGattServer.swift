@@ -35,6 +35,14 @@ public final class PebbleGattServer: NSObject {
         var onUnsubscribe: () -> Void
     }
 
+    /// Called when a watch subscribes that no connection is handling yet.
+    ///
+    /// A watch that has been set up reconnects on its own and starts talking to
+    /// the phone's service without the app having scanned for it. Until the app
+    /// opens its own link to the same watch there is nothing to hand its
+    /// packets to, so they would be dropped and the watch would keep retrying.
+    public var onUnclaimedWatch: ((_ centralID: String) -> Void)?
+
     private var peripheralManager: CBPeripheralManager!
     private var dataCharacteristic: CBMutableCharacteristic?
     private var registrations: [String: Registration] = [:]
@@ -288,13 +296,19 @@ extension PebbleGattServer: CBPeripheralManagerDelegate {
         }
         let centralID = central.identifier.uuidString
         subscribedCentrals[centralID] = central
-        Task {
+        Task { [isClaimed = registrations[centralID] != nil] in
             await PebbleDiagnostics.shared.record(
                 category: "pairing",
-                message: "Watch subscribed to the phone's protocol service"
+                message: isClaimed
+                    ? "Watch subscribed to the phone's protocol service"
+                    : "Watch subscribed to the phone's protocol service on a link the app does not hold"
             )
         }
-        registrations[centralID]?.onSubscribe()
+        guard let registration = registrations[centralID] else {
+            onUnclaimedWatch?(centralID)
+            return
+        }
+        registration.onSubscribe()
     }
 
     public func peripheralManager(

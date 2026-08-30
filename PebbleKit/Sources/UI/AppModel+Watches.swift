@@ -26,6 +26,47 @@ extension AppModel {
         }
     }
 
+    /// Answers a watch that came back on its own.
+    ///
+    /// A watch that has been set up does not advertise and does not wait to be
+    /// found: it reconnects and subscribes to the phone's protocol service by
+    /// itself. Only the app's own link carries the session, though, so until it
+    /// opens one the watch's packets have nowhere to go and it keeps retrying.
+    func observeWatchesReconnectingThemselves() {
+        PebbleGattServer.shared.onUnclaimedWatch = { [weak self] centralID in
+            guard let self else { return }
+            Task { await self.claimWatchThatReconnectedItself(centralID: centralID) }
+        }
+    }
+
+    /// The watch and the peripheral share an identifier, so a subscription
+    /// names the watch to connect to.
+    func claimWatchThatReconnectedItself(centralID: String) async {
+        if let watch = savedWatches.first(where: { $0.id == centralID }) {
+            await PebbleDiagnostics.shared.record(
+                category: "connection",
+                message: "\(watch.name) reconnected on its own; opening a link to it"
+            )
+            await connect(to: watch)
+            return
+        }
+        // A watch this phone is bonded to that the app has no record of, after
+        // being forgotten or after a reinstall. Nothing else can bring it back:
+        // a bonded watch does not advertise, so it never turns up in a scan.
+        // The name and model here are placeholders — connecting replaces both
+        // with what the watch itself reports, and saves it.
+        await PebbleDiagnostics.shared.record(
+            category: "connection",
+            message: "A bonded watch the app does not know reconnected; adopting it"
+        )
+        await connect(to: DiscoveredPebble(
+            id: centralID,
+            name: "Pebble",
+            model: .pebble2Duo,
+            signalStrength: 0
+        ))
+    }
+
     public func setAutomaticallyConnects(_ enabled: Bool, watchID: String) async {
         do {
             savedWatches = try await watchLibrary.setAutomaticallyConnects(enabled, watchID: watchID)

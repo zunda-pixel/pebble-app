@@ -211,6 +211,48 @@ struct UITests {
     }
 
     @Test
+    func aWatchThatReconnectsOnItsOwnIsGivenALink() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        try await watchLibrary.record(PebbleDevice(
+            id: "saved-bonded-watch",
+            name: "My Pebble",
+            model: .pebbleTime2,
+            firmwareVersion: "v5.0.0",
+            batteryLevel: 60
+        ))
+        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+        await model.loadSavedWatches()
+
+        // The watch subscribed to the phone's protocol service by itself; no
+        // scan ran and nothing else asked for this connection.
+        await model.claimWatchThatReconnectedItself(centralID: "saved-bonded-watch")
+
+        #expect(model.connectedDevice?.id == "saved-bonded-watch")
+    }
+
+    @Test
+    func anUnknownBondedWatchIsAdoptedWhenItReconnects() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+        await model.loadSavedWatches()
+
+        // Bonded but unknown to the app: nothing else can find it, so it is
+        // adopted and saved rather than ignored.
+        await model.claimWatchThatReconnectedItself(centralID: "mock-emery")
+
+        #expect(model.connectedDevice?.id == "mock-emery")
+        #expect(model.savedWatches.contains { $0.id == "mock-emery" })
+    }
+
+    @Test
     func scanWhileConnectedPreservesConnection() async throws {
         let client = MockPebbleClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)

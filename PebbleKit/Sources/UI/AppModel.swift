@@ -183,6 +183,7 @@ public final class AppModel {
         notificationSourceApps = (try? await notificationSourceAppLibrary.apps()) ?? []
         musicCoordinator.start()
         phoneCallCoordinator.start()
+        observeWatchesReconnectingThemselves()
         if savedWatches.contains(where: \.automaticallyConnects) {
             await scan()
         }
