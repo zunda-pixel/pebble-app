@@ -3,6 +3,7 @@ import API
 import AsyncAlgorithms
 import EventKit
 import Foundation
+import Retry
 import SwiftUI
 
 /// Timeline pins, and the calendar they are drawn from.
@@ -49,9 +50,9 @@ extension AppModel {
                     let client = connection.client
                     switch operation {
                     case .upsert(let pin):
-                        try await PebbleRetryPolicy().execute { try await client.upsertTimelinePin(pin) }
+                        try await retry(with: .watchWork) { try await client.upsertTimelinePin(pin) }
                     case .delete(let id):
-                        try await PebbleRetryPolicy().execute { try await client.deleteTimelinePin(id: id) }
+                        try await retry(with: .watchWork) { try await client.deleteTimelinePin(id: id) }
                     }
                 }
             } catch {

@@ -3,6 +3,7 @@ import API
 import AsyncOperations
 import Defaults
 import Foundation
+import Retry
 import SwiftUI
 
 /// The installed application library and its transfers to a watch.
@@ -68,7 +69,7 @@ extension AppModel {
         do {
             for connection in activeConnections {
                 let client = connection.client
-                try await PebbleRetryPolicy().execute {
+                try await retry(with: .watchWork) {
                     try await client.launchApplication(id: application.id)
                 }
             }

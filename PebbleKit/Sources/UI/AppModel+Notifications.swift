@@ -2,6 +2,7 @@ import Algorithms
 import API
 import Defaults
 import Foundation
+import Retry
 import SwiftUI
 
 /// Notifications sent to a watch, and messages coming back.
@@ -113,7 +114,7 @@ extension AppModel {
             }
             for connection in activeConnections {
                 let client = connection.client
-                try await PebbleRetryPolicy().execute {
+                try await retry(with: .watchWork) {
                     try await client.sendNotification(notification)
                 }
             }
@@ -271,7 +272,7 @@ extension AppModel {
             do {
                 for connection in activeConnections {
                     let client = connection.client
-                    try await PebbleRetryPolicy().execute {
+                    try await retry(with: .watchWork) {
                         try await client.sendNotification(notification)
                     }
                 }

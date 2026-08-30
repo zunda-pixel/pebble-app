@@ -1,5 +1,4 @@
 public import Foundation
-import MemberwiseInit
 
 public enum AppRunStateEvent: Equatable, Sendable {
     case started(UUID)
@@ -43,26 +42,3 @@ public enum AppRunStateCodec {
 }
 
 public enum AppRunStateCodecError: Error, Equatable, Sendable { case invalidPayload }
-
-@MemberwiseInit(.public)
-public struct PebbleRetryPolicy: Equatable, Sendable {
-    public var maximumAttempts: Int = 3
-    public var initialDelay: Duration = .milliseconds(250)
-    public var maximumDelay: Duration = .seconds(2)
-
-    public func execute<Value: Sendable>(
-        operation: @Sendable () async throws -> Value
-    ) async throws -> Value {
-        var attempt = 0
-        var delay = initialDelay
-        while true {
-            do { return try await operation() }
-            catch {
-                attempt += 1
-                guard attempt < maximumAttempts, !Task.isCancelled else { throw error }
-                try await Task.sleep(for: delay)
-                delay = min(delay * 2, maximumDelay)
-            }
-        }
-    }
-}

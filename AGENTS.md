@@ -83,8 +83,13 @@ Reach for what is already in `PebbleKit/Package.swift` before adding anything:
 swift-algorithms, swift-async-algorithms, swift-collections (`DequeModule`),
 swift-async-operations (`asyncMap` and friends, for concurrent work that has to
 stay in order), swift-http-types (typed `HTTPRequest` for every network call),
-Defaults (typed keys in `PebbleDefaults.swift`), Valet (keychain, in
-`PebbleTokenStore.swift`), MemberwiseInit, ZIPFoundation.
+swift-retry (`DMRetry`), Defaults (typed keys in `PebbleDefaults.swift`), Valet
+(keychain, in `PebbleTokenStore.swift`), MemberwiseInit, ZIPFoundation.
+
+Work sent to a watch is retried with `retry(with: .watchWork)`
+(`WatchWorkRetry.swift`), not with a hand-written loop. Add a reason to
+`PebbleConnectionError.isWorthAnotherAttempt` rather than a special case at a
+call site.
 
 Notifications between the app's own parts are typed `NotificationCenter`
 messages (`PebbleWindowMessages.swift`), not `Notification.Name` plus an

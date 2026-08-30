@@ -53,6 +53,20 @@ public enum PebbleConnectionError: Error, Equatable, Sendable {
     case connectionTimedOut
     case protocolNegotiationFailed
     case disconnected
+
+    /// Whether the same request could succeed if it were sent again in a
+    /// moment. A link that is gone, or a radio that is off, will not come back
+    /// within the few hundred milliseconds a retry waits, so that work belongs
+    /// in the queue that waits for the next connection instead of in a loop.
+    public var isWorthAnotherAttempt: Bool {
+        switch self {
+        case .bluetoothUnavailable, .bluetoothUnsupported, .permissionDenied, .disconnected:
+            false
+        case .scanAlreadyInProgress, .deviceNotFound, .connectionAlreadyInProgress,
+             .connectionFailed, .connectionTimedOut, .protocolNegotiationFailed:
+            true
+        }
+    }
 }
 
 @MainActor

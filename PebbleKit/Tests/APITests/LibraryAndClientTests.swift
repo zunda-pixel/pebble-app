@@ -445,6 +445,19 @@ struct CompanionStorageTests {
         #expect(backoff.nextDelay() == .seconds(2))
     }
 
+    @Test func onlySomeConnectionErrorsAreWorthAnotherAttempt() {
+        // Nothing the phone does within a retry's few hundred milliseconds
+        // brings a lost link or a switched-off radio back.
+        #expect(!PebbleConnectionError.disconnected.isWorthAnotherAttempt)
+        #expect(!PebbleConnectionError.bluetoothUnavailable.isWorthAnotherAttempt)
+        #expect(!PebbleConnectionError.bluetoothUnsupported.isWorthAnotherAttempt)
+        #expect(!PebbleConnectionError.permissionDenied.isWorthAnotherAttempt)
+
+        #expect(PebbleConnectionError.connectionTimedOut.isWorthAnotherAttempt)
+        #expect(PebbleConnectionError.connectionFailed.isWorthAnotherAttempt)
+        #expect(PebbleConnectionError.protocolNegotiationFailed.isWorthAnotherAttempt)
+    }
+
     @Test func corruptPendingOperationsAreQuarantinedAndRecovered() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         let url = directory.appending(path: "pending-timeline.json")

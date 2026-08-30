@@ -1,6 +1,7 @@
 import API
 import Defaults
 import Foundation
+import Retry
 import Testing
 import ZIPFoundation
 @testable import UI
@@ -98,6 +99,23 @@ struct UITests {
         #expect(Defaults.Keys.activeWatchfaceID.defaultValue == nil)
         #expect(Defaults.Keys.catalogSource.defaultValue == nil)
         #expect(Defaults.Keys.healthKitLastExportDate.defaultValue == .distantPast)
+    }
+
+    @Test
+    func workSentToAWatchIsRetriedOnlyWhenAnotherAttemptCouldWork() {
+        let policy = RetryConfiguration<ContinuousClock>.watchWork
+        func isThrownStraightAway(_ error: any Error) -> Bool {
+            if case .throw = policy.recoverFromFailure(error) { return true }
+            return false
+        }
+
+        #expect(policy.maxAttempts == 3)
+        // Sleeping before reporting a link that is already gone only delays
+        // the queue the work belongs in.
+        #expect(isThrownStraightAway(PebbleConnectionError.disconnected))
+        #expect(isThrownStraightAway(PebbleConnectionError.bluetoothUnavailable))
+        #expect(!isThrownStraightAway(PebbleConnectionError.connectionTimedOut))
+        #expect(!isThrownStraightAway(PutBytesTransferError.invalidConfiguration))
     }
 
     @Test

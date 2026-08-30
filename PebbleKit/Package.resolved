@@ -1,5 +1,5 @@
 {
-  "originHash" : "5f42636d7935dcc5786a9466378dc82b3bd2aaa3535bb997b2f37839ab807ab7",
+  "originHash" : "d22aac11b49e462a738f1f8dee2030eacb17c3b3a1ba34cb05c20b08ca12b765",
   "pins" : [
     {
       "identity" : "defaults",
@@ -56,6 +56,15 @@
       }
     },
     {
+      "identity" : "swift-log",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-log.git",
+      "state" : {
+        "revision" : "3ffafb9722d5d918c614feb496c8789a3b59d222",
+        "version" : "1.15.0"
+      }
+    },
+    {
       "identity" : "swift-memberwise-init-macro",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/gohanlon/swift-memberwise-init-macro.git",
@@ -71,6 +80,15 @@
       "state" : {
         "revision" : "0c0290ff6b24942dadb83a929ffaaa1481df04a2",
         "version" : "1.1.1"
+      }
+    },
+    {
+      "identity" : "swift-retry",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/fumoboy007/swift-retry.git",
+      "state" : {
+        "revision" : "df9d7b185d2e433147ec0083a73c257e665eea0d",
+        "version" : "0.2.4"
       }
     },
     {
