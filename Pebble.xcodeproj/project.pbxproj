@@ -304,10 +304,12 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Pebble/Info.plist;
+				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Pebble shows the current song on your watch and lets it control playback.";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Pebble uses Bluetooth to find, connect to, and synchronize with your watch.";
-				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Pebble reads upcoming calendar events to show them on your watch timeline.";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Pebble synchronizes upcoming calendar events to your watch timeline.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Pebble reads steps and sleep data to keep your watch health history synchronized.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Pebble saves watch steps and sleep data to your Health data when you choose to synchronize.";
+				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Pebble synchronizes upcoming reminders to your watch timeline.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -359,10 +361,12 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Pebble/Info.plist;
+				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Pebble shows the current song on your watch and lets it control playback.";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Pebble uses Bluetooth to find, connect to, and synchronize with your watch.";
-				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Pebble reads upcoming calendar events to show them on your watch timeline.";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Pebble synchronizes upcoming calendar events to your watch timeline.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Pebble reads steps and sleep data to keep your watch health history synchronized.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Pebble saves watch steps and sleep data to your Health data when you choose to synchronize.";
+				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Pebble synchronizes upcoming reminders to your watch timeline.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;

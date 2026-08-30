@@ -2,17 +2,9 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSAppleMusicUsageDescription</key>
-	<string>Pebble shows the current song on your watch and lets it control playback.</string>
-	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>Pebble synchronizes upcoming calendar events to your watch timeline.</string>
-	<key>NSRemindersFullAccessUsageDescription</key>
-	<string>Pebble synchronizes upcoming reminders to your watch timeline.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-central</string>
-		<!-- Watches without a protocol service of their own connect to one
-		     hosted by the phone, which has to keep serving in the background. -->
 		<string>bluetooth-peripheral</string>
 	</array>
 </dict>
