@@ -1,3 +1,4 @@
+import API
 import Defaults
 import Foundation
 
@@ -10,6 +11,9 @@ import Foundation
 extension Defaults.Keys {
     /// Where the application catalog is fetched from.
     static let catalogSource = Key<String?>("appCatalogSource")
+
+    /// Firmware fetched from PebbleOS and waiting to be installed.
+    static let downloadedFirmware = Key<DownloadedFirmware?>("downloadedFirmware")
 
     /// Whether notifications raised by installed watch apps are delivered.
     static let companionNotificationsEnabled = Key<Bool>("companionNotificationsEnabled", default: true)
@@ -26,3 +30,5 @@ extension Defaults.Keys {
     /// When health samples were last written to HealthKit.
     static let healthKitLastExportDate = Key<Date>("healthKitLastExportDate", default: .distantPast)
 }
+
+extension DownloadedFirmware: Defaults.Serializable {}

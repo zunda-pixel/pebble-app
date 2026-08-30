@@ -1,4 +1,5 @@
 import API
+import Defaults
 import Foundation
 import SwiftUI
 
@@ -78,25 +79,45 @@ extension AppModel {
         }
     }
 
-    /// Downloads the firmware found by `checkForFirmwareUpdate` and hands it to
-    /// the same path a chosen file takes.
-    public func installAvailableFirmware(deviceID: String? = nil) async {
+    /// Fetches the published firmware and keeps it. Installing it is a
+    /// separate step: the download only needs the network, the install needs
+    /// the watch, and a watch in recovery firmware is not around for long.
+    public func downloadAvailableFirmware(deviceID: String? = nil) async {
         guard let release = availableFirmwareRelease else {
             await checkForFirmwareUpdate(deviceID: deviceID)
             guard availableFirmwareRelease != nil else { return }
-            await installAvailableFirmware(deviceID: deviceID)
+            await downloadAvailableFirmware(deviceID: deviceID)
             return
         }
-        let url: URL
         do {
             firmwareUpdateStatusMessage = "Downloading PebbleOS \(release.versionTag)…"
-            url = try await firmwareCatalog.download(release)
+            let firmware = try await firmwareCatalog.download(release)
+            downloadedFirmware = firmware
+            Defaults[.downloadedFirmware] = firmware
+            firmwareUpdateStatusMessage = "PebbleOS \(firmware.versionTag) is ready to install."
         } catch {
             firmwareUpdateStatusMessage = "Firmware could not be downloaded right now."
+        }
+    }
+
+    /// Installs what was downloaded earlier, which is the same path a chosen
+    /// file takes.
+    public func installDownloadedFirmware(deviceID: String? = nil) async {
+        guard let firmware = downloadedFirmware else {
+            firmwareUpdateStatusMessage = "Download the firmware first."
             return
         }
-        defer { try? FileManager.default.removeItem(at: url) }
-        await installFirmware(from: url, deviceID: deviceID)
+        await installFirmware(from: firmware.url, deviceID: deviceID)
+    }
+
+    /// Picks up a download from an earlier run, unless the file is gone.
+    func loadDownloadedFirmware() {
+        guard let firmware = Defaults[.downloadedFirmware] else { return }
+        guard FileManager.default.fileExists(atPath: firmware.url.path(percentEncoded: false)) else {
+            Defaults[.downloadedFirmware] = nil
+            return
+        }
+        downloadedFirmware = firmware
     }
 
     /// The board of the watch a firmware action targets, connected or not.

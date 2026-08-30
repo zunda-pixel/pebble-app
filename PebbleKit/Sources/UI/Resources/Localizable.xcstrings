@@ -63,6 +63,32 @@
         }
       }
     },
+    "%@ of %@ MB sent" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ of %2$@ MB sent"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%@/%@ MB 送信済み"
+          }
+        }
+      }
+    },
+    "%@ ready" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%@ 準備完了"
+          }
+        }
+      }
+    },
     "%lld dBm" : {
       "localizations" : {
         "ja" : {
@@ -89,6 +115,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "3モデル"
+          }
+        }
+      }
+    },
+    "A PBZ package built for this watch's board." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このウォッチのボード向けにビルドされたPBZパッケージです。"
           }
         }
       }
@@ -199,6 +235,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ペアリング済み"
+          }
+        }
+      }
+    },
+    "An update is waiting" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アップデートが待機中"
           }
         }
       }
@@ -373,6 +419,16 @@
         }
       }
     },
+    "Board" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ボード"
+          }
+        }
+      }
+    },
     "Browse" : {
       "localizations" : {
         "ja" : {
@@ -419,16 +475,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "キャンセル"
-          }
-        }
-      }
-    },
-    "Cancel Update" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アップデートをキャンセル"
           }
         }
       }
@@ -489,6 +535,26 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "カテゴリ"
+          }
+        }
+      }
+    },
+    "Check for Updates" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アップデートを確認"
+          }
+        }
+      }
+    },
+    "Check for updates to see what is published." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "公開されているバージョンを見るには、アップデートを確認してください。"
           }
         }
       }
@@ -589,6 +655,26 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "リセットする前にウォッチを接続してください。"
+          }
+        }
+      }
+    },
+    "Connect the watch to install it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "インストールするには、ウォッチを接続してください。"
+          }
+        }
+      }
+    },
+    "Connect the watch to read the version it runs." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "実行中のバージョンを読み取るには、ウォッチを接続してください。"
           }
         }
       }
@@ -773,26 +859,6 @@
         }
       }
     },
-    "Discard Recovery Data" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "リカバリデータを破棄"
-          }
-        }
-      }
-    },
-    "Discard recovery data?" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "リカバリデータを破棄しますか?"
-          }
-        }
-      }
-    },
     "Disconnect" : {
       "localizations" : {
         "ja" : {
@@ -813,12 +879,42 @@
         }
       }
     },
-    "Download Latest Firmware" : {
+    "Download it, then install it." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
-            "value" : "最新のファームウェアをダウンロード"
+            "value" : "ダウンロードしてからインストールします。"
+          }
+        }
+      }
+    },
+    "Download PebbleOS %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "PebbleOS %@をダウンロード"
+          }
+        }
+      }
+    },
+    "Download the firmware first." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "先にファームウェアをダウンロードしてください。"
+          }
+        }
+      }
+    },
+    "Downloaded" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ダウンロード済み"
           }
         }
       }
@@ -829,6 +925,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "“%@”をダウンロード中…"
+          }
+        }
+      }
+    },
+    "Downloading only needs the network, so it works with the watch away. Installing needs the watch, and starts as soon as it connects." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ダウンロードはネットワークだけで済むので、ウォッチが手元になくても実行できます。インストールにはウォッチが必要で、接続され次第始まります。"
           }
         }
       }
@@ -963,22 +1069,22 @@
         }
       }
     },
-    "Firmware published for this watch is downloaded from PebbleOS. A PBZ file can also be chosen while the watch is away; either way the transfer starts as soon as it connects." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "このウォッチ向けに公開されているファームウェアをPebbleOSからダウンロードします。ウォッチが接続されていなくてもPBZファイルを選択できます。いずれの場合も、転送は接続され次第、自動的に始まります。"
-          }
-        }
-      }
-    },
     "Firmware ready. It installs as soon as the watch connects." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ファームウェアの準備ができました。ウォッチが接続され次第インストールされます。"
+          }
+        }
+      }
+    },
+    "Firmware unknown" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ファームウェア不明"
           }
         }
       }
@@ -1003,12 +1109,42 @@
         }
       }
     },
+    "Forget" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "破棄"
+          }
+        }
+      }
+    },
     "Forget %@?" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "“%@”の登録を解除しますか?"
+          }
+        }
+      }
+    },
+    "Forget This Update" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このアップデートを破棄"
+          }
+        }
+      }
+    },
+    "Forget this update?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このアップデートを破棄しますか?"
           }
         }
       }
@@ -1233,22 +1369,32 @@
         }
       }
     },
-    "Install Firmware…" : {
+    "Install from a File…" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
-            "value" : "ファームウェアをインストール…"
+            "value" : "ファイルからインストール…"
           }
         }
       }
     },
-    "Install Recovery Firmware" : {
+    "Install it whenever you like." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
-            "value" : "リカバリファームウェアをインストール"
+            "value" : "好きなタイミングでインストールできます。"
+          }
+        }
+      }
+    },
+    "Install PebbleOS %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "PebbleOS %@をインストール"
           }
         }
       }
@@ -1313,6 +1459,26 @@
         }
       }
     },
+    "Installing firmware" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ファームウェアをインストール中"
+          }
+        }
+      }
+    },
+    "Installing PebbleOS %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "PebbleOS %@をインストール中"
+          }
+        }
+      }
+    },
     "Installing the firmware chosen for this watch…" : {
       "localizations" : {
         "ja" : {
@@ -1323,12 +1489,32 @@
         }
       }
     },
-    "Installing recovery firmware can make the watch temporarily unavailable. Keep it connected until the update completes." : {
+    "Installing…" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
-            "value" : "リカバリファームウェアをインストールすると、ウォッチが一時的に使用できなくなることがあります。アップデートが完了するまで接続したままにしてください。"
+            "value" : "インストール中…"
+          }
+        }
+      }
+    },
+    "It installs as soon as this watch connects." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このウォッチが接続され次第インストールされます。"
+          }
+        }
+      }
+    },
+    "Keep the watch nearby until this finishes." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "完了するまでウォッチを近くに置いてください。"
           }
         }
       }
@@ -1493,6 +1679,26 @@
         }
       }
     },
+    "Nothing was lost. Connect the watch to try again." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "失われたものはありません。やり直すには、ウォッチを接続してください。"
+          }
+        }
+      }
+    },
+    "Nothing was lost. Try again when you are ready." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "失われたものはありません。準備ができたらやり直してみてください。"
+          }
+        }
+      }
+    },
     "Notifications" : {
       "localizations" : {
         "ja" : {
@@ -1519,6 +1725,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このアプリの通知をミュートしました。"
+          }
+        }
+      }
+    },
+    "On the Watch" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチ上"
           }
         }
       }
@@ -1553,12 +1769,72 @@
         }
       }
     },
+    "PebbleOS" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "PebbleOS"
+          }
+        }
+      }
+    },
+    "PebbleOS %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "PebbleOS %@"
+          }
+        }
+      }
+    },
     "PebbleOS %@ is available." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "PebbleOS %@が利用できます。"
+          }
+        }
+      }
+    },
+    "PebbleOS %@ is downloaded" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "PebbleOS %@をダウンロード済み"
+          }
+        }
+      }
+    },
+    "PebbleOS %@ is published" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "PebbleOS %@が公開されています"
+          }
+        }
+      }
+    },
+    "PebbleOS %@ is ready to install." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "PebbleOS %@をインストールできます。"
+          }
+        }
+      }
+    },
+    "PebbleOS %@ is waiting" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "PebbleOS %@が待機中"
           }
         }
       }
@@ -1663,22 +1939,22 @@
         }
       }
     },
+    "Published" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "公開バージョン"
+          }
+        }
+      }
+    },
     "Published firmware could not be checked right now." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "現在、公開されているファームウェアを確認できません。"
-          }
-        }
-      }
-    },
-    "Published Version" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "公開バージョン"
           }
         }
       }
@@ -1719,6 +1995,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "再接続中…"
+          }
+        }
+      }
+    },
+    "Recovery firmware" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リカバリファームウェア"
           }
         }
       }
@@ -1823,6 +2109,16 @@
         }
       }
     },
+    "Replacing" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "置き換え前"
+          }
+        }
+      }
+    },
     "Required to connect to Pebble" : {
       "localizations" : {
         "ja" : {
@@ -1879,6 +2175,26 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチを再起動"
+          }
+        }
+      }
+    },
+    "Running recovery firmware" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リカバリファームウェアで動作中"
+          }
+        }
+      }
+    },
+    "Running Slot" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "実行中のスロット"
           }
         }
       }
@@ -2013,12 +2329,32 @@
         }
       }
     },
+    "Start the Recovery Install" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リカバリファームウェアのインストールを開始"
+          }
+        }
+      }
+    },
     "Starts at %lld:00" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "開始: %lld:00"
+          }
+        }
+      }
+    },
+    "State" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "状態"
           }
         }
       }
@@ -2039,6 +2375,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "歩数"
+          }
+        }
+      }
+    },
+    "Stop" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "停止"
           }
         }
       }
@@ -2119,16 +2465,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "システム通知は、Apple Notification Center Serviceを使用してペアリング済みのPebbleに直接配信されます。このスイッチでは、インストール済みのウォッチアプリが作成する通知を制御できます。テスト通知は各ウォッチの詳細ページから送信できます。"
-          }
-        }
-      }
-    },
-    "Target Version" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "対象バージョン"
           }
         }
       }
@@ -2273,12 +2609,22 @@
         }
       }
     },
-    "The interrupted update can no longer be resumed after its recovery data is discarded." : {
+    "The install stopped" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
-            "value" : "リカバリデータを破棄すると、中断されたアップデートを再開できなくなります。"
+            "value" : "インストールが停止しました"
+          }
+        }
+      }
+    },
+    "The package is removed, so this update cannot be picked up again. The watch keeps the firmware it is running." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "パッケージが削除され、このアップデートは再開できなくなります。ウォッチは現在のファームウェアのまま動作します。"
           }
         }
       }
@@ -2359,6 +2705,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "テスト通知を送信できませんでした。"
+          }
+        }
+      }
+    },
+    "The watch cannot be used until this finishes. Keep it nearby and connected." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "完了するまでウォッチは使用できません。接続したまま近くに置いてください。"
           }
         }
       }
@@ -2583,6 +2939,16 @@
         }
       }
     },
+    "The watch works again once firmware is installed." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ファームウェアをインストールすると、ウォッチは再び使えるようになります。"
+          }
+        }
+      }
+    },
     "The watchface could not be activated." : {
       "localizations" : {
         "ja" : {
@@ -2609,6 +2975,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ローカルに保存されている歩数と睡眠の履歴が削除されます。この操作は取り消せません。"
+          }
+        }
+      }
+    },
+    "This Update" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このアップデート"
           }
         }
       }
@@ -2723,6 +3099,16 @@
         }
       }
     },
+    "Try Again" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "やり直す"
+          }
+        }
+      }
+    },
     "Turn on your Pebble and keep it nearby." : {
       "localizations" : {
         "ja" : {
@@ -2739,6 +3125,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "種類"
+          }
+        }
+      }
+    },
+    "Unknown" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "不明"
           }
         }
       }
@@ -2773,12 +3169,12 @@
         }
       }
     },
-    "Update State" : {
+    "Update waiting" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
-            "value" : "アップデートの状態"
+            "value" : "アップデート待機中"
           }
         }
       }

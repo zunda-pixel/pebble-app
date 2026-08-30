@@ -63,6 +63,8 @@ public final class AppModel {
     public internal(set) var firmwareRequiresConfirmation = false
     public internal(set) var firmwareUpdateProgress: PutBytesTransferProgress?
     public internal(set) var availableFirmwareRelease: PebbleOSFirmwareRelease?
+    /// Firmware already fetched from PebbleOS, waiting to be installed.
+    public internal(set) var downloadedFirmware: DownloadedFirmware?
     public internal(set) var dataSyncStatusMessage: LocalizedStringKey?
     public internal(set) var timelineActionStatusMessage: LocalizedStringKey?
     public internal(set) var healthExportURL: URL?
@@ -183,6 +185,7 @@ public final class AppModel {
         await loadHealth()
         await loadCatalog()
         firmwareUpdateJournal = try? await pendingFirmwareUpdateLibrary.journal()
+        loadDownloadedFirmware()
         notificationSourceApps = (try? await notificationSourceAppLibrary.apps()) ?? []
         musicCoordinator.start()
         phoneCallCoordinator.start()

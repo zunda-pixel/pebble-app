@@ -210,7 +210,6 @@ struct WatchListRow: View {
 struct WatchDetailView: View {
     var model: AppModel
     var watchID: String
-    @State private var isChoosingFirmware = false
     @Environment(\.dismiss) private var dismiss
 
     private var connection: WatchConnection? {
@@ -223,6 +222,26 @@ struct WatchDetailView: View {
 
     private var watchName: String {
         connection?.device.name ?? savedWatch?.name ?? watchID
+    }
+
+    /// What the Firmware row says before it is opened. A version is a version
+    /// in any language, so it is the one part of this that is not translated.
+    private var firmwareSummary: Text {
+        if let journal = model.firmwareUpdateJournal, journal.deviceID == watchID {
+            return journal.phase == .transferring || journal.phase == .installing
+                ? Text("Installing…")
+                : Text("Update waiting")
+        }
+        if connection?.device.isRunningRecoveryFirmware == true {
+            return Text("Recovery firmware")
+        }
+        if let downloaded = model.downloadedFirmware {
+            return Text("\(downloaded.versionTag) ready")
+        }
+        guard let version = connection?.device.firmwareVersion ?? savedWatch?.firmwareVersion else {
+            return Text("Unknown")
+        }
+        return Text(verbatim: version)
     }
 
     var body: some View {
@@ -239,9 +258,6 @@ struct WatchDetailView: View {
             Section("Watch") {
                 if let model = connection?.device.model ?? savedWatch?.model {
                     LabeledContent("Model", value: model.displayName)
-                }
-                if let firmwareVersion = connection?.device.firmwareVersion ?? savedWatch?.firmwareVersion {
-                    LabeledContent("Firmware", value: firmwareVersion)
                 }
                 if let serialNumber = connection?.device.serialNumber ?? savedWatch?.serialNumber {
                     LabeledContent("Serial Number", value: serialNumber)
@@ -292,60 +308,13 @@ struct WatchDetailView: View {
                 }
             }
             Section {
-                Button("Download Latest Firmware", systemImage: "arrow.down.circle") {
-                    Task { await model.installAvailableFirmware(deviceID: watchID) }
-                }
-                if let release = model.availableFirmwareRelease {
-                    LabeledContent("Published Version", value: release.versionTag)
-                }
-                Button("Install Firmware…", systemImage: "externaldrive.badge.timemachine") {
-                    isChoosingFirmware = true
-                }
-                if let journal = model.firmwareUpdateJournal, journal.deviceID == watchID {
-                    LabeledContent("Update State") { Text(journal.phase.title) }
-                    if let targetVersion = journal.targetVersion {
-                        LabeledContent("Target Version", value: targetVersion)
-                    }
-                    if let progress = model.firmwareUpdateProgress, progress.totalBytes > 0 {
-                        ProgressView(value: Double(progress.bytesSent), total: Double(progress.totalBytes))
-                        Text("\(progress.bytesSent, format: .number) of \(progress.totalBytes, format: .number) bytes")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    // Recovery firmware leaves the watch unusable until the
-                    // transfer finishes, so it is never started unasked.
-                    if model.firmwareRequiresConfirmation {
-                        ConfirmingButton(
-                            title: "Install Recovery Firmware",
-                            role: .destructive,
-                            question: "Install recovery firmware?",
-                            explanation: "Installing recovery firmware can make the watch temporarily unavailable. Keep it connected until the update completes.",
-                            confirmationTitle: "Install Recovery Firmware"
-                        ) {
-                            Task { await model.confirmRecoveryFirmwareUpdate() }
-                        }
-                    }
-                    Button("Cancel Update", role: .destructive) {
-                        Task { await model.cancelFirmwareUpdate() }
-                    }
-                    ConfirmingButton(
-                        title: "Discard Recovery Data",
-                        role: .destructive,
-                        question: "Discard recovery data?",
-                        explanation: "The interrupted update can no longer be resumed after its recovery data is discarded.",
-                        confirmationTitle: "Discard Recovery Data"
-                    ) {
-                        Task { await model.discardPendingFirmwareUpdate() }
+                NavigationLink {
+                    FirmwareView(model: model, watchID: watchID)
+                } label: {
+                    LabeledContent("Firmware") {
+                        firmwareSummary
                     }
                 }
-                if let firmwareUpdateStatusMessage = model.firmwareUpdateStatusMessage {
-                    Label(firmwareUpdateStatusMessage, systemImage: "info.circle")
-                        .foregroundStyle(.secondary)
-                }
-            } header: {
-                Text("Firmware")
-            } footer: {
-                Text("Firmware published for this watch is downloaded from PebbleOS. A PBZ file can also be chosen while the watch is away; either way the transfer starts as soon as it connects.")
             }
             Section {
                 ConfirmingButton(
@@ -407,17 +376,6 @@ struct WatchDetailView: View {
         }
         .formStyle(.grouped)
         .navigationTitle(watchName)
-        .fileImporter(isPresented: $isChoosingFirmware, allowedContentTypes: [.pebbleFirmware]) { result in
-            guard case .success(let url) = result else { return }
-            Task { await model.installFirmware(from: url, deviceID: watchID) }
-        }
-        .dropDestination(for: URL.self) { urls, _ in
-            guard let firmwareURL = urls.first(where: { $0.pathExtension.lowercased() == "pbz" }) else {
-                return false
-            }
-            Task { await model.installFirmware(from: firmwareURL, deviceID: watchID) }
-            return true
-        }
     }
 }
 

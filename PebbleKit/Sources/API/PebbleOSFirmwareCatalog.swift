@@ -3,6 +3,14 @@ import HTTPTypes
 import HTTPTypesFoundation
 import MemberwiseInit
 
+/// A firmware package that has been fetched and is waiting on disk.
+@MemberwiseInit(.public)
+public struct DownloadedFirmware: Codable, Equatable, Sendable {
+    public var versionTag: String
+    public var board: PebbleWatchBoard
+    public var url: URL
+}
+
 /// One firmware package published for a board.
 @MemberwiseInit(.public)
 public struct PebbleOSFirmwareRelease: Equatable, Sendable {
@@ -82,7 +90,9 @@ public struct PebbleOSFirmwareCatalog: Sendable {
     }
 
     /// Downloads a package to a file the firmware importer can read.
-    public func download(_ release: PebbleOSFirmwareRelease) async throws -> URL {
+    /// Fetches a release and keeps it, so it can be installed later — on a
+    /// watch that is not here yet, or after a first attempt stopped.
+    public func download(_ release: PebbleOSFirmwareRelease) async throws -> DownloadedFirmware {
         let temporaryURL: URL
         do {
             temporaryURL = try await downloadFile(from: release.downloadURL, using: session)
@@ -91,11 +101,31 @@ public struct PebbleOSFirmwareCatalog: Sendable {
         } catch {
             throw PebbleOSFirmwareCatalogError.releasesUnavailable
         }
-        let output = FileManager.default.temporaryDirectory
+        let directory = try Self.downloadDirectory()
+        let output = directory
             .appending(path: "pebbleos-\(release.board.rawValue)-\(release.versionTag).pbz")
         try? FileManager.default.removeItem(at: output)
         try FileManager.default.moveItem(at: temporaryURL, to: output)
-        return output
+        return DownloadedFirmware(
+            versionTag: release.versionTag,
+            board: release.board,
+            url: output
+        )
+    }
+
+    /// Downloads live in Application Support rather than the temporary
+    /// directory: the system empties that one whenever it likes, and a package
+    /// waiting for a watch to turn up may wait a while.
+    private static func downloadDirectory() throws -> URL {
+        let directory = try FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        .appending(path: "Firmware", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
     }
 }
 
