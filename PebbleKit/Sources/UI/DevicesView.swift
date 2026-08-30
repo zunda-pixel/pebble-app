@@ -80,6 +80,28 @@ struct AddWatchSheet: View {
                         .foregroundStyle(.red)
                 }
 
+                if !model.unknownBondedWatches.isEmpty {
+                    Section {
+                        ForEach(model.unknownBondedWatches) { watch in
+                            Button {
+                                Task {
+                                    await model.connect(to: watch)
+                                    if model.connections.contains(where: { $0.device.id == watch.id }) {
+                                        dismiss()
+                                    }
+                                }
+                            } label: {
+                                Label(watch.name, systemImage: "applewatch.radiowaves.left.and.right")
+                            }
+                            .disabled(isConnecting)
+                        }
+                    } header: {
+                        Text("Already Paired")
+                    } footer: {
+                        Text("A watch that is paired with this phone but has not been added here. It cannot be found by scanning; it appears when it reaches the app by itself.")
+                    }
+                }
+
                 Section {
                     ForEach(model.discoveredDevices) { device in
                         DiscoveredDeviceRow(device: device) {

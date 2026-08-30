@@ -229,13 +229,13 @@ struct UITests {
 
         // The watch subscribed to the phone's protocol service by itself; no
         // scan ran and nothing else asked for this connection.
-        await model.claimWatchThatReconnectedItself(centralID: "saved-bonded-watch")
+        await model.noteWatchThatReconnectedItself(centralID: "saved-bonded-watch")
 
         #expect(model.connectedDevice?.id == "saved-bonded-watch")
     }
 
     @Test
-    func anUnknownBondedWatchIsAdoptedWhenItReconnects() async throws {
+    func anUnknownBondedWatchIsOfferedRatherThanConnected() async throws {
         let client = MockPebbleClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
@@ -244,12 +244,19 @@ struct UITests {
         let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
         await model.loadSavedWatches()
 
-        // Bonded but unknown to the app: nothing else can find it, so it is
-        // adopted and saved rather than ignored.
-        await model.claimWatchThatReconnectedItself(centralID: "mock-emery")
+        // Bonded but never added here: offered rather than connected, because
+        // nothing else can surface it and the reader decides.
+        await model.noteWatchThatReconnectedItself(centralID: "mock-emery")
+
+        #expect(model.connectedDevice == nil)
+        #expect(model.unknownBondedWatches.map(\.id) == ["mock-emery"])
+
+        let offered = try #require(model.unknownBondedWatches.first)
+        await model.connect(to: offered)
 
         #expect(model.connectedDevice?.id == "mock-emery")
         #expect(model.savedWatches.contains { $0.id == "mock-emery" })
+        #expect(model.unknownBondedWatches.isEmpty)
     }
 
     @Test

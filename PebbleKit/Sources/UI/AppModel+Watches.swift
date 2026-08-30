@@ -26,7 +26,7 @@ extension AppModel {
         }
     }
 
-    /// Answers a watch that came back on its own.
+    /// Notices a watch that came back on its own.
     ///
     /// A watch that has been set up does not advertise and does not wait to be
     /// found: it reconnects and subscribes to the phone's protocol service by
@@ -35,13 +35,13 @@ extension AppModel {
     func observeWatchesReconnectingThemselves() {
         PebbleGattServer.shared.onUnclaimedWatch = { [weak self] centralID in
             guard let self else { return }
-            Task { await self.claimWatchThatReconnectedItself(centralID: centralID) }
+            Task { await self.noteWatchThatReconnectedItself(centralID: centralID) }
         }
     }
 
     /// The watch and the peripheral share an identifier, so a subscription
-    /// names the watch to connect to.
-    func claimWatchThatReconnectedItself(centralID: String) async {
+    /// names the watch it came from.
+    func noteWatchThatReconnectedItself(centralID: String) async {
         if let watch = savedWatches.first(where: { $0.id == centralID }) {
             await PebbleDiagnostics.shared.record(
                 category: "connection",
@@ -51,20 +51,38 @@ extension AppModel {
             return
         }
         // A watch this phone is bonded to that the app has no record of, after
-        // being forgotten or after a reinstall. Nothing else can bring it back:
-        // a bonded watch does not advertise, so it never turns up in a scan.
-        // The name and model here are placeholders — connecting replaces both
-        // with what the watch itself reports, and saves it.
+        // being forgotten or after a reinstall. Connecting to it is the reader's
+        // call, so it is only offered: it goes in the list of watches to add,
+        // which is the only way it can appear there, since a bonded watch never
+        // turns up in a scan.
+        guard !unknownBondedWatches.contains(where: { $0.id == centralID }) else {
+            return
+        }
+        let watch = UnknownBondedWatch(id: centralID, name: await bondedWatchName(centralID: centralID))
+        unknownBondedWatches.append(watch)
         await PebbleDiagnostics.shared.record(
             category: "connection",
-            message: "A bonded watch the app does not know reconnected; adopting it"
+            message: "\(watch.name) is paired with this phone but not added; offering it"
         )
-        await connect(to: DiscoveredPebble(
-            id: centralID,
-            name: "Pebble",
-            model: .pebble2Duo,
-            signalStrength: 0
-        ))
+    }
+
+    /// Connects to a watch offered in the list of watches to add.
+    public func connect(to watch: UnknownBondedWatch) async {
+        await connect(to: provisionalDevice(id: watch.id, name: watch.name))
+    }
+
+    /// The name the system already holds for a bonded peripheral.
+    private func bondedWatchName(centralID: String) async -> String {
+        let hint = provisionalDevice(id: centralID, name: "Pebble")
+        let retrieved = try? await scannerClient.retrieveKnownDevices([hint])
+        return retrieved?.first { $0.id == centralID }?.name ?? hint.name
+    }
+
+    /// Connecting needs a model before the watch has said what it is. Only the
+    /// identifier and the name are real; the version the watch reports on
+    /// connecting replaces the rest, and is what gets saved.
+    private func provisionalDevice(id: String, name: String) -> DiscoveredPebble {
+        DiscoveredPebble(id: id, name: name, model: .pebble2Duo, signalStrength: 0)
     }
 
     public func setAutomaticallyConnects(_ enabled: Bool, watchID: String) async {

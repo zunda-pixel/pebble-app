@@ -103,6 +103,16 @@
         }
       }
     },
+    "A watch that is paired with this phone but has not been added here. It cannot be found by scanning; it appears when it reaches the app by itself." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "この端末とペアリング済みですが、まだ追加されていないウォッチです。スキャンでは見つからないため、ウォッチ側から接続してきたときに表示されます。"
+          }
+        }
+      }
+    },
     "Activate" : {
       "localizations" : {
         "ja" : {
@@ -179,6 +189,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "求められたらBluetoothへのアクセスを許可してください。"
+          }
+        }
+      }
+    },
+    "Already Paired" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ペアリング済み"
           }
         }
       }

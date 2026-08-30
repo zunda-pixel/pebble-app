@@ -47,6 +47,9 @@ public final class AppModel {
     public internal(set) var notificationStatusMessage: LocalizedStringKey?
     public internal(set) var notificationPreferences = NotificationDeliveryPreferences()
     public internal(set) var savedWatches: [SavedPebbleWatch] = []
+    /// Watches this phone is bonded to that the app has no record of, offered
+    /// for the reader to add.
+    public internal(set) var unknownBondedWatches: [UnknownBondedWatch] = []
     public internal(set) var watchManagementErrorMessage: LocalizedStringKey?
     public internal(set) var watchResetStatusMessage: LocalizedStringKey?
     public internal(set) var timelinePins: [PebbleTimelinePin] = []
@@ -298,6 +301,7 @@ public final class AppModel {
                 }
             )
             discoveredDevices.removeAll { $0.id == device.id }
+            unknownBondedWatches.removeAll { $0.id == device.id }
             refreshConnectionState()
             await recordConnectedWatch(connectedDevice)
             await restorePendingNotifications()
