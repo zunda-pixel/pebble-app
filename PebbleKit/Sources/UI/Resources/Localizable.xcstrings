@@ -573,6 +573,16 @@
         }
       }
     },
+    "Connect the watch to resume its firmware update." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ファームウェアのアップデートを再開するには、ウォッチを接続してください。"
+          }
+        }
+      }
+    },
     "Connect your Pebble, install watch apps, and keep timeline and health data synchronized." : {
       "localizations" : {
         "ja" : {
@@ -963,26 +973,6 @@
         }
       }
     },
-    "Firmware update remains queued for reconnection." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ファームウェアのアップデートは再接続時まで保留されます。"
-          }
-        }
-      }
-    },
-    "Firmware update resumed successfully." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ファームウェアのアップデートを再開しました。"
-          }
-        }
-      }
-    },
     "Firmware update stopped safely: %@" : {
       "localizations" : {
         "ja" : {
@@ -1303,22 +1293,22 @@
         }
       }
     },
+    "Installing the firmware chosen for this watch…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このウォッチ用に選択されたファームウェアをインストール中…"
+          }
+        }
+      }
+    },
     "Installing recovery firmware can make the watch temporarily unavailable. Keep it connected until the update completes." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "リカバリファームウェアをインストールすると、ウォッチが一時的に使用できなくなることがあります。アップデートが完了するまで接続したままにしてください。"
-          }
-        }
-      }
-    },
-    "Interrupted recovery update requires confirmation." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "中断されたリカバリアップデートには確認が必要です。"
           }
         }
       }
@@ -1713,6 +1703,16 @@
         }
       }
     },
+    "Recovery firmware is ready. Confirm to continue." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リカバリファームウェアの準備ができました。続けるには確認してください。"
+          }
+        }
+      }
+    },
     "Recovery firmware validated. Confirm to continue." : {
       "localizations" : {
         "ja" : {
@@ -1859,16 +1859,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチを再起動"
-          }
-        }
-      }
-    },
-    "Resuming interrupted firmware update…" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "中断されたファームウェアのアップデートを再開中…"
           }
         }
       }
@@ -2029,6 +2019,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "歩数"
+          }
+        }
+      }
+    },
+    "Stopped" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "停止"
           }
         }
       }
@@ -2239,6 +2239,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "診断レポートを作成できませんでした。"
+          }
+        }
+      }
+    },
+    "The firmware update stopped part-way. Resume it when you are ready." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ファームウェアのアップデートは途中で停止しました。準備ができたら再開してください。"
           }
         }
       }

@@ -112,7 +112,15 @@ public actor PendingFirmwareUpdateLibrary {
 }
 
 public enum FirmwareUpdatePhase: String, Codable, Equatable, Sendable {
-    case validated, transferring, installing, awaitingRestart, cancelled
+    case validated, transferring, installing, awaitingRestart, cancelled, failed
+
+    /// Whether an update in this phase may start again without being asked
+    /// for. Only one that was accepted and never sent qualifies: it was staged
+    /// deliberately, for a watch that was away. Anything that already ran and
+    /// stopped is the reader's call to make again.
+    public var mayStartUnattended: Bool {
+        self == .validated
+    }
 }
 
 @MemberwiseInit(.public)

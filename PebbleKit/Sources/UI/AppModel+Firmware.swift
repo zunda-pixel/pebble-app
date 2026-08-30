@@ -165,13 +165,30 @@ extension AppModel {
         let task = Task { try await client.installFirmware(package) }
         firmwareUpdateTask = task
         defer { firmwareUpdateTask = nil }
-        try await task.value
+        do {
+            try await task.value
+        } catch {
+            // Record the failure, so the next connection offers the update
+            // again instead of silently starting the whole transfer over.
+            // A cancelled journal already says what happened.
+            let stopped = try? await pendingFirmwareUpdateLibrary.journal()
+            if stopped?.phase == .transferring {
+                try? await pendingFirmwareUpdateLibrary.updatePhase(.failed)
+                firmwareUpdateJournal = try? await pendingFirmwareUpdateLibrary.journal()
+            }
+            throw error
+        }
         try await pendingFirmwareUpdateLibrary.updatePhase(.awaitingRestart)
         firmwareUpdateJournal = try await pendingFirmwareUpdateLibrary.journal()
         firmwareUpdateStatusMessage = "Firmware installed. Waiting for the watch to restart."
         await pendingFirmwareUpdateLibrary.clear()
     }
 
+    /// Starts an update that was accepted while the watch was away, as soon as
+    /// it turns up. Only that case runs unasked: it is the whole point of
+    /// staging one, and a watch in recovery firmware stays connected for too
+    /// short a time to be caught by hand. An update that already ran and
+    /// stopped waits to be started again.
     func resumePendingFirmwareUpdate(on connection: WatchConnection) async {
         let device = connection.device
         guard let package = try? await pendingFirmwareUpdateLibrary.package(),
@@ -181,17 +198,36 @@ extension AppModel {
               journal.packageSHA256 == package.sha256,
               journal.phase != .cancelled else { return }
         firmwareUpdateJournal = journal
+        guard journal.phase.mayStartUnattended else {
+            firmwareUpdateStatusMessage = "The firmware update stopped part-way. Resume it when you are ready."
+            return
+        }
         if package.manifest.firmware.type == "recovery" {
             firmwareRequiresConfirmation = true
-            firmwareUpdateStatusMessage = "Interrupted recovery update requires confirmation."
+            firmwareUpdateStatusMessage = "Recovery firmware is ready. Confirm to continue."
             return
         }
         do {
-            firmwareUpdateStatusMessage = "Resuming interrupted firmware update…"
+            firmwareUpdateStatusMessage = "Installing the firmware chosen for this watch…"
             try await performFirmwareUpdate(package, on: connection)
-            firmwareUpdateStatusMessage = "Firmware update resumed successfully."
         } catch {
-            firmwareUpdateStatusMessage = "Firmware update remains queued for reconnection."
+            firmwareUpdateStatusMessage = "Firmware update stopped safely: \(error.localizedDescription)"
+        }
+    }
+
+    /// Starts an update that stopped part-way, at the reader's request.
+    public func resumeFirmwareUpdate(deviceID: String? = nil) async {
+        guard let package = try? await pendingFirmwareUpdateLibrary.package(),
+              let journal = try? await pendingFirmwareUpdateLibrary.journal(),
+              let connection = connection(for: deviceID ?? journal.deviceID),
+              connection.isConnected else {
+            firmwareUpdateStatusMessage = "Connect the watch to resume its firmware update."
+            return
+        }
+        do {
+            try await performFirmwareUpdate(package, on: connection)
+        } catch {
+            firmwareUpdateStatusMessage = "Firmware update stopped safely: \(error.localizedDescription)"
         }
     }
 }

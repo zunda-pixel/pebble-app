@@ -53,6 +53,7 @@ public extension FirmwareUpdatePhase {
         case .installing: "Installing"
         case .awaitingRestart: "Waiting for restart"
         case .cancelled: "Cancelled"
+        case .failed: "Stopped"
         }
     }
 }
