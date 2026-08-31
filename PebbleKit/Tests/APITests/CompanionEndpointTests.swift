@@ -229,6 +229,80 @@ struct PhoneVersionTests {
         let bytes = PhoneVersionCodec.capabilityBytes([.appRunStateProtocol, .notificationFiltering])
         #expect(bytes == [0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
     }
+
+    @Test func theWeatherClaimIsMadeOrTheWatchRefusesTheWrite() {
+        // `weather_service_supported_by_phone` reads this bit from the answer
+        // given while connecting, and refuses every weather write without it.
+        #expect(PhoneVersionCodec.supportedCapabilities.contains(.weatherApp))
+        let frame = PhoneVersionCodec.responseFrame(operatingSystem: .iOS)
+        #expect(frame.payload[18] & 0x08 == 0x08)
+    }
+}
+
+@Suite
+@MainActor
+struct WeatherTests {
+    private let report = PebbleWeatherReport(
+        id: UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF")!,
+        locationName: "Kyoto",
+        isCurrentLocation: true,
+        currentTemperature: 21,
+        currentType: .sun,
+        todayHigh: 26,
+        todayLow: 18,
+        tomorrowType: .lightRain,
+        tomorrowHigh: 24,
+        tomorrowLow: 17,
+        shortPhrase: "Clear",
+        updated: Date(timeIntervalSince1970: 0x66000000)
+    )
+
+    @Test func theRecordMatchesTheFirmwareStruct() {
+        // WeatherDBEntry, packed and little-endian: version, current, today,
+        // tomorrow, when it was taken, whether it is where the phone is, then
+        // the two strings as a serialized array of pstring16s.
+        #expect(WeatherCodec.value(for: report) == [
+            0x03,
+            0x15, 0x00,
+            0x07,
+            0x1A, 0x00,
+            0x12, 0x00,
+            0x03,
+            0x18, 0x00,
+            0x11, 0x00,
+            0x00, 0x00, 0x00, 0x66,
+            0x01,
+            // The strings' total size: two lengths of two bytes and ten of text.
+            0x0E, 0x00,
+            0x05, 0x00, 0x4B, 0x79, 0x6F, 0x74, 0x6F,
+            0x05, 0x00, 0x43, 0x6C, 0x65, 0x61, 0x72,
+        ])
+    }
+
+    @Test func theRecordGoesIntoTheWeatherDatabaseUnderTheLocationsKey() {
+        let frame = WeatherCodec.insertFrame(report: report, token: 0x1234)
+
+        #expect(frame.endpoint == BlobDBCodec.endpoint)
+        #expect(frame.payload[0] == 0x01)
+        #expect(Array(frame.payload[1..<3]) == [0x12, 0x34])
+        // Database 5 is the weather one.
+        #expect(frame.payload[3] == 5)
+        #expect(frame.payload[4] == 16)
+        #expect(Array(frame.payload[5..<21]) == BlobDBCodec.uuidBytes(report.id))
+    }
+
+    @Test func aNameLongerThanTheWatchsBufferIsCutBetweenCharacters() {
+        // The firmware keeps 64 bytes for the name and wants room for a
+        // terminator, and a kanji costs three bytes — cutting by character
+        // count would overrun it, cutting mid-character would corrupt it.
+        let long = String(repeating: "京", count: 30)
+        let cut = WeatherCodec.truncated(long, toBytes: 63)
+
+        #expect(cut.utf8.count <= 63)
+        #expect(cut.count == 21)
+        #expect(String(decoding: Array(cut.utf8), as: UTF8.self) == cut)
+        #expect(WeatherCodec.truncated("Kyoto", toBytes: 63) == "Kyoto")
+    }
 }
 
 @Suite

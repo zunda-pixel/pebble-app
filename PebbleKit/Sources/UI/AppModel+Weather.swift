@@ -1,0 +1,160 @@
+import API
+import CoreLocation
+import Defaults
+import Foundation
+import SwiftUI
+
+/// The weather the watch shows in its own weather app.
+///
+/// The phone holds the places, fetches their forecasts from WeatherKit and
+/// writes one record per place into the watch's weather database. The watch
+/// stores what it is given: it does no fetching and no unit conversion.
+extension AppModel {
+    /// Adds the phone's own position to the list, which is the entry the watch
+    /// marks as current.
+    public func followPhoneForWeather() async {
+        guard !weatherPlaces.contains(where: \.followsPhone) else { return }
+        guard phoneLocationSource.isAllowed else {
+            phoneLocationSource.requestAuthorization()
+            weatherStatusMessage = "Allow location access to use where the phone is."
+            return
+        }
+        do {
+            let location = try await phoneLocationSource.currentLocation()
+            let name = await placeName(for: location) ?? String(localized: "Current Location")
+            weatherPlaces.insert(
+                WeatherPlace(
+                    id: UUID(),
+                    name: name,
+                    latitude: location.coordinate.latitude,
+                    longitude: location.coordinate.longitude,
+                    followsPhone: true
+                ),
+                at: 0
+            )
+            saveWeatherPlaces()
+            await refreshWeather()
+        } catch {
+            weatherStatusMessage = "The phone's position could not be read."
+        }
+    }
+
+    /// Looks a place up by name and keeps it if it is somewhere.
+    public func addWeatherPlace(named query: String) async {
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return }
+        do {
+            let places = try await CLGeocoder().geocodeAddressString(query)
+            guard let place = places.first, let location = place.location else {
+                throw WeatherSourceError.placeNotFound
+            }
+            weatherPlaces.append(
+                WeatherPlace(
+                    id: UUID(),
+                    name: place.locality ?? place.name ?? query,
+                    latitude: location.coordinate.latitude,
+                    longitude: location.coordinate.longitude,
+                    followsPhone: false
+                )
+            )
+            saveWeatherPlaces()
+            await refreshWeather()
+        } catch {
+            weatherStatusMessage = "No place was found for “\(query)”."
+        }
+    }
+
+    public func removeWeatherPlace(id: UUID) async {
+        weatherPlaces.removeAll { $0.id == id }
+        saveWeatherPlaces()
+        weatherReports.removeAll { $0.id == id }
+        // The watch keeps what it was given until it is told otherwise.
+        for connection in activeConnections where connection.device.supportsWeatherApp {
+            connection.blobDBTokenCounter &+= 1
+            try? await connection.client.send(
+                WeatherCodec.deleteFrame(id: id, token: connection.blobDBTokenCounter)
+            )
+        }
+    }
+
+    public func setWeatherUsesFahrenheit(_ usesFahrenheit: Bool) async {
+        weatherUsesFahrenheit = usesFahrenheit
+        Defaults[.weatherUsesFahrenheit] = usesFahrenheit
+        await refreshWeather()
+    }
+
+    /// Fetches every place's forecast and writes it to every watch that has the
+    /// weather app.
+    public func refreshWeather() async {
+        guard !weatherPlaces.isEmpty else {
+            weatherStatusMessage = nil
+            return
+        }
+        isRefreshingWeather = true
+        defer { isRefreshingWeather = false }
+        if weatherCredit == nil {
+            weatherCredit = try? await weatherBridge.credit()
+        }
+        var reports: [PebbleWeatherReport] = []
+        for place in weatherPlaces {
+            var place = place
+            // The entry that follows the phone is only useful where the phone
+            // is now, so its position is read again before the forecast.
+            if place.followsPhone, let location = try? await phoneLocationSource.currentLocation() {
+                place.latitude = location.coordinate.latitude
+                place.longitude = location.coordinate.longitude
+            }
+            do {
+                reports.append(
+                    try await weatherBridge.report(for: place, inFahrenheit: weatherUsesFahrenheit)
+                )
+            } catch {
+                weatherStatusMessage = "The forecast for \(place.name) could not be fetched. \(error.localizedDescription)"
+            }
+        }
+        guard !reports.isEmpty else { return }
+        weatherReports = reports
+        weatherUpdated = .now
+        weatherStatusMessage = nil
+        for connection in activeConnections {
+            await sendWeather(to: connection)
+        }
+    }
+
+    /// Writes what has already been fetched to one watch, which is what a fresh
+    /// connection needs.
+    func sendWeather(to connection: WatchConnection) async {
+        guard connection.isConnected, !weatherReports.isEmpty else { return }
+        // A watch without the weather app refuses the write, and one in
+        // recovery firmware refuses everything.
+        guard connection.device.supportsWeatherApp, !connection.device.isRunningRecoveryFirmware else {
+            return
+        }
+        for report in weatherReports {
+            connection.blobDBTokenCounter &+= 1
+            do {
+                try await connection.client.send(
+                    WeatherCodec.insertFrame(report: report, token: connection.blobDBTokenCounter)
+                )
+            } catch {
+                return
+            }
+        }
+    }
+
+    func loadWeatherPlaces() {
+        weatherPlaces = Defaults[.weatherPlaces]
+        weatherUsesFahrenheit = Defaults[.weatherUsesFahrenheit]
+    }
+
+    private func saveWeatherPlaces() {
+        Defaults[.weatherPlaces] = weatherPlaces
+    }
+
+    /// The name a position reads as, so the watch shows a town rather than a
+    /// pair of numbers.
+    private func placeName(for location: CLLocation) async -> String? {
+        let places = try? await CLGeocoder().reverseGeocodeLocation(location)
+        return places?.first?.locality ?? places?.first?.name
+    }
+}

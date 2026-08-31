@@ -43,6 +43,16 @@
         }
       }
     },
+    "%@ has no weather app, so nothing is sent to it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”には天気アプリがないため、何も送信しません。"
+          }
+        }
+      }
+    },
     "%@ installed." : {
       "localizations" : {
         "ja" : {
@@ -145,6 +155,16 @@
         }
       }
     },
+    "%lld places" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld件の地点"
+          }
+        }
+      }
+    },
     "3 models" : {
       "localizations" : {
         "ja" : {
@@ -215,12 +235,32 @@
         }
       }
     },
+    "Add" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加"
+          }
+        }
+      }
+    },
     "Add a Pebble 2 Duo, Pebble Time 2, or Pebble Round 2." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "Pebble 2 Duo、Pebble Time 2、またはPebble Round 2を追加してください。"
+          }
+        }
+      }
+    },
+    "Add a Place" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地点を追加"
           }
         }
       }
@@ -255,6 +295,16 @@
         }
       }
     },
+    "Add where you are, or a place you want to keep an eye on." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地か、気にしている場所を追加してください。"
+          }
+        }
+      }
+    },
     "All" : {
       "localizations" : {
         "ja" : {
@@ -271,6 +321,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "求められたらBluetoothへのアクセスを許可してください。"
+          }
+        }
+      }
+    },
+    "Allow location access to use where the phone is." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地を使うには、位置情報の利用を許可してください。"
           }
         }
       }
@@ -585,6 +645,16 @@
         }
       }
     },
+    "Celsius" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "摂氏"
+          }
+        }
+      }
+    },
     "Check for Updates" : {
       "localizations" : {
         "ja" : {
@@ -841,6 +911,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このウォッチに接続します"
+          }
+        }
+      }
+    },
+    "Current Location" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地"
           }
         }
       }
@@ -1105,6 +1185,16 @@
         }
       }
     },
+    "Fahrenheit" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "華氏"
+          }
+        }
+      }
+    },
     "Favorite" : {
       "localizations" : {
         "ja" : {
@@ -1191,6 +1281,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ファームウェアのアップデートを安全に停止しました: %@"
+          }
+        }
+      }
+    },
+    "Follows the phone" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地に追従"
           }
         }
       }
@@ -1535,6 +1635,16 @@
         }
       }
     },
+    "Installing a language replaces the one on the watch. The watch switches over by itself and says so on its own screen. English needs no pack: it is part of the firmware." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "言語をインストールすると、ウォッチ上の言語が置き換わります。ウォッチは自動で切り替わり、その旨を画面に表示します。英語はファームウェアに含まれているため、パックは不要です。"
+          }
+        }
+      }
+    },
     "Installing application…" : {
       "localizations" : {
         "ja" : {
@@ -1641,6 +1751,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ローカルのPebbleヘルスケアデータを削除しました。"
+          }
+        }
+      }
+    },
+    "Location" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位置情報"
           }
         }
       }
@@ -1765,6 +1885,26 @@
         }
       }
     },
+    "No place was found for “%@”." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”に該当する地点が見つかりませんでした。"
+          }
+        }
+      }
+    },
+    "No Places" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地点がありません"
+          }
+        }
+      }
+    },
     "Not connected" : {
       "localizations" : {
         "ja" : {
@@ -1831,6 +1971,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このアプリの通知をミュートしました。"
+          }
+        }
+      }
+    },
+    "Off" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフ"
           }
         }
       }
@@ -2025,6 +2175,16 @@
         }
       }
     },
+    "Places" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地点"
+          }
+        }
+      }
+    },
     "Prepare Diagnostic Report" : {
       "localizations" : {
         "ja" : {
@@ -2161,6 +2321,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "再読み込み"
+          }
+        }
+      }
+    },
+    "Refresh Now" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "いま更新"
           }
         }
       }
@@ -2595,6 +2765,16 @@
         }
       }
     },
+    "Temperature" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "温度"
+          }
+        }
+      }
+    },
     "Test notification sent." : {
       "localizations" : {
         "ja" : {
@@ -2745,6 +2925,22 @@
         }
       }
     },
+    "The forecast for %@ could not be fetched. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The forecast for %1$@ could not be fetched. %2$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”の予報を取得できませんでした。%@"
+          }
+        }
+      }
+    },
     "The install stopped" : {
       "localizations" : {
         "ja" : {
@@ -2781,6 +2977,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "PBWパッケージにアプリケーションの実行ファイルが含まれていません。"
+          }
+        }
+      }
+    },
+    "The phone's position could not be read." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地を取得できませんでした。"
           }
         }
       }
@@ -3005,6 +3211,16 @@
         }
       }
     },
+    "The watch keeps the numbers it is given, so they are sent in this unit." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ウォッチは渡された数値をそのまま保持するため、この単位で送信します。"
+          }
+        }
+      }
+    },
     "The watch rejected health synchronization." : {
       "localizations" : {
         "ja" : {
@@ -3215,6 +3431,16 @@
         }
       }
     },
+    "Town or city" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "市区町村"
+          }
+        }
+      }
+    },
     "Tracked Days" : {
       "localizations" : {
         "ja" : {
@@ -3325,12 +3551,42 @@
         }
       }
     },
+    "Updated %@." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@に更新しました。"
+          }
+        }
+      }
+    },
     "Updating application order…" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "アプリケーションの並び順を更新中…"
+          }
+        }
+      }
+    },
+    "Use Where the Phone Is" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地を使う"
+          }
+        }
+      }
+    },
+    "Used only for the weather where the phone is" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地の天気にのみ使用します"
           }
         }
       }
@@ -3455,6 +3711,26 @@
         }
       }
     },
+    "Weather" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "天気"
+          }
+        }
+      }
+    },
+    "Weather data sources" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "気象データの提供元"
+          }
+        }
+      }
+    },
     "Week" : {
       "localizations" : {
         "ja" : {
@@ -3471,16 +3747,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "Pebbleへようこそ"
-          }
-        }
-      }
-    },
-    "Installing a language replaces the one on the watch. The watch switches over by itself and says so on its own screen. English needs no pack: it is part of the firmware." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "言語をインストールすると、ウォッチ上の言語が置き換わります。ウォッチは自動で切り替わり、その旨を画面に表示します。英語はファームウェアに含まれているため、パックは不要です。"
           }
         }
       }

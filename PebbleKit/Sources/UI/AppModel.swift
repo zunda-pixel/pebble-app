@@ -71,6 +71,15 @@ public final class AppModel {
     public internal(set) var downloadedFirmware: DownloadedFirmware?
     public internal(set) var languageStatusMessage: LocalizedStringKey?
     public internal(set) var isInstallingLanguagePack = false
+    /// The places the watch shows weather for, the forecasts last fetched for
+    /// them, and what Apple requires be shown alongside.
+    public internal(set) var weatherPlaces: [WeatherPlace] = []
+    public internal(set) var weatherReports: [PebbleWeatherReport] = []
+    public internal(set) var weatherCredit: WeatherCredit?
+    public internal(set) var weatherUpdated: Date?
+    public internal(set) var weatherUsesFahrenheit = false
+    public internal(set) var isRefreshingWeather = false
+    public internal(set) var weatherStatusMessage: LocalizedStringKey?
     public internal(set) var dataSyncStatusMessage: LocalizedStringKey?
     public internal(set) var timelineActionStatusMessage: LocalizedStringKey?
     public internal(set) var healthExportURL: URL?
@@ -131,6 +140,8 @@ public final class AppModel {
     let healthLibrary = PebbleHealthLibrary()
     let appCatalog = PebbleAppCatalog()
     let languagePackCatalog = PebbleLanguagePackCatalog()
+    let weatherBridge = WeatherBridge()
+    let phoneLocationSource = PhoneLocationSource()
     let pendingNotificationLibrary = PendingNotificationLibrary()
     let notificationPreferenceLibrary = NotificationPreferenceLibrary()
     let pendingTimelineOperationLibrary = PendingTimelineOperationLibrary()
@@ -207,6 +218,7 @@ public final class AppModel {
         await loadCatalog()
         firmwareUpdateJournal = try? await pendingFirmwareUpdateLibrary.journal()
         loadDownloadedFirmware()
+        loadWeatherPlaces()
         notificationSourceApps = (try? await notificationSourceAppLibrary.apps()) ?? []
         musicCoordinator.start()
         phoneCallCoordinator.start()
@@ -466,6 +478,7 @@ public final class AppModel {
         await flushPendingNotifications()
         await flushPendingAppMessages()
         await synchronizeTimeline()
+        await sendWeather(to: connection)
         await requestHealthSync(on: connection)
         await resumePendingFirmwareUpdate(on: connection)
     }

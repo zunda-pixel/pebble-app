@@ -15,6 +15,14 @@ extension Defaults.Keys {
     /// Firmware fetched from PebbleOS and waiting to be installed.
     static let downloadedFirmware = Key<DownloadedFirmware?>("downloadedFirmware")
 
+    /// The places the watch shows weather for, and the unit their temperatures
+    /// are sent in — the watch stores a number with no unit attached.
+    static let weatherPlaces = Key<[WeatherPlace]>("weatherPlaces", default: [])
+    static let weatherUsesFahrenheit = Key<Bool>(
+        "weatherUsesFahrenheit",
+        default: Locale.current.measurementSystem == .us
+    )
+
     /// Whether notifications raised by installed watch apps are delivered.
     static let companionNotificationsEnabled = Key<Bool>("companionNotificationsEnabled", default: true)
 
@@ -32,3 +40,4 @@ extension Defaults.Keys {
 }
 
 extension DownloadedFirmware: Defaults.Serializable {}
+extension WeatherPlace: Defaults.Serializable {}

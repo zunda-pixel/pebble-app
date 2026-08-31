@@ -22,15 +22,35 @@ struct SettingsView: View {
     @State private var catalogSource = Defaults[.catalogSource]
         ?? PebbleAppCatalog.defaultSourceURL.absoluteString
 
+    /// What the Weather row says before it is opened: how many places the watch
+    /// is being told about.
+    private var weatherSummary: Text {
+        switch model.weatherPlaces.count {
+        case 0: Text("Off")
+        case 1: Text(verbatim: model.weatherPlaces[0].name)
+        case let count: Text("\(count) places")
+        }
+    }
+
     var body: some View {
         Form {
             Section("Support") {
                 LabeledContent("Supported Watches") { Text("3 models") }
                 LabeledContent("Connection") { Text("Bluetooth LE") }
             }
+            Section {
+                NavigationLink {
+                    WeatherView(model: model)
+                } label: {
+                    LabeledContent("Weather") {
+                        weatherSummary
+                    }
+                }
+            }
             Section("Permissions") {
                 LabeledContent("Bluetooth") { Text("Required to connect to Pebble") }
                 LabeledContent("Calendar") { Text("Used only when you sync timeline events") }
+                LabeledContent("Location") { Text("Used only for the weather where the phone is") }
                 Button("Open Privacy Settings", systemImage: "gear") {
                     openPrivacySettings()
                 }

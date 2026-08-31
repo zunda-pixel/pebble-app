@@ -26,8 +26,16 @@ public enum PhoneVersionCodec {
     public static var endpoint: UInt16 { 17 }
 
     /// The capabilities this companion app actually implements.
+    ///
+    /// The weather bit is not decoration: the firmware refuses a write to the
+    /// weather database from a phone that has not claimed it
+    /// (`weather_service_supported_by_phone`), and it reads the claim from the
+    /// answer given here, once, while connecting.
     public static var supportedCapabilities: Set<PhoneCapability> {
-        [.appRunStateProtocol, .infiniteLogDump, .appMessage8k, .appDictation, .notificationFiltering]
+        [
+            .appRunStateProtocol, .infiniteLogDump, .appMessage8k, .appDictation,
+            .notificationFiltering, .weatherApp,
+        ]
     }
 
     public static func isRequest(_ frame: PebbleProtocolFrame) -> Bool {
