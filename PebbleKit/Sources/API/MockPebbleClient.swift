@@ -12,6 +12,7 @@ public final class MockPebbleClient: PebbleClient {
     public private(set) var installedFirmwarePackages: [PBZFirmwarePackage] = []
     public private(set) var installedFiles: [(bytes: [UInt8], filename: String)] = []
     public private(set) var writtenWeather: [PebbleWeatherReport] = []
+    public private(set) var writtenWeatherLocationOrder: [UUID] = []
     public private(set) var writtenNotificationSourceApps: [NotificationSourceApp] = []
     public private(set) var registeredApplications: [PebbleAppMetadata] = []
     public private(set) var unregisteredApplicationIDs: [UUID] = []
@@ -167,6 +168,10 @@ public final class MockPebbleClient: PebbleClient {
 
     public func removeWeather(id: UUID) async throws {
         writtenWeather.removeAll { $0.id == id }
+    }
+
+    public func writeWeatherLocationOrder(_ orderedIDs: [UUID]) async throws {
+        writtenWeatherLocationOrder = orderedIDs
     }
 
     public func registerApplication(_ metadata: PebbleAppMetadata) async throws {

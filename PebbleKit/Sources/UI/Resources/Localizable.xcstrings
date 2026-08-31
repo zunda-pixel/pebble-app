@@ -3786,6 +3786,16 @@
           }
         }
       }
+    },
+    "%@ did not accept the list of places. %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”が地点リストを受け付けませんでした。%@"
+          }
+        }
+      }
     }
   },
   "version" : "1.3"

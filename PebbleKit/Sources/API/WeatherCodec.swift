@@ -93,6 +93,36 @@ public enum WeatherCodec {
         BlobDBCodec.deleteFrame(databaseID: databaseID, key: BlobDBCodec.uuidBytes(id), token: token)
     }
 
+    /// The watch app preferences database, where the weather app keeps the
+    /// order it shows locations in.
+    public static var preferencesDatabaseID: UInt8 { 9 }
+
+    /// The key that ordering is filed under. The firmware compares it to the
+    /// literal it holds, so it is not a UUID like the forecasts themselves.
+    public static var preferencesKey: String { "weatherApp" }
+
+    /// The locations the weather app will show, in order.
+    ///
+    /// Writing a forecast is not enough on its own: the app walks this list and
+    /// skips any forecast whose key is not in it — "has no known ordering" —
+    /// which leaves it saying it has no locations while the watchface, which
+    /// reads the database directly, shows the weather perfectly well.
+    public static func preferencesValue(orderedIDs: [UUID]) -> [UInt8] {
+        // `num_locations` is one byte, and the firmware checks the length
+        // against it, so more than 255 would be a record it refuses.
+        let ids = orderedIDs.prefix(Int(UInt8.max))
+        return [UInt8(ids.count)] + ids.flatMap { BlobDBCodec.uuidBytes($0) }
+    }
+
+    public static func preferencesFrame(orderedIDs: [UUID], token: UInt16) -> PebbleProtocolFrame {
+        BlobDBCodec.insertFrame(
+            databaseID: preferencesDatabaseID,
+            key: Array(preferencesKey.utf8),
+            value: preferencesValue(orderedIDs: orderedIDs),
+            token: token
+        )
+    }
+
     private static func pascalString(_ value: String) -> [UInt8] {
         let bytes = Array(value.utf8)
         return UInt16(bytes.count).littleEndianBytes + bytes

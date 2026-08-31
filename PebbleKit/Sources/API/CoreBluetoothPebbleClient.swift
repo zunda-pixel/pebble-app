@@ -523,6 +523,12 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
     }
 
+    public func writeWeatherLocationOrder(_ orderedIDs: [UUID]) async throws {
+        try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
+            WeatherCodec.preferencesFrame(orderedIDs: orderedIDs, token: token)
+        }
+    }
+
     public func removeWeather(id: UUID) async throws {
         try await performBlobDBOperation(acceptedStatuses: [.success, .keyDoesNotExist]) { token in
             WeatherCodec.deleteFrame(id: id, token: token)

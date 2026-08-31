@@ -291,6 +291,26 @@ struct WeatherTests {
         #expect(Array(frame.payload[5..<21]) == BlobDBCodec.uuidBytes(report.id))
     }
 
+    @Test func theWeatherAppIsAlsoToldWhichPlacesToShow() {
+        // A forecast the watch holds but this list does not name is skipped by
+        // the weather app — "has no known ordering" — even though a watchface
+        // reading the database directly shows it.
+        let second = UUID(uuidString: "FFEEDDCC-BBAA-9988-7766-554433221100")!
+        let frame = WeatherCodec.preferencesFrame(orderedIDs: [report.id, second], token: 0x0102)
+
+        #expect(frame.payload[0] == 0x01)
+        #expect(Array(frame.payload[1..<3]) == [0x01, 0x02])
+        // The ordering lives in the watch app preferences database, under a
+        // name rather than a UUID.
+        #expect(frame.payload[3] == 9)
+        #expect(frame.payload[4] == UInt8("weatherApp".utf8.count))
+        #expect(Array(frame.payload[5..<15]) == Array("weatherApp".utf8))
+        #expect(Array(frame.payload[15..<17]) == UInt16(33).littleEndianBytes)
+        #expect(frame.payload[17] == 2)
+        #expect(Array(frame.payload[18..<34]) == BlobDBCodec.uuidBytes(report.id))
+        #expect(Array(frame.payload[34..<50]) == BlobDBCodec.uuidBytes(second))
+    }
+
     @Test func aNameLongerThanTheWatchsBufferIsCutBetweenCharacters() {
         // The firmware keeps 64 bytes for the name and wants room for a
         // terminator, and a kanji costs three bytes — cutting by character

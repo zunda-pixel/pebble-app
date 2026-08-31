@@ -112,6 +112,9 @@ public protocol PebbleClient: Sendable {
     /// waits for the watch to say whether it took it.
     func writeWeather(_ report: PebbleWeatherReport) async throws
     func removeWeather(id: UUID) async throws
+    /// Tells the weather app which locations to show, and in what order. A
+    /// forecast the watch holds but this list does not name is not shown.
+    func writeWeatherLocationOrder(_ orderedIDs: [UUID]) async throws
     func registerApplication(_ metadata: PebbleAppMetadata) async throws
     func unregisterApplication(applicationID: UUID) async throws
 }

@@ -73,9 +73,11 @@ extension AppModel {
         weatherPlaces.removeAll { $0.id == id }
         saveWeatherPlaces()
         weatherReports.removeAll { $0.id == id }
-        // The watch keeps what it was given until it is told otherwise.
+        // The watch keeps what it was given until it is told otherwise, and
+        // the app's own list has to lose the place as well.
         for connection in activeConnections where connection.device.supportsWeatherApp {
             try? await connection.client.removeWeather(id: id)
+            try? await connection.client.writeWeatherLocationOrder(weatherReports.map(\.id))
         }
     }
 
@@ -138,6 +140,20 @@ extension AppModel {
         // A watch without the weather app refuses the write, and one in
         // recovery firmware refuses everything.
         guard connection.device.supportsWeatherApp, !connection.device.isRunningRecoveryFirmware else {
+            return
+        }
+        // The order has to be written before the forecasts: the app skips a
+        // forecast whose key it has no ordering for, and this is the only place
+        // that ordering comes from.
+        do {
+            try await connection.client.writeWeatherLocationOrder(weatherReports.map(\.id))
+        } catch {
+            weatherStatusMessage = "\(connection.device.name) did not accept the list of places. \(error.localizedDescription)"
+            await PebbleDiagnostics.shared.record(
+                .error,
+                category: "weather",
+                message: "\(connection.device.name) rejected the location order: \(String(reflecting: error))"
+            )
             return
         }
         for report in weatherReports {
