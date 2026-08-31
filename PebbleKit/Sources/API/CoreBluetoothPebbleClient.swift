@@ -784,10 +784,13 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
 
         if frame.endpoint == PutBytesCodec.endpoint, pendingInstallCookie != nil {
-            // The watch answers the install command with a cookie of its own,
-            // usually zero, so only the result means anything. Holding out for
-            // the cookie that was sent leaves the install hanging after the
-            // watch has already written the firmware and reached 100%.
+            // The cookie that comes back is zero, so only the result means
+            // anything. The firmware answers install from `prv_do_install`
+            // through `prv_cleanup_and_send_response`, which sends the token
+            // held in its transfer state — and the commit that had to come
+            // first already cleared that state. Holding out for the cookie that
+            // was sent leaves the install hanging after the watch has written
+            // the firmware and reached 100%.
             let response = try PutBytesCodec.decodeResponse(frame)
             pendingInstallCookie = nil
             response.result == .acknowledgement

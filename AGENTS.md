@@ -98,10 +98,30 @@ model a window shows is that class.
 
 ## Protocol reference
 
-The wire protocol is not documented publicly. When behaviour is in question,
-read [coredevices/mobileapp](https://github.com/coredevices/mobileapp) — the
-Kotlin `libpebble3` module is the reference implementation, and it is what the
-codecs here were written against. Match its byte layouts exactly; the watch
+The wire protocol is not documented publicly. Two checkouts answer questions
+about it, and they answer different ones.
+
+[coredevices/PebbleOS](https://github.com/coredevices/PebbleOS), locally at
+`/Users/zunda/Documents/GitHub/PebbleOS-Swift`, is the watch firmware — the
+other end of every conversation, and the last word on what the watch actually
+does. Worth knowing: `src/fw/services/comm_session/` (framing, the endpoint
+router, and `meta_endpoint.c`, which is the `0xDC`/`0xDD` refusal on endpoint 0),
+`src/fw/services/put_bytes/put_bytes.c` (the transfer state machine, its tokens
+and its responses), `src/fw/services/firmware_update/`,
+`src/fw/services/app_fetch_endpoint/`. `CONFIG_RECOVERY_FW` guards mark what
+recovery firmware refuses to do.
+
+[coredevices/mobileapp](https://github.com/coredevices/mobileapp), locally at
+`/Users/zunda/Documents/GitHub/mobileapp`, is the official companion app; its
+Kotlin `libpebble3` module is what the codecs here were written against. Read it
+for **logic only** — byte layouts, sequencing, which endpoint answers what. Its
+UI and UX are not a model for this app's; `composeApp/` and `iosApp/` have
+nothing to teach us.
+
+Both are long-lived codebases and both contain bugs. Neither is authority on its
+own: check a claim in both, and where they disagree, the firmware wins. Where
+neither explains what a watch is doing, the device log does — say what was
+observed rather than what ought to happen. Match byte layouts exactly; the watch
 silently drops anything it cannot parse.
 
 Firmware packages (`.pbz`) match on **board revision** (`hwrev`), not on watch

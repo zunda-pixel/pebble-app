@@ -5,12 +5,18 @@ public struct PebbleProtocolFrame: Equatable, Sendable {
     public var endpoint: UInt16
     public var payload: [UInt8]
 
-    /// The endpoint this frame refuses, when it is the watch saying it does not
-    /// implement one. Firmware answers on endpoint 0 with `DC` and the endpoint
-    /// that was addressed; recovery firmware refuses nearly everything this
-    /// way, so a refusal is often the only reply a request gets.
+    /// The endpoint this frame refuses, when it is the watch saying it will not
+    /// answer there. The firmware's meta endpoint replies on endpoint 0 with a
+    /// reason and the endpoint that was addressed, big-endian: `DC` for one it
+    /// does not implement and `DD` for one it implements but will not serve.
+    /// Both mean no answer is coming, and both prove the watch is listening —
+    /// recovery firmware refuses nearly everything this way, so a refusal is
+    /// often the only reply a request gets.
+    ///
+    /// A corrupted-message reply (`D0`) carries no endpoint, so it is not one
+    /// of these.
     public var rejectedEndpoint: UInt16? {
-        guard endpoint == 0, payload.count >= 3, payload[0] == 0xDC else {
+        guard endpoint == 0, payload.count >= 3, payload[0] == 0xDC || payload[0] == 0xDD else {
             return nil
         }
         return UInt16(payload[1]) << 8 | UInt16(payload[2])

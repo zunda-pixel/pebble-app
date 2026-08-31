@@ -189,12 +189,18 @@ struct TransportTests {
     }
 
     @Test
-    func aRefusalNamesTheEndpointTheWatchDoesNotImplement() {
+    func aRefusalNamesTheEndpointTheWatchWillNotAnswerOn() {
         // Recovery firmware answers a ping this way; reading it as a refusal
-        // is what keeps the health check from dropping the link.
-        let refusal = PebbleProtocolFrame(endpoint: 0, payload: [0xDC, 0x07, 0xD1])
-        #expect(refusal.rejectedEndpoint == PingPongCodec.endpoint)
+        // is what keeps the health check from dropping the link. The firmware's
+        // meta endpoint has two of these: not implemented, and not allowed.
+        let unhandled = PebbleProtocolFrame(endpoint: 0, payload: [0xDC, 0x07, 0xD1])
+        #expect(unhandled.rejectedEndpoint == PingPongCodec.endpoint)
+        let disallowed = PebbleProtocolFrame(endpoint: 0, payload: [0xDD, 0x07, 0xD1])
+        #expect(disallowed.rejectedEndpoint == PingPongCodec.endpoint)
 
+        // A corrupted-message reply names no endpoint, and neither does a
+        // truncated one.
+        #expect(PebbleProtocolFrame(endpoint: 0, payload: [0xD0]).rejectedEndpoint == nil)
         #expect(PebbleProtocolFrame(endpoint: 0, payload: [0xDC, 0x07]).rejectedEndpoint == nil)
         #expect(PebbleProtocolFrame(endpoint: 0, payload: [0x01, 0x07, 0xD1]).rejectedEndpoint == nil)
         #expect(PebbleProtocolFrame(endpoint: 11, payload: [0xDC, 0x07, 0xD1]).rejectedEndpoint == nil)
