@@ -395,6 +395,21 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         objectType: PutBytesObjectType,
         appBankID: UInt32
     ) async throws {
+        try await transferObject(bytes, objectType: objectType, appBankID: appBankID, filename: nil)
+    }
+
+    /// Sends a named file, which the watch keeps under that name once the
+    /// install command lands. A language pack is filed as `lang`.
+    public func installFile(_ bytes: [UInt8], filename: String) async throws {
+        try await transferObject(bytes, objectType: .file, appBankID: 0, filename: filename)
+    }
+
+    private func transferObject(
+        _ bytes: [UInt8],
+        objectType: PutBytesObjectType,
+        appBankID: UInt32,
+        filename: String?
+    ) async throws {
         completedTransferCookie = nil
         guard let peripheral = connectedPeripheral,
               ppogSession != nil else {
@@ -407,7 +422,8 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         var session = PutBytesTransferSession(
             bytes: bytes,
             objectType: objectType,
-            appBankID: appBankID
+            appBankID: appBankID,
+            filename: filename
         )
         let firstAction = try session.start()
         activeTransferSession = session
@@ -570,7 +586,10 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             serialNumber: information.serialNumber,
             isRunningRecoveryFirmware: information.isRunningRecoveryFirmware,
             runningFirmwareSlot: information.runningFirmwareSlot,
-            board: information.board
+            board: information.board,
+            languageLocale: information.languageLocale,
+            languageVersion: information.languageVersion,
+            capabilities: information.capabilities
         )
         self.connectedDevice = connectedDevice
         let initialConnectionContinuation = connectionContinuation

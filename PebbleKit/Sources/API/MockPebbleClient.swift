@@ -10,6 +10,7 @@ public final class MockPebbleClient: PebbleClient {
     public private(set) var timelinePins: [PebbleTimelinePin] = []
     public private(set) var installedObjects: [(bytes: [UInt8], objectType: PutBytesObjectType, appBankID: UInt32)] = []
     public private(set) var installedFirmwarePackages: [PBZFirmwarePackage] = []
+    public private(set) var installedFiles: [(bytes: [UInt8], filename: String)] = []
     public private(set) var registeredApplications: [PebbleAppMetadata] = []
     public private(set) var unregisteredApplicationIDs: [UUID] = []
     public private(set) var disconnectedDevices: [PebbleDevice] = []
@@ -142,6 +143,10 @@ public final class MockPebbleClient: PebbleClient {
 
     public func installFirmware(_ package: PBZFirmwarePackage) async throws {
         installedFirmwarePackages.append(package)
+    }
+
+    public func installFile(_ bytes: [UInt8], filename: String) async throws {
+        installedFiles.append((bytes, filename))
     }
 
     public func registerApplication(_ metadata: PebbleAppMetadata) async throws {

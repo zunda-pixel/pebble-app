@@ -239,6 +239,48 @@ struct ProtocolCodecTests {
     }
 
     @Test
+    func watchVersionCodecReadsTheLanguageAndCapabilities() throws {
+        // The locale, its version and the capability bits sit after the two
+        // firmware metadata blocks, the bootloader timestamp, board, serial,
+        // Bluetooth address and resource version.
+        var payload = [UInt8](repeating: 0, count: 150)
+        payload[0] = 0x01
+        payload.replaceSubrange(134..<140, with: Array("fr_FR".utf8) + [0])
+        payload[140] = 0x00
+        payload[141] = 0x26
+        // Language packs are bit 4, the weather app bit 11, so the field reads
+        // least significant byte first.
+        payload[142] = 0b0001_0000
+        payload[143] = 0b0000_1000
+
+        let information = try WatchVersionCodec.decode(
+            PebbleProtocolFrame(endpoint: 16, payload: payload)
+        )
+
+        #expect(information.languageLocale == "fr_FR")
+        #expect(information.languageVersion == 38)
+        #expect(information.supportsLanguagePacks)
+        #expect(information.supportsWeatherApp)
+    }
+
+    @Test
+    func aShorterVersionResponseSaysNothingAboutTheLanguage() throws {
+        // Firmware old enough to stop after the serial number is still a valid
+        // answer, and must not be read as "no language, no capabilities".
+        var payload = [UInt8](repeating: 0, count: 120)
+        payload[0] = 0x01
+
+        let information = try WatchVersionCodec.decode(
+            PebbleProtocolFrame(endpoint: 16, payload: payload)
+        )
+
+        #expect(information.languageLocale.isEmpty)
+        #expect(information.languageVersion == 0)
+        #expect(information.capabilities == 0)
+        #expect(!information.supportsLanguagePacks)
+    }
+
+    @Test
     func batteryLevelCodecAcceptsBluetoothPercentage() {
         #expect(BatteryLevelCodec.decode([84]) == 84)
         #expect(BatteryLevelCodec.decode([100]) == 100)

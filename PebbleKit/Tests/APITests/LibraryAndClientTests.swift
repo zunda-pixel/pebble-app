@@ -228,6 +228,60 @@ struct CompanionStorageTests {
         #expect(SystemMessageCodec.firmwareUpdateCompleteFrame().payload == [0, 2])
     }
 
+    @Test func aLanguagePackIsSentAsAFileNamedLang() throws {
+        var session = PutBytesTransferSession(
+            bytes: [1, 2, 3],
+            objectType: .file,
+            appBankID: 0,
+            filename: PebbleLanguagePackCatalog.filename
+        )
+        guard case .send(let initialization) = try session.start() else {
+            Issue.record("Expected a file initialization frame")
+            return
+        }
+        // The firmware reads the name with `strlen`, so the terminator is part
+        // of the message.
+        #expect(initialization.payload == [
+            0x01, 0, 0, 0, 3,
+            PutBytesObjectType.file.rawValue, 0,
+            0x6C, 0x61, 0x6E, 0x67, 0x00,
+        ])
+
+        // A named file has to be installed as well as committed, or the watch
+        // keeps the bytes and never reads them.
+        let actions = try session.receive(PutBytesResponse(result: .acknowledgement, cookie: 7))
+        _ = try session.receive(PutBytesResponse(result: .acknowledgement, cookie: 7))
+        let commit = try session.receive(PutBytesResponse(result: .acknowledgement, cookie: 7))
+        #expect(!actions.isEmpty)
+        #expect(commit.contains { action in
+            guard case .send(let frame) = action else { return false }
+            return frame.payload.first == 0x05
+        })
+    }
+
+    @Test func aFilenameThatCannotBeStoredIsRefused() {
+        #expect(throws: PutBytesCodecError.invalidFilename) {
+            try PutBytesCodec.fileInitializationFrame(objectSize: 1, filename: "")
+        }
+        #expect(throws: PutBytesCodecError.invalidFilename) {
+            try PutBytesCodec.fileInitializationFrame(objectSize: 1, filename: "la\0ng")
+        }
+    }
+
+    @Test func languagePacksFallBackToThePebble2WhereABoardHasNoneOfItsOwn() {
+        let packs = PebbleLanguagePackCatalog.packs(for: .obelixPVT)
+
+        // Arabic is built for this board; everything else is a silk pack.
+        let arabic = packs.filter { $0.locale == "ar_SA" }
+        #expect(arabic.count == 1)
+        #expect(arabic.first?.boardName == PebbleWatchBoard.obelixPVT.rawValue)
+        #expect(packs.count > 1)
+        #expect(packs.filter { $0.locale == "fr_FR" }.allSatisfy { $0.boardName == "silk" })
+        // One pack per locale, or the list would offer the same language twice.
+        #expect(Set(packs.map(\.locale)).count == packs.count)
+        #expect(packs.allSatisfy { $0.url.scheme == "https" })
+    }
+
     @Test func healthSyncUsesOfficialEndpointAndLittleEndianElapsedTime() {
         let frame = HealthSyncCodec.requestFrame(
             since: Date(timeIntervalSince1970: 100),

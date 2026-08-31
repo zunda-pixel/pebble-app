@@ -49,6 +49,30 @@ public enum PutBytesCodec {
         )
     }
 
+    /// Starts a transfer of a named file, which is how a language pack is sent:
+    /// the firmware stores `ObjectFile` under the name given here.
+    ///
+    /// The name follows the bank byte and is read with `strlen`, so the
+    /// terminator is part of the message rather than optional.
+    public static func fileInitializationFrame(
+        objectSize: UInt32,
+        filename: String,
+        bank: UInt8 = 0
+    ) throws -> PebbleProtocolFrame {
+        let name = Array(filename.utf8)
+        guard !name.isEmpty, !name.contains(0) else {
+            throw PutBytesCodecError.invalidFilename
+        }
+        return PebbleProtocolFrame(
+            endpoint: endpoint,
+            payload: [0x01]
+                + bigEndianBytes(of: objectSize)
+                + [PutBytesObjectType.file.rawValue, bank]
+                + name
+                + [0x00]
+        )
+    }
+
     public static func putFrame(cookie: UInt32, bytes: [UInt8]) throws -> PebbleProtocolFrame {
         guard let payloadSize = UInt32(exactly: bytes.count) else {
             throw PutBytesCodecError.payloadTooLarge
@@ -111,4 +135,5 @@ public enum PutBytesCodecError: Error, Equatable, Sendable {
     case payloadTooLarge
     case unexpectedEndpoint
     case invalidPayload
+    case invalidFilename
 }

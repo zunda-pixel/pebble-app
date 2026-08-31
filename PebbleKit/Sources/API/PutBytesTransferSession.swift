@@ -18,6 +18,11 @@ public struct PutBytesTransferSession: Sendable {
     public var appBankID: UInt32
     public var chunkSize: Int
 
+    /// The name the watch files the object under. Only a `file` object has one,
+    /// and it is what tells the firmware that a language pack is a language
+    /// pack rather than any other file.
+    public var filename: String?
+
     private var state: State = .ready
     private var crc: UInt32
     private var usesApplicationInitialization: Bool
@@ -28,15 +33,19 @@ public struct PutBytesTransferSession: Sendable {
         bytes: [UInt8],
         objectType: PutBytesObjectType,
         appBankID: UInt32,
+        filename: String? = nil,
         chunkSize: Int = 2_000
     ) {
         self.bytes = bytes
         self.objectType = objectType
         self.appBankID = appBankID
+        self.filename = filename
         self.chunkSize = chunkSize
         self.crc = PebbleCRC32.calculate(bytes)
         self.usesApplicationInitialization = [.appResource, .appExecutable, .worker].contains(objectType)
-        self.sendsInstall = self.usesApplicationInitialization
+        // A named file has to be installed as well as committed; the firmware
+        // only moves it into place when the install command arrives.
+        self.sendsInstall = self.usesApplicationInitialization || filename != nil
     }
 
     public mutating func start() throws -> PutBytesTransferAction {
@@ -47,6 +56,13 @@ public struct PutBytesTransferSession: Sendable {
             throw PutBytesTransferError.invalidConfiguration
         }
         state = .awaitingInitialization
+        if let filename {
+            return .send(try PutBytesCodec.fileInitializationFrame(
+                objectSize: size,
+                filename: filename,
+                bank: UInt8(truncatingIfNeeded: appBankID)
+            ))
+        }
         return .send(usesApplicationInitialization
             ? PutBytesCodec.appInitializationFrame(objectSize: size, objectType: objectType, appBankID: appBankID)
             : PutBytesCodec.systemInitializationFrame(objectSize: size, objectType: objectType, bank: UInt8(truncatingIfNeeded: appBankID)))

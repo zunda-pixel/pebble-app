@@ -69,6 +69,8 @@ public final class AppModel {
     public internal(set) var availableFirmwareRelease: PebbleOSFirmwareRelease?
     /// Firmware already fetched from PebbleOS, waiting to be installed.
     public internal(set) var downloadedFirmware: DownloadedFirmware?
+    public internal(set) var languageStatusMessage: LocalizedStringKey?
+    public internal(set) var isInstallingLanguagePack = false
     public internal(set) var dataSyncStatusMessage: LocalizedStringKey?
     public internal(set) var timelineActionStatusMessage: LocalizedStringKey?
     public internal(set) var healthExportURL: URL?
@@ -128,6 +130,7 @@ public final class AppModel {
     let timelineLibrary = TimelinePinLibrary()
     let healthLibrary = PebbleHealthLibrary()
     let appCatalog = PebbleAppCatalog()
+    let languagePackCatalog = PebbleLanguagePackCatalog()
     let pendingNotificationLibrary = PendingNotificationLibrary()
     let notificationPreferenceLibrary = NotificationPreferenceLibrary()
     let pendingTimelineOperationLibrary = PendingTimelineOperationLibrary()

@@ -338,6 +338,32 @@ struct UITests {
     }
 
     @Test
+    func aLanguagePackChosenFromAFileIsSentUnderTheNameTheWatchReads() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+
+        await model.scan()
+        let discovered = try #require(model.discoveredDevices.first)
+        await model.connect(to: discovered)
+
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let packURL = directory.appending(path: "fr_FR.pbl")
+        try Data([1, 2, 3, 4]).write(to: packURL)
+
+        await model.installLanguagePack(from: packURL, deviceID: discovered.id)
+
+        let sent = try #require(client.installedFiles.first)
+        #expect(sent.filename == "lang")
+        #expect(sent.bytes == [1, 2, 3, 4])
+        // The transfer is over, so nothing claims to still be running.
+        #expect(model.installationProgress == nil)
+    }
+
+    @Test
     func transferProgressStaysWithTheWatchItCameFrom() async throws {
         let scanner = MockPebbleClient()
         var connectionClients: [String: MockPebbleClient] = [:]

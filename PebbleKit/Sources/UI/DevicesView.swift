@@ -244,6 +244,18 @@ struct WatchDetailView: View {
         return Text(verbatim: version)
     }
 
+    /// What the Language row says before it is opened. A language reads best in
+    /// itself, so the name is not translated either.
+    private var languageSummary: Text {
+        guard let locale = connection?.device.languageLocale, !locale.isEmpty else {
+            return connection?.isConnected == true ? Text("English") : Text("Unknown")
+        }
+        if let pack = model.languagePacks(deviceID: watchID).first(where: { $0.locale == locale }) {
+            return Text(verbatim: pack.localName)
+        }
+        return Text(verbatim: locale)
+    }
+
     var body: some View {
         Form {
             if connection?.device.isRunningRecoveryFirmware == true {
@@ -313,6 +325,13 @@ struct WatchDetailView: View {
                 } label: {
                     LabeledContent("Firmware") {
                         firmwareSummary
+                    }
+                }
+                NavigationLink {
+                    LanguageView(model: model, watchID: watchID)
+                } label: {
+                    LabeledContent("Language") {
+                        languageSummary
                     }
                 }
             }

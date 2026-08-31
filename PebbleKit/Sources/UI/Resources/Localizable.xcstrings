@@ -17,6 +17,32 @@
         }
       }
     },
+    "%@ could not be downloaded right now." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "いま“%@”をダウンロードできませんでした。"
+          }
+        }
+      }
+    },
+    "%@ could not be installed. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ could not be installed. %2$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”をインストールできませんでした。%@"
+          }
+        }
+      }
+    },
     "%@ installed." : {
       "localizations" : {
         "ja" : {
@@ -33,6 +59,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "“%@”を使用中です。"
+          }
+        }
+      }
+    },
+    "%@ is installed. The watch restarts to use it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”をインストールしました。ウォッチが再起動して切り替わります。"
           }
         }
       }
@@ -115,6 +151,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "3モデル"
+          }
+        }
+      }
+    },
+    "A PBL pack built for this watch's board. A pack built for another board installs but shows the wrong glyphs." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このウォッチのボード向けにビルドされたPBLパック。別のボード向けのパックもインストールはできますが、字形が崩れます。"
           }
         }
       }
@@ -659,6 +705,26 @@
         }
       }
     },
+    "Connect the watch once so its board is known, and the languages built for it appear here." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ウォッチを一度接続してボードが分かると、そのボード向けの言語がここに表示されます。"
+          }
+        }
+      }
+    },
+    "Connect the watch to change its language." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "言語を変えるには、ウォッチを接続してください。"
+          }
+        }
+      }
+    },
     "Connect the watch to install it." : {
       "localizations" : {
         "ja" : {
@@ -955,6 +1021,26 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "終了: %lld:00"
+          }
+        }
+      }
+    },
+    "English" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "英語"
+          }
+        }
+      }
+    },
+    "English (built in)" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "英語（内蔵）"
           }
         }
       }
@@ -1449,6 +1535,16 @@
         }
       }
     },
+    "Installing a language replaces the one on the watch, which restarts to use it. English needs no pack: it is part of the firmware." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "言語をインストールすると、ウォッチ上の言語が置き換わり、再起動して切り替わります。英語はファームウェアに含まれているため、パックは不要です。"
+          }
+        }
+      }
+    },
     "Installing application…" : {
       "localizations" : {
         "ja" : {
@@ -1515,6 +1611,26 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "完了するまでウォッチを近くに置いてください。"
+          }
+        }
+      }
+    },
+    "Language" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "言語"
+          }
+        }
+      }
+    },
+    "Languages" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "言語"
           }
         }
       }
@@ -1755,6 +1871,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このウォッチアプリケーションの設定を開きます"
+          }
+        }
+      }
+    },
+    "Pack Version" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パックのバージョン"
           }
         }
       }
@@ -2249,6 +2375,16 @@
         }
       }
     },
+    "Sending %@ to the watch…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”をウォッチに送信中…"
+          }
+        }
+      }
+    },
     "Serial Number" : {
       "localizations" : {
         "ja" : {
@@ -2475,6 +2611,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "テスト通知を送信しました。"
+          }
+        }
+      }
+    },
+    "That language pack could not be read." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "その言語パックを読み込めませんでした。"
           }
         }
       }
@@ -2985,6 +3131,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このアップデート"
+          }
+        }
+      }
+    },
+    "This watch cannot take a language pack." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このウォッチは言語パックを受け付けません。"
           }
         }
       }

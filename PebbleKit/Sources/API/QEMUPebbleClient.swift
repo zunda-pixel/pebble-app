@@ -184,6 +184,11 @@ public final class QEMUPebbleClient: PebbleClient {
         try await send(AppRunStateCodec.startFrame(applicationID: id))
     }
 
+    public func installFile(_ bytes: [UInt8], filename: String) async throws {
+        // The emulator has no filesystem the app can write into.
+        throw PutBytesTransferError.invalidConfiguration
+    }
+
     public func installApplicationObject(
         _ bytes: [UInt8],
         objectType: PutBytesObjectType,

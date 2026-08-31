@@ -11,4 +11,9 @@ extension UTType {
     static var pebbleFirmware: UTType {
         UTType(filenameExtension: "pbz") ?? .data
     }
+
+    /// A language pack.
+    static var pebbleLanguagePack: UTType {
+        UTType(filenameExtension: "pbl") ?? .data
+    }
 }

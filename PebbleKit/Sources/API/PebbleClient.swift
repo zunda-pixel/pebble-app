@@ -97,6 +97,9 @@ public protocol PebbleClient: Sendable {
         appBankID: UInt32
     ) async throws
     func installFirmware(_ package: PBZFirmwarePackage) async throws
+    /// Sends a named file. A language pack goes under the name `lang`, which is
+    /// how the firmware knows what it is.
+    func installFile(_ bytes: [UInt8], filename: String) async throws
     func registerApplication(_ metadata: PebbleAppMetadata) async throws
     func unregisterApplication(applicationID: UUID) async throws
 }

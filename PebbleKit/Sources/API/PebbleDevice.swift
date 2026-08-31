@@ -81,6 +81,22 @@ public struct PebbleDevice: Identifiable, Hashable, Sendable {
     /// The board this watch is built on, which is what firmware packages are
     /// named and matched by.
     public var board: PebbleWatchBoard? = nil
+    /// The locale of the language pack the watch runs, empty when it runs the
+    /// firmware's built-in English.
+    public var languageLocale: String = ""
+    /// The version of that pack, as whoever built it counted.
+    public var languageVersion: UInt16 = 0
+    /// What the watch says it can do, which is how the app knows whether to
+    /// offer language packs or write weather at all.
+    public var capabilities: UInt64 = 0
+
+    public var supportsLanguagePacks: Bool {
+        WatchCapability.languagePack.isSet(in: capabilities)
+    }
+
+    public var supportsWeatherApp: Bool {
+        WatchCapability.weatherApp.isSet(in: capabilities)
+    }
 
     /// The slot a firmware update targets: the one that is not running.
     public var firmwareUpdateSlot: Int? {
