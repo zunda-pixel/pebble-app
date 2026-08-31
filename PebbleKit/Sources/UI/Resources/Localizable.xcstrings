@@ -2925,6 +2925,16 @@
         }
       }
     },
+    "The forecast for %@ could not be fetched: the network did not answer." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”の予報を取得できませんでした。ネットワークから応答がありません。"
+          }
+        }
+      }
+    },
     "The forecast for %@ could not be fetched. %@" : {
       "localizations" : {
         "en" : {
@@ -2937,6 +2947,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "“%@”の予報を取得できませんでした。%@"
+          }
+        }
+      }
+    },
+    "The forecast for %@ was refused by WeatherKit. Check that this app's identifier has the WeatherKit capability, which can take up to half an hour to take effect." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”の予報がWeatherKitに拒否されました。このアプリのIdentifierでWeatherKitが有効になっているか確認してください（反映まで最大30分かかります）。"
           }
         }
       }

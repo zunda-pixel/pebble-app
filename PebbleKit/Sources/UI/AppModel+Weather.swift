@@ -36,6 +36,11 @@ extension AppModel {
             await refreshWeather()
         } catch {
             weatherStatusMessage = "The phone's position could not be read."
+            await PebbleDiagnostics.shared.record(
+                .error,
+                category: "weather",
+                message: "the phone's position: \(String(reflecting: error))"
+            )
         }
     }
 
@@ -109,7 +114,15 @@ extension AppModel {
                     try await weatherBridge.report(for: place, inFahrenheit: weatherUsesFahrenheit)
                 )
             } catch {
-                weatherStatusMessage = "The forecast for \(place.name) could not be fetched. \(error.localizedDescription)"
+                weatherStatusMessage = weatherFailureMessage(for: error, place: place.name)
+                // `localizedDescription` on a WeatherKit failure is usually
+                // "The operation couldn't be completed", which says nothing.
+                // The domain and code do, so they go in the report.
+                await PebbleDiagnostics.shared.record(
+                    .error,
+                    category: "weather",
+                    message: "\(place.name): \(String(reflecting: error))"
+                )
             }
         }
         guard !reports.isEmpty else { return }
@@ -156,5 +169,28 @@ extension AppModel {
     private func placeName(for location: CLLocation) async -> String? {
         let places = try? await CLGeocoder().reverseGeocodeLocation(location)
         return places?.first?.locality ?? places?.first?.name
+    }
+}
+
+extension AppModel {
+    /// What to say when a forecast does not arrive.
+    ///
+    /// WeatherKit reports the two failures a reader can do something about —
+    /// an app that is not registered for the service, and a service that is
+    /// out of reach — as errors of its own, and describes both as "the
+    /// operation couldn't be completed". Naming them is the difference between
+    /// a setting to fix and a mystery.
+    func weatherFailureMessage(for error: any Error, place: String) -> LocalizedStringKey {
+        let error = error as NSError
+        switch error.domain {
+        case NSURLErrorDomain:
+            return "The forecast for \(place) could not be fetched: the network did not answer."
+        case let domain where domain.contains("WeatherDaemon") || domain.contains("WeatherKit"):
+            // Authentication is what fails when the app's identifier has no
+            // WeatherKit capability, or the change has not propagated yet.
+            return "The forecast for \(place) was refused by WeatherKit. Check that this app's identifier has the WeatherKit capability, which can take up to half an hour to take effect."
+        default:
+            return "The forecast for \(place) could not be fetched. \(error.localizedDescription)"
+        }
     }
 }
