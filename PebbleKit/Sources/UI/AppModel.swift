@@ -78,6 +78,18 @@ public final class AppModel {
     public internal(set) var cannedReplies: [String] = []
     /// Replies chosen on the watch that the phone has not been able to send.
     public internal(set) var unsentReplies: [WatchReply] = []
+    /// What the watch can tell about itself.
+    public internal(set) var latestScreenshot: PebbleScreenshot?
+    public internal(set) var screenshotURL: URL?
+    public internal(set) var watchLogLines: [WatchLogLine] = []
+    public internal(set) var watchLogsURL: URL?
+    public internal(set) var applicationLogLines: [WatchLogLine] = []
+    public internal(set) var isApplicationLoggingEnabled = false
+    public internal(set) var coredumpURL: URL?
+    public internal(set) var isTakingScreenshot = false
+    public internal(set) var isGatheringWatchLogs = false
+    public internal(set) var isCollectingCoredump = false
+    public internal(set) var watchDiagnosticsStatusMessage: LocalizedStringKey?
     public internal(set) var healthSamples: [PebbleHealthSample] = []
     public internal(set) var catalogApplications: [PebbleCatalogApplication] = []
     public internal(set) var catalogLastUpdated: Date?
@@ -485,6 +497,8 @@ public final class AppModel {
                 try? await self.timelineLibrary.save(self.timelinePins)
                 self.timelineActionStatusMessage = "Timeline action completed."
             }
+        case .applicationLogReceived(let applicationID, let line):
+            recordApplicationLogLine(line, from: applicationID)
         case .imageRequested(let request):
             Task { [weak self] in
                 await self?.answerImageRequest(request, on: connection)
@@ -521,6 +535,7 @@ public final class AppModel {
         await synchronizeWatchSettings(on: connection)
         await synchronizeContacts(on: connection)
         await synchronizeCannedReplies(on: connection)
+        await synchronizeApplicationLogging(on: connection)
         await sendWeather(to: connection)
         await requestHealthSync(on: connection)
         await resumePendingFirmwareUpdate(on: connection)

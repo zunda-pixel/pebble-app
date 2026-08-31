@@ -203,6 +203,16 @@
         }
       }
     },
+    "%lld" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%lld"
+          }
+        }
+      }
+    },
     "%lld chosen" : {
       "localizations" : {
         "ja" : {
@@ -579,6 +589,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "アプリカタログを更新しました（%lld個のアプリ）。"
+          }
+        }
+      }
+    },
+    "App Logs" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリのログ"
           }
         }
       }
@@ -974,6 +994,16 @@
         }
       }
     },
+    "Collect Crash Report" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "クラッシュレポートを取得"
+          }
+        }
+      }
+    },
     "Compatibility" : {
       "localizations" : {
         "ja" : {
@@ -1044,12 +1074,42 @@
         }
       }
     },
+    "Connect the watch before collecting a crash report." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "クラッシュレポートを取得する前にウォッチを接続してください。"
+          }
+        }
+      }
+    },
+    "Connect the watch before gathering its logs." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ログを取得する前にウォッチを接続してください。"
+          }
+        }
+      }
+    },
     "Connect the watch before resetting it." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "リセットする前にウォッチを接続してください。"
+          }
+        }
+      }
+    },
+    "Connect the watch before taking a screenshot." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "スクリーンショットを撮る前にウォッチを接続してください。"
           }
         }
       }
@@ -1210,6 +1270,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "常時"
+          }
+        }
+      }
+    },
+    "Crash Report" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "クラッシュレポート"
           }
         }
       }
@@ -1714,6 +1784,16 @@
         }
       }
     },
+    "Gather Watch Logs" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチのログを取得"
+          }
+        }
+      }
+    },
     "Get Started" : {
       "localizations" : {
         "ja" : {
@@ -2150,6 +2230,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "言語"
+          }
+        }
+      }
+    },
+    "Lines" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "行数"
           }
         }
       }
@@ -3210,6 +3300,16 @@
         }
       }
     },
+    "Screen" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "画面"
+          }
+        }
+      }
+    },
     "Screenshot of %@" : {
       "localizations" : {
         "ja" : {
@@ -3300,6 +3400,16 @@
         }
       }
     },
+    "Share Crash Report" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "クラッシュレポートを共有"
+          }
+        }
+      }
+    },
     "Share Diagnostic Report" : {
       "localizations" : {
         "ja" : {
@@ -3316,6 +3426,26 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "書き出したデータを共有"
+          }
+        }
+      }
+    },
+    "Share Logs" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ログを共有"
+          }
+        }
+      }
+    },
+    "Share Screenshot" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "スクリーンショットを共有"
           }
         }
       }
@@ -3500,6 +3630,16 @@
         }
       }
     },
+    "Take Screenshot" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "スクリーンショットを撮る"
+          }
+        }
+      }
+    },
     "Temperature" : {
       "localizations" : {
         "ja" : {
@@ -3660,12 +3800,32 @@
         }
       }
     },
+    "The crash report could not be read." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "クラッシュレポートを読み取れませんでした。"
+          }
+        }
+      }
+    },
     "The diagnostic report could not be created." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "診断レポートを作成できませんでした。"
+          }
+        }
+      }
+    },
+    "The dump the watch saved the last time it restarted unexpectedly. It is marked as read once collected, so a second attempt finds nothing." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチが前回予期せず再起動したときに保存したダンプです。一度取得すると既読として記録されるため、もう一度取得しても何も見つかりません。"
           }
         }
       }
@@ -3926,6 +4086,26 @@
         }
       }
     },
+    "The watch has no crash report that has not been read." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチに未読のクラッシュレポートはありません。"
+          }
+        }
+      }
+    },
+    "The watch has no crash report." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチにクラッシュレポートはありません。"
+          }
+        }
+      }
+    },
     "The watch is already processing another application change. Please try again." : {
       "localizations" : {
         "ja" : {
@@ -3992,6 +4172,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチを再起動しています。"
+          }
+        }
+      }
+    },
+    "The watch keeps a log of each run in flash. Gathering reads them back until it says it has no more." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチは起動ごとのログをフラッシュメモリに保存しています。取得すると、ウォッチがこれ以上ないと応答するまで読み出します。"
           }
         }
       }
@@ -4076,6 +4266,16 @@
         }
       }
     },
+    "The watch stopped part way through its logs." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチのログの取得が途中で停止しました。"
+          }
+        }
+      }
+    },
     "The watch works again once firmware is installed." : {
       "localizations" : {
         "ja" : {
@@ -4092,6 +4292,26 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチはこれらの値からカロリーと距離を算出します。1つのレコードとして送信されるため、すべてまとめて書き込まれます。"
+          }
+        }
+      }
+    },
+    "The watch would not send a screenshot." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチがスクリーンショットを送信しませんでした。"
+          }
+        }
+      }
+    },
+    "The watch's screen" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチの画面"
           }
         }
       }
@@ -4596,6 +4816,16 @@
         }
       }
     },
+    "Watch Logs" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチのログ"
+          }
+        }
+      }
+    },
     "Watch Settings" : {
       "localizations" : {
         "ja" : {
@@ -4682,6 +4912,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "Pebbleへようこそ"
+          }
+        }
+      }
+    },
+    "What the apps on the watch write while this is on. The watch forgets on the next connection, so it is asked again each time." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "オンのあいだにウォッチ上のアプリが書き出した内容です。ウォッチは次回の接続時にこの設定を忘れるため、接続のたびに設定し直します。"
           }
         }
       }

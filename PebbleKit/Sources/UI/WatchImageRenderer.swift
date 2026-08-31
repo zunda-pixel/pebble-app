@@ -1,6 +1,8 @@
 public import API
 public import CoreGraphics
-import Foundation
+public import Foundation
+import ImageIO
+import UniformTypeIdentifiers
 
 /// Turns a picture the phone has into one the watch can show.
 ///
@@ -15,6 +17,41 @@ public enum WatchImageRenderer {
               let pixels = argbPixels(image, width: width, height: height)
         else { return nil }
         return PebbleImageEncoder.encode(argb: pixels, width: width, height: height)
+    }
+
+    /// A picture the watch sent, as a PNG.
+    public static func pngData(_ screenshot: PebbleScreenshot) -> Data? {
+        guard screenshot.width > 0, screenshot.height > 0,
+              screenshot.pixels.count >= screenshot.width * screenshot.height,
+              let image = makeImage(screenshot)
+        else { return nil }
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            data, UTType.png.identifier as CFString, 1, nil
+        ) else { return nil }
+        CGImageDestinationAddImage(destination, image, nil)
+        guard CGImageDestinationFinalize(destination) else { return nil }
+        return data as Data
+    }
+
+    static func makeImage(_ screenshot: PebbleScreenshot) -> CGImage? {
+        var pixels = screenshot.pixels
+        let bytesPerRow = screenshot.width * 4
+        return pixels.withUnsafeMutableBytes { buffer -> CGImage? in
+            guard let base = buffer.baseAddress,
+                  let context = unsafe CGContext(
+                      data: base,
+                      width: screenshot.width,
+                      height: screenshot.height,
+                      bitsPerComponent: 8,
+                      bytesPerRow: bytesPerRow,
+                      space: CGColorSpaceCreateDeviceRGB(),
+                      bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue
+                          | CGBitmapInfo.byteOrder32Little.rawValue
+                  )
+            else { return nil }
+            return context.makeImage()
+        }
     }
 
     /// The picture as `0xAARRGGBB` a row at a time.

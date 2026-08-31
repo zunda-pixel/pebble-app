@@ -24,6 +24,14 @@ public final class MockPebbleClient: PebbleClient {
     public private(set) var timelineActionResponses: [(itemID: UUID, succeeded: Bool, subtitle: String?)] = []
     public private(set) var sentImages: [(token: UInt8, kindValue: UInt8, image: PebbleEncodedImage?)] = []
     public private(set) var declinedImageKinds: [UInt8] = []
+    public private(set) var screenshotRequestCount = 0
+    public private(set) var requestedLogGenerations: [UInt8] = []
+    public private(set) var isApplicationLoggingEnabled = false
+    public private(set) var getBytesRequests: [GetBytesRequest] = []
+    /// What a test wants the watch to answer with.
+    public var screenshotToReturn = PebbleScreenshot(width: 1, height: 1, pixels: [0xFF00_0000])
+    public var logGenerations: [[WatchLogLine]] = []
+    public var bytesToReturn: [UInt8] = []
     public private(set) var writtenNotificationSourceApps: [NotificationSourceApp] = []
     public private(set) var registeredApplications: [PebbleAppMetadata] = []
     public private(set) var unregisteredApplicationIDs: [UUID] = []
@@ -243,6 +251,26 @@ public final class MockPebbleClient: PebbleClient {
 
     public func declineImageKind(token: UInt8, kindValue: UInt8) async throws {
         declinedImageKinds.append(kindValue)
+    }
+
+    public func takeScreenshot() async throws -> PebbleScreenshot {
+        screenshotRequestCount += 1
+        return screenshotToReturn
+    }
+
+    public func readLogGeneration(_ generation: UInt8) async throws -> [WatchLogLine]? {
+        requestedLogGenerations.append(generation)
+        guard Int(generation) < logGenerations.count else { return nil }
+        return logGenerations[Int(generation)]
+    }
+
+    public func setApplicationLoggingEnabled(_ isEnabled: Bool) async throws {
+        isApplicationLoggingEnabled = isEnabled
+    }
+
+    public func getBytes(_ request: GetBytesRequest) async throws -> [UInt8] {
+        getBytesRequests.append(request)
+        return bytesToReturn
     }
 
     public func registerApplication(_ metadata: PebbleAppMetadata) async throws {

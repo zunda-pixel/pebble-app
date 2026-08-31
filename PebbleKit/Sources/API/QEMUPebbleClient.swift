@@ -269,6 +269,24 @@ public final class QEMUPebbleClient: PebbleClient {
         try await send(ImagingCodec.unsupportedFrame(token: token, kindValue: kindValue))
     }
 
+    // The emulator has no screen to photograph, no flash log and no crash to
+    // hand over.
+    public func takeScreenshot() async throws -> PebbleScreenshot {
+        throw WatchPullError.notSupported
+    }
+
+    public func readLogGeneration(_ generation: UInt8) async throws -> [WatchLogLine]? {
+        nil
+    }
+
+    public func setApplicationLoggingEnabled(_ isEnabled: Bool) async throws {
+        try await send(AppLogCodec.enableFrame(isEnabled))
+    }
+
+    public func getBytes(_ request: GetBytesRequest) async throws -> [UInt8] {
+        throw WatchPullError.notSupported
+    }
+
     public func installFile(_ bytes: [UInt8], filename: String) async throws {
         // The emulator has no filesystem the app can write into.
         throw PutBytesTransferError.invalidConfiguration

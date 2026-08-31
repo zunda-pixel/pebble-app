@@ -116,6 +116,21 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var activeAppMessageTransactionID: UInt8?
     private var appMessageTimeoutTask: Task<Void, Never>?
     private var healthDataLoggingProcessor = HealthDataLoggingProcessor()
+    private var screenshotCollector: ScreenshotCollector?
+    private var screenshotContinuation: CheckedContinuation<PebbleScreenshot, any Error>?
+    private var logDumpCookie: UInt32?
+    private var nextLogDumpCookie: UInt32 = 1
+    private var logDumpLines: [WatchLogLine] = []
+    private var logDumpContinuation: CheckedContinuation<[WatchLogLine]?, any Error>?
+    private var getBytesCollector: GetBytesCollector?
+    private var getBytesContinuation: CheckedContinuation<[UInt8], any Error>?
+    private var nextGetBytesTransactionID: UInt8 = 1
+    /// Each pull keeps its own clock: the watch answers a screenshot in one
+    /// burst and a coredump over a minute or more, so one timeout for both
+    /// would either give up early or hang about.
+    private var screenshotTimeoutTask: Task<Void, Never>?
+    private var logDumpTimeoutTask: Task<Void, Never>?
+    private var getBytesTimeoutTask: Task<Void, Never>?
 
     /// Identifies this client in diagnostics. Several clients can be alive at
     /// once, one per watch, and their logs are otherwise indistinguishable.
@@ -616,6 +631,137 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         try await send(ImagingCodec.unsupportedFrame(token: token, kindValue: kindValue))
     }
 
+    public func takeScreenshot() async throws -> PebbleScreenshot {
+        guard let peripheral = connectedPeripheral, ppogSession != nil else {
+            throw PebbleConnectionError.disconnected
+        }
+        guard screenshotContinuation == nil else {
+            throw WatchPullError.operationAlreadyInProgress
+        }
+        return try await withCheckedThrowingContinuation { continuation in
+            screenshotContinuation = continuation
+            screenshotCollector = ScreenshotCollector()
+            do {
+                try sendFrame(ScreenshotCodec.requestFrame(), to: peripheral)
+                screenshotTimeoutTask = quietTimeout(seconds: 30) { [weak self] in
+                    self?.finishScreenshot(.failure(PebbleConnectionError.connectionTimedOut))
+                }
+            } catch {
+                finishScreenshot(.failure(error))
+            }
+        }
+    }
+
+    public func readLogGeneration(_ generation: UInt8) async throws -> [WatchLogLine]? {
+        guard let peripheral = connectedPeripheral, ppogSession != nil else {
+            throw PebbleConnectionError.disconnected
+        }
+        guard logDumpContinuation == nil else {
+            throw WatchPullError.operationAlreadyInProgress
+        }
+        let cookie = nextLogDumpCookie
+        nextLogDumpCookie &+= 1
+        return try await withCheckedThrowingContinuation { continuation in
+            logDumpContinuation = continuation
+            logDumpCookie = cookie
+            logDumpLines = []
+            do {
+                try sendFrame(
+                    LogDumpCodec.requestFrame(generation: generation, cookie: cookie),
+                    to: peripheral
+                )
+                logDumpTimeoutTask = quietTimeout(seconds: 30) { [weak self] in
+                    self?.finishLogDump(.failure(PebbleConnectionError.connectionTimedOut))
+                }
+            } catch {
+                finishLogDump(.failure(error))
+            }
+        }
+    }
+
+    public func setApplicationLoggingEnabled(_ isEnabled: Bool) async throws {
+        try await send(AppLogCodec.enableFrame(isEnabled))
+    }
+
+    public func getBytes(_ request: GetBytesRequest) async throws -> [UInt8] {
+        guard let peripheral = connectedPeripheral, ppogSession != nil else {
+            throw PebbleConnectionError.disconnected
+        }
+        guard getBytesContinuation == nil else {
+            throw WatchPullError.operationAlreadyInProgress
+        }
+        let transactionID = nextGetBytesTransactionID
+        nextGetBytesTransactionID &+= 1
+        return try await withCheckedThrowingContinuation { continuation in
+            getBytesContinuation = continuation
+            getBytesCollector = GetBytesCollector(transactionID: transactionID)
+            do {
+                try sendFrame(
+                    GetBytesCodec.requestFrame(request, transactionID: transactionID),
+                    to: peripheral
+                )
+                // A coredump is a hundred kilobytes over a link that manages a
+                // few of them a second, so this waits for the watch to go quiet
+                // rather than for the whole thing.
+                getBytesTimeoutTask = quietTimeout(seconds: 60) { [weak self] in
+                    self?.finishGetBytes(.failure(PebbleConnectionError.connectionTimedOut))
+                }
+            } catch {
+                finishGetBytes(.failure(error))
+            }
+        }
+    }
+
+    /// A deadline that measures silence rather than the whole transfer: the
+    /// watch sends an object in chunks and each one puts the deadline back, so
+    /// a large but healthy transfer is not cut off while a stalled one is.
+    private func quietTimeout(
+        seconds: Int,
+        onExpiry: @escaping @MainActor () -> Void
+    ) -> Task<Void, Never> {
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled, self != nil else { return }
+            onExpiry()
+        }
+    }
+
+    /// Everything the watch was in the middle of sending is over when the link
+    /// is: none of it resumes, and a caller left waiting would wait for ever.
+    private func failPulls(_ error: any Error) {
+        finishScreenshot(.failure(error))
+        finishLogDump(.failure(error))
+        finishGetBytes(.failure(error))
+    }
+
+    private func finishScreenshot(_ result: Result<PebbleScreenshot, any Error>) {
+        screenshotTimeoutTask?.cancel()
+        screenshotTimeoutTask = nil
+        screenshotCollector = nil
+        guard let continuation = screenshotContinuation else { return }
+        screenshotContinuation = nil
+        continuation.resume(with: result)
+    }
+
+    private func finishLogDump(_ result: Result<[WatchLogLine]?, any Error>) {
+        logDumpTimeoutTask?.cancel()
+        logDumpTimeoutTask = nil
+        logDumpCookie = nil
+        logDumpLines = []
+        guard let continuation = logDumpContinuation else { return }
+        logDumpContinuation = nil
+        continuation.resume(with: result)
+    }
+
+    private func finishGetBytes(_ result: Result<[UInt8], any Error>) {
+        getBytesTimeoutTask?.cancel()
+        getBytesTimeoutTask = nil
+        getBytesCollector = nil
+        guard let continuation = getBytesContinuation else { return }
+        getBytesContinuation = nil
+        continuation.resume(with: result)
+    }
+
     public func writeWeatherLocationOrder(_ orderedIDs: [UUID]) async throws {
         try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
             WeatherCodec.preferencesFrame(orderedIDs: orderedIDs, token: token)
@@ -783,6 +929,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         stopHealthChecks()
         failTransfer(error)
         failBlobDBOperation(error)
+        failPulls(error)
         failAppReorder(error)
         failAllAppMessages(error)
     }
@@ -923,6 +1070,62 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
 
         if frame.endpoint == AppRunStateCodec.endpoint {
             eventContinuation?.yield(.appRunStateChanged(try AppRunStateCodec.decode(frame)))
+            return
+        }
+
+        if frame.endpoint == ScreenshotCodec.endpoint, screenshotCollector != nil {
+            do {
+                if let screenshot = try screenshotCollector?.accept(frame) {
+                    finishScreenshot(.success(screenshot))
+                } else {
+                    screenshotTimeoutTask?.cancel()
+                    screenshotTimeoutTask = quietTimeout(seconds: 30) { [weak self] in
+                        self?.finishScreenshot(.failure(PebbleConnectionError.connectionTimedOut))
+                    }
+                }
+            } catch {
+                finishScreenshot(.failure(error))
+            }
+            return
+        }
+
+        if frame.endpoint == LogDumpCodec.endpoint, let cookie = logDumpCookie {
+            switch try LogDumpCodec.decode(frame, cookie: cookie) {
+            case .line(let line):
+                logDumpLines.append(line)
+                logDumpTimeoutTask?.cancel()
+                logDumpTimeoutTask = quietTimeout(seconds: 30) { [weak self] in
+                    self?.finishLogDump(.failure(PebbleConnectionError.connectionTimedOut))
+                }
+            case .done:
+                finishLogDump(.success(logDumpLines))
+            case .noLogs:
+                finishLogDump(.success(nil))
+            case nil:
+                break
+            }
+            return
+        }
+
+        if frame.endpoint == AppLogCodec.endpoint {
+            let (applicationID, line) = try AppLogCodec.decode(frame)
+            eventContinuation?.yield(.applicationLogReceived(applicationID: applicationID, line: line))
+            return
+        }
+
+        if frame.endpoint == GetBytesCodec.endpoint, getBytesCollector != nil {
+            do {
+                if let bytes = try getBytesCollector?.accept(frame) {
+                    finishGetBytes(.success(bytes))
+                } else {
+                    getBytesTimeoutTask?.cancel()
+                    getBytesTimeoutTask = quietTimeout(seconds: 60) { [weak self] in
+                        self?.finishGetBytes(.failure(PebbleConnectionError.connectionTimedOut))
+                    }
+                }
+            } catch {
+                finishGetBytes(.failure(error))
+            }
             return
         }
 
@@ -1322,6 +1525,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         stopHealthChecks()
         failTransfer(PebbleConnectionError.disconnected)
         failBlobDBOperation(PebbleConnectionError.disconnected)
+        failPulls(PebbleConnectionError.disconnected)
         failAppReorder(PebbleConnectionError.disconnected)
     }
 

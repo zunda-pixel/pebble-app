@@ -42,6 +42,9 @@ public enum PebbleClientEvent: Equatable, Sendable {
     case appRunStateChanged(AppRunStateEvent)
     /// The watch has somewhere to show a picture and is asking for one.
     case imageRequested(PebbleImageRequest)
+    /// A line an app running on the watch wrote, which only arrives while app
+    /// logging is turned on.
+    case applicationLogReceived(applicationID: UUID, line: WatchLogLine)
 }
 
 public enum PebbleConnectionError: Error, Equatable, Sendable {
@@ -157,6 +160,17 @@ public protocol PebbleClient: Sendable {
     ) async throws
     /// Says this kind of picture is never coming, so the watch stops asking.
     func declineImageKind(token: UInt8, kindValue: UInt8) async throws
+    /// Asks the watch for what is on its screen.
+    func takeScreenshot() async throws -> PebbleScreenshot
+    /// Reads back one generation of the watch's own log — zero being the run it
+    /// is in now, one the run before that. Returns nil once asked for further
+    /// back than the watch goes.
+    func readLogGeneration(_ generation: UInt8) async throws -> [WatchLogLine]?
+    /// Turns on the watch sending the log lines its apps write. They arrive as
+    /// `applicationLogReceived` events.
+    func setApplicationLoggingEnabled(_ isEnabled: Bool) async throws
+    /// Pulls a whole object off the watch: a crash dump, or a file.
+    func getBytes(_ request: GetBytesRequest) async throws -> [UInt8]
     func registerApplication(_ metadata: PebbleAppMetadata) async throws
     func unregisterApplication(applicationID: UUID) async throws
 }
@@ -178,6 +192,14 @@ public enum BlobDBClientError: Error, Equatable, Sendable {
 public enum AppReorderClientError: Error, Equatable, Sendable {
     case operationAlreadyInProgress
     case rejected(AppReorderResult)
+}
+
+/// Reading something back off the watch — a screenshot, a log, a crash dump.
+public enum WatchPullError: Error, Equatable, Sendable {
+    /// The watch sends one of these at a time, and is already sending one.
+    case operationAlreadyInProgress
+    /// This transport has nothing to read back.
+    case notSupported
 }
 
 public enum AppMessageClientError: Error, Equatable, Sendable {

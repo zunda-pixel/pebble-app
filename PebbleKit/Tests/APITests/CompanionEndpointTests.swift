@@ -398,7 +398,139 @@ struct ImagingTests {
 
 @Suite
 @MainActor
-struct NotificationColorTests {
+struct WatchDiagnosticsTests {
+    private func screenshotFrame(_ payload: [UInt8]) -> PebbleProtocolFrame {
+        PebbleProtocolFrame(endpoint: 8_000, payload: payload)
+    }
+
+    @Test func aColourScreenshotArrivesAsAHeaderAndThenPixels() throws {
+        var collector = ScreenshotCollector()
+        // Two by two, eight bits a pixel. The header counts in network order.
+        let header: [UInt8] = [0x00] + UInt32(2).bigEndianBytes
+            + UInt32(2).bigEndianBytes + UInt32(2).bigEndianBytes
+
+        #expect(try collector.accept(screenshotFrame(header + [0xFF, 0xC0])) == nil)
+        let screenshot = try #require(try collector.accept(screenshotFrame([0xF0, 0xC3])))
+
+        #expect(screenshot.width == 2)
+        #expect(screenshot.height == 2)
+        #expect(screenshot.pixels == [0xFFFF_FFFF, 0xFF00_0000, 0xFFFF_0000, 0xFF00_00FF])
+    }
+
+    @Test func aBlackAndWhiteScreenshotIsOneBitAPixelFromTheLowestUp() throws {
+        var collector = ScreenshotCollector()
+        let header: [UInt8] = [0x00] + UInt32(1).bigEndianBytes
+            + UInt32(8).bigEndianBytes + UInt32(1).bigEndianBytes
+
+        let screenshot = try #require(try collector.accept(screenshotFrame(header + [0b0000_0101])))
+
+        #expect(screenshot.pixels.count == 8)
+        #expect(screenshot.pixels[0] == 0xFFFF_FFFF)
+        #expect(screenshot.pixels[1] == 0xFF00_0000)
+        #expect(screenshot.pixels[2] == 0xFFFF_FFFF)
+    }
+
+    @Test func aWatchThatWillNotTakeAPictureSaysWhy() {
+        var collector = ScreenshotCollector()
+        let refusal: [UInt8] = [0x03] + UInt32(1).bigEndianBytes
+            + UInt32(0).bigEndianBytes + UInt32(0).bigEndianBytes
+
+        #expect(throws: ScreenshotError.refused(3)) {
+            try collector.accept(screenshotFrame(refusal))
+        }
+    }
+
+    @Test func aLogLineIsTheFirmwaresOwnRecord() throws {
+        // The firmware sends the struct as it sits in memory, so its numbers
+        // are little-endian whichever way round the rest of the protocol is.
+        var payload: [UInt8] = [0x80] + UInt32(0x1234_5678).littleEndianBytes
+        payload += UInt32(0x6600_0000).littleEndianBytes
+        payload += [50, 5]
+        payload += UInt16(321).littleEndianBytes
+        payload += Array("main.c".utf8) + [UInt8](repeating: 0, count: 10)
+        payload += Array("hello".utf8)
+
+        let message = try LogDumpCodec.decode(
+            PebbleProtocolFrame(endpoint: 2_002, payload: payload),
+            cookie: 0x1234_5678
+        )
+
+        guard case .line(let line) = message else {
+            Issue.record("expected a line")
+            return
+        }
+        #expect(line.date == Date(timeIntervalSince1970: 0x6600_0000))
+        #expect(line.level == 50)
+        #expect(line.levelName == "W")
+        #expect(line.file == "main.c")
+        #expect(line.line == 321)
+        #expect(line.message == "hello")
+    }
+
+    @Test func aLineForSomebodyElsesRequestIsIgnored() throws {
+        let payload: [UInt8] = [0x81] + UInt32(7).littleEndianBytes
+
+        #expect(try LogDumpCodec.decode(
+            PebbleProtocolFrame(endpoint: 2_002, payload: payload),
+            cookie: 8
+        ) == nil)
+        #expect(try LogDumpCodec.decode(
+            PebbleProtocolFrame(endpoint: 2_002, payload: payload),
+            cookie: 7
+        ) == .done)
+    }
+
+    @Test func anAppLogLineNamesTheAppThatWroteIt() throws {
+        let id = UUID(uuidString: "01020304-0506-0708-090A-0B0C0D0E0F10")!
+        var payload = BlobDBCodec.uuidBytes(id)
+        payload += UInt32(100).littleEndianBytes
+        payload += [200, 2]
+        payload += UInt16(9).littleEndianBytes
+        payload += Array("a.c".utf8) + [UInt8](repeating: 0, count: 13)
+        payload += Array("hi".utf8)
+
+        let (applicationID, line) = try AppLogCodec.decode(
+            PebbleProtocolFrame(endpoint: 2_006, payload: payload)
+        )
+
+        #expect(applicationID == id)
+        #expect(line.message == "hi")
+        #expect(AppLogCodec.enableFrame(true).payload == [1])
+    }
+
+    @Test func anObjectIsPulledInOrderUntilItsSizeIsReached() throws {
+        var collector = GetBytesCollector(transactionID: 9)
+        let info: [UInt8] = [0x01, 9, 0x00] + UInt32(6).bigEndianBytes
+
+        #expect(try collector.accept(PebbleProtocolFrame(endpoint: 9_000, payload: info)) == nil)
+        let first: [UInt8] = [0x02, 9] + UInt32(0).bigEndianBytes + [0xAA, 0xBB, 0xCC]
+        #expect(try collector.accept(PebbleProtocolFrame(endpoint: 9_000, payload: first)) == nil)
+        let second: [UInt8] = [0x02, 9] + UInt32(3).bigEndianBytes + [0xDD, 0xEE, 0xFF]
+
+        #expect(try collector.accept(PebbleProtocolFrame(endpoint: 9_000, payload: second))
+            == [0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF])
+    }
+
+    @Test func aChunkThatDoesNotFollowOnIsRefusedRatherThanStitchedIn() throws {
+        var collector = GetBytesCollector(transactionID: 1)
+        let info: [UInt8] = [0x01, 1, 0x00] + UInt32(4).bigEndianBytes
+        _ = try collector.accept(PebbleProtocolFrame(endpoint: 9_000, payload: info))
+        let outOfOrder: [UInt8] = [0x02, 1] + UInt32(2).bigEndianBytes + [0x01, 0x02]
+
+        #expect(throws: GetBytesError.outOfOrderChunk) {
+            try collector.accept(PebbleProtocolFrame(endpoint: 9_000, payload: outOfOrder))
+        }
+        // Another transaction's answer is not this caller's to complain about.
+        #expect(try collector.accept(PebbleProtocolFrame(endpoint: 9_000, payload: [0x02, 2, 0, 0, 0, 0])) == nil)
+    }
+
+    @Test func aRequestForAFileCarriesItsName() {
+        #expect(GetBytesCodec.requestFrame(.coredump, transactionID: 3).payload == [0x00, 3])
+        #expect(GetBytesCodec.requestFrame(.unreadCoredump, transactionID: 3).payload == [0x05, 3])
+        #expect(GetBytesCodec.requestFrame(.file(name: "ab"), transactionID: 3).payload
+            == [0x03, 3, 2, 0x61, 0x62])
+    }
+
     @Test func aColourIsSixBitsAndAlwaysOpaque() {
         let colour = PebbleColor(red: 3, green: 0, blue: 2)
 
