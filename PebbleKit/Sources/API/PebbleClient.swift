@@ -100,6 +100,10 @@ public protocol PebbleClient: Sendable {
     /// Sends a named file. A language pack goes under the name `lang`, which is
     /// how the firmware knows what it is.
     func installFile(_ bytes: [UInt8], filename: String) async throws
+    /// Asks the watch what it is running now. The answer arrives as a
+    /// `deviceUpdated` event, which is how a change the watch made — a new
+    /// language pack, a firmware slot — becomes visible.
+    func refreshDeviceInformation() async throws
     func registerApplication(_ metadata: PebbleAppMetadata) async throws
     func unregisterApplication(applicationID: UUID) async throws
 }
@@ -108,6 +112,9 @@ public extension PebbleClient {
     func retrieveKnownDevices(_ hints: [DiscoveredPebble]) async throws -> [DiscoveredPebble] {
         []
     }
+
+    /// A transport with nothing to ask does nothing.
+    func refreshDeviceInformation() async throws {}
 }
 
 public enum BlobDBClientError: Error, Equatable, Sendable {

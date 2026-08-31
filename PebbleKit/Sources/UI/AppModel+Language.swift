@@ -79,9 +79,29 @@ extension AppModel {
             try await retry(with: .watchWork) {
                 try await connection.client.installFile(bytes, filename: PebbleLanguagePackCatalog.filename)
             }
-            languageStatusMessage = "\(name) is installed. The watch restarts to use it."
+            // The watch does not restart: it notices the file, reloads it and
+            // says so on its own screen. Nothing it reports about itself
+            // changes until it is asked again, so ask — otherwise the language
+            // has changed on the wrist while this screen still shows the old
+            // one, which reads as an install that never finished.
+            languageStatusMessage = "\(name) is installed. The watch switches to it now."
+            await confirmLanguageChange(on: connection)
         } catch {
             languageStatusMessage = "\(name) could not be installed. \(error.localizedDescription)"
+        }
+    }
+}
+
+extension AppModel {
+    /// Asks the watch what language it is running, a moment after installing
+    /// one. The firmware reloads the pack asynchronously, so the first answer
+    /// can still be the old locale; asking twice covers the gap without
+    /// leaving the reader waiting.
+    private func confirmLanguageChange(on connection: WatchConnection) async {
+        for delay in [Duration.seconds(1), .seconds(3)] {
+            try? await Task.sleep(for: delay)
+            guard connection.isConnected else { return }
+            try? await connection.client.refreshDeviceInformation()
         }
     }
 }

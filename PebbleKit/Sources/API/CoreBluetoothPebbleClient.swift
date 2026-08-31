@@ -398,6 +398,13 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         try await transferObject(bytes, objectType: objectType, appBankID: appBankID, filename: nil)
     }
 
+    /// Asks the watch to describe itself again. What it answers — firmware
+    /// version, language pack, capabilities — arrives as `deviceUpdated`.
+    public func refreshDeviceInformation() async throws {
+        guard let peripheral = connectedPeripheral else { throw PebbleConnectionError.disconnected }
+        try sendFrame(WatchVersionCodec.requestFrame(), to: peripheral)
+    }
+
     /// Sends a named file, which the watch keeps under that name once the
     /// install command lands. A language pack is filed as `lang`.
     public func installFile(_ bytes: [UInt8], filename: String) async throws {
@@ -828,6 +835,27 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
 
         if frame.endpoint == BlobDBCodec.endpoint, pendingBlobDBToken != nil {
             processBlobDBResponse(frame)
+            return
+        }
+
+        // A version response can also arrive after the connection is up,
+        // because the app asked again — the watch changes what it reports when
+        // a language pack is installed, and that is how the app finds out.
+        if frame.endpoint == WatchVersionCodec.endpoint,
+           pendingDevice == nil,
+           let device = connectedDevice {
+            let information = try WatchVersionCodec.decode(frame)
+            var updated = device
+            updated.firmwareVersion = information.firmwareVersion
+            updated.serialNumber = information.serialNumber
+            updated.isRunningRecoveryFirmware = information.isRunningRecoveryFirmware
+            updated.runningFirmwareSlot = information.runningFirmwareSlot
+            updated.board = information.board
+            updated.languageLocale = information.languageLocale
+            updated.languageVersion = information.languageVersion
+            updated.capabilities = information.capabilities
+            connectedDevice = updated
+            eventContinuation?.yield(.deviceUpdated(updated))
             return
         }
 

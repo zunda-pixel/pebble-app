@@ -77,7 +77,7 @@ struct LanguageView: View {
                 if packs.isEmpty {
                     Text("Connect the watch once so its board is known, and the languages built for it appear here.")
                 } else {
-                    Text("Installing a language replaces the one on the watch, which restarts to use it. English needs no pack: it is part of the firmware.")
+                    Text("Installing a language replaces the one on the watch. The watch switches over by itself and says so on its own screen. English needs no pack: it is part of the firmware.")
                 }
             }
 

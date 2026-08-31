@@ -63,12 +63,12 @@
         }
       }
     },
-    "%@ is installed. The watch restarts to use it." : {
+    "%@ is installed. The watch switches to it now." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“%@”をインストールしました。ウォッチが再起動して切り替わります。"
+            "value" : "“%@”をインストールしました。ウォッチはこれから切り替わります。"
           }
         }
       }
@@ -1531,16 +1531,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "インストール中"
-          }
-        }
-      }
-    },
-    "Installing a language replaces the one on the watch, which restarts to use it. English needs no pack: it is part of the firmware." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "言語をインストールすると、ウォッチ上の言語が置き換わり、再起動して切り替わります。英語はファームウェアに含まれているため、パックは不要です。"
           }
         }
       }
@@ -3481,6 +3471,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "Pebbleへようこそ"
+          }
+        }
+      }
+    },
+    "Installing a language replaces the one on the watch. The watch switches over by itself and says so on its own screen. English needs no pack: it is part of the firmware." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "言語をインストールすると、ウォッチ上の言語が置き換わります。ウォッチは自動で切り替わり、その旨を画面に表示します。英語はファームウェアに含まれているため、パックは不要です。"
           }
         }
       }
