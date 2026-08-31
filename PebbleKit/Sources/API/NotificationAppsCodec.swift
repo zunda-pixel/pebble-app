@@ -29,6 +29,10 @@ public struct NotificationSourceApp: Codable, Equatable, Sendable, Identifiable 
     /// Replies the watch offers for this app's notifications. Empty means the
     /// watch shows no reply action at all.
     public var cannedReplies: [String] = []
+    /// What the watch paints behind this app's notifications, and what it
+    /// writes on top. Nil leaves the firmware's own choice for the app alone.
+    public var backgroundColor: PebbleColor? = nil
+    public var foregroundColor: PebbleColor? = nil
 
     public var id: String { bundleID }
 }
@@ -46,6 +50,8 @@ public enum NotificationAppsCodec {
     static let muteDayOfWeekAttribute: UInt8 = 40
     static let muteExpirationAttribute: UInt8 = 50
     static let iconAttribute: UInt8 = 48
+    static let foregroundColorAttribute: UInt8 = 27
+    static let backgroundColorAttribute: UInt8 = 28
     static let cannedResponsesAttribute: UInt8 = 8
     static let titleAttribute: UInt8 = 1
     /// `TimelineItemActionTypeResponse`. The watch turns an action of this type
@@ -73,6 +79,12 @@ public enum NotificationAppsCodec {
         attributes.append(attribute(id: muteExpirationAttribute, content: expiration.littleEndianBytes))
         if let icon = app.icon {
             attributes.append(attribute(id: iconAttribute, content: icon.resourceID.littleEndianBytes))
+        }
+        if let background = app.backgroundColor {
+            attributes.append(attribute(id: backgroundColorAttribute, content: [background.argb]))
+        }
+        if let foreground = app.foregroundColor {
+            attributes.append(attribute(id: foregroundColorAttribute, content: [foreground.argb]))
         }
 
         var actions: [[UInt8]] = []
@@ -347,11 +359,13 @@ public actor NotificationSourceAppLibrary {
         if let index = apps.firstIndex(where: { $0.bundleID == app.bundleID }) {
             if app.stateUpdated > apps[index].stateUpdated {
                 var merged = app
-                // The watch's record says nothing about the icon or the
-                // replies, which are the phone's to choose; taking the record
-                // whole would quietly throw them away.
+                // The watch's record says nothing about the icon, the colours
+                // or the replies, which are the phone's to choose; taking the
+                // record whole would quietly throw them away.
                 merged.icon = apps[index].icon
                 merged.cannedReplies = apps[index].cannedReplies
+                merged.backgroundColor = apps[index].backgroundColor
+                merged.foregroundColor = apps[index].foregroundColor
                 apps[index] = merged
             }
         } else {

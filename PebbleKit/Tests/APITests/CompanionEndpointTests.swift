@@ -398,6 +398,36 @@ struct ImagingTests {
 
 @Suite
 @MainActor
+struct NotificationColorTests {
+    @Test func aColourIsSixBitsAndAlwaysOpaque() {
+        let colour = PebbleColor(red: 3, green: 0, blue: 2)
+
+        #expect(colour.argb == 0b1111_0010)
+        #expect(PebbleColor(argb: 0b1111_0010) == colour)
+        // A value without the alpha bits is not one of the watch's colours.
+        #expect(PebbleColor(argb: 0b0011_0010) == nil)
+        #expect(PebbleColor.all.count == 64)
+        #expect(PebbleColor.all.allSatisfy { PebbleColor(argb: $0.argb) == $0 })
+    }
+
+    @Test func anAppsColoursRideOnItsRecord() {
+        var app = NotificationSourceApp(
+            bundleID: "com.example.chat",
+            displayName: "Chat",
+            stateUpdated: Date(timeIntervalSince1970: 0)
+        )
+        app.backgroundColor = PebbleColor(red: 3, green: 0, blue: 0)
+        app.foregroundColor = .white
+
+        let value = NotificationAppsCodec.value(for: app)
+
+        #expect(value[4] == 6)
+        #expect(Array(value.suffix(8)) == [28, 0x01, 0x00, 0b1111_0000, 27, 0x01, 0x00, 0b1111_1111])
+    }
+}
+
+@Suite
+@MainActor
 struct WatchSettingsTests {
     @Test func aSettingIsWrittenAsOneByteUnderItsFirmwareName() {
         let frame = WatchSettingsCodec.insertFrame(.clock24Hour, isOn: true, token: 0x0102)

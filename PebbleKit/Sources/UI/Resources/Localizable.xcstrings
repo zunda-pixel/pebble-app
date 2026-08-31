@@ -644,6 +644,16 @@
         }
       }
     },
+    "Background" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "背景"
+          }
+        }
+      }
+    },
     "Backlight" : {
       "localizations" : {
         "ja" : {
@@ -2954,6 +2964,22 @@
         }
       }
     },
+    "Red %u, green %u, blue %u" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Red %1$u, green %2$u, blue %3$u"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "赤%1$u、緑%2$u、青%3$u"
+          }
+        }
+      }
+    },
     "Refresh" : {
       "localizations" : {
         "ja" : {
@@ -3490,6 +3516,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "テスト通知を送信しました。"
+          }
+        }
+      }
+    },
+    "Text" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "文字"
           }
         }
       }
@@ -4056,6 +4092,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチはこれらの値からカロリーと距離を算出します。1つのレコードとして送信されるため、すべてまとめて書き込まれます。"
+          }
+        }
+      }
+    },
+    "The watch's screen has four levels of each colour, and these are all of them. Choosing none leaves the colour the watch already uses for this app." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチの画面は各色に4段階あり、ここにあるのが表示できる色のすべてです。色を選ばなければ、このアプリにウォッチがすでに使っている色のままになります。"
           }
         }
       }

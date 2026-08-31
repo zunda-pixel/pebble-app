@@ -223,6 +223,27 @@ extension AppModel {
         }
     }
 
+    /// Chooses what the watch paints behind this app's notifications, and what
+    /// it writes on top.
+    public func setNotificationSourceAppColors(
+        bundleID: String,
+        background: PebbleColor?,
+        foreground: PebbleColor?
+    ) async {
+        guard var app = notificationSourceApps.first(where: { $0.bundleID == bundleID }) else {
+            return
+        }
+        app.backgroundColor = background
+        app.foregroundColor = foreground
+        app.stateUpdated = .now
+        if let apps = try? await notificationSourceAppLibrary.update(app) {
+            notificationSourceApps = apps
+        }
+        for connection in activeConnections {
+            await synchronizeNotificationSourceApps(on: connection)
+        }
+    }
+
     public func setNotificationSourceAppMute(bundleID: String, muteState: NotificationAppMuteState) async {
         guard var app = notificationSourceApps.first(where: { $0.bundleID == bundleID }) else {
             return
