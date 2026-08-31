@@ -10,15 +10,18 @@ public struct PebbleLanguagePack: Equatable, Identifiable, Sendable {
     public var locale: String
     /// The language's name in itself, which is how it should be read.
     public var localName: String
-    /// The board the pack was built for, as the pack list names it. A pack is
-    /// compiled against a display and a font set, so it is not interchangeable
-    /// between boards — and the list covers boards this app never connects to,
-    /// which is why this is a name rather than a `PebbleWatchBoard`.
-    public var boardName: String
+    /// The board the pack was built for, as the pack list names it, or nil for
+    /// one built to suit any board. A pack is compiled against a display and a
+    /// font set, so a board-specific one is not interchangeable — and the list
+    /// covers boards this app never connects to, which is why this is a name
+    /// rather than a `PebbleWatchBoard`.
+    public var boardName: String?
     public var version: UInt16
     public var url: URL
 
-    public var id: String { "\(boardName)/\(locale)" }
+    /// Two packs can share a locale — Japanese comes in two font weights — so
+    /// what identifies one is where it comes from.
+    public var id: String { url.absoluteString }
 }
 
 /// The language packs this app knows how to fetch.
@@ -41,14 +44,18 @@ public struct PebbleLanguagePackCatalog: Sendable {
 
     /// The packs on offer for a board, in the order they should be read.
     ///
-    /// Only Arabic is built for the current boards. Every other language falls
-    /// back to the Pebble 2 (silk) pack, which is what the official app does
-    /// too: the boards share enough of their display and fonts for those packs
-    /// to work, and offering nothing would be worse.
+    /// Only Arabic is built for the current boards. Every other language comes
+    /// either from a pack built for any board or from the Pebble 2's (silk),
+    /// which is what the official app does too: the boards share enough of
+    /// their display and fonts for those packs to work, and offering nothing
+    /// would be worse. A locale the board itself provides is not offered twice.
     public static func packs(for board: PebbleWatchBoard) -> [PebbleLanguagePack] {
         let exact = all.filter { $0.boardName == board.rawValue }
         let exactLocales = Set(exact.map(\.locale))
-        let fallback = all.filter { $0.boardName == silkBoardName && !exactLocales.contains($0.locale) }
+        let fallback = all.filter { pack in
+            (pack.boardName == nil || pack.boardName == silkBoardName)
+                && !exactLocales.contains(pack.locale)
+        }
         return (exact + fallback).sorted { $0.localName < $1.localName }
     }
 
@@ -88,6 +95,16 @@ public struct PebbleLanguagePackCatalog: Sendable {
         let arabicBoards: [PebbleWatchBoard] = [
             .asterix, .obelixEVT, .obelixDVT, .obelixPVT, .getafixEVT, .getafixDVT, .getafixDVT2,
         ]
+        // Packs built to suit any board, which is where Japanese, Hebrew,
+        // Bulgarian and Catalan come from. Japanese has two font weights, so it
+        // appears twice on purpose.
+        let anyBoard: [(String, String, UInt16, String)] = [
+            ("ja_JP", "日本語", 5, "https://github.com/elliottback/PebbleTimeJapaneseLanguagePack/raw/1e914c39dc459c03ce8a1ae6ee7c17f59f56f21c/pblp_zhs_zht_ja_v5_regular.pbl"),
+            ("ja_JP", "日本語（細字）", 5, "https://github.com/elliottback/PebbleTimeJapaneseLanguagePack/raw/1e914c39dc459c03ce8a1ae6ee7c17f59f56f21c/pblp_zhs_zht_ja_v5_light.pbl"),
+            ("he_IL", "עברית", 1, "https://github.com/alonmln/PebbleOS/releases/download/he_IL-v1/he_IL.pbl"),
+            ("bg", "български", 1, "https://github.com/MarSoft/pebble-firmware-utils/raw/builds/langs/Bulgarian-v1.pbl"),
+            ("ca", "català", 1, "https://github.com/MarSoft/pebble-firmware-utils/raw/builds/langs/Catalan-v1.pbl"),
+        ]
         let silk: [(String, String, UInt16, String)] = [
             ("de_DE", "Deutsch", 34, "Vzq58DE-de_DE.pbl"),
             ("en_US", "English", 1, "960sGtg-en_US.pbl"),
@@ -107,6 +124,14 @@ public struct PebbleLanguagePackCatalog: Sendable {
                 boardName: board.rawValue,
                 version: 1,
                 url: arabic
+            )
+        } + anyBoard.map { locale, name, version, url in
+            PebbleLanguagePack(
+                locale: locale,
+                localName: name,
+                boardName: nil,
+                version: version,
+                url: URL(string: url)!
             )
         } + silk.map { locale, name, version, file in
             PebbleLanguagePack(

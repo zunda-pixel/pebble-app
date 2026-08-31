@@ -277,8 +277,16 @@ struct CompanionStorageTests {
         #expect(arabic.first?.boardName == PebbleWatchBoard.obelixPVT.rawValue)
         #expect(packs.count > 1)
         #expect(packs.filter { $0.locale == "fr_FR" }.allSatisfy { $0.boardName == "silk" })
-        // One pack per locale, or the list would offer the same language twice.
-        #expect(Set(packs.map(\.locale)).count == packs.count)
+
+        // Japanese is built for no board in particular, and comes in two font
+        // weights, so it must survive the board filter twice over.
+        let japanese = packs.filter { $0.locale == "ja_JP" }
+        #expect(japanese.count == 2)
+        #expect(japanese.allSatisfy { $0.boardName == nil })
+        #expect(Set(japanese.map(\.id)).count == 2)
+
+        // A locale the board itself provides is not also offered as a fallback.
+        #expect(packs.filter { $0.locale == "ar_SA" }.count == 1)
         #expect(packs.allSatisfy { $0.url.scheme == "https" })
     }
 
