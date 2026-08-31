@@ -47,6 +47,7 @@ let package = Package(
         .product(name: "DequeModule", package: "swift-collections"),
         .product(name: "HTTPTypes", package: "swift-http-types"),
         .product(name: "HTTPTypesFoundation", package: "swift-http-types"),
+        .product(name: "DMRetry", package: "swift-retry"),
         .product(name: "MemberwiseInit", package: "swift-memberwise-init-macro"),
         .product(name: "ZIPFoundation", package: "ZIPFoundation"),
       ],
@@ -63,7 +64,10 @@ let package = Package(
     ),
     .testTarget(
       name: "APITests",
-      dependencies: ["API"],
+      dependencies: [
+        "API",
+        .product(name: "HTTPTypes", package: "swift-http-types"),
+      ],
       swiftSettings: [
         .enableUpcomingFeature("ExistentialAny"),
         .enableUpcomingFeature("InternalImportsByDefault"),

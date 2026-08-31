@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import Synchronization
 import Testing
 import ZIPFoundation
@@ -524,8 +525,9 @@ final class StubURLProtocol: URLProtocol {
     }
 
     private struct State: Sendable {
-        var exchanges: [URL: Exchange] = [:]
+        var exchanges: [URL: [Exchange]] = [:]
         var requestHeaders: [URL: [String: String]] = [:]
+        var requestCounts: [URL: Int] = [:]
     }
 
     // `startLoading()` is synchronous, so the shared state is guarded rather
@@ -539,13 +541,28 @@ final class StubURLProtocol: URLProtocol {
     }
 
     static func stub(_ url: URL, status: Int, body: Data = Data()) {
-        state.withLock { $0.exchanges[url] = Exchange(status: status, body: body) }
+        stub(url, exchanges: [Exchange(status: status, body: body)])
+    }
+
+    /// Answers each request with the next reply in the list, so a client that
+    /// retries can be shown a failure followed by a success. The last reply is
+    /// repeated once the list runs out.
+    static func stub(_ url: URL, exchanges: [Exchange]) {
+        state.withLock {
+            $0.exchanges[url] = exchanges
+            $0.requestCounts[url] = 0
+        }
     }
 
     /// The headers the client actually sent, to check what the typed request
     /// produced on the wire.
     static func sentHeaders(for url: URL) -> [String: String] {
         state.withLock { $0.requestHeaders[url] ?? [:] }
+    }
+
+    /// How many requests reached this URL, which is how a retry is observed.
+    static func requestCount(for url: URL) -> Int {
+        state.withLock { $0.requestCounts[url] ?? 0 }
     }
 
     override class func canInit(with request: URLRequest) -> Bool { true }
@@ -556,7 +573,12 @@ final class StubURLProtocol: URLProtocol {
         let headers = request.allHTTPHeaderFields ?? [:]
         let exchange = Self.state.withLock { state -> Exchange in
             state.requestHeaders[url] = headers
-            return state.exchanges[url] ?? Exchange(status: 404, body: Data())
+            let attempt = state.requestCounts[url] ?? 0
+            state.requestCounts[url] = attempt + 1
+            guard let exchanges = state.exchanges[url], !exchanges.isEmpty else {
+                return Exchange(status: 404, body: Data())
+            }
+            return exchanges[min(attempt, exchanges.count - 1)]
         }
         let response = HTTPURLResponse(
             url: url,
@@ -612,6 +634,33 @@ struct FirmwareCatalogNetworkTests {
         await #expect(throws: PebbleOSFirmwareCatalogError.releasesUnavailable) {
             try await catalog(url).latestRelease(for: .obelixPVT)
         }
+        // A service that has understood the request and refused it will refuse
+        // it again, so nothing is gained by asking twice.
+        #expect(StubURLProtocol.requestCount(for: url) == 1)
+    }
+
+    @Test func aBusyServiceIsAskedAgain() async throws {
+        let url = URL(string: "https://example.invalid/busy/releases")!
+        StubURLProtocol.stub(url, exchanges: [
+            StubURLProtocol.Exchange(status: 503, body: Data()),
+            StubURLProtocol.Exchange(status: 200, body: Data(Self.releaseJSON.utf8)),
+        ])
+
+        let release = try await catalog(url).latestRelease(for: .obelixPVT)
+
+        #expect(release.versionTag == "v4.36.2")
+        #expect(StubURLProtocol.requestCount(for: url) == 2)
+    }
+
+    @Test func aBoardWithoutAPackageIsNotAskedForTwice() async {
+        let url = URL(string: "https://example.invalid/other-board-once/releases")!
+        StubURLProtocol.stub(url, status: 200, body: Data(Self.releaseJSON.utf8))
+
+        await #expect(throws: PebbleOSFirmwareCatalogError.noFirmwareForBoard(.asterix)) {
+            try await catalog(url).latestRelease(for: .asterix)
+        }
+        // The reply arrived and was fine; the board simply has no package in it.
+        #expect(StubURLProtocol.requestCount(for: url) == 1)
     }
 
     @Test func aBoardWithoutAPackageIsReported() async {
@@ -637,8 +686,21 @@ struct FirmwareCatalogNetworkTests {
         let url = URL(string: "https://example.invalid/refused/firmware.pbz")!
         StubURLProtocol.stub(url, status: 500)
 
-        await #expect(throws: HTTPFileDownloadError.unsuccessfulReply) {
+        await #expect(throws: HTTPFileDownloadError.unsuccessfulReply(.internalServerError)) {
             try await downloadFile(from: url, using: StubURLProtocol.session())
         }
+    }
+
+    @Test func onlyATransientDownloadFailureIsWorthAnotherAttempt() {
+        // The status decides it: a busy or rate-limited service may answer
+        // differently in a moment, one that refused the request will not.
+        #expect(HTTPFileDownloadError.unsuccessfulReply(.internalServerError).isWorthAnotherAttempt)
+        #expect(HTTPFileDownloadError.unsuccessfulReply(.serviceUnavailable).isWorthAnotherAttempt)
+        #expect(HTTPFileDownloadError.unsuccessfulReply(.tooManyRequests).isWorthAnotherAttempt)
+
+        #expect(!HTTPFileDownloadError.unsuccessfulReply(.notFound).isWorthAnotherAttempt)
+        #expect(!HTTPFileDownloadError.unsuccessfulReply(.forbidden).isWorthAnotherAttempt)
+        #expect(!HTTPFileDownloadError.insecureURL.isWorthAnotherAttempt)
+        #expect(!HTTPFileDownloadError.invalidRequest.isWorthAnotherAttempt)
     }
 }

@@ -4,7 +4,20 @@ import HTTPTypesFoundation
 
 enum HTTPFileDownloadError: Error, Equatable, Sendable {
     case insecureURL
-    case unsuccessfulReply
+    case invalidRequest
+    case unsuccessfulReply(HTTPResponse.Status)
+
+    /// Whether asking again could get the file. The status the service gave is
+    /// what decides it; a refused URL, or a request that could not be built at
+    /// all, fails the same way every time.
+    var isWorthAnotherAttempt: Bool {
+        switch self {
+        case .insecureURL, .invalidRequest:
+            false
+        case .unsuccessfulReply(let status):
+            status.isWorthAnotherAttempt
+        }
+    }
 }
 
 /// Fetches a file over HTTPS into a temporary location.
@@ -21,11 +34,14 @@ func downloadFile(
         throw HTTPFileDownloadError.insecureURL
     }
     guard let request = URLRequest(httpRequest: HTTPRequest(method: .get, url: url)) else {
-        throw HTTPFileDownloadError.unsuccessfulReply
+        throw HTTPFileDownloadError.invalidRequest
     }
     let (temporaryURL, response) = try await session.download(for: request)
-    guard (response as? HTTPURLResponse)?.httpResponse?.status == .ok else {
-        throw HTTPFileDownloadError.unsuccessfulReply
+    guard let status = (response as? HTTPURLResponse)?.httpResponse?.status else {
+        throw HTTPFileDownloadError.invalidRequest
+    }
+    guard status == .ok else {
+        throw HTTPFileDownloadError.unsuccessfulReply(status)
     }
     return temporaryURL
 }

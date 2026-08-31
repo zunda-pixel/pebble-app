@@ -2,6 +2,7 @@ public import Foundation
 import HTTPTypes
 import HTTPTypesFoundation
 import MemberwiseInit
+import Retry
 
 /// A firmware package that has been fetched and is waiting on disk.
 @MemberwiseInit(.public)
@@ -53,26 +54,31 @@ public struct PebbleOSFirmwareCatalog: Sendable {
 
     /// The newest firmware published for a board.
     public func latestRelease(for board: PebbleWatchBoard) async throws -> PebbleOSFirmwareRelease {
-        let request = HTTPRequest(
-            method: .get,
-            url: releasesURL,
-            headerFields: [.accept: "application/vnd.github+json"]
-        )
-        let (data, response) = try await session.data(for: request)
-        guard response.status == .ok else {
-            throw PebbleOSFirmwareCatalogError.releasesUnavailable
+        try await retry(with: .networkFetch) {
+            let request = HTTPRequest(
+                method: .get,
+                url: releasesURL,
+                headerFields: [.accept: "application/vnd.github+json"]
+            )
+            let (data, response) = try await session.data(for: request)
+            guard response.status == .ok else {
+                let error = PebbleOSFirmwareCatalogError.releasesUnavailable
+                throw response.status.isWorthAnotherAttempt ? error : NotRetryable(error)
+            }
+            let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
+            guard let asset = Self.asset(for: board, in: release.assets) else {
+                // The release is published and has no package for this board.
+                // Asking again returns the same list.
+                throw NotRetryable(PebbleOSFirmwareCatalogError.noFirmwareForBoard(board))
+            }
+            return PebbleOSFirmwareRelease(
+                versionTag: release.tagName,
+                board: board,
+                downloadURL: asset.browserDownloadURL,
+                sizeInBytes: asset.size,
+                releaseNotesURL: release.htmlURL
+            )
         }
-        let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
-        guard let asset = Self.asset(for: board, in: release.assets) else {
-            throw PebbleOSFirmwareCatalogError.noFirmwareForBoard(board)
-        }
-        return PebbleOSFirmwareRelease(
-            versionTag: release.tagName,
-            board: board,
-            downloadURL: asset.browserDownloadURL,
-            sizeInBytes: asset.size,
-            releaseNotesURL: release.htmlURL
-        )
     }
 
     /// Picks the package that covers every slot of a board.
@@ -93,13 +99,20 @@ public struct PebbleOSFirmwareCatalog: Sendable {
     /// Fetches a release and keeps it, so it can be installed later — on a
     /// watch that is not here yet, or after a first attempt stopped.
     public func download(_ release: PebbleOSFirmwareRelease) async throws -> DownloadedFirmware {
-        let temporaryURL: URL
-        do {
-            temporaryURL = try await downloadFile(from: release.downloadURL, using: session)
-        } catch HTTPFileDownloadError.insecureURL {
-            throw PebbleOSFirmwareCatalogError.insecureURL
-        } catch {
-            throw PebbleOSFirmwareCatalogError.releasesUnavailable
+        let temporaryURL = try await retry(with: .networkFetch) {
+            do {
+                return try await downloadFile(from: release.downloadURL, using: session)
+            } catch HTTPFileDownloadError.insecureURL {
+                throw NotRetryable(PebbleOSFirmwareCatalogError.insecureURL)
+            } catch let error as HTTPFileDownloadError {
+                throw error.isWorthAnotherAttempt
+                    ? PebbleOSFirmwareCatalogError.releasesUnavailable
+                    : NotRetryable(PebbleOSFirmwareCatalogError.releasesUnavailable)
+            } catch {
+                // A dropped link mid-download; the file is megabytes, so this
+                // is the failure most worth another attempt.
+                throw PebbleOSFirmwareCatalogError.releasesUnavailable
+            }
         }
         let directory = try Self.downloadDirectory()
         let output = directory

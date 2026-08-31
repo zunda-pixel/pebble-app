@@ -4,6 +4,7 @@ import HTTPTypes
 import HTTPTypesFoundation
 import CryptoKit
 import MemberwiseInit
+import Retry
 
 /// The remote catalog of installable applications.
 @MemberwiseInit(.public)
@@ -115,13 +116,18 @@ public actor PebbleAppCatalog {
     }
 
     public func download(_ application: PebbleCatalogApplication) async throws -> URL {
-        let temporaryURL: URL
-        do {
-            temporaryURL = try await downloadFile(from: application.downloadURL, using: session)
-        } catch HTTPFileDownloadError.insecureURL {
-            throw AppCatalogError.insecureURL
-        } catch {
-            throw AppCatalogError.invalidResponse
+        let temporaryURL = try await retry(with: .networkFetch) {
+            do {
+                return try await downloadFile(from: application.downloadURL, using: session)
+            } catch HTTPFileDownloadError.insecureURL {
+                throw NotRetryable(AppCatalogError.insecureURL)
+            } catch let error as HTTPFileDownloadError {
+                throw error.isWorthAnotherAttempt
+                    ? AppCatalogError.invalidResponse
+                    : NotRetryable(AppCatalogError.invalidResponse)
+            } catch {
+                throw AppCatalogError.invalidResponse
+            }
         }
         let attributes = try FileManager.default.attributesOfItem(atPath: temporaryURL.path)
         guard (attributes[.size] as? NSNumber)?.intValue ?? 0 <= 64 * 1_024 * 1_024 else {
@@ -159,12 +165,19 @@ public actor PebbleAppCatalog {
     }
 
     private func responseData(from url: URL) async throws -> Data {
-        let request = HTTPRequest(method: .get, url: url, headerFields: [.accept: "application/json"])
-        let (data, response) = try await session.data(for: request)
-        guard response.status == .ok, data.count <= 20 * 1_024 * 1_024 else {
-            throw AppCatalogError.invalidResponse
+        try await retry(with: .networkFetch) {
+            let request = HTTPRequest(method: .get, url: url, headerFields: [.accept: "application/json"])
+            let (data, response) = try await session.data(for: request)
+            guard response.status == .ok else {
+                let error = AppCatalogError.invalidResponse
+                throw response.status.isWorthAnotherAttempt ? error : NotRetryable(error)
+            }
+            guard data.count <= 20 * 1_024 * 1_024 else {
+                // The feed is this size on purpose; it will be next time too.
+                throw NotRetryable(AppCatalogError.invalidResponse)
+            }
+            return data
         }
-        return data
     }
 }
 
