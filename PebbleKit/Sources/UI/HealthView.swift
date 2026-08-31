@@ -1,6 +1,7 @@
 import SwiftUI
 import API
 import Charts
+import UniformTypeIdentifiers
 
 struct HealthView: View {
     var model: AppModel

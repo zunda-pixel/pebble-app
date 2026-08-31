@@ -2,7 +2,7 @@ import Algorithms
 import API
 import AsyncAlgorithms
 import EventKit
-import Foundation
+public import Foundation
 import Retry
 import SwiftUI
 

@@ -1,5 +1,5 @@
 import API
-import Foundation
+public import Foundation
 import SwiftUI
 
 /// Health samples, and their exchange with HealthKit.

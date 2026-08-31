@@ -1,5 +1,5 @@
 public import SwiftUI
-import API
+public import API
 
 /// How the protocol layer's types read on screen. Those types have no string
 /// catalog of their own, so they name their cases for the logs and leave the

@@ -1,4 +1,4 @@
-import API
+public import API
 import AsyncOperations
 import Foundation
 import SwiftUI

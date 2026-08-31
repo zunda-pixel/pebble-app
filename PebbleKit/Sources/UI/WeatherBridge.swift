@@ -1,6 +1,6 @@
 import API
 import CoreLocation
-import Foundation
+public import Foundation
 import WeatherKit
 
 /// Where a forecast is wanted: the phone's own position, or a place the reader

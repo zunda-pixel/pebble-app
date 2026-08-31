@@ -1,5 +1,7 @@
 import API
-import Defaults
+// The conformances at the bottom are on public types, so the protocol they
+// conform to has to be as visible as they are.
+public import Defaults
 import Foundation
 
 /// Every preference the app stores, in one place and with its type.

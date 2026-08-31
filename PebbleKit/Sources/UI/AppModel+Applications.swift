@@ -1,8 +1,8 @@
 import Algorithms
-import API
+public import API
 import AsyncOperations
 import Defaults
-import Foundation
+public import Foundation
 import Retry
 import SwiftUI
 

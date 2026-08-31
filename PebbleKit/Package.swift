@@ -2,6 +2,18 @@
 
 import PackageDescription
 
+let swiftSettings: [SwiftSetting] = [
+  .enableUpcomingFeature("ExistentialAny"),
+  .enableUpcomingFeature("InternalImportsByDefault"),
+  .enableUpcomingFeature("MemberImportVisibility"),
+  .enableUpcomingFeature("InferIsolatedConformances"),
+  .enableUpcomingFeature("ImmutableWeakCaptures"),
+  .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
+  .defaultIsolation(nil),
+  .strictMemorySafety(),
+  .treatAllWarnings(as: .error),
+]
+
 let package = Package(
   name: "PebbleKit",
   defaultLocalization: "en",
@@ -38,7 +50,8 @@ let package = Package(
         .product(name: "Defaults", package: "Defaults"),
         .product(name: "DMRetry", package: "swift-retry"),
         .product(name: "Valet", package: "Valet"),
-      ]
+      ],
+      swiftSettings: swiftSettings
     ),
     .target(
       name: "API",
@@ -51,16 +64,7 @@ let package = Package(
         .product(name: "MemberwiseInit", package: "swift-memberwise-init-macro"),
         .product(name: "ZIPFoundation", package: "ZIPFoundation"),
       ],
-      swiftSettings: [
-        .enableUpcomingFeature("ExistentialAny"),
-        .enableUpcomingFeature("InternalImportsByDefault"),
-        .enableUpcomingFeature("MemberImportVisibility"),
-        .enableUpcomingFeature("InferIsolatedConformances"),
-        .enableUpcomingFeature("ImmutableWeakCaptures"),
-        .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
-        .defaultIsolation(nil),
-        .strictMemorySafety(),
-      ],
+      swiftSettings: swiftSettings
     ),
     .testTarget(
       name: "APITests",
@@ -68,16 +72,7 @@ let package = Package(
         "API",
         .product(name: "HTTPTypes", package: "swift-http-types"),
       ],
-      swiftSettings: [
-        .enableUpcomingFeature("ExistentialAny"),
-        .enableUpcomingFeature("InternalImportsByDefault"),
-        .enableUpcomingFeature("MemberImportVisibility"),
-        .enableUpcomingFeature("InferIsolatedConformances"),
-        .enableUpcomingFeature("ImmutableWeakCaptures"),
-        .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
-        .defaultIsolation(nil),
-        .strictMemorySafety(),
-      ],
+      swiftSettings: swiftSettings
     ),
     .testTarget(
       name: "UITests",
@@ -86,16 +81,7 @@ let package = Package(
         "API",
         .product(name: "ZIPFoundation", package: "ZIPFoundation"),
       ],
-      swiftSettings: [
-        .enableUpcomingFeature("ExistentialAny"),
-        .enableUpcomingFeature("InternalImportsByDefault"),
-        .enableUpcomingFeature("MemberImportVisibility"),
-        .enableUpcomingFeature("InferIsolatedConformances"),
-        .enableUpcomingFeature("ImmutableWeakCaptures"),
-        .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
-        .defaultIsolation(nil),
-        .strictMemorySafety(),
-      ],
+      swiftSettings: swiftSettings
     ),
   ],
   swiftLanguageModes: [.v6]

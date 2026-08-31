@@ -1,5 +1,5 @@
-import API
-import Foundation
+public import API
+public import Foundation
 import Retry
 import SwiftUI
 

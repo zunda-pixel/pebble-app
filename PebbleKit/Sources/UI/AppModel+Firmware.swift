@@ -1,6 +1,6 @@
 import API
 import Defaults
-import Foundation
+public import Foundation
 import SwiftUI
 
 /// Choosing, downloading and transferring watch firmware.

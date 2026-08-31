@@ -1,6 +1,8 @@
 public import API
 import Foundation
-import Observation
+// `WatchConnection` is public and `@Observable`, so the conformance the macro
+// writes is public too, and the protocol behind it has to be visible with it.
+public import Observation
 
 public enum WatchConnectionPhase: Equatable, Sendable {
     case connected

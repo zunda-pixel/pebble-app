@@ -1,4 +1,4 @@
-import API
+public import API
 import Foundation
 #if os(iOS)
 import MediaPlayer

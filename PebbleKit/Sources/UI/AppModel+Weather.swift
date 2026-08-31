@@ -2,7 +2,7 @@ import API
 import CoreLocation
 import Defaults
 import MapKit
-import Foundation
+public import Foundation
 import SwiftUI
 
 /// The weather the watch shows in its own weather app.
