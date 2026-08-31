@@ -69,6 +69,22 @@
         }
       }
     },
+    "%@ did not accept the reminder. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ did not accept the reminder. %2$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“%@”がリマインダーを受け付けませんでした。%@"
+          }
+        }
+      }
+    },
     "%@ has no weather app, so nothing is sent to it." : {
       "localizations" : {
         "ja" : {
@@ -221,6 +237,16 @@
         }
       }
     },
+    "A reminder buzzes on the watch when its time comes, rather than waiting on the timeline. The watch keeps the ones near today and forgets the rest." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リマインダーは、タイムラインで待つのではなく、時間になるとウォッチが振動して知らせます。ウォッチは今日に近いものだけを保持し、残りは破棄します。"
+          }
+        }
+      }
+    },
     "A watch scan is already in progress." : {
       "localizations" : {
         "ja" : {
@@ -297,6 +323,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "アプリを追加"
+          }
+        }
+      }
+    },
+    "Add Reminder" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リマインダーを追加"
           }
         }
       }
@@ -2371,6 +2407,16 @@
         }
       }
     },
+    "Reminders" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リマインダー"
+          }
+        }
+      }
+    },
     "Remove" : {
       "localizations" : {
         "ja" : {
@@ -3403,6 +3449,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このウォッチはリカバリファームウェアで起動しています。セットアップを完了するには、ファームウェアをインストールしてください。"
+          }
+        }
+      }
+    },
+    "Time" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "時刻"
           }
         }
       }

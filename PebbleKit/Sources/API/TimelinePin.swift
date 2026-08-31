@@ -1,6 +1,15 @@
 public import Foundation
 import MemberwiseInit
 
+/// What a timeline item is, as the firmware numbers them. The number decides
+/// how the watch presents the item, and has to agree with the database it is
+/// filed in: a pin in the reminder database is neither one thing nor the other.
+public enum PebbleTimelineItemType: UInt8, Codable, Equatable, Sendable {
+    case notification = 1
+    case pin = 2
+    case reminder = 3
+}
+
 @MemberwiseInit(.public)
 public struct PebbleTimelinePin: Codable, Equatable, Identifiable, Sendable {
     public var id: UUID = UUID()
@@ -11,6 +20,9 @@ public struct PebbleTimelinePin: Codable, Equatable, Identifiable, Sendable {
     public var subtitle: String?
     public var body: String?
     public var isAllDay: Bool = false
+    /// Whether the watch shows this as a pin on the timeline or as a reminder,
+    /// which is a different database and a different presentation.
+    public var kind: PebbleTimelineItemType = .pin
 
     public func encoded() throws -> [UInt8] {
         var attributes = [textAttribute(id: 0x01, value: title, limit: 64)]
@@ -24,7 +36,7 @@ public struct PebbleTimelinePin: Codable, Equatable, Identifiable, Sendable {
         bytes += BlobDBCodec.uuidBytes(parentApplicationID)
         bytes += UInt32(seconds).littleEndianBytes
         bytes += durationMinutes.littleEndianBytes
-        bytes.append(0x02)
+        bytes.append(kind.rawValue)
         bytes += UInt16(isAllDay ? 1 << 2 : 0).littleEndianBytes
         bytes.append(0x01)
         bytes += length.littleEndianBytes
@@ -41,13 +53,40 @@ public struct PebbleTimelinePin: Codable, Equatable, Identifiable, Sendable {
 }
 
 public enum TimelinePinCodec {
-    public static var databaseID: UInt8 { 0x03 }
+    /// Pins live in their own database. They were being written to the
+    /// reminder database, which stores them but shows them as something else.
+    public static var databaseID: UInt8 { 0x01 }
 
     public static func insertFrame(_ pin: PebbleTimelinePin, token: UInt16) throws -> PebbleProtocolFrame {
         BlobDBCodec.insertFrame(
             databaseID: databaseID,
             key: BlobDBCodec.uuidBytes(pin.id),
             value: try pin.encoded(),
+            token: token
+        )
+    }
+
+    public static func deleteFrame(id: UUID, token: UInt16) -> PebbleProtocolFrame {
+        BlobDBCodec.deleteFrame(databaseID: databaseID, key: BlobDBCodec.uuidBytes(id), token: token)
+    }
+}
+
+/// A reminder is the same item in a database of its own: the watch keeps a
+/// window of them around the present and shows each one when its time comes,
+/// rather than listing it on the timeline.
+public enum TimelineReminderCodec {
+    public static var databaseID: UInt8 { 0x03 }
+
+    public static func insertFrame(
+        _ reminder: PebbleTimelinePin,
+        token: UInt16
+    ) throws -> PebbleProtocolFrame {
+        var reminder = reminder
+        reminder.kind = .reminder
+        return BlobDBCodec.insertFrame(
+            databaseID: databaseID,
+            key: BlobDBCodec.uuidBytes(reminder.id),
+            value: try reminder.encoded(),
             token: token
         )
     }

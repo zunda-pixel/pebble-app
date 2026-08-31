@@ -58,6 +58,10 @@ public final class AppModel {
     public internal(set) var watchManagementErrorMessage: LocalizedStringKey?
     public internal(set) var watchResetStatusMessage: LocalizedStringKey?
     public internal(set) var timelinePins: [PebbleTimelinePin] = []
+    /// Reminders the watch buzzes for at a set time, kept apart from pins
+    /// because the watch files them separately and shows them differently.
+    public internal(set) var reminders: [PebbleTimelinePin] = []
+    public internal(set) var reminderStatusMessage: LocalizedStringKey?
     public internal(set) var healthSamples: [PebbleHealthSample] = []
     public internal(set) var catalogApplications: [PebbleCatalogApplication] = []
     public internal(set) var catalogLastUpdated: Date?
@@ -137,6 +141,11 @@ public final class AppModel {
     let applicationLibrary: PebbleApplicationLibrary
     let watchLibrary: PebbleWatchLibrary
     let timelineLibrary = TimelinePinLibrary()
+    /// Reminders live beside the pins, in a file of their own so the two lists
+    /// cannot overwrite each other.
+    let reminderLibrary = TimelinePinLibrary(
+        fileURL: URL.applicationSupportDirectory.appending(path: "Pebble/reminders.json")
+    )
     let healthLibrary = PebbleHealthLibrary()
     let appCatalog = PebbleAppCatalog()
     let languagePackCatalog = PebbleLanguagePackCatalog()
@@ -478,6 +487,7 @@ public final class AppModel {
         await flushPendingNotifications()
         await flushPendingAppMessages()
         await synchronizeTimeline()
+        await synchronizeReminders(on: connection)
         await sendWeather(to: connection)
         await requestHealthSync(on: connection)
         await resumePendingFirmwareUpdate(on: connection)

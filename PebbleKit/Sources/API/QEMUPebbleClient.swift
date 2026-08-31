@@ -192,6 +192,14 @@ public final class QEMUPebbleClient: PebbleClient {
         throw BlobDBClientError.rejected(.notSupported)
     }
 
+    public func upsertTimelineReminder(_ reminder: PebbleTimelinePin) async throws {
+        try await send(try TimelineReminderCodec.insertFrame(reminder, token: 1))
+    }
+
+    public func deleteTimelineReminder(id: UUID) async throws {
+        try await send(TimelineReminderCodec.deleteFrame(id: id, token: 1))
+    }
+
     public func writeWeather(_ report: PebbleWeatherReport) async throws {
         throw BlobDBClientError.rejected(.notSupported)
     }

@@ -90,6 +90,10 @@ public protocol PebbleClient: Sendable {
     func sendNotification(_ notification: PebbleTimelineNotification) async throws
     func upsertTimelinePin(_ pin: PebbleTimelinePin) async throws
     func deleteTimelinePin(id: UUID) async throws
+    /// Writes a reminder, which the watch shows when its time comes rather
+    /// than listing on the timeline.
+    func upsertTimelineReminder(_ reminder: PebbleTimelinePin) async throws
+    func deleteTimelineReminder(id: UUID) async throws
     func launchApplication(id: UUID) async throws
     func installApplicationObject(
         _ bytes: [UInt8],

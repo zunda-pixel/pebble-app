@@ -340,6 +340,29 @@ struct CompanionStorageTests {
         #expect(try TimelinePinCodec.insertFrame(pin, token: 1).endpoint == BlobDBCodec.endpoint)
     }
 
+    @Test func aReminderGoesToItsOwnDatabaseAsItsOwnKindOfItem() throws {
+        let reminder = PebbleTimelinePin(
+            parentApplicationID: UUID(),
+            timestamp: Date(timeIntervalSince1970: 0x66000000),
+            title: "Tea",
+            subtitle: nil,
+            body: nil
+        )
+
+        let pin = try TimelinePinCodec.insertFrame(reminder, token: 1)
+        let alarm = try TimelineReminderCodec.insertFrame(reminder, token: 1)
+
+        // Pins and reminders are the same record in different databases, and
+        // the type byte has to agree with the database it is filed in.
+        #expect(pin.payload[3] == 0x01)
+        #expect(alarm.payload[3] == 0x03)
+        // Past the header and the record's own identifiers: key, value length,
+        // then the item's id, its app's id, the time and the duration.
+        let typeIndex = 5 + 16 + 2 + 16 + 16 + 4 + 2
+        #expect(pin.payload[typeIndex] == PebbleTimelineItemType.pin.rawValue)
+        #expect(alarm.payload[typeIndex] == PebbleTimelineItemType.reminder.rawValue)
+    }
+
     @Test func healthLibraryPersistsSamples() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         let url = directory.appending(path: "health.json")

@@ -386,6 +386,18 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
     }
 
+    public func upsertTimelineReminder(_ reminder: PebbleTimelinePin) async throws {
+        try await performBlobDBOperation(acceptedStatuses: [.success]) { token in
+            try TimelineReminderCodec.insertFrame(reminder, token: token)
+        }
+    }
+
+    public func deleteTimelineReminder(id: UUID) async throws {
+        try await performBlobDBOperation(acceptedStatuses: [.success, .keyDoesNotExist]) { token in
+            TimelineReminderCodec.deleteFrame(id: id, token: token)
+        }
+    }
+
     public func launchApplication(id: UUID) async throws {
         try await send(AppRunStateCodec.startFrame(applicationID: id))
     }
