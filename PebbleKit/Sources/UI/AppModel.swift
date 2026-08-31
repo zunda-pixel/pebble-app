@@ -62,6 +62,14 @@ public final class AppModel {
     /// because the watch files them separately and shows them differently.
     public internal(set) var reminders: [PebbleTimelinePin] = []
     public internal(set) var reminderStatusMessage: LocalizedStringKey?
+    /// The watch's own settings, kept by the phone and written on every
+    /// connection. Keyed by name so a setting the app stops offering does not
+    /// strand a stored value.
+    public internal(set) var watchSettings: [String: Bool] = [:]
+    public internal(set) var activitySettings = PebbleActivitySettings()
+    public internal(set) var heartRateSettings = PebbleHeartRateSettings()
+    public internal(set) var isReminderAppEnabled = true
+    public internal(set) var watchSettingsStatusMessage: LocalizedStringKey?
     public internal(set) var healthSamples: [PebbleHealthSample] = []
     public internal(set) var catalogApplications: [PebbleCatalogApplication] = []
     public internal(set) var catalogLastUpdated: Date?
@@ -228,6 +236,7 @@ public final class AppModel {
         firmwareUpdateJournal = try? await pendingFirmwareUpdateLibrary.journal()
         loadDownloadedFirmware()
         loadWeatherPlaces()
+        loadWatchSettings()
         notificationSourceApps = (try? await notificationSourceAppLibrary.apps()) ?? []
         musicCoordinator.start()
         phoneCallCoordinator.start()
@@ -488,6 +497,7 @@ public final class AppModel {
         await flushPendingAppMessages()
         await synchronizeTimeline()
         await synchronizeReminders(on: connection)
+        await synchronizeWatchSettings(on: connection)
         await sendWeather(to: connection)
         await requestHealthSync(on: connection)
         await resumePendingFirmwareUpdate(on: connection)

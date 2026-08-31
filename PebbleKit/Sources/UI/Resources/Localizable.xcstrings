@@ -85,6 +85,22 @@
         }
       }
     },
+    "%@ did not accept the setting. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ did not accept the setting. %2$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“%@”が設定を受け付けませんでした。%@"
+          }
+        }
+      }
+    },
     "%@ has no weather app, so nothing is sent to it." : {
       "localizations" : {
         "ja" : {
@@ -217,6 +233,16 @@
         }
       }
     },
+    "24-Hour Clock" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "24時間表示"
+          }
+        }
+      }
+    },
     "A PBL pack built for this watch's board. A pack built for another board installs but shows the wrong glyphs." : {
       "localizations" : {
         "ja" : {
@@ -267,6 +293,16 @@
         }
       }
     },
+    "About You" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "身体情報"
+          }
+        }
+      }
+    },
     "Activate" : {
       "localizations" : {
         "ja" : {
@@ -283,6 +319,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "適用中"
+          }
+        }
+      }
+    },
+    "Activity Insights" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アクティビティのインサイト"
           }
         }
       }
@@ -363,6 +409,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "現在地か、気にしている場所を追加してください。"
+          }
+        }
+      }
+    },
+    "Age: %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "年齢: %@歳"
           }
         }
       }
@@ -503,6 +559,36 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このPebbleの自動再接続情報が削除されます。"
+          }
+        }
+      }
+    },
+    "Backlight" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "バックライト"
+          }
+        }
+      }
+    },
+    "Backlight on Wrist Flick" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "手首を返してバックライト点灯"
+          }
+        }
+      }
+    },
+    "Backlight Only in the Dark" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "暗い場所でのみバックライト点灯"
           }
         }
       }
@@ -713,6 +799,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "摂氏"
+          }
+        }
+      }
+    },
+    "Changes are kept and written when the watch connects." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "変更内容は保存され、ウォッチが接続したときに書き込まれます。"
           }
         }
       }
@@ -977,6 +1073,16 @@
         }
       }
     },
+    "Continuous" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "常時"
+          }
+        }
+      }
+    },
     "Current Location" : {
       "localizations" : {
         "ja" : {
@@ -1213,6 +1319,26 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチを消去"
+          }
+        }
+      }
+    },
+    "Every 5 Minutes" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "5分ごと"
+          }
+        }
+      }
+    },
+    "Every 10 Minutes" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "10分ごと"
           }
         }
       }
@@ -1523,6 +1649,26 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "“ヘルスケア”のデータを読み込んで重複を除去しました。"
+          }
+        }
+      }
+    },
+    "Heart Rate" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "心拍数"
+          }
+        }
+      }
+    },
+    "Height: %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "身長: %@"
           }
         }
       }
@@ -1847,6 +1993,16 @@
         }
       }
     },
+    "Menus Wrap Around" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "メニューのループスクロール"
+          }
+        }
+      }
+    },
     "Minutes" : {
       "localizations" : {
         "ja" : {
@@ -1873,6 +2029,26 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "月"
+          }
+        }
+      }
+    },
+    "Music: Progress Bar" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ミュージック: プログレスバー"
+          }
+        }
+      }
+    },
+    "Music: Volume Controls" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ミュージック: 音量コントロール"
           }
         }
       }
@@ -2317,6 +2493,26 @@
         }
       }
     },
+    "Read During Activity" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アクティビティ中の測定"
+          }
+        }
+      }
+    },
+    "Reading" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "測定頻度"
+          }
+        }
+      }
+    },
     "Received %lld health update(s) from the watch." : {
       "localizations" : {
         "ja" : {
@@ -2413,6 +2609,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "リマインダー"
+          }
+        }
+      }
+    },
+    "Reminders App" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リマインダーアプリ"
           }
         }
       }
@@ -2687,12 +2893,32 @@
         }
       }
     },
+    "Sleep Insights" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "睡眠のインサイト"
+          }
+        }
+      }
+    },
     "Sort" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "並べ替え"
+          }
+        }
+      }
+    },
+    "Standby Mode" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "スタンバイモード"
           }
         }
       }
@@ -3393,12 +3619,32 @@
         }
       }
     },
+    "The watch works out calories and distance from these. They are sent as one record, so all of them are written together." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチはこれらの値からカロリーと距離を算出します。1つのレコードとして送信されるため、すべてまとめて書き込まれます。"
+          }
+        }
+      }
+    },
     "The watchface could not be activated." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチフェイスを使用できませんでした。"
+          }
+        }
+      }
+    },
+    "These are the watch's own settings. They are written again whenever it connects, so this is the copy that wins." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "これらはウォッチ本体の設定です。接続するたびに書き込まれるため、こちらの内容が優先されます。"
           }
         }
       }
@@ -3513,6 +3759,16 @@
         }
       }
     },
+    "Timeline Quick View" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "タイムラインクイックビュー"
+          }
+        }
+      }
+    },
     "Title" : {
       "localizations" : {
         "ja" : {
@@ -3539,6 +3795,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "市区町村"
+          }
+        }
+      }
+    },
+    "Track Activity" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アクティビティの記録"
           }
         }
       }
@@ -3589,6 +3855,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "Pebbleの電源を入れて、近くに置いてください。"
+          }
+        }
+      }
+    },
+    "Turns the watch's own Reminders app on, which is where the reminders added on the Timeline screen appear." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチ本体のリマインダーアプリを有効にします。“タイムライン”画面で追加したリマインダーは、このアプリに表示されます。"
           }
         }
       }
@@ -3803,6 +4079,16 @@
         }
       }
     },
+    "Watch Settings" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチ設定"
+          }
+        }
+      }
+    },
     "Watchfaces" : {
       "localizations" : {
         "ja" : {
@@ -3839,6 +4125,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "週"
+          }
+        }
+      }
+    },
+    "Weight: %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "体重: %@"
           }
         }
       }

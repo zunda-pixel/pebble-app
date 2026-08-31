@@ -212,6 +212,27 @@ public final class QEMUPebbleClient: PebbleClient {
         throw BlobDBClientError.rejected(.notSupported)
     }
 
+    public func writeWatchSetting(_ setting: WatchSetting, isOn: Bool) async throws {
+        try await send(WatchSettingsCodec.insertFrame(setting, isOn: isOn, token: 1))
+    }
+
+    public func writeActivitySettings(_ settings: PebbleActivitySettings) async throws {
+        try await send(HealthSettingsCodec.insertFrame(settings, token: 1))
+    }
+
+    public func writeHeartRateSettings(_ settings: PebbleHeartRateSettings) async throws {
+        try await send(HealthSettingsCodec.insertFrame(settings, token: 1))
+    }
+
+    public func writeHealthDay(_ day: PebbleHealthDay) async throws {
+        try await send(HealthStatsCodec.movementFrame(for: day, token: 1))
+        try await send(HealthStatsCodec.sleepFrame(for: day, token: 2))
+    }
+
+    public func writeReminderAppState(_ state: PebbleReminderAppState) async throws {
+        try await send(WeatherCodec.reminderAppFrame(state: state, token: 1))
+    }
+
     public func installFile(_ bytes: [UInt8], filename: String) async throws {
         // The emulator has no filesystem the app can write into.
         throw PutBytesTransferError.invalidConfiguration

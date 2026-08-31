@@ -535,6 +535,39 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
     }
 
+    public func writeWatchSetting(_ setting: WatchSetting, isOn: Bool) async throws {
+        try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
+            WatchSettingsCodec.insertFrame(setting, isOn: isOn, token: token)
+        }
+    }
+
+    public func writeActivitySettings(_ settings: PebbleActivitySettings) async throws {
+        try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
+            HealthSettingsCodec.insertFrame(settings, token: token)
+        }
+    }
+
+    public func writeHeartRateSettings(_ settings: PebbleHeartRateSettings) async throws {
+        try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
+            HealthSettingsCodec.insertFrame(settings, token: token)
+        }
+    }
+
+    public func writeHealthDay(_ day: PebbleHealthDay) async throws {
+        try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
+            HealthStatsCodec.movementFrame(for: day, token: token)
+        }
+        try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
+            HealthStatsCodec.sleepFrame(for: day, token: token)
+        }
+    }
+
+    public func writeReminderAppState(_ state: PebbleReminderAppState) async throws {
+        try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
+            WeatherCodec.reminderAppFrame(state: state, token: token)
+        }
+    }
+
     public func writeWeatherLocationOrder(_ orderedIDs: [UUID]) async throws {
         try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
             WeatherCodec.preferencesFrame(orderedIDs: orderedIDs, token: token)

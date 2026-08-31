@@ -14,6 +14,11 @@ public final class MockPebbleClient: PebbleClient {
     public private(set) var writtenWeather: [PebbleWeatherReport] = []
     public private(set) var timelineReminders: [PebbleTimelinePin] = []
     public private(set) var writtenWeatherLocationOrder: [UUID] = []
+    public private(set) var writtenWatchSettings: [WatchSetting: Bool] = [:]
+    public private(set) var writtenActivitySettings: PebbleActivitySettings?
+    public private(set) var writtenHeartRateSettings: PebbleHeartRateSettings?
+    public private(set) var writtenHealthDays: [PebbleHealthDay] = []
+    public private(set) var writtenReminderAppState: PebbleReminderAppState?
     public private(set) var writtenNotificationSourceApps: [NotificationSourceApp] = []
     public private(set) var registeredApplications: [PebbleAppMetadata] = []
     public private(set) var unregisteredApplicationIDs: [UUID] = []
@@ -182,6 +187,27 @@ public final class MockPebbleClient: PebbleClient {
 
     public func writeWeatherLocationOrder(_ orderedIDs: [UUID]) async throws {
         writtenWeatherLocationOrder = orderedIDs
+    }
+
+    public func writeWatchSetting(_ setting: WatchSetting, isOn: Bool) async throws {
+        writtenWatchSettings[setting] = isOn
+    }
+
+    public func writeActivitySettings(_ settings: PebbleActivitySettings) async throws {
+        writtenActivitySettings = settings
+    }
+
+    public func writeHeartRateSettings(_ settings: PebbleHeartRateSettings) async throws {
+        writtenHeartRateSettings = settings
+    }
+
+    public func writeHealthDay(_ day: PebbleHealthDay) async throws {
+        writtenHealthDays.removeAll { $0.weekday == day.weekday }
+        writtenHealthDays.append(day)
+    }
+
+    public func writeReminderAppState(_ state: PebbleReminderAppState) async throws {
+        writtenReminderAppState = state
     }
 
     public func registerApplication(_ metadata: PebbleAppMetadata) async throws {

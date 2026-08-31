@@ -45,6 +45,35 @@ public extension HealthAnalysisPeriod {
     }
 }
 
+public extension WatchSetting {
+    /// What each setting is called on screen. The firmware's own names for
+    /// them are keys, not sentences.
+    var title: LocalizedStringKey {
+        switch self {
+        case .clock24Hour: "24-Hour Clock"
+        case .standbyMode: "Standby Mode"
+        case .backlight: "Backlight"
+        case .backlightAmbientSensor: "Backlight Only in the Dark"
+        case .backlightMotion: "Backlight on Wrist Flick"
+        case .timelineQuickView: "Timeline Quick View"
+        case .menuScrollWrapAround: "Menus Wrap Around"
+        case .musicShowVolumeControls: "Music: Volume Controls"
+        case .musicShowProgressBar: "Music: Progress Bar"
+        }
+    }
+}
+
+public extension PebbleHeartRateInterval {
+    var title: LocalizedStringKey {
+        switch self {
+        case .off: "Off"
+        case .everyTenMinutes: "Every 10 Minutes"
+        case .everyFiveMinutes: "Every 5 Minutes"
+        case .continuous: "Continuous"
+        }
+    }
+}
+
 public extension FirmwareUpdatePhase {
     var title: LocalizedStringKey {
         switch self {

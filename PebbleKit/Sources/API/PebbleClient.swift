@@ -119,6 +119,18 @@ public protocol PebbleClient: Sendable {
     /// Tells the weather app which locations to show, and in what order. A
     /// forecast the watch holds but this list does not name is not shown.
     func writeWeatherLocationOrder(_ orderedIDs: [UUID]) async throws
+    /// Changes one of the watch's own settings. Only the settings the firmware
+    /// lists as syncable are accepted.
+    func writeWatchSetting(_ setting: WatchSetting, isOn: Bool) async throws
+    /// Writes the watch's health tracking preferences, which the firmware
+    /// stores as one record and therefore takes whole.
+    func writeActivitySettings(_ settings: PebbleActivitySettings) async throws
+    func writeHeartRateSettings(_ settings: PebbleHeartRateSettings) async throws
+    /// Gives the watch's health app a day it did not see for itself.
+    func writeHealthDay(_ day: PebbleHealthDay) async throws
+    /// Turns the watch's Reminders app on, which is what makes a reminder
+    /// visible there rather than only buzzing.
+    func writeReminderAppState(_ state: PebbleReminderAppState) async throws
     func registerApplication(_ metadata: PebbleAppMetadata) async throws
     func unregisterApplication(applicationID: UUID) async throws
 }

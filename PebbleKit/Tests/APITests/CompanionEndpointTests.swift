@@ -241,6 +241,83 @@ struct PhoneVersionTests {
 
 @Suite
 @MainActor
+struct WatchSettingsTests {
+    @Test func aSettingIsWrittenAsOneByteUnderItsFirmwareName() {
+        let frame = WatchSettingsCodec.insertFrame(.clock24Hour, isOn: true, token: 0x0102)
+
+        #expect(frame.endpoint == BlobDBCodec.endpoint)
+        // The settings database, whose whitelist is keyed by the firmware's own
+        // preference names — with the terminator it writes them with.
+        #expect(frame.payload[3] == 0x0C)
+        #expect(Array(frame.payload[5..<(5 + 9)]) == Array("clock24h".utf8) + [0])
+        #expect(frame.payload[4] == 9)
+        #expect(Array(frame.payload.suffix(3)) == [0x01, 0x00, 0x01])
+    }
+
+    @Test func theActivityRecordMatchesTheFirmwareStruct() {
+        // `ActivitySettings`, packed: two little-endian int16s, three flags,
+        // then age and gender as signed bytes.
+        let settings = PebbleActivitySettings(
+            heightMillimetres: 1_750,
+            weightDecagrams: 7_250,
+            isTrackingEnabled: true,
+            areActivityInsightsEnabled: false,
+            areSleepInsightsEnabled: true,
+            ageYears: 34,
+            gender: 1
+        )
+
+        #expect(settings.encoded() == [0xD6, 0x06, 0x52, 0x1C, 0x01, 0x00, 0x01, 0x22, 0x01])
+        #expect(settings.encoded().count == 9)
+    }
+
+    @Test func theHeartRateRecordIsThreeBytes() {
+        let settings = PebbleHeartRateSettings(
+            isEnabled: true,
+            interval: .everyFiveMinutes,
+            isEnabledDuringActivity: false
+        )
+
+        #expect(settings.encoded() == [0x01, 0x02, 0x00])
+    }
+
+    @Test func aHealthDayIsKeyedByItsWeekdayAndMeasuredInWords() {
+        let day = PebbleHealthDay(
+            weekday: 1,
+            lastProcessed: Date(timeIntervalSince1970: 0x66000000),
+            steps: 8_000,
+            activeKilocalories: 0,
+            restingKilocalories: 0,
+            distanceMetres: 0,
+            activeSeconds: 0,
+            sleepSeconds: 25_200,
+            deepSleepSeconds: 0
+        )
+
+        #expect(HealthStatsCodec.movementKey(weekday: day.weekday) == "monday_movementData")
+        #expect(HealthStatsCodec.sleepKey(weekday: day.weekday) == "monday_sleepData")
+        // The firmware refuses a value whose length is not a multiple of four.
+        #expect(HealthStatsCodec.movementValue(for: day).count % 4 == 0)
+        #expect(HealthStatsCodec.sleepValue(for: day).count % 4 == 0)
+        #expect(HealthStatsCodec.movementValue(for: day).prefix(12) == [
+            0x01, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x66,
+            0x40, 0x1F, 0x00, 0x00,
+        ])
+        #expect(HealthStatsCodec.movementFrame(for: day, token: 1).payload[3] == 0x0A)
+    }
+
+    @Test func theRemindersAppIsTurnedOnThroughItsOwnPreference() {
+        let frame = WeatherCodec.reminderAppFrame(state: .enabled, token: 1)
+
+        #expect(frame.payload[3] == 9)
+        #expect(Array(frame.payload[5..<17]) == Array("remindersApp".utf8))
+        #expect(Array(frame.payload.suffix(1)) == [2])
+    }
+}
+
+@Suite
+@MainActor
 struct WeatherTests {
     private let report = PebbleWeatherReport(
         id: UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF")!,

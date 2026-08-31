@@ -334,6 +334,11 @@ struct WatchDetailView: View {
                         languageSummary
                     }
                 }
+                NavigationLink {
+                    WatchSettingsView(model: model, watchID: watchID)
+                } label: {
+                    Text("Watch Settings")
+                }
             }
             Section {
                 ConfirmingButton(

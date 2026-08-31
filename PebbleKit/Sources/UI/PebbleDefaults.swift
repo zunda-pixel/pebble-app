@@ -25,6 +25,19 @@ extension Defaults.Keys {
         default: Locale.current.measurementSystem == .us
     )
 
+    /// The watch's own settings as this phone last set them, so a watch that
+    /// connects can be brought back to what the reader chose.
+    static let watchSettings = Key<[String: Bool]>("watchSettings", default: [:])
+    static let activitySettings = Key<PebbleActivitySettings>(
+        "activitySettings",
+        default: PebbleActivitySettings()
+    )
+    static let heartRateSettings = Key<PebbleHeartRateSettings>(
+        "heartRateSettings",
+        default: PebbleHeartRateSettings()
+    )
+    static let reminderAppEnabled = Key<Bool>("reminderAppEnabled", default: true)
+
     /// Whether notifications raised by installed watch apps are delivered.
     static let companionNotificationsEnabled = Key<Bool>("companionNotificationsEnabled", default: true)
 
@@ -43,3 +56,5 @@ extension Defaults.Keys {
 
 extension DownloadedFirmware: Defaults.Serializable {}
 extension WeatherPlace: Defaults.Serializable {}
+extension PebbleActivitySettings: Defaults.Serializable {}
+extension PebbleHeartRateSettings: Defaults.Serializable {}
