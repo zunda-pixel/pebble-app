@@ -134,5 +134,11 @@ model. Watch apps (`.pbw`) match on platform.
 - If something cannot be implemented because Apple ships no public API for it,
   open a GitHub issue in Japanese naming the API and the code location, rather
   than leaving a workaround unexplained.
+- A bug found anywhere — in this app, in the firmware, in the official app —
+  gets a GitHub issue on `zunda-pixel/pebble-app`, in Japanese: what was
+  observed, where it comes from (file and function, cited in the reference
+  checkout), and the workaround in use here if there is one, with the code that
+  implements it. A bug that is only in a commit message is a bug nobody can
+  find. See issue #10 for the shape of one.
 - Commit messages describe the change and the reason for it in prose. Keep
   changes scoped to what was asked.
