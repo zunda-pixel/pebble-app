@@ -184,6 +184,14 @@ public final class QEMUPebbleClient: PebbleClient {
         try await send(AppRunStateCodec.startFrame(applicationID: id))
     }
 
+    public func writeNotificationSourceApp(_ app: NotificationSourceApp) async throws {
+        throw BlobDBClientError.rejected(.notSupported)
+    }
+
+    public func removeNotificationSourceApp(bundleID: String) async throws {
+        throw BlobDBClientError.rejected(.notSupported)
+    }
+
     public func writeWeather(_ report: PebbleWeatherReport) async throws {
         throw BlobDBClientError.rejected(.notSupported)
     }

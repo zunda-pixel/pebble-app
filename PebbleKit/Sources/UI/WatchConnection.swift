@@ -24,7 +24,6 @@ public final class WatchConnection: Identifiable {
     public private(set) var transferProgress: PutBytesTransferProgress?
 
     @ObservationIgnored var synchronizedNotificationAppRecords: [String: [UInt8]] = [:]
-    @ObservationIgnored var blobDBTokenCounter: UInt16 = 0x4000
     @ObservationIgnored private var needsPostReconnectSync = false
     @ObservationIgnored let voiceCoordinator: VoiceSessionCoordinator
     @ObservationIgnored private var eventsTask: Task<Void, Never>?

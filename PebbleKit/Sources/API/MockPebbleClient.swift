@@ -12,6 +12,7 @@ public final class MockPebbleClient: PebbleClient {
     public private(set) var installedFirmwarePackages: [PBZFirmwarePackage] = []
     public private(set) var installedFiles: [(bytes: [UInt8], filename: String)] = []
     public private(set) var writtenWeather: [PebbleWeatherReport] = []
+    public private(set) var writtenNotificationSourceApps: [NotificationSourceApp] = []
     public private(set) var registeredApplications: [PebbleAppMetadata] = []
     public private(set) var unregisteredApplicationIDs: [UUID] = []
     public private(set) var disconnectedDevices: [PebbleDevice] = []
@@ -148,6 +149,15 @@ public final class MockPebbleClient: PebbleClient {
 
     public func installFile(_ bytes: [UInt8], filename: String) async throws {
         installedFiles.append((bytes, filename))
+    }
+
+    public func writeNotificationSourceApp(_ app: NotificationSourceApp) async throws {
+        writtenNotificationSourceApps.removeAll { $0.bundleID == app.bundleID }
+        writtenNotificationSourceApps.append(app)
+    }
+
+    public func removeNotificationSourceApp(bundleID: String) async throws {
+        writtenNotificationSourceApps.removeAll { $0.bundleID == bundleID }
     }
 
     public func writeWeather(_ report: PebbleWeatherReport) async throws {

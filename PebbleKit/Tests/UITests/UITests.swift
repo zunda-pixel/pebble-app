@@ -402,6 +402,31 @@ struct UITests {
     }
 
     @Test
+    func aNotificationSettingIsOnlyRememberedOnceTheWatchTakesIt() async throws {
+        let client = MockPebbleClient()
+        let app = NotificationSourceApp(
+            bundleID: "com.example.chat",
+            displayName: "Chat",
+            muteState: .always,
+            stateUpdated: .now
+        )
+
+        try await client.writeNotificationSourceApp(app)
+        #expect(client.writtenNotificationSourceApps.map(\.bundleID) == ["com.example.chat"])
+
+        // The same app written again replaces its setting rather than adding
+        // a second record.
+        var muted = app
+        muted.muteState = .never
+        try await client.writeNotificationSourceApp(muted)
+        #expect(client.writtenNotificationSourceApps.count == 1)
+        #expect(client.writtenNotificationSourceApps.first?.muteState == .never)
+
+        try await client.removeNotificationSourceApp(bundleID: app.bundleID)
+        #expect(client.writtenNotificationSourceApps.isEmpty)
+    }
+
+    @Test
     func transferProgressStaysWithTheWatchItCameFrom() async throws {
         let scanner = MockPebbleClient()
         var connectionClients: [String: MockPebbleClient] = [:]

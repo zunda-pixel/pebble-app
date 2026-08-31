@@ -188,13 +188,20 @@ extension AppModel {
             guard connection.synchronizedNotificationAppRecords[app.bundleID] != value else {
                 continue
             }
-            connection.blobDBTokenCounter &+= 1
             do {
-                try await connection.client.send(
-                    NotificationAppsCodec.insertFrame(app: app, token: connection.blobDBTokenCounter)
-                )
+                // Awaited rather than posted and forgotten: the record is only
+                // recorded as synchronized once the watch says it took it, so
+                // a refusal is retried on the next pass instead of being
+                // remembered as done.
+                try await connection.client.writeNotificationSourceApp(app)
                 connection.synchronizedNotificationAppRecords[app.bundleID] = value
             } catch {
+                await PebbleDiagnostics.shared.record(
+                    .error,
+                    category: "notification",
+                    message: "\(connection.device.name) rejected the setting for \(app.displayName): "
+                        + String(reflecting: error)
+                )
                 return
             }
         }
@@ -224,11 +231,17 @@ extension AppModel {
         notificationSourceApps = (try? await notificationSourceAppLibrary.apps()) ?? apps
         for app in removed {
             for connection in activeConnections {
-                connection.blobDBTokenCounter &+= 1
                 connection.synchronizedNotificationAppRecords[app.bundleID] = nil
-                try? await connection.client.send(
-                    NotificationAppsCodec.deleteFrame(bundleID: app.bundleID, token: connection.blobDBTokenCounter)
-                )
+                do {
+                    try await connection.client.removeNotificationSourceApp(bundleID: app.bundleID)
+                } catch {
+                    await PebbleDiagnostics.shared.record(
+                        .error,
+                        category: "notification",
+                        message: "\(connection.device.name) kept \(app.displayName): "
+                            + String(reflecting: error)
+                    )
+                }
             }
         }
     }

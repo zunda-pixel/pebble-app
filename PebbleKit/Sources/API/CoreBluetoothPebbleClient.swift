@@ -503,6 +503,19 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
     }
 
+    public func writeNotificationSourceApp(_ app: NotificationSourceApp) async throws {
+        // A stale record means the watch already holds this app's setting.
+        try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
+            NotificationAppsCodec.insertFrame(app: app, token: token)
+        }
+    }
+
+    public func removeNotificationSourceApp(bundleID: String) async throws {
+        try await performBlobDBOperation(acceptedStatuses: [.success, .keyDoesNotExist]) { token in
+            NotificationAppsCodec.deleteFrame(bundleID: bundleID, token: token)
+        }
+    }
+
     public func writeWeather(_ report: PebbleWeatherReport) async throws {
         // A stale record means the watch already holds exactly this forecast.
         try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
