@@ -36,7 +36,12 @@ public final class AppModel {
     public internal(set) var applicationLibraryErrorMessage: LocalizedStringKey?
     public internal(set) var installingApplicationID: UUID?
     public internal(set) var installingApplicationName: String?
-    public internal(set) var installationProgress: PutBytesTransferProgress?
+    /// The watch an application is being transferred to, and the watch whose
+    /// firmware is being installed. Progress belongs to the connection it
+    /// arrives on; naming the watch each piece of work runs on is what keeps
+    /// one watch's transfer from being read as the other's.
+    var applicationTransferDeviceID: String?
+    var firmwareTransferDeviceID: String?
     public internal(set) var applicationManagementOperation: ApplicationManagementOperation?
     public internal(set) var applicationManagementStatusMessage: LocalizedStringKey?
     public internal(set) var isHandlingAppFetch = false
@@ -61,7 +66,6 @@ public final class AppModel {
     public internal(set) var firmwareUpdateStatusMessage: LocalizedStringKey?
     public internal(set) var firmwareUpdateJournal: FirmwareUpdateJournal?
     public internal(set) var firmwareRequiresConfirmation = false
-    public internal(set) var firmwareUpdateProgress: PutBytesTransferProgress?
     public internal(set) var availableFirmwareRelease: PebbleOSFirmwareRelease?
     /// Firmware already fetched from PebbleOS, waiting to be installed.
     public internal(set) var downloadedFirmware: DownloadedFirmware?
@@ -94,6 +98,20 @@ public final class AppModel {
 
     var activeConnections: [WatchConnection] {
         connections.filter(\.isConnected)
+    }
+
+    /// How far the application being sent to a watch has got. Nothing is
+    /// reported unless a transfer is running: `connection(for:)` falls back to
+    /// the first watch when given nothing, which is not an answer here.
+    public var installationProgress: PutBytesTransferProgress? {
+        guard let applicationTransferDeviceID else { return nil }
+        return connection(for: applicationTransferDeviceID)?.transferProgress
+    }
+
+    /// How far the firmware being installed on a watch has got.
+    public var firmwareUpdateProgress: PutBytesTransferProgress? {
+        guard let firmwareTransferDeviceID else { return nil }
+        return connection(for: firmwareTransferDeviceID)?.transferProgress
     }
 
     func connection(for deviceID: String?) -> WatchConnection? {
@@ -349,7 +367,7 @@ public final class AppModel {
         applicationManagementStatusMessage = nil
         installingApplicationID = nil
         installingApplicationName = nil
-        installationProgress = nil
+        applicationTransferDeviceID = nil
     }
 
     func handleEvent(_ event: PebbleClientEvent, from connection: WatchConnection) {
@@ -368,9 +386,11 @@ public final class AppModel {
             beginHandlingAppFetchRequest(request, from: connection)
         case .appMessageReceived(let message):
             Task { [weak self] in await self?.handleAppMessage(message, from: connection) }
-        case .transferProgress(let progress):
-            if firmwareUpdateTask != nil { firmwareUpdateProgress = progress }
-            else { installationProgress = progress }
+        case .transferProgress:
+            // The connection has already recorded it. Which transfer the bytes
+            // belong to follows from the watch they arrived from, not from
+            // whichever kind of work happens to be running somewhere.
+            break
         case .reconnecting:
             refreshConnectionState()
             needsApplicationSynchronization = true

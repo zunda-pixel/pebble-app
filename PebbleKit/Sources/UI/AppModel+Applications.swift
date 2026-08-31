@@ -438,11 +438,13 @@ extension AppModel {
         installingApplicationName = (watchApplications + watchfaces)
             .first { $0.id == request.applicationID }?
             .displayName
-        installationProgress = PutBytesTransferProgress(bytesSent: 0, totalBytes: 0)
+        applicationTransferDeviceID = connection.device.id
+        connection.beginTransfer()
         defer {
             installingApplicationID = nil
             installingApplicationName = nil
-            installationProgress = nil
+            applicationTransferDeviceID = nil
+            connection.endTransfer()
         }
 
         do {

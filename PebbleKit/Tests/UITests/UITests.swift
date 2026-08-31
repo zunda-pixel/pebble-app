@@ -338,6 +338,60 @@ struct UITests {
     }
 
     @Test
+    func transferProgressStaysWithTheWatchItCameFrom() async throws {
+        let scanner = MockPebbleClient()
+        var connectionClients: [String: MockPebbleClient] = [:]
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(
+            client: scanner,
+            applicationLibrary: library,
+            watchLibrary: watchLibrary,
+            clientFactory: { deviceID in
+                let client = MockPebbleClient()
+                connectionClients[deviceID] = client
+                return client
+            }
+        )
+
+        await model.scan()
+        let devices = model.discoveredDevices
+        let first = try #require(devices.first)
+        let second = try #require(devices.dropFirst().first)
+        await model.connect(to: first)
+        await model.connect(to: second)
+
+        // Firmware going onto one watch while an application goes onto another.
+        model.firmwareTransferDeviceID = first.id
+        model.applicationTransferDeviceID = second.id
+
+        connectionClients[second.id]?.emit(.transferProgress(
+            PutBytesTransferProgress(bytesSent: 30, totalBytes: 100)
+        ))
+        try await Task.sleep(for: .milliseconds(20))
+
+        // The application's bytes must not be read as the firmware's.
+        #expect(model.installationProgress == PutBytesTransferProgress(bytesSent: 30, totalBytes: 100))
+        #expect(model.firmwareUpdateProgress == nil)
+
+        connectionClients[first.id]?.emit(.transferProgress(
+            PutBytesTransferProgress(bytesSent: 4, totalBytes: 4096)
+        ))
+        try await Task.sleep(for: .milliseconds(20))
+
+        #expect(model.firmwareUpdateProgress == PutBytesTransferProgress(bytesSent: 4, totalBytes: 4096))
+        #expect(model.installationProgress == PutBytesTransferProgress(bytesSent: 30, totalBytes: 100))
+
+        // Nothing is reported once the work that owned the transfer is over.
+        model.firmwareTransferDeviceID = nil
+        model.applicationTransferDeviceID = nil
+        #expect(model.firmwareUpdateProgress == nil)
+        #expect(model.installationProgress == nil)
+    }
+
+    @Test
     func connectingToTheConnectedWatchIsANoOp() async throws {
         let client = MockPebbleClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)

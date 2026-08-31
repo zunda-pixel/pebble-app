@@ -181,11 +181,16 @@ extension AppModel {
         try await pendingFirmwareUpdateLibrary.updatePhase(.transferring)
         firmwareUpdateJournal = try await pendingFirmwareUpdateLibrary.journal()
         firmwareUpdateStatusMessage = "Transferring verified firmware…"
-        firmwareUpdateProgress = nil
+        firmwareTransferDeviceID = connection.device.id
+        connection.beginTransfer()
         let client = connection.client
         let task = Task { try await client.installFirmware(package) }
         firmwareUpdateTask = task
-        defer { firmwareUpdateTask = nil }
+        defer {
+            firmwareUpdateTask = nil
+            firmwareTransferDeviceID = nil
+            connection.endTransfer()
+        }
         do {
             try await task.value
         } catch {

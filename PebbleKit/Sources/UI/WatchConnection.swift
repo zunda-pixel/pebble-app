@@ -17,6 +17,11 @@ public final class WatchConnection: Identifiable {
     public let client: any PebbleClient
     public private(set) var device: PebbleDevice
     public private(set) var phase: WatchConnectionPhase = .connected
+    /// How far the transfer running on this watch has got, whether it carries
+    /// an application or firmware. The watch is the thing doing the work, so
+    /// the count belongs to it; what the bytes are for is known to whatever
+    /// started the transfer.
+    public private(set) var transferProgress: PutBytesTransferProgress?
 
     @ObservationIgnored var synchronizedNotificationAppRecords: [String: [UInt8]] = [:]
     @ObservationIgnored var blobDBTokenCounter: UInt16 = 0x4000
@@ -74,17 +79,31 @@ public final class WatchConnection: Identifiable {
         case .deviceUpdated(let device):
             self.device = device
             phase = .connected
+        case .transferProgress(let progress):
+            transferProgress = progress
         case .reconnecting:
             phase = .reconnecting
             needsPostReconnectSync = true
             synchronizedNotificationAppRecords = [:]
+            transferProgress = nil
         case .disconnected(let error):
             phase = .disconnected(error)
             synchronizedNotificationAppRecords = [:]
+            transferProgress = nil
             voiceCoordinator.reset()
         default:
             break
         }
+    }
+
+    /// Starts counting a transfer from nothing, so a bar appears at once and
+    /// the count left by the last transfer is not mistaken for this one.
+    func beginTransfer() {
+        transferProgress = PutBytesTransferProgress(bytesSent: 0, totalBytes: 0)
+    }
+
+    func endTransfer() {
+        transferProgress = nil
     }
 
     /// Returns whether the watch just came back from a reconnect (and
