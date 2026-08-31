@@ -43,6 +43,22 @@
         }
       }
     },
+    "%@ did not accept the forecast. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ did not accept the forecast. %2$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”が予報を受け付けませんでした。%@"
+          }
+        }
+      }
+    },
     "%@ has no weather app, so nothing is sent to it." : {
       "localizations" : {
         "ja" : {

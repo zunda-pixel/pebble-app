@@ -75,10 +75,7 @@ extension AppModel {
         weatherReports.removeAll { $0.id == id }
         // The watch keeps what it was given until it is told otherwise.
         for connection in activeConnections where connection.device.supportsWeatherApp {
-            connection.blobDBTokenCounter &+= 1
-            try? await connection.client.send(
-                WeatherCodec.deleteFrame(id: id, token: connection.blobDBTokenCounter)
-            )
+            try? await connection.client.removeWeather(id: id)
         }
     }
 
@@ -144,12 +141,19 @@ extension AppModel {
             return
         }
         for report in weatherReports {
-            connection.blobDBTokenCounter &+= 1
             do {
-                try await connection.client.send(
-                    WeatherCodec.insertFrame(report: report, token: connection.blobDBTokenCounter)
-                )
+                // The write is awaited rather than posted and forgotten: the
+                // watch answers every one, and a refusal — no weather app, a
+                // database that is full — is the difference between "sent" and
+                // "shown", which the reader is entitled to know about.
+                try await connection.client.writeWeather(report)
             } catch {
+                weatherStatusMessage = "\(connection.device.name) did not accept the forecast. \(error.localizedDescription)"
+                await PebbleDiagnostics.shared.record(
+                    .error,
+                    category: "weather",
+                    message: "\(connection.device.name) rejected \(report.locationName): \(String(reflecting: error))"
+                )
                 return
             }
         }

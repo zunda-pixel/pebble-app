@@ -503,6 +503,19 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
     }
 
+    public func writeWeather(_ report: PebbleWeatherReport) async throws {
+        // A stale record means the watch already holds exactly this forecast.
+        try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
+            WeatherCodec.insertFrame(report: report, token: token)
+        }
+    }
+
+    public func removeWeather(id: UUID) async throws {
+        try await performBlobDBOperation(acceptedStatuses: [.success, .keyDoesNotExist]) { token in
+            WeatherCodec.deleteFrame(id: id, token: token)
+        }
+    }
+
     private func performBlobDBOperation(
         acceptedStatuses: [BlobDBStatus],
         frame: (UInt16) throws -> PebbleProtocolFrame

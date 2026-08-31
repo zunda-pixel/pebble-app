@@ -104,6 +104,10 @@ public protocol PebbleClient: Sendable {
     /// `deviceUpdated` event, which is how a change the watch made — a new
     /// language pack, a firmware slot — becomes visible.
     func refreshDeviceInformation() async throws
+    /// Writes one location's forecast into the watch's weather database, and
+    /// waits for the watch to say whether it took it.
+    func writeWeather(_ report: PebbleWeatherReport) async throws
+    func removeWeather(id: UUID) async throws
     func registerApplication(_ metadata: PebbleAppMetadata) async throws
     func unregisterApplication(applicationID: UUID) async throws
 }

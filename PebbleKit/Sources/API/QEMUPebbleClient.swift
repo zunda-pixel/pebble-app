@@ -184,6 +184,14 @@ public final class QEMUPebbleClient: PebbleClient {
         try await send(AppRunStateCodec.startFrame(applicationID: id))
     }
 
+    public func writeWeather(_ report: PebbleWeatherReport) async throws {
+        throw BlobDBClientError.rejected(.notSupported)
+    }
+
+    public func removeWeather(id: UUID) async throws {
+        throw BlobDBClientError.rejected(.notSupported)
+    }
+
     public func installFile(_ bytes: [UInt8], filename: String) async throws {
         // The emulator has no filesystem the app can write into.
         throw PutBytesTransferError.invalidConfiguration
