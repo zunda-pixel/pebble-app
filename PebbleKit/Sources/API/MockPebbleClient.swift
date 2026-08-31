@@ -19,6 +19,9 @@ public final class MockPebbleClient: PebbleClient {
     public private(set) var writtenHeartRateSettings: PebbleHeartRateSettings?
     public private(set) var writtenHealthDays: [PebbleHealthDay] = []
     public private(set) var writtenReminderAppState: PebbleReminderAppState?
+    public private(set) var writtenContacts: [PebbleContact] = []
+    public private(set) var writtenSendTextContacts: [PebbleContact] = []
+    public private(set) var timelineActionResponses: [(itemID: UUID, succeeded: Bool, subtitle: String?)] = []
     public private(set) var writtenNotificationSourceApps: [NotificationSourceApp] = []
     public private(set) var registeredApplications: [PebbleAppMetadata] = []
     public private(set) var unregisteredApplicationIDs: [UUID] = []
@@ -208,6 +211,27 @@ public final class MockPebbleClient: PebbleClient {
 
     public func writeReminderAppState(_ state: PebbleReminderAppState) async throws {
         writtenReminderAppState = state
+    }
+
+    public func writeContact(_ contact: PebbleContact) async throws {
+        writtenContacts.removeAll { $0.id == contact.id }
+        writtenContacts.append(contact)
+    }
+
+    public func removeContact(id: UUID) async throws {
+        writtenContacts.removeAll { $0.id == id }
+    }
+
+    public func writeSendTextContacts(_ contacts: [PebbleContact]) async throws {
+        writtenSendTextContacts = contacts
+    }
+
+    public func respondToTimelineAction(
+        itemID: UUID,
+        succeeded: Bool,
+        subtitle: String?
+    ) async throws {
+        timelineActionResponses.append((itemID: itemID, succeeded: succeeded, subtitle: subtitle))
     }
 
     public func registerApplication(_ metadata: PebbleAppMetadata) async throws {

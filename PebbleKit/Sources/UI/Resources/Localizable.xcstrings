@@ -43,6 +43,16 @@
         }
       }
     },
+    "%@ did not accept the contact list." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“%@”が連絡先リストを受け付けませんでした。"
+          }
+        }
+      }
+    },
     "%@ did not accept the forecast. %@" : {
       "localizations" : {
         "en" : {
@@ -193,6 +203,16 @@
         }
       }
     },
+    "%lld chosen" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%lld人を選択中"
+          }
+        }
+      }
+    },
     "%lld dBm" : {
       "localizations" : {
         "ja" : {
@@ -219,6 +239,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld件の地点"
+          }
+        }
+      }
+    },
+    "%lld replies" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%lld件の返信"
           }
         }
       }
@@ -413,6 +443,16 @@
         }
       }
     },
+    "Address Book" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アドレスブック"
+          }
+        }
+      }
+    },
     "Age: %@" : {
       "localizations" : {
         "ja" : {
@@ -429,6 +469,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "すべて"
+          }
+        }
+      }
+    },
+    "Allow access to Contacts to choose who the watch can write to." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチがメッセージを送る相手を選ぶには、“連絡先”へのアクセスを許可してください。"
           }
         }
       }
@@ -723,6 +773,16 @@
         }
       }
     },
+    "Call me" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "電話ください"
+          }
+        }
+      }
+    },
     "Cancel" : {
       "localizations" : {
         "ja" : {
@@ -849,6 +909,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "“デバイス”を選択してから“スキャン”で接続します。"
+          }
+        }
+      }
+    },
+    "Chosen on the Watch" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチで選択した返信"
           }
         }
       }
@@ -1073,6 +1143,16 @@
         }
       }
     },
+    "Contacts" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "連絡先"
+          }
+        }
+      }
+    },
     "Continuous" : {
       "localizations" : {
         "ja" : {
@@ -1169,6 +1249,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "診断"
+          }
+        }
+      }
+    },
+    "Discard" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "破棄"
           }
         }
       }
@@ -1399,6 +1489,26 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチフェイスをお気に入りに追加"
+          }
+        }
+      }
+    },
+    "Favourite" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "お気に入り"
+          }
+        }
+      }
+    },
+    "Finish in the app" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "続きはアプリで"
           }
         }
       }
@@ -1673,6 +1783,16 @@
         }
       }
     },
+    "I'll call you later" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "あとで電話します"
+          }
+        }
+      }
+    },
     "Import" : {
       "localizations" : {
         "ja" : {
@@ -1903,6 +2023,16 @@
         }
       }
     },
+    "iOS has no way for an app to send a message on its own, so a reply picked on the watch waits here until it is sent from Messages." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "iOSではアプリが単独でメッセージを送信できないため、ウォッチで選択した返信は、“メッセージ”から送信されるまでここで待機します。"
+          }
+        }
+      }
+    },
     "It installs as soon as this watch connects." : {
       "localizations" : {
         "ja" : {
@@ -2093,6 +2223,26 @@
         }
       }
     },
+    "New Reply" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "新規返信"
+          }
+        }
+      }
+    },
+    "No" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "いいえ"
+          }
+        }
+      }
+    },
     "No Apps" : {
       "localizations" : {
         "ja" : {
@@ -2223,12 +2373,52 @@
         }
       }
     },
+    "OK" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "了解"
+          }
+        }
+      }
+    },
+    "On my way" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "今向かっています"
+          }
+        }
+      }
+    },
     "On the Watch" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチ上"
+          }
+        }
+      }
+    },
+    "Only people with a phone number are shown: the watch sends to a number." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "電話番号が登録されている人だけが表示されます。ウォッチは番号宛てに送信するためです。"
+          }
+        }
+      }
+    },
+    "Open in Messages" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“メッセージ”で開く"
           }
         }
       }
@@ -2493,6 +2683,16 @@
         }
       }
     },
+    "Read Contacts" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "連絡先を読み込む"
+          }
+        }
+      }
+    },
     "Read During Activity" : {
       "localizations" : {
         "ja" : {
@@ -2683,6 +2883,16 @@
         }
       }
     },
+    "Replies" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "返信"
+          }
+        }
+      }
+    },
     "Required to connect to Pebble" : {
       "localizations" : {
         "ja" : {
@@ -2809,6 +3019,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "テスト通知を送信"
+          }
+        }
+      }
+    },
+    "Send Text" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "テキスト送信"
           }
         }
       }
@@ -3089,6 +3309,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "その言語パックを読み込めませんでした。"
+          }
+        }
+      }
+    },
+    "The address book could not be read." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アドレスブックを読み込めませんでした。"
           }
         }
       }
@@ -3629,12 +3859,42 @@
         }
       }
     },
+    "The watch's Send Text app lists these. It hides itself when there are none." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチの“テキスト送信”アプリに、これらの返信が一覧表示されます。1つもないときは、アプリ自体が非表示になります。"
+          }
+        }
+      }
+    },
+    "The watch's Send Text app writes to the people chosen here, using one of these replies." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチの“テキスト送信”アプリは、ここで選んだ相手に、これらの返信のいずれかを送信します。"
+          }
+        }
+      }
+    },
     "The watchface could not be activated." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチフェイスを使用できませんでした。"
+          }
+        }
+      }
+    },
+    "These appear in the watch's Send Text app. A favourite is listed first." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "これらはウォッチの“テキスト送信”アプリに表示されます。お気に入りは先頭に並びます。"
           }
         }
       }
@@ -4145,6 +4405,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "Pebbleへようこそ"
+          }
+        }
+      }
+    },
+    "Yes" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "はい"
           }
         }
       }

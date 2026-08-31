@@ -241,6 +241,69 @@ struct PhoneVersionTests {
 
 @Suite
 @MainActor
+struct ContactsTests {
+    private func contact() -> PebbleContact {
+        PebbleContact(
+            id: UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF")!,
+            systemIdentifier: "ABC",
+            name: "Ann",
+            addresses: [
+                PebbleContactAddress(
+                    id: UUID(uuidString: "FFEEDDCC-BBAA-9988-7766-554433221100")!,
+                    kind: .phoneNumber,
+                    value: "+15551234",
+                    isFavourite: true
+                ),
+            ]
+        )
+    }
+
+    @Test func aContactCarriesItsAddressesAfterItsOwnAttributes() {
+        let value = ContactsCodec.value(for: contact())
+
+        #expect(Array(value.prefix(16)) == [
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+            0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF,
+        ])
+        // Flags, then how many attributes the contact has and how many
+        // addresses follow it.
+        #expect(Array(value[16..<22]) == [0, 0, 0, 0, 1, 1])
+        // The contact's name is a title; the number is an address attribute on
+        // an address of its own, headed by its id and its kind.
+        #expect(Array(value[22..<28]) == [1, 0x03, 0x00, 0x41, 0x6E, 0x6E])
+        #expect(Array(value[28..<44]) == [
+            0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88,
+            0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00,
+        ])
+        #expect(Array(value[44..<47]) == [1, 1, 39])
+        #expect(Array(value.suffix(12)) == [39, 0x09, 0x00] + Array("+15551234".utf8))
+    }
+
+    @Test func theSendTextListNamesAnAddressPerRow() {
+        let value = SendTextPrefsCodec.value(for: [contact()])
+
+        // The firmware refuses a list whose length is not one plus a whole
+        // number of thirty-three byte rows.
+        #expect(value.count == 1 + 33)
+        #expect((value.count - 1) % 33 == 0)
+        #expect(value[0] == 1)
+        #expect(value.last == 1)
+        #expect(SendTextPrefsCodec.value(for: []) == [0])
+    }
+
+    @Test func onlyNumbersAreOfferedToTheSendTextApp() {
+        var withEmail = contact()
+        withEmail.addresses.append(PebbleContactAddress(id: UUID(), kind: .email, value: "a@b.c"))
+
+        // The app sends a text; an email address in the list would be a row
+        // that cannot be used.
+        #expect(SendTextPrefsCodec.value(for: [withEmail])[0] == 1)
+        #expect(ContactsCodec.value(for: withEmail)[21] == 2)
+    }
+}
+
+@Suite
+@MainActor
 struct WatchSettingsTests {
     @Test func aSettingIsWrittenAsOneByteUnderItsFirmwareName() {
         let frame = WatchSettingsCodec.insertFrame(.clock24Hour, isOn: true, token: 0x0102)
@@ -422,6 +485,31 @@ struct NotificationAppsTests {
             14, 0x04, 0x00, 0xED, 0xC9, 0x0D, 0x68,
             50, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00,
         ])
+    }
+
+    @Test func aReplyListRidesOnAnActionOfItsOwn() {
+        let app = NotificationSourceApp(
+            bundleID: NotificationAppsCodec.sendTextKey,
+            displayName: "Send Text",
+            stateUpdated: Date(timeIntervalSince1970: 0),
+            cannedReplies: ["Ok", "No"]
+        )
+
+        let value = NotificationAppsCodec.value(for: app)
+
+        // Four attributes and one action, of the kind that offers a reply.
+        #expect(value[4] == 4)
+        #expect(value[5] == 1)
+        #expect(Array(value.suffix(19)) == [
+            0, 3, 2,
+            1, 0x05, 0x00, 0x52, 0x65, 0x70, 0x6C, 0x79,
+            8, 0x05, 0x00, 0x4F, 0x6B, 0x00, 0x4E, 0x6F,
+        ])
+        // The replies run together with one NUL between them and none after:
+        // the firmware counts the strings by counting the NULs and adding one,
+        // so a trailing one would leave an empty reply on the watch's list.
+        #expect(NotificationAppsCodec.stringList(["Ok", "No"]) == [0x4F, 0x6B, 0x00, 0x4E, 0x6F])
+        #expect(NotificationAppsCodec.stringList([]) == nil)
     }
 
     @Test func decodesWatchWrittenRecord() throws {

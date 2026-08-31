@@ -131,6 +131,20 @@ public protocol PebbleClient: Sendable {
     /// Turns the watch's Reminders app on, which is what makes a reminder
     /// visible there rather than only buzzing.
     func writeReminderAppState(_ state: PebbleReminderAppState) async throws
+    /// Writes one person into the watch's contacts, which is where its Send
+    /// Text app looks them up.
+    func writeContact(_ contact: PebbleContact) async throws
+    func removeContact(id: UUID) async throws
+    /// Tells the Send Text app which of those people to list. A contact the
+    /// watch holds but this list does not name is not shown.
+    func writeSendTextContacts(_ contacts: [PebbleContact]) async throws
+    /// Tells the watch how an action it invoked turned out. Answering a reply
+    /// is the caller's job, because only the caller knows whether it was sent.
+    func respondToTimelineAction(
+        itemID: UUID,
+        succeeded: Bool,
+        subtitle: String?
+    ) async throws
     func registerApplication(_ metadata: PebbleAppMetadata) async throws
     func unregisterApplication(applicationID: UUID) async throws
 }

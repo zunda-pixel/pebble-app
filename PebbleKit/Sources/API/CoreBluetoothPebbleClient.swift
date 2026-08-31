@@ -568,6 +568,36 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
     }
 
+    public func writeContact(_ contact: PebbleContact) async throws {
+        try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
+            ContactsCodec.insertFrame(contact, token: token)
+        }
+    }
+
+    public func removeContact(id: UUID) async throws {
+        try await performBlobDBOperation(acceptedStatuses: [.success, .keyDoesNotExist]) { token in
+            ContactsCodec.deleteFrame(id: id, token: token)
+        }
+    }
+
+    public func writeSendTextContacts(_ contacts: [PebbleContact]) async throws {
+        try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
+            SendTextPrefsCodec.insertFrame(contacts: contacts, token: token)
+        }
+    }
+
+    public func respondToTimelineAction(
+        itemID: UUID,
+        succeeded: Bool,
+        subtitle: String?
+    ) async throws {
+        try await send(TimelineActionCodec.responseFrame(
+            itemID: itemID,
+            succeeded: succeeded,
+            subtitle: subtitle
+        ))
+    }
+
     public func writeWeatherLocationOrder(_ orderedIDs: [UUID]) async throws {
         try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
             WeatherCodec.preferencesFrame(orderedIDs: orderedIDs, token: token)
@@ -862,7 +892,14 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         if frame.endpoint == TimelineActionCodec.endpoint {
             let invocation = try TimelineActionCodec.decode(frame)
             eventContinuation?.yield(.timelineActionInvoked(invocation))
-            try sendFrame(TimelineActionCodec.responseFrame(itemID: invocation.itemID, succeeded: true), to: peripheral)
+            // A reply is answered by whoever tries to deliver it; anything else
+            // is done as soon as it is read.
+            if invocation.responseText == nil {
+                try sendFrame(
+                    TimelineActionCodec.responseFrame(itemID: invocation.itemID, succeeded: true),
+                    to: peripheral
+                )
+            }
             return
         }
 

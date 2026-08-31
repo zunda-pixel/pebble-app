@@ -22,6 +22,9 @@ public struct NotificationSourceApp: Codable, Equatable, Sendable, Identifiable 
     public var muteState: NotificationAppMuteState = .never
     public var muteExpiration: Date? = nil
     public var stateUpdated: Date = .now
+    /// Replies the watch offers for this app's notifications. Empty means the
+    /// watch shows no reply action at all.
+    public var cannedReplies: [String] = []
 
     public var id: String { bundleID }
 }
@@ -29,29 +32,75 @@ public struct NotificationSourceApp: Codable, Equatable, Sendable, Identifiable 
 public enum NotificationAppsCodec {
     public static var databaseID: UInt8 { 6 }
 
+    /// The key the watch's Send Text app reads its reply action from. It is not
+    /// an app that sends notifications: the record exists so the watch has a
+    /// reply action, and the app hides itself when there is none.
+    public static var sendTextKey: String { "com.pebble.sendText" }
+
     static let appNameAttribute: UInt8 = 30
     static let lastUpdatedAttribute: UInt8 = 14
     static let muteDayOfWeekAttribute: UInt8 = 40
     static let muteExpirationAttribute: UInt8 = 50
+    static let cannedResponsesAttribute: UInt8 = 8
+    static let titleAttribute: UInt8 = 1
+    /// `TimelineItemActionTypeResponse`. The watch turns an action of this type
+    /// into a list of replies to choose from.
+    static let responseActionType: UInt8 = 3
     static let maximumNameLength = 40
+    /// The firmware caps the attribute at 512 bytes and drops anything past it,
+    /// which would leave a half-written reply on the list.
+    static let maximumCannedResponsesLength = 512
 
     public static func key(for app: NotificationSourceApp) -> [UInt8] {
         Array(app.bundleID.utf8)
     }
 
     public static func value(for app: NotificationSourceApp) -> [UInt8] {
-        var value: [UInt8] = UInt32(0).littleEndianBytes
-        value.append(4)
-        value.append(0)
-        value.append(contentsOf: attribute(id: appNameAttribute, content: trimmedName(app.displayName)))
-        value.append(contentsOf: attribute(id: muteDayOfWeekAttribute, content: [app.muteState.rawValue]))
-        value.append(contentsOf: attribute(
-            id: lastUpdatedAttribute,
-            content: UInt32(clamping: Int(app.stateUpdated.timeIntervalSince1970)).littleEndianBytes
-        ))
+        var attributes: [[UInt8]] = [
+            attribute(id: appNameAttribute, content: trimmedName(app.displayName)),
+            attribute(id: muteDayOfWeekAttribute, content: [app.muteState.rawValue]),
+            attribute(
+                id: lastUpdatedAttribute,
+                content: UInt32(clamping: Int(app.stateUpdated.timeIntervalSince1970)).littleEndianBytes
+            ),
+        ]
         let expiration = app.muteExpiration.map { UInt32(clamping: Int($0.timeIntervalSince1970)) } ?? 0
-        value.append(contentsOf: attribute(id: muteExpirationAttribute, content: expiration.littleEndianBytes))
+        attributes.append(attribute(id: muteExpirationAttribute, content: expiration.littleEndianBytes))
+        var actions: [[UInt8]] = []
+        if let replies = stringList(app.cannedReplies) {
+            // One action, carrying the replies it offers. Its id comes back
+            // with the reply the reader chose.
+            actions.append(
+                [0, responseActionType, 2]
+                    + attribute(id: titleAttribute, content: Array("Reply".utf8))
+                    + attribute(id: cannedResponsesAttribute, content: replies)
+            )
+        }
+
+        var value: [UInt8] = UInt32(0).littleEndianBytes
+        value.append(UInt8(attributes.count))
+        value.append(UInt8(actions.count))
+        value.append(contentsOf: attributes.flatMap { $0 })
+        value.append(contentsOf: actions.flatMap { $0 })
         return value
+    }
+
+    /// The replies as one attribute: the strings run together with a NUL
+    /// between them and none at the end, because the firmware counts the
+    /// strings by counting the NULs and adding one.
+    static func stringList(_ strings: [String]) -> [UInt8]? {
+        var bytes: [UInt8] = []
+        for string in strings {
+            let content = Array(string.utf8)
+            guard !content.isEmpty else { continue }
+            let separator = bytes.isEmpty ? 0 : 1
+            guard bytes.count + separator + content.count <= maximumCannedResponsesLength else {
+                break
+            }
+            if !bytes.isEmpty { bytes.append(0) }
+            bytes += content
+        }
+        return bytes.isEmpty ? nil : bytes
     }
 
     public static func insertFrame(app: NotificationSourceApp, token: UInt16) -> PebbleProtocolFrame {
@@ -59,6 +108,20 @@ public enum NotificationAppsCodec {
             databaseID: databaseID,
             key: key(for: app),
             value: value(for: app),
+            token: token
+        )
+    }
+
+    /// The record the Send Text app reads. It carries only the reply action:
+    /// the app takes the contact from the send-text list and the addressee from
+    /// the contact, and needs nothing else here.
+    public static func sendTextFrame(replies: [String], token: UInt16) -> PebbleProtocolFrame {
+        insertFrame(
+            app: NotificationSourceApp(
+                bundleID: sendTextKey,
+                displayName: "Send Text",
+                cannedReplies: replies
+            ),
             token: token
         )
     }
@@ -254,13 +317,32 @@ public actor NotificationSourceAppLibrary {
         try PersistentJSON.save(apps.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }, to: fileURL)
     }
 
+    /// Stores a record the phone changed, whole. This is the other half of
+    /// `merge`: what the reader chooses here wins, because the watch's copy of
+    /// the record never carried it.
+    public func update(_ app: NotificationSourceApp) throws -> [NotificationSourceApp] {
+        var apps = try apps()
+        if let index = apps.firstIndex(where: { $0.bundleID == app.bundleID }) {
+            apps[index] = app
+        } else {
+            apps.append(app)
+        }
+        try save(apps)
+        return try self.apps()
+    }
+
     /// Applies a record written by the watch, keeping the newer state when the
     /// same app already exists locally. Returns the updated list.
     public func merge(_ app: NotificationSourceApp) throws -> [NotificationSourceApp] {
         var apps = try apps()
         if let index = apps.firstIndex(where: { $0.bundleID == app.bundleID }) {
             if app.stateUpdated > apps[index].stateUpdated {
-                apps[index] = app
+                var merged = app
+                // The watch's record says nothing about the replies, which
+                // are the phone's to choose; taking the record whole would
+                // quietly throw them away.
+                merged.cannedReplies = apps[index].cannedReplies
+                apps[index] = merged
             }
         } else {
             apps.append(app)

@@ -30,11 +30,13 @@ public enum PhoneVersionCodec {
     /// The weather bit is not decoration: the firmware refuses a write to the
     /// weather database from a phone that has not claimed it
     /// (`weather_service_supported_by_phone`), and it reads the claim from the
-    /// answer given here, once, while connecting.
+    /// answer given here, once, while connecting. The send-text bit works the
+    /// same way — the watch hides that app from a phone that has not claimed
+    /// it, however many contacts it has been given.
     public static var supportedCapabilities: Set<PhoneCapability> {
         [
             .appRunStateProtocol, .infiniteLogDump, .appMessage8k, .appDictation,
-            .notificationFiltering, .weatherApp,
+            .sendTextApp, .notificationFiltering, .weatherApp,
         ]
     }
 
