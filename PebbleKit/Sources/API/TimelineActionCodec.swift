@@ -57,9 +57,13 @@ public enum TimelineActionCodec {
     public static func responseFrame(
         itemID: UUID,
         succeeded: Bool,
+        icon: PebbleTimelineIcon? = nil,
         subtitle: String? = nil
     ) -> PebbleProtocolFrame {
         var attributes: [[UInt8]] = []
+        if let icon {
+            attributes.append([0x06] + UInt16(4).littleEndianBytes + icon.resourceID.littleEndianBytes)
+        }
         if let subtitle {
             let content = Array(subtitle.utf8.prefix(64))
             attributes.append([0x02] + UInt16(content.count).littleEndianBytes + content)

@@ -122,17 +122,15 @@ struct SettingsView: View {
             if !model.notificationSourceApps.isEmpty {
                 Section {
                     ForEach(model.notificationSourceApps) { app in
-                        Toggle(app.displayName, isOn: Binding(
-                            get: { app.muteState == .never },
-                            set: { enabled in
-                                Task {
-                                    await model.setNotificationSourceAppMute(
-                                        bundleID: app.bundleID,
-                                        muteState: enabled ? .never : .always
-                                    )
-                                }
+                        NavigationLink {
+                            NotificationAppView(model: model, app: app)
+                        } label: {
+                            LabeledContent {
+                                Text(app.muteState.title)
+                            } label: {
+                                Text(verbatim: app.displayName)
                             }
-                        ))
+                        }
                     }
                     .onDelete { offsets in
                         Task { await model.removeNotificationSourceApps(at: offsets) }
@@ -140,7 +138,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Phone App Notifications")
                 } footer: {
-                    Text("Apps the watch has seen sending notifications. Turning one off tells the watch to filter that app's notifications.")
+                    Text("Apps the watch has seen sending notifications. Muting one tells the watch to filter that app's notifications.")
                 }
             }
             Section("Diagnostics") {

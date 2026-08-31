@@ -248,13 +248,25 @@ public final class QEMUPebbleClient: PebbleClient {
     public func respondToTimelineAction(
         itemID: UUID,
         succeeded: Bool,
+        icon: PebbleTimelineIcon?,
         subtitle: String?
     ) async throws {
         try await send(TimelineActionCodec.responseFrame(
             itemID: itemID,
             succeeded: succeeded,
+            icon: icon,
             subtitle: subtitle
         ))
+    }
+
+    public func sendImage(token: UInt8, kindValue: UInt8, image: PebbleEncodedImage?) async throws {
+        for frame in ImagingCodec.responseFrames(token: token, kindValue: kindValue, image: image) {
+            try await send(frame)
+        }
+    }
+
+    public func declineImageKind(token: UInt8, kindValue: UInt8) async throws {
+        try await send(ImagingCodec.unsupportedFrame(token: token, kindValue: kindValue))
     }
 
     public func installFile(_ bytes: [UInt8], filename: String) async throws {
@@ -471,6 +483,8 @@ public final class QEMUPebbleClient: PebbleClient {
             if invocation.responseText == nil {
                 Task { try? await send(TimelineActionCodec.responseFrame(itemID: invocation.itemID, succeeded: true)) }
             }
+        } else if frame.endpoint == ImagingCodec.endpoint {
+            eventContinuation?.yield(.imageRequested(try ImagingCodec.decode(frame)))
         } else if frame.endpoint == AppRunStateCodec.endpoint {
             eventContinuation?.yield(.appRunStateChanged(try AppRunStateCodec.decode(frame)))
         } else if frame.endpoint == BlobDBCodec.endpoint, let token = pendingBlobToken {

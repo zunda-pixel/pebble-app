@@ -101,6 +101,7 @@ extension AppModel {
         try? await connection.client.respondToTimelineAction(
             itemID: invocation.itemID,
             succeeded: false,
+            icon: .failed,
             subtitle: String(localized: "Finish in the app")
         )
         await PebbleDiagnostics.shared.record(

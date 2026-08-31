@@ -1,7 +1,9 @@
 public import API
+import CoreGraphics
 import Foundation
 #if os(iOS)
 import MediaPlayer
+import UIKit
 #endif
 
 public struct MusicSnapshot: Equatable, Sendable {
@@ -19,6 +21,13 @@ protocol SystemMusicSource: AnyObject {
     func start()
     func stop()
     func perform(_ action: MusicAction)
+    /// The cover of what is playing, at the size the watch asked for, or nil
+    /// when the track has none.
+    func artwork(width: Int, height: Int) -> CGImage?
+}
+
+extension SystemMusicSource {
+    func artwork(width: Int, height: Int) -> CGImage? { nil }
 }
 
 /// Forwards the system's now-playing state to the watch's music endpoint and
@@ -54,6 +63,12 @@ final class MusicCoordinator {
 
     func watchConnected() {
         schedulePush(force: true)
+    }
+
+    /// The cover art of what is playing, ready for the watch.
+    func artwork(width: Int, height: Int) -> PebbleEncodedImage? {
+        guard let image = source.artwork(width: width, height: height) else { return nil }
+        return WatchImageRenderer.encode(image, width: width, height: height)
     }
 
     func handleFrame(_ frame: PebbleProtocolFrame) {
@@ -198,6 +213,13 @@ final class MediaPlayerMusicSource: SystemMusicSource {
         }
         observers = []
         player.endGeneratingPlaybackNotifications()
+    }
+
+    func artwork(width: Int, height: Int) -> CGImage? {
+        guard let artwork = player.nowPlayingItem?.artwork else { return nil }
+        // Asking for the size the watch wants lets the store hand back the
+        // smallest copy that will do rather than a full-sized cover.
+        return artwork.image(at: CGSize(width: width, height: height))?.cgImage
     }
 
     func perform(_ action: MusicAction) {

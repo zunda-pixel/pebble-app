@@ -589,13 +589,31 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     public func respondToTimelineAction(
         itemID: UUID,
         succeeded: Bool,
+        icon: PebbleTimelineIcon?,
         subtitle: String?
     ) async throws {
         try await send(TimelineActionCodec.responseFrame(
             itemID: itemID,
             succeeded: succeeded,
+            icon: icon,
             subtitle: subtitle
         ))
+    }
+
+    public func sendImage(
+        token: UInt8,
+        kindValue: UInt8,
+        image: PebbleEncodedImage?
+    ) async throws {
+        // The chunks are one transfer as far as the watch is concerned: another
+        // response arriving between them abandons it, so they go out together.
+        for frame in ImagingCodec.responseFrames(token: token, kindValue: kindValue, image: image) {
+            try await send(frame)
+        }
+    }
+
+    public func declineImageKind(token: UInt8, kindValue: UInt8) async throws {
+        try await send(ImagingCodec.unsupportedFrame(token: token, kindValue: kindValue))
     }
 
     public func writeWeatherLocationOrder(_ orderedIDs: [UUID]) async throws {
@@ -905,6 +923,11 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
 
         if frame.endpoint == AppRunStateCodec.endpoint {
             eventContinuation?.yield(.appRunStateChanged(try AppRunStateCodec.decode(frame)))
+            return
+        }
+
+        if frame.endpoint == ImagingCodec.endpoint {
+            eventContinuation?.yield(.imageRequested(try ImagingCodec.decode(frame)))
             return
         }
 

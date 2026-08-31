@@ -40,6 +40,8 @@ public enum PebbleClientEvent: Equatable, Sendable {
     case healthSamplesReceived([PebbleHealthSample])
     case timelineActionInvoked(TimelineActionInvocation)
     case appRunStateChanged(AppRunStateEvent)
+    /// The watch has somewhere to show a picture and is asking for one.
+    case imageRequested(PebbleImageRequest)
 }
 
 public enum PebbleConnectionError: Error, Equatable, Sendable {
@@ -143,8 +145,18 @@ public protocol PebbleClient: Sendable {
     func respondToTimelineAction(
         itemID: UUID,
         succeeded: Bool,
+        icon: PebbleTimelineIcon?,
         subtitle: String?
     ) async throws
+    /// Answers a request for a picture. A nil image says there is none, which
+    /// is what lets the watch stop waiting and show what it has.
+    func sendImage(
+        token: UInt8,
+        kindValue: UInt8,
+        image: PebbleEncodedImage?
+    ) async throws
+    /// Says this kind of picture is never coming, so the watch stops asking.
+    func declineImageKind(token: UInt8, kindValue: UInt8) async throws
     func registerApplication(_ metadata: PebbleAppMetadata) async throws
     func unregisterApplication(applicationID: UUID) async throws
 }

@@ -22,6 +22,8 @@ public final class MockPebbleClient: PebbleClient {
     public private(set) var writtenContacts: [PebbleContact] = []
     public private(set) var writtenSendTextContacts: [PebbleContact] = []
     public private(set) var timelineActionResponses: [(itemID: UUID, succeeded: Bool, subtitle: String?)] = []
+    public private(set) var sentImages: [(token: UInt8, kindValue: UInt8, image: PebbleEncodedImage?)] = []
+    public private(set) var declinedImageKinds: [UInt8] = []
     public private(set) var writtenNotificationSourceApps: [NotificationSourceApp] = []
     public private(set) var registeredApplications: [PebbleAppMetadata] = []
     public private(set) var unregisteredApplicationIDs: [UUID] = []
@@ -229,9 +231,18 @@ public final class MockPebbleClient: PebbleClient {
     public func respondToTimelineAction(
         itemID: UUID,
         succeeded: Bool,
+        icon: PebbleTimelineIcon?,
         subtitle: String?
     ) async throws {
         timelineActionResponses.append((itemID: itemID, succeeded: succeeded, subtitle: subtitle))
+    }
+
+    public func sendImage(token: UInt8, kindValue: UInt8, image: PebbleEncodedImage?) async throws {
+        sentImages.append((token: token, kindValue: kindValue, image: image))
+    }
+
+    public func declineImageKind(token: UInt8, kindValue: UInt8) async throws {
+        declinedImageKinds.append(kindValue)
     }
 
     public func registerApplication(_ metadata: PebbleAppMetadata) async throws {

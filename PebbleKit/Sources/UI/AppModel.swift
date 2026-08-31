@@ -485,6 +485,10 @@ public final class AppModel {
                 try? await self.timelineLibrary.save(self.timelinePins)
                 self.timelineActionStatusMessage = "Timeline action completed."
             }
+        case .imageRequested(let request):
+            Task { [weak self] in
+                await self?.answerImageRequest(request, on: connection)
+            }
         }
     }
 

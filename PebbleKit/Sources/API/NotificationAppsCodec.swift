@@ -22,6 +22,10 @@ public struct NotificationSourceApp: Codable, Equatable, Sendable, Identifiable 
     public var muteState: NotificationAppMuteState = .never
     public var muteExpiration: Date? = nil
     public var stateUpdated: Date = .now
+    /// The icon the watch shows beside this app's notifications, in place of
+    /// the one the firmware would pick for itself. Nil leaves that choice to
+    /// the watch.
+    public var icon: PebbleTimelineIcon? = nil
     /// Replies the watch offers for this app's notifications. Empty means the
     /// watch shows no reply action at all.
     public var cannedReplies: [String] = []
@@ -41,6 +45,7 @@ public enum NotificationAppsCodec {
     static let lastUpdatedAttribute: UInt8 = 14
     static let muteDayOfWeekAttribute: UInt8 = 40
     static let muteExpirationAttribute: UInt8 = 50
+    static let iconAttribute: UInt8 = 48
     static let cannedResponsesAttribute: UInt8 = 8
     static let titleAttribute: UInt8 = 1
     /// `TimelineItemActionTypeResponse`. The watch turns an action of this type
@@ -66,6 +71,10 @@ public enum NotificationAppsCodec {
         ]
         let expiration = app.muteExpiration.map { UInt32(clamping: Int($0.timeIntervalSince1970)) } ?? 0
         attributes.append(attribute(id: muteExpirationAttribute, content: expiration.littleEndianBytes))
+        if let icon = app.icon {
+            attributes.append(attribute(id: iconAttribute, content: icon.resourceID.littleEndianBytes))
+        }
+
         var actions: [[UInt8]] = []
         if let replies = stringList(app.cannedReplies) {
             // One action, carrying the replies it offers. Its id comes back
@@ -338,9 +347,10 @@ public actor NotificationSourceAppLibrary {
         if let index = apps.firstIndex(where: { $0.bundleID == app.bundleID }) {
             if app.stateUpdated > apps[index].stateUpdated {
                 var merged = app
-                // The watch's record says nothing about the replies, which
-                // are the phone's to choose; taking the record whole would
-                // quietly throw them away.
+                // The watch's record says nothing about the icon or the
+                // replies, which are the phone's to choose; taking the record
+                // whole would quietly throw them away.
+                merged.icon = apps[index].icon
                 merged.cannedReplies = apps[index].cannedReplies
                 apps[index] = merged
             }

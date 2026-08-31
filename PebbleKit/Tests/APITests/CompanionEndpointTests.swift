@@ -304,6 +304,100 @@ struct ContactsTests {
 
 @Suite
 @MainActor
+struct ImagingTests {
+    @Test func anAlbumArtRequestCarriesWhatIsPlaying() throws {
+        let frame = PebbleProtocolFrame(endpoint: 53, payload: [
+            0x01, 0x07, 0x00, 0x02, 0x50, 0x00, 0x3C, 0x00,
+            0x01, 0x41,
+            0x01, 0x42,
+        ])
+
+        let request = try ImagingCodec.decode(frame)
+
+        #expect(request == .albumArt(
+            PebbleImageRequestHeader(token: 7, kindValue: 0, format: 2, width: 80, height: 60),
+            title: "A",
+            artist: "B"
+        ))
+    }
+
+    @Test func aKindThisAppHasNeverHeardOfIsStillAnswerable() throws {
+        let request = try ImagingCodec.decode(PebbleProtocolFrame(
+            endpoint: 53,
+            payload: [0x01, 0x09, 0x7F, 0x02, 0x10, 0x00, 0x10, 0x00]
+        ))
+
+        #expect(request == .unsupported(
+            PebbleImageRequestHeader(token: 9, kindValue: 0x7F, format: 2, width: 16, height: 16)
+        ))
+        // The kind rides in the top nibble of the flags byte, and only four
+        // bits of it fit.
+        #expect(ImagingCodec.unsupportedFrame(token: 9, kindValue: 0x7F).payload
+            == [0x02, 0x09, 0xF8, 0, 0, 0, 0, 0, 0])
+    }
+
+    @Test func aPictureIsSentAsChunksWithTheHeaderOnTheFirst() {
+        let image = PebbleEncodedImage(
+            width: 4,
+            height: 4,
+            palette: [0xC0, 0xFF],
+            pixels: [UInt8](repeating: 0x01, count: 8)
+        )
+
+        let frames = ImagingCodec.responseFrames(token: 3, kindValue: 0, image: image)
+
+        #expect(frames.count == 1)
+        let payload = frames[0].payload
+        #expect(Array(payload.prefix(9)) == [0x02, 0x03, 0x03, 0, 0, 0, 0, 8, 0])
+        // Size, then the format and how many colours the palette holds.
+        #expect(Array(payload[9..<15]) == [4, 0, 4, 0, 0x02, 0x02])
+        #expect(Array(payload[15..<17]) == [0xC0, 0xFF])
+        #expect(Array(payload.suffix(8)) == image.pixels)
+    }
+
+    @Test func aPictureTooLargeForOneFrameIsSplitAndTheLastSaysSo() {
+        let image = PebbleEncodedImage(
+            width: 100,
+            height: 30,
+            palette: [0xC0],
+            pixels: [UInt8](repeating: 0, count: 1_500)
+        )
+
+        let frames = ImagingCodec.responseFrames(token: 1, kindValue: 1, image: image)
+
+        #expect(frames.count == 2)
+        // First and not last, then last and not first, with the kind in the
+        // top nibble of both.
+        #expect(frames[0].payload[2] == 0x11)
+        #expect(frames[1].payload[2] == 0x12)
+        #expect(Array(frames[1].payload[3..<7]) == [0xE8, 0x03, 0x00, 0x00])
+    }
+
+    @Test func aPictureIsReducedToTheColoursTheWatchHas() throws {
+        // A red and a blue half: two colours out of the sixteen available, and
+        // no dithering to invent a third.
+        var argb: [UInt32] = []
+        for _ in 0..<8 {
+            argb += [UInt32](repeating: 0xFFFF_0000, count: 4)
+            argb += [UInt32](repeating: 0xFF00_00FF, count: 4)
+        }
+
+        let image = try #require(PebbleImageEncoder.encode(argb: argb, width: 8, height: 8))
+
+        #expect(image.palette.count == 2)
+        #expect(image.palette.allSatisfy { $0 & 0b1100_0000 == 0b1100_0000 })
+        #expect(image.palette.contains(0b1111_0000))
+        #expect(image.palette.contains(0b1100_0011))
+        // Two pixels to the byte, each row padded out to a whole byte.
+        #expect(image.pixels.count == 4 * 8)
+        let red = image.palette.firstIndex(of: 0b1111_0000).map { UInt8($0) }
+        #expect(image.pixels[0] >> 4 == red)
+        #expect(image.pixels[0] & 0x0F == red)
+    }
+}
+
+@Suite
+@MainActor
 struct WatchSettingsTests {
     @Test func aSettingIsWrittenAsOneByteUnderItsFirmwareName() {
         let frame = WatchSettingsCodec.insertFrame(.clock24Hour, isOn: true, token: 0x0102)
@@ -510,6 +604,22 @@ struct NotificationAppsTests {
         // so a trailing one would leave an empty reply on the watch's list.
         #expect(NotificationAppsCodec.stringList(["Ok", "No"]) == [0x4F, 0x6B, 0x00, 0x4E, 0x6F])
         #expect(NotificationAppsCodec.stringList([]) == nil)
+    }
+
+    @Test func anIconIsWrittenAsTheWatchsOwnResourceNumber() {
+        var app = NotificationSourceApp(
+            bundleID: "com.example.chat",
+            displayName: "Chat",
+            stateUpdated: Date(timeIntervalSince1970: 0)
+        )
+        app.icon = .sms
+
+        let value = NotificationAppsCodec.value(for: app)
+
+        #expect(value[4] == 5)
+        // The high bit says the picture belongs to the system rather than to
+        // an app of the watch's own.
+        #expect(Array(value.suffix(7)) == [48, 0x04, 0x00, 45, 0x00, 0x00, 0x80])
     }
 
     @Test func decodesWatchWrittenRecord() throws {

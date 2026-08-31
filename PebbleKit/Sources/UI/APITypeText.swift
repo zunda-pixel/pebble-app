@@ -63,6 +63,42 @@ public extension WatchSetting {
     }
 }
 
+public extension NotificationAppMuteState {
+    var title: LocalizedStringKey {
+        switch self {
+        case .never: "Never"
+        case .always: "Always"
+        case .weekdays: "Weekdays"
+        case .weekends: "Weekends"
+        }
+    }
+}
+
+public extension PebbleTimelineIcon {
+    /// What the icon stands for, for the ones the app offers. The rest are
+    /// company logos the watch picks by itself and no one has to name.
+    var title: LocalizedStringKey {
+        switch self {
+        case .generic: "Notification"
+        case .sms: "Message"
+        case .email: "Mail"
+        case .calendar: "Calendar"
+        case .reminder: "Reminder"
+        case .alarmClock: "Alarm"
+        case .duringPhoneCall: "Phone Call"
+        case .missedCall: "Missed Call"
+        case .musicEvent: "Music"
+        case .newsEvent: "News"
+        case .payBill: "Payment"
+        case .scheduledEvent: "Event"
+        case .warning: "Warning"
+        case .question: "Question"
+        case .flag: "Flag"
+        default: "Notification"
+        }
+    }
+}
+
 public extension PebbleHeartRateInterval {
     var title: LocalizedStringKey {
         switch self {

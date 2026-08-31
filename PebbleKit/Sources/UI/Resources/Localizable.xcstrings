@@ -463,6 +463,16 @@
         }
       }
     },
+    "Alarm" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アラーム"
+          }
+        }
+      }
+    },
     "All" : {
       "localizations" : {
         "ja" : {
@@ -509,6 +519,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ペアリング済み"
+          }
+        }
+      }
+    },
+    "Always" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "常に"
           }
         }
       }
@@ -593,7 +613,18 @@
         }
       }
     },
+    "Apps the watch has seen sending notifications. Muting one tells the watch to filter that app's notifications." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチが通知の送信を検出したアプリの一覧です。ミュートすると、そのアプリの通知はウォッチでフィルタリングされます。"
+          }
+        }
+      }
+    },
     "Apps the watch has seen sending notifications. Turning one off tells the watch to filter that app's notifications." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -909,6 +940,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "“デバイス”を選択してから“スキャン”で接続します。"
+          }
+        }
+      }
+    },
+    "Chosen by the Watch" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチが選択"
           }
         }
       }
@@ -1413,6 +1454,16 @@
         }
       }
     },
+    "Event" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "イベント"
+          }
+        }
+      }
+    },
     "Every 5 Minutes" : {
       "localizations" : {
         "ja" : {
@@ -1579,6 +1630,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ファームウェアのアップデートを安全に停止しました: %@"
+          }
+        }
+      }
+    },
+    "Flag" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "フラグ"
           }
         }
       }
@@ -1789,6 +1850,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "あとで電話します"
+          }
+        }
+      }
+    },
+    "Icon" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アイコン"
           }
         }
       }
@@ -2113,6 +2184,16 @@
         }
       }
     },
+    "Mail" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "メール"
+          }
+        }
+      }
+    },
     "Makes this the active watchface" : {
       "localizations" : {
         "ja" : {
@@ -2133,12 +2214,32 @@
         }
       }
     },
+    "Message" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "メッセージ"
+          }
+        }
+      }
+    },
     "Minutes" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "分"
+          }
+        }
+      }
+    },
+    "Missed Call" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "不在着信"
           }
         }
       }
@@ -2163,6 +2264,16 @@
         }
       }
     },
+    "Music" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ミュージック"
+          }
+        }
+      }
+    },
     "Music: Progress Bar" : {
       "localizations" : {
         "ja" : {
@@ -2179,6 +2290,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ミュージック: 音量コントロール"
+          }
+        }
+      }
+    },
+    "Mute" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ミュート"
           }
         }
       }
@@ -2213,6 +2334,16 @@
         }
       }
     },
+    "Never" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "しない"
+          }
+        }
+      }
+    },
     "New Pin" : {
       "localizations" : {
         "ja" : {
@@ -2229,6 +2360,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "新規返信"
+          }
+        }
+      }
+    },
+    "News" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ニュース"
           }
         }
       }
@@ -2329,6 +2470,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "失われたものはありません。準備ができたらやり直してみてください。"
+          }
+        }
+      }
+    },
+    "Notification" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "通知"
           }
         }
       }
@@ -2449,6 +2600,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "パックのバージョン"
+          }
+        }
+      }
+    },
+    "Payment" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "支払い"
           }
         }
       }
@@ -2593,6 +2754,16 @@
         }
       }
     },
+    "Phone Call" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "通話"
+          }
+        }
+      }
+    },
     "Pins" : {
       "localizations" : {
         "ja" : {
@@ -2669,6 +2840,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "四半期"
+          }
+        }
+      }
+    },
+    "Question" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "質問"
           }
         }
       }
@@ -2799,6 +2980,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "リリースノート"
+          }
+        }
+      }
+    },
+    "Reminder" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リマインダー"
           }
         }
       }
@@ -3689,6 +3880,16 @@
         }
       }
     },
+    "The watch has a logo of its own for the apps it knows. Choosing one here is for the ones it does not." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチは、知っているアプリには独自のロゴを表示します。ここでアイコンを選ぶのは、ウォッチが知らないアプリのためです。"
+          }
+        }
+      }
+    },
     "The watch is already processing another application change. Please try again." : {
       "localizations" : {
         "ja" : {
@@ -4279,6 +4480,16 @@
         }
       }
     },
+    "Warning" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "警告"
+          }
+        }
+      }
+    },
     "Watch" : {
       "localizations" : {
         "ja" : {
@@ -4385,6 +4596,26 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "週"
+          }
+        }
+      }
+    },
+    "Weekdays" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "平日"
+          }
+        }
+      }
+    },
+    "Weekends" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "週末"
           }
         }
       }

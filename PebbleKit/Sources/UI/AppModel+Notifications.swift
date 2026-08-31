@@ -207,6 +207,22 @@ extension AppModel {
         }
     }
 
+    /// Chooses which of the watch's own icons stands for an app's
+    /// notifications, in place of the one the firmware would pick.
+    public func setNotificationSourceAppIcon(bundleID: String, icon: PebbleTimelineIcon?) async {
+        guard var app = notificationSourceApps.first(where: { $0.bundleID == bundleID }) else {
+            return
+        }
+        app.icon = icon
+        app.stateUpdated = .now
+        if let apps = try? await notificationSourceAppLibrary.update(app) {
+            notificationSourceApps = apps
+        }
+        for connection in activeConnections {
+            await synchronizeNotificationSourceApps(on: connection)
+        }
+    }
+
     public func setNotificationSourceAppMute(bundleID: String, muteState: NotificationAppMuteState) async {
         guard var app = notificationSourceApps.first(where: { $0.bundleID == bundleID }) else {
             return
