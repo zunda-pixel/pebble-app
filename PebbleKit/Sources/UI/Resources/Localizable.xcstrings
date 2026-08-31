@@ -59,6 +59,16 @@
         }
       }
     },
+    "%@ did not accept the list of places. %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”が地点リストを受け付けませんでした。%@"
+          }
+        }
+      }
+    },
     "%@ has no weather app, so nothing is sent to it." : {
       "localizations" : {
         "ja" : {
@@ -891,12 +901,12 @@
         }
       }
     },
-    "Connection failed: %@" : {
+    "Connection failed. %@" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "接続に失敗しました: %@"
+            "state" : "translated",
+            "value" : "接続に失敗しました。%@"
           }
         }
       }
@@ -3783,16 +3793,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "Pebbleへようこそ"
-          }
-        }
-      }
-    },
-    "%@ did not accept the list of places. %@" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "“%@”が地点リストを受け付けませんでした。%@"
           }
         }
       }

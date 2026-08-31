@@ -232,7 +232,7 @@ struct ConnectionStatusBanner: View {
 
     var body: some View {
         HStack {
-            Label(title, systemImage: systemImage)
+            Label { title } icon: { Image(systemName: systemImage) }
                 .font(.callout)
                 .frame(maxWidth: .infinity, alignment: .leading)
             if case .reconnecting = state, let cancelReconnect {
@@ -247,15 +247,19 @@ struct ConnectionStatusBanner: View {
         .accessibilityValue(title)
     }
 
-    private var title: LocalizedStringKey {
+    /// The line is a `Text` rather than a key because the failure reads as two
+    /// sentences: what happened, and what the connection layer said about it.
+    /// One of those is already a localized phrase, and a localized phrase
+    /// cannot be interpolated into another one.
+    private var title: Text {
         switch state {
-        case .idle: "Not connected"
-        case .scanning: "Scanning for watches…"
-        case .connecting: "Connecting…"
-        case .negotiating: "Setting up connection…"
-        case .connected(let device): "Connected to \(device.name)"
-        case .reconnecting: "Connection lost — reconnecting…"
-        case .failed(let error): "Connection failed: \(error.message)"
+        case .idle: Text("Not connected")
+        case .scanning: Text("Scanning for watches…")
+        case .connecting: Text("Connecting…")
+        case .negotiating: Text("Setting up connection…")
+        case .connected(let device): Text("Connected to \(device.name)")
+        case .reconnecting: Text("Connection lost — reconnecting…")
+        case .failed(let error): Text("Connection failed. \(Text(error.message))")
         }
     }
 

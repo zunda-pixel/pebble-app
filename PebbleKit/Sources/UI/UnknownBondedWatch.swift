@@ -1,5 +1,3 @@
-public import Foundation
-
 /// A watch this phone is bonded to that the app has no record of, after being
 /// forgotten or after the app was reinstalled while the bond survived.
 ///

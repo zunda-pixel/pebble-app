@@ -1,6 +1,7 @@
 import API
 import CoreLocation
 import Defaults
+import MapKit
 import Foundation
 import SwiftUI
 
@@ -49,16 +50,19 @@ extension AppModel {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return }
         do {
-            let places = try await CLGeocoder().geocodeAddressString(query)
-            guard let place = places.first, let location = place.location else {
+            guard let request = MKGeocodingRequest(addressString: query) else {
                 throw WeatherSourceError.placeNotFound
             }
+            guard let place = try await request.mapItems.first else {
+                throw WeatherSourceError.placeNotFound
+            }
+            let coordinate = place.location.coordinate
             weatherPlaces.append(
                 WeatherPlace(
                     id: UUID(),
-                    name: place.locality ?? place.name ?? query,
-                    latitude: location.coordinate.latitude,
-                    longitude: location.coordinate.longitude,
+                    name: placeName(of: place) ?? query,
+                    latitude: coordinate.latitude,
+                    longitude: coordinate.longitude,
                     followsPhone: false
                 )
             )
@@ -187,8 +191,15 @@ extension AppModel {
     /// The name a position reads as, so the watch shows a town rather than a
     /// pair of numbers.
     private func placeName(for location: CLLocation) async -> String? {
-        let places = try? await CLGeocoder().reverseGeocodeLocation(location)
-        return places?.first?.locality ?? places?.first?.name
+        let request = MKReverseGeocodingRequest(location: location)
+        guard let place = try? await request?.mapItems.first else { return nil }
+        return placeName(of: place)
+    }
+
+    /// A town, not a street: the watch has room for a word or two, and the
+    /// place is being shown as a weather location rather than an address.
+    private func placeName(of place: MKMapItem) -> String? {
+        place.addressRepresentations?.cityName ?? place.name
     }
 }
 
