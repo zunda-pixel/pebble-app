@@ -234,6 +234,7 @@
       }
     },
     "%lld pins" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -283,12 +284,32 @@
         }
       }
     },
+    "A pin waits on the watch's timeline until its moment, and stays there afterwards." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ピンは、その時刻までウォッチのタイムラインで待機し、時刻が過ぎたあともそのまま残ります。"
+          }
+        }
+      }
+    },
     "A reminder buzzes on the watch when its time comes, rather than waiting on the timeline. The watch keeps the ones near today and forgets the rest." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "リマインダーは、タイムラインで待つのではなく、時間になるとウォッチが振動して知らせます。ウォッチは今日に近いものだけを保持し、残りは破棄します。"
+          }
+        }
+      }
+    },
+    "A reminder whose time has gone is not sent to the watch." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "時間が過ぎたリマインダーは、ウォッチに送信されません。"
           }
         }
       }
@@ -393,7 +414,18 @@
         }
       }
     },
+    "Add one and the watch will buzz when its time comes." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "追加すると、時間になったときにウォッチが振動して知らせます。"
+          }
+        }
+      }
+    },
     "Add one on the Timeline screen, or sync the calendar." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -403,7 +435,18 @@
         }
       }
     },
+    "Add one with the plus button, or sync the calendar." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "+ボタンで追加するか、カレンダーを同期してください。"
+          }
+        }
+      }
+    },
     "Add Reminder" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -414,6 +457,7 @@
       }
     },
     "Add to Timeline" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -960,6 +1004,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "クラッシュレポートを取得"
+          }
+        }
+      }
+    },
+    "Coming Up" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "これから"
           }
         }
       }
@@ -1515,6 +1569,7 @@
       }
     },
     "Everything the watch is showing on its timeline, including the events a calendar sync brought over." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -2154,6 +2209,16 @@
         }
       }
     },
+    "List" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リスト"
+          }
+        }
+      }
+    },
     "Loading applications" : {
       "localizations" : {
         "ja" : {
@@ -2364,6 +2429,16 @@
         }
       }
     },
+    "New Reminder" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "新規リマインダー"
+          }
+        }
+      }
+    },
     "News" : {
       "localizations" : {
         "ja" : {
@@ -2440,6 +2515,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "地点がありません"
+          }
+        }
+      }
+    },
+    "No Reminders" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リマインダーなし"
           }
         }
       }
@@ -2611,6 +2696,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "一部許可"
+          }
+        }
+      }
+    },
+    "Passed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "過去"
           }
         }
       }

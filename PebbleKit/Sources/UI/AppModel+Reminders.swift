@@ -1,4 +1,4 @@
-import API
+public import API
 public import Foundation
 import SwiftUI
 
@@ -35,9 +35,14 @@ extension AppModel {
         }
     }
 
-    public func removeReminders(at offsets: IndexSet) async {
-        let removed = offsets.compactMap { reminders.indices.contains($0) ? reminders[$0] : nil }
-        reminders.remove(atOffsets: offsets)
+    /// Forgets these reminders, here and on every watch that holds them.
+    ///
+    /// Named rather than numbered: the list they were picked from is sorted and
+    /// split for reading, so a row's place on screen is not its place here.
+    public func removeReminders(_ removed: [PebbleTimelinePin]) async {
+        guard !removed.isEmpty else { return }
+        let identifiers = Set(removed.map(\.id))
+        reminders.removeAll { identifiers.contains($0.id) }
         try? await reminderLibrary.save(reminders)
         for reminder in removed {
             for connection in activeConnections {

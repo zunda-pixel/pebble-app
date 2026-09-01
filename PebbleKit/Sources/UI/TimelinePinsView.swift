@@ -1,11 +1,11 @@
 import API
 import SwiftUI
 
-/// Everything on the watch's timeline.
+/// Everything on the watch's timeline, by day.
 ///
-/// The list is as long as the reader's diary: one calendar sync brings a
-/// month of events at a time, so it lives on a page of its own rather than
-/// under the field that adds one by hand.
+/// The list is as long as the reader's diary — one calendar sync brings a month
+/// of events at a time — so it is grouped and searchable rather than one run of
+/// rows.
 struct TimelinePinsView: View {
     var model: AppModel
     @State private var search = ""
@@ -56,13 +56,11 @@ struct TimelinePinsView: View {
                 ContentUnavailableView(
                     "No Pins",
                     systemImage: "pin",
-                    description: Text("Add one on the Timeline screen, or sync the calendar.")
+                    description: Text("Add one with the plus button, or sync the calendar.")
                 )
             } else if matches.isEmpty {
                 ContentUnavailableView.search(text: search)
             }
         }
-        .navigationTitle("Pins")
-        .task { await model.loadTimeline() }
     }
 }

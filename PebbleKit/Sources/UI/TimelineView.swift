@@ -1,69 +1,145 @@
-import SwiftUI
 import API
+import SwiftUI
+
+/// The two lists the watch keeps for things that happen at a time: the pins on
+/// its timeline, and the reminders it buzzes for.
+///
+/// Two databases on the watch and two different behaviours, but one question
+/// for the reader — what is coming up — so they share a screen and are swapped
+/// between rather than stacked.
+enum TimelineListKind: String, CaseIterable, Identifiable {
+    case pins
+    case reminders
+
+    var id: Self { self }
+
+    var title: LocalizedStringKey {
+        switch self {
+        case .pins: "Pins"
+        case .reminders: "Reminders"
+        }
+    }
+
+    /// What the sheet that adds one is called.
+    var newTitle: LocalizedStringKey {
+        switch self {
+        case .pins: "New Pin"
+        case .reminders: "New Reminder"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .pins: "pin"
+        case .reminders: "bell.badge"
+        }
+    }
+}
 
 struct TimelineView: View {
     var model: AppModel
-    @State private var title = ""
-    @State private var date = Date()
-    @State private var reminderTitle = ""
-    @State private var reminderDate = Date()
+    @State private var kind = TimelineListKind.pins
+    @State private var composing: TimelineListKind?
 
     var body: some View {
-        List {
-            Section("New Pin") {
-                TextField("Title", text: $title)
-                DatePicker("Date", selection: $date)
-                Button("Add to Timeline", systemImage: "plus") {
-                    let value = title
-                    title = ""
-                    Task { await model.addTimelinePin(title: value, date: date) }
+        content
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Picker("List", selection: $kind) {
+                        ForEach(TimelineListKind.allCases) { kind in
+                            Text(kind.title).tag(kind)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
                 }
-                .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-            Section {
-                NavigationLink {
-                    TimelinePinsView(model: model)
-                } label: {
-                    LabeledContent("Pins") {
-                        Text("\(model.timelinePins.count) pins")
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        ForEach(TimelineListKind.allCases) { kind in
+                            Button(kind.newTitle, systemImage: kind.symbol) {
+                                composing = kind
+                            }
+                        }
+                    } label: {
+                        Label("Add", systemImage: "plus")
                     }
                 }
-            } footer: {
-                Text("Everything the watch is showing on its timeline, including the events a calendar sync brought over.")
-            }
-            Section {
-                TextField("Title", text: $reminderTitle)
-                DatePicker("Time", selection: $reminderDate)
-                Button("Add Reminder", systemImage: "bell.badge") {
-                    let value = reminderTitle
-                    reminderTitle = ""
-                    Task { await model.addReminder(title: value, date: reminderDate) }
-                }
-                .disabled(reminderTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                ForEach(model.reminders) { reminder in
-                    LabeledContent(reminder.title) {
-                        Text(reminder.timestamp, format: .dateTime)
+                ToolbarItem(placement: .secondaryAction) {
+                    Button("Sync Calendar", systemImage: "calendar.badge.clock") {
+                        Task { await model.synchronizeCalendar() }
                     }
                 }
-                .onDelete { offsets in Task { await model.removeReminders(at: offsets) } }
-                if let message = model.reminderStatusMessage {
-                    Text(message).foregroundStyle(.secondary)
-                }
-            } header: {
-                Text("Reminders")
-            } footer: {
-                Text("A reminder buzzes on the watch when its time comes, rather than waiting on the timeline. The watch keeps the ones near today and forgets the rest.")
             }
-            Section("Calendar") {
-                Button("Sync Calendar", systemImage: "calendar.badge.clock") {
-                    Task { await model.synchronizeCalendar() }
-                }
+            .navigationTitle("Timeline")
+            .sheet(item: $composing) { kind in
+                TimelineItemComposer(model: model, kind: kind)
             }
+            .task {
+                await model.loadTimeline()
+                await model.loadReminders()
+            }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch kind {
+        case .pins:
+            TimelinePinsView(model: model)
+        case .reminders:
+            TimelineRemindersView(model: model)
         }
-        .navigationTitle("Timeline")
-        .task {
-            await model.loadTimeline()
-            await model.loadReminders()
+    }
+}
+
+/// Adds one pin, or one reminder. The same two fields either way: what it is,
+/// and when.
+struct TimelineItemComposer: View {
+    var model: AppModel
+    var kind: TimelineListKind
+    @State private var title = ""
+    @State private var date = Date()
+    @Environment(\.dismiss) private var dismiss
+
+    private var isComplete: Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Title", text: $title)
+                    DatePicker(kind == .pins ? "Date" : "Time", selection: $date)
+                } footer: {
+                    switch kind {
+                    case .pins:
+                        Text("A pin waits on the watch's timeline until its moment, and stays there afterwards.")
+                    case .reminders:
+                        Text("A reminder buzzes on the watch when its time comes, rather than waiting on the timeline. The watch keeps the ones near today and forgets the rest.")
+                    }
+                }
+            }
+            .formStyle(.grouped)
+            .navigationTitle(kind.newTitle)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") {
+                        let value = title
+                        let when = date
+                        dismiss()
+                        Task {
+                            switch kind {
+                            case .pins: await model.addTimelinePin(title: value, date: when)
+                            case .reminders: await model.addReminder(title: value, date: when)
+                            }
+                        }
+                    }
+                    .disabled(!isComplete)
+                }
+            }
         }
     }
 }
