@@ -99,7 +99,6 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var firmwareResponseContinuation: CheckedContinuation<Void, any Error>?
     private var firmwareResponseTimeoutTask: Task<Void, Never>?
     private var waitingForFirmwareStart = false
-    /// Set for the whole of `installFirmware`, transfers and all.
     private var isInstallingFirmware = false
     private var pendingInstallCookie: UInt32?
     private var transferContinuation: CheckedContinuation<Void, any Error>?

@@ -238,15 +238,10 @@ struct PhoneVersionTests {
         let frame = PhoneVersionCodec.responseFrame(operatingSystem: .iOS)
 
         #expect(Array(frame.payload[17..<25]) == [0xA7, 0x5E, 0, 0, 0, 0, 0, 0])
-        // Without bit 2 the watch reads only the first three fields of a
-        // now-playing frame and reports no music capabilities at all.
         #expect(PhoneVersionCodec.capabilityBytes([.extendedMusicProtocol])
             == [0x04, 0, 0, 0, 0, 0, 0, 0])
-        // Without bit 14 `system_message.c` ignores the byte counts we send it
-        // and falls back to the legacy firmware-update path.
         #expect(PhoneVersionCodec.capabilityBytes([.smoothFirmwareInstallProgress])
             == [0x00, 0x40, 0, 0, 0, 0, 0, 0])
-        // Without bit 12 `reminder_app_get_info` hides the Reminders app.
         #expect(PhoneVersionCodec.capabilityBytes([.remindersApp])
             == [0x00, 0x10, 0, 0, 0, 0, 0, 0])
         // Nothing here sends a text message, teaches the watch a language, or
@@ -407,9 +402,8 @@ struct WatchDiagnosticsTests {
         // `pbl_log_binary_format` puts the timestamp through `htonl` and the
         // line number through `htons` before it hands the buffer over, and both
         // are unconditional byte swaps, so the two numbers arrive most
-        // significant byte first. Read the other way round, this record would
-        // be dated 1970 and blame line 16641. The cookie is not the firmware's
-        // to read: it is copied out of the request and back verbatim.
+        // significant byte first. The cookie is not the firmware's to read: it
+        // is copied out of the request and back verbatim.
         var payload: [UInt8] = [0x80] + UInt32(0x1234_5678).littleEndianBytes
         payload += [0x66, 0x00, 0x00, 0x00]
         payload += [50, 5]
@@ -509,9 +503,7 @@ struct WatchDiagnosticsTests {
     }
 
     @Test func anObjectBiggerThanAnyWatchIsRefusedRatherThanReservedFor() {
-        // The size is believed before a byte of the object has arrived, so a
-        // corrupt OBJECT_INFO would otherwise have the app reserve four
-        // gigabytes and be killed for it.
+        // 32 MiB, which is the largest flash any Pebble has.
         var collector = GetBytesCollector(transactionID: 4)
         let corrupt: [UInt8] = [0x01, 4, 0x00] + UInt32.max.bigEndianBytes
 
@@ -604,9 +596,8 @@ struct WatchSettingsTests {
 
     @Test func theHeartRateIntervalsAreTheFourTheWatchHas() {
         // `HRMonitoringInterval`: 10Min = 0, 30Min = 1, 1Hour = 2,
-        // Disabled = 3. The raw value goes straight into
-        // `ActivityHRMSettings.measurement_interval`, so numbering them any
-        // other way turns "off" into a reading every ten minutes.
+        // Disabled = 3, written straight into
+        // `ActivityHRMSettings.measurement_interval`.
         #expect(PebbleHeartRateInterval.everyTenMinutes.rawValue == 0)
         #expect(PebbleHeartRateInterval.everyThirtyMinutes.rawValue == 1)
         #expect(PebbleHeartRateInterval.everyHour.rawValue == 2)
@@ -622,10 +613,9 @@ struct WatchSettingsTests {
     }
 
     @Test func turningTheHeartRateOffStopsTheSamplingAsWell() {
-        // The watch's sampling loop reads only the interval, and its `enabled`
-        // flag only decides whether an app may ask for a reading, so a reader
-        // who turns the heart rate off keeps paying for it in battery unless
-        // the interval is sent as Disabled too.
+        // `enabled`, then the interval, then activity tracking. The watch's
+        // sampling loop (`activity.c`) consults the interval alone; `enabled`
+        // gates only the health service's readings (`health_service.c`).
         let settings = PebbleHeartRateSettings(
             isEnabled: false,
             interval: .everyTenMinutes,

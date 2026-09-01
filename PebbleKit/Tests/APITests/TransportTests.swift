@@ -191,8 +191,8 @@ struct TransportTests {
     @Test
     func pebbleProtocolDecoderKeepsTheFramesItDecodedBeforeABadLengthPrefix() throws {
         // The watch packs frames for unrelated endpoints into one delivery, so
-        // an unusable length prefix part-way through used to cost the app the
-        // reply it was waiting for as well.
+        // an unusable length prefix part-way through must not take the frames
+        // before it with it.
         let good = PebbleProtocolFrame(endpoint: 45, payload: [0x01, 0x02])
         var decoder = PebbleProtocolFrameDecoder()
 
@@ -245,9 +245,9 @@ struct TransportTests {
 
     @Test
     func healthDataLoggingRefusesASessionItWasNeverOpenedFor() throws {
-        // A session id means something only inside the session that opened it,
-        // and the watch reuses low ids freely across links. This is the
-        // property the client leans on when it throws its processor away on a
+        // A session id means something only inside the session that opened it.
+        // This is the property the client leans on when it throws its
+        // processor away on a
         // disconnect: records for an id it has not been told about are refused,
         // so the watch opens the session again rather than having its records
         // read with a previous session's tag and item size.

@@ -47,9 +47,8 @@ struct ProtocolCodecTests {
     }
 
     @Test func aSignedAppMessageValueIsWidenedByItsSignAndNotByAZero() throws {
-        // A watchapp writes a signed value in whatever width it asked for:
-        // `dict_write_int(iter, key, &value, 1, true)` with -1 sends the single
-        // byte 0xFF, which zero-extended would read as 255.
+        // `dict_write_int(iter, key, &value, 1, true)` with -1 sends the
+        // single byte 0xFF, and the same call at each of the three widths.
         let header: [UInt8] = [
             0x01, 0x01,
             0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
@@ -184,9 +183,7 @@ struct ProtocolCodecTests {
 
     @Test func everyAppFetchAnswerHasItsOwnWordForItself() {
         // `AppFetchInstallResult`: STARTING = 0x01, BUSY = 0x02,
-        // UUID_INVALID = 0x03, NO_DATA = 0x04. Saying "no data" with the
-        // starting value leaves the watch waiting for a transfer that will
-        // never come until it times out fifteen seconds later.
+        // UUID_INVALID = 0x03, NO_DATA = 0x04.
         #expect(AppFetchCodec.responseFrame(status: .start).payload == [0x01, 0x01])
         #expect(AppFetchCodec.responseFrame(status: .busy).payload == [0x01, 0x02])
         #expect(AppFetchCodec.responseFrame(status: .invalidApplicationID).payload == [0x01, 0x03])
@@ -472,8 +469,6 @@ struct ProtocolCodecTests {
     }
 
     @Test func anActionsSubtitleIsCutOnACharacterAndNotInsideOne() throws {
-        // The watch draws nothing at all when a string begins mid-character,
-        // so the reply that says how the action went would come up blank.
         let id = try #require(UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF"))
         let frame = TimelineActionCodec.responseFrame(
             itemID: id,

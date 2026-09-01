@@ -364,10 +364,7 @@ struct CompanionStorageTests {
     }
 
     @Test func aPinsTextIsCutOnACharacterAndNotInsideOne() throws {
-        // A cut that lands inside a multi-byte character leaves the watch a
-        // byte it cannot read as the start of one: `utf8_get_bounds` fails and
-        // the text layout draws the field as nothing at all, so a Japanese
-        // title one character too long would vanish rather than lose its tail.
+        // Twenty-one three-byte characters, which is 63 of the 64 bytes.
         let pin = PebbleTimelinePin(
             parentApplicationID: UUID(),
             timestamp: Date(timeIntervalSince1970: 0),
@@ -388,8 +385,7 @@ struct CompanionStorageTests {
     }
 
     @Test func aPinIsHeldToTheFirmwaresOwnAttributeLengths() throws {
-        // `MAX_ATTRIBUTE_LENGTHS`: title 64, subtitle 64, body 512. The
-        // firmware cuts anything longer itself, and cuts it mid-character.
+        // `MAX_ATTRIBUTE_LENGTHS`: title 64, subtitle 64, body 512.
         let pin = PebbleTimelinePin(
             parentApplicationID: UUID(),
             timestamp: Date(timeIntervalSince1970: 0),

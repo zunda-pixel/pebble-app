@@ -61,9 +61,12 @@ public enum LogDumpCodec {
         case noLogs
     }
 
-    /// The record is the firmware's own `LogBinaryMessage`, whose two numbers
-    /// `pbl_log_binary_format` puts through `htonl` and `htons` before it hands
-    /// the buffer over, so they arrive most significant byte first.
+    /// Not little-endian, whatever the record's provenance suggests: it is the
+    /// firmware's own `LogBinaryMessage`, written to flash and dumped verbatim
+    /// on an ARM watch, so reading it the way the struct is laid out is the
+    /// obvious move and the wrong one. `pbl_log_binary_format` puts the
+    /// timestamp and the line number through `htonl` and `htons` before it
+    /// hands the buffer over.
     public static func decode(_ frame: PebbleProtocolFrame, cookie: UInt32) throws -> Message? {
         guard frame.endpoint == endpoint else { throw WatchLogError.unexpectedEndpoint }
         guard frame.payload.count >= 5 else { throw WatchLogError.invalidPayload }
