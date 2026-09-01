@@ -78,7 +78,7 @@ struct PendingWorkTests {
 
         // Removing whatever was first at the time dropped the second message
         // without ever sending it, and then saved the empty queue.
-        #expect(client.sentAppMessages.map(\.applicationID) == queued.map(\.applicationID))
+        #expect(client.sentAppMessages.map { $0.applicationID } == queued.map(\.applicationID))
         #expect(model.pendingAppMessages.isEmpty)
     }
 
@@ -94,7 +94,7 @@ struct PendingWorkTests {
         // entries and so the first ones evicted.
         let removedEventID = UUID()
         var operations: [PendingTimelineOperation] = [.delete(removedEventID)]
-        operations += (0..<205).map { index in
+        operations += (0..<205).map { index -> PendingTimelineOperation in
             .upsert(PebbleTimelinePin(
                 parentApplicationID: UUID(),
                 timestamp: Date(),
@@ -121,7 +121,9 @@ struct PendingWorkTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = makeModel(client: client, directory: directory)
 
-        var operations: [PendingTimelineOperation] = (0..<210).map { _ in .delete(UUID()) }
+        var operations: [PendingTimelineOperation] = (0..<210).map { _ -> PendingTimelineOperation in
+            .delete(UUID())
+        }
         model.trimQueuedOperations(&operations)
 
         // Nothing here can be reconstructed, so nothing is thrown away — and

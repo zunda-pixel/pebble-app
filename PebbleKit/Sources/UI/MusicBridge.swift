@@ -84,11 +84,18 @@ final class MusicCoordinator {
     }
 
     private func schedulePush(force: Bool) {
-        guard pushTask == nil else {
-            return
-        }
+        // Forgetting the last snapshot is the whole of what `force` does: it
+        // makes the next push send every field rather than a diff. It has to
+        // happen even when a debounced push is already on its way, because
+        // that push is the one that will run — a watch connecting during the
+        // second after a track change would otherwise be sent the difference
+        // between two states it never saw, which is usually nothing at all,
+        // and its music screen would stay blank.
         if force {
             lastSnapshot = nil
+        }
+        guard pushTask == nil else {
+            return
         }
         pushTask = Task { [weak self] in
             // Collapse bursts of change notifications into one update per second.

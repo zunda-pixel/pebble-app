@@ -348,7 +348,7 @@ struct ApplicationListRow: View {
             Button("Remove Application", role: .destructive, action: removeApplication)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("The application and its settings will be removed from the connected Pebble.")
+            Text("The application and its settings will be removed. A Pebble that is not connected is told the next time it is.")
         }
     }
 }

@@ -233,17 +233,6 @@
         }
       }
     },
-    "%lld pins" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "%lld件のピン"
-          }
-        }
-      }
-    },
     "%lld places" : {
       "localizations" : {
         "ja" : {
@@ -424,45 +413,12 @@
         }
       }
     },
-    "Add one on the Timeline screen, or sync the calendar." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "“タイムライン”画面で追加するか、カレンダーを同期してください。"
-          }
-        }
-      }
-    },
     "Add one with the plus button, or sync the calendar." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "+ボタンで追加するか、カレンダーを同期してください。"
-          }
-        }
-      }
-    },
-    "Add Reminder" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "リマインダーを追加"
-          }
-        }
-      }
-    },
-    "Add to Timeline" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "タイムラインに追加"
           }
         }
       }
@@ -673,17 +629,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチが通知の送信を検出したアプリの一覧です。ミュートすると、そのアプリの通知はウォッチでフィルタリングされます。"
-          }
-        }
-      }
-    },
-    "Apps the watch has seen sending notifications. Turning one off tells the watch to filter that app's notifications." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチが通知の送信を検出したアプリの一覧です。オフにすると、そのアプリの通知はウォッチでフィルタリングされます。"
           }
         }
       }
@@ -1058,6 +1003,16 @@
         }
       }
     },
+    "Connect a Pebble to change the watchface." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ウォッチフェイスを変更するには、Pebbleを接続してください。"
+          }
+        }
+      }
+    },
     "Connect Automatically" : {
       "localizations" : {
         "ja" : {
@@ -1264,16 +1219,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このウォッチに接続します"
-          }
-        }
-      }
-    },
-    "Continuous" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "常時"
           }
         }
       }
@@ -1538,22 +1483,22 @@
         }
       }
     },
-    "Every 5 Minutes" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "5分ごと"
-          }
-        }
-      }
-    },
     "Every 10 Minutes" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "10分ごと"
+          }
+        }
+      }
+    },
+    "Every 30 Minutes" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30分ごと"
           }
         }
       }
@@ -1568,13 +1513,12 @@
         }
       }
     },
-    "Everything the watch is showing on its timeline, including the events a calendar sync brought over." : {
-      "extractionState" : "stale",
+    "Every Hour" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチがタイムラインに表示している項目のすべてです。カレンダーの同期で取り込んだイベントも含まれます。"
+            "state" : "translated",
+            "value" : "1時間ごと"
           }
         }
       }
@@ -2199,6 +2143,16 @@
         }
       }
     },
+    "Last Recorded %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最終記録 %@"
+          }
+        }
+      }
+    },
     "Lines" : {
       "localizations" : {
         "ja" : {
@@ -2645,17 +2599,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチ上"
-          }
-        }
-      }
-    },
-    "Only people with a phone number are shown: the watch sends to a number." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "電話番号が登録されている人だけが表示されます。ウォッチは番号宛てに送信するためです。"
           }
         }
       }
@@ -3656,12 +3599,12 @@
         }
       }
     },
-    "The application and its settings will be removed from the connected Pebble." : {
+    "The application and its settings will be removed. A Pebble that is not connected is told the next time it is." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "接続中のPebbleからアプリケーションとその設定が削除されます。"
+            "state" : "translated",
+            "value" : "アプリケーションとその設定を削除します。接続していないPebbleには、次に接続したときに伝えます。"
           }
         }
       }
@@ -3706,12 +3649,12 @@
         }
       }
     },
-    "The application transfer was interrupted. The previous version was restored." : {
+    "The application transfer was interrupted. The application library was left as it was." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アプリケーションの転送が中断されました。以前のバージョンに戻しました。"
+            "state" : "translated",
+            "value" : "アプリケーションの転送が中断されました。アプリケーションライブラリは元のままです。"
           }
         }
       }
@@ -3928,6 +3871,26 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "テスト通知を送信できませんでした。"
+          }
+        }
+      }
+    },
+    "The timeline pin could not be saved." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タイムラインのピンを保存できませんでした。"
+          }
+        }
+      }
+    },
+    "The timeline queue is full. %lld removed event(s) are still waiting for the watch." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タイムラインの送信待ちがいっぱいです。削除されたイベント%lld件が、まだウォッチへの反映を待っています。"
           }
         }
       }
@@ -4172,12 +4135,12 @@
         }
       }
     },
-    "The watch rejected the application data. The previous version was restored." : {
+    "The watch rejected the application data. The application library was left as it was." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチがアプリケーションのデータを拒否しました。以前のバージョンに戻しました。"
+            "state" : "translated",
+            "value" : "ウォッチがアプリケーションのデータを拒否しました。アプリケーションライブラリは元のままです。"
           }
         }
       }
@@ -4262,6 +4225,16 @@
         }
       }
     },
+    "The watch's health data was saved, but Apple Health did not accept it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ウォッチのヘルスケアデータを保存しましたが、“ヘルスケア”には追加できませんでした。"
+          }
+        }
+      }
+    },
     "The watch's screen" : {
       "localizations" : {
         "ja" : {
@@ -4308,6 +4281,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このアプリケーションは接続中のPebbleのモデルに対応していません。"
+          }
+        }
+      }
+    },
+    "This firmware is already being transferred." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このファームウェアはすでに転送中です。"
           }
         }
       }

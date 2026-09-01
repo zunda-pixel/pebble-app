@@ -12,13 +12,36 @@ final class HealthKitBridge {
         set { Defaults[.healthKitLastExportDate] = newValue }
     }
 
-    func synchronize(_ samples: [PebbleHealthSample]) async throws {
+    /// Whether writing to HealthKit may ask for permission first.
+    ///
+    /// Asking puts a full-screen sheet over whatever the reader is doing, so
+    /// only something the reader started may do it. Health data arriving from
+    /// a watch is not that: it turns up whenever a watch answers a
+    /// synchronization request, in the middle of any screen.
+    enum Authorization {
+        case mayAsk
+        case onlyWhatIsAlreadyGranted
+    }
+
+    func synchronize(
+        _ samples: [PebbleHealthSample],
+        authorization: Authorization = .mayAsk
+    ) async throws {
         guard HKHealthStore.isHealthDataAvailable(),
               let stepsType = HKQuantityType.quantityType(forIdentifier: .stepCount),
               let sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) else {
             throw HealthKitBridgeError.unavailable
         }
-        try await store.requestAuthorization(toShare: [stepsType, sleepType], read: [stepsType, sleepType])
+        switch authorization {
+        case .mayAsk:
+            try await store.requestAuthorization(toShare: [stepsType, sleepType], read: [stepsType, sleepType])
+        case .onlyWhatIsAlreadyGranted:
+            // Writing is the one side HealthKit lets an app read back, and it
+            // is the side used here.
+            guard store.authorizationStatus(for: stepsType) == .sharingAuthorized else {
+                throw HealthKitBridgeError.notGranted
+            }
+        }
         let changedSamples = samples.filter { $0.updatedAt > lastExportDate && $0.source != .healthKit }
         var healthSamples: [HKSample] = []
         for sample in changedSamples {
@@ -113,5 +136,10 @@ final class HealthKitBridge {
     }
 }
 
-enum HealthKitBridgeError: Error { case unavailable }
+enum HealthKitBridgeError: Error {
+    case unavailable
+    /// Writing has not been allowed, and this is not a moment when the reader
+    /// may be asked. Nothing was written and nothing is wrong.
+    case notGranted
+}
 #endif

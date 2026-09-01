@@ -1,4 +1,3 @@
-import Algorithms
 public import API
 import Defaults
 public import Foundation
@@ -93,39 +92,49 @@ extension AppModel {
         let fingerprint = "\(application.id.uuidString)|\(normalizedTitle)|\(normalizedBody)"
         guard recentNotificationFingerprints[fingerprint] == nil else { return }
         recentNotificationFingerprints[fingerprint] = now
+        let notification = PebbleTimelineNotification(
+            parentApplicationID: application.id,
+            title: normalizedTitle,
+            body: normalizedBody,
+            appName: application.displayName
+        )
+        guard !activeConnections.isEmpty else {
+            await queue(notification, reason: "no watch is connected")
+            return
+        }
         do {
-            let notification = PebbleTimelineNotification(
-                parentApplicationID: application.id,
-                title: normalizedTitle,
-                body: normalizedBody,
-                appName: application.displayName
-            )
-            guard !activeConnections.isEmpty else {
-                pendingNotifications.append(notification)
-                if pendingNotifications.count > 20 {
-                    pendingNotifications.removeFirst(pendingNotifications.count - 20)
-                }
-                try? await pendingNotificationLibrary.save(pendingNotifications)
-                await PebbleDiagnostics.shared.record(
-                    category: "notification",
-                    message: "Watch app notification queued until reconnection"
-                )
-                return
-            }
             for connection in activeConnections {
                 let client = connection.client
                 try await retry(with: .watchWork) {
                     try await client.sendNotification(notification)
                 }
             }
-            await PebbleDiagnostics.shared.record(
-                category: "notification",
-                message: "Watch app notification sent"
-            )
         } catch {
-            recentNotificationFingerprints[fingerprint] = nil
-            throw error
+            // Rethrowing loses the notification: the only caller is a
+            // `try?`-ed task in the companion runtime, which has nowhere to
+            // put it. A watch that would not take it now is in the same
+            // position as one that was not there at all, so it is queued.
+            await queue(notification, reason: "the watch would not take it")
+            return
         }
+        await PebbleDiagnostics.shared.record(
+            category: "notification",
+            message: "Watch app notification sent"
+        )
+    }
+
+    /// Keeps a notification for the next flush, capped so a phone that has
+    /// been away for a long time does not hand a watch a day's backlog.
+    private func queue(_ notification: PebbleTimelineNotification, reason: String) async {
+        pendingNotifications.append(notification)
+        if pendingNotifications.count > 20 {
+            pendingNotifications.removeFirst(pendingNotifications.count - 20)
+        }
+        try? await pendingNotificationLibrary.save(pendingNotifications)
+        await PebbleDiagnostics.shared.record(
+            category: "notification",
+            message: "Watch app notification queued: \(reason)"
+        )
     }
 
     func handleCompanionFrame(
@@ -251,7 +260,10 @@ extension AppModel {
         app.muteState = muteState
         app.muteExpiration = nil
         app.stateUpdated = .now
-        if let apps = try? await notificationSourceAppLibrary.merge(app) {
+        // The reader changed this here, on the phone, so it is stored whole
+        // rather than merged: `merge` is for records the watch sends, and its
+        // timestamp gate can discard a change made in the same second.
+        if let apps = try? await notificationSourceAppLibrary.update(app) {
             notificationSourceApps = apps
         }
         for connection in activeConnections {
@@ -319,10 +331,24 @@ extension AppModel {
         }
     }
 
+    /// Hands the watch everything queued while it was away, once.
+    ///
+    /// A flush already running is joined rather than repeated: the two callers
+    /// overlap in practice, and each one working from its own snapshot of the
+    /// queue is what made the watch buzz twice for every queued notification.
     func flushPendingNotifications() async {
-        guard !activeConnections.isEmpty, !pendingNotifications.isEmpty else { return }
-        var remaining: [PebbleTimelineNotification] = []
-        for (index, notification) in pendingNotifications.indexed() {
+        if let flush = pendingNotificationFlush {
+            await flush.value
+            return
+        }
+        let flush = Task { await self.deliverPendingNotifications() }
+        pendingNotificationFlush = flush
+        await flush.value
+        pendingNotificationFlush = nil
+    }
+
+    private func deliverPendingNotifications() async {
+        while !activeConnections.isEmpty, let notification = pendingNotifications.first {
             do {
                 for connection in activeConnections {
                     let client = connection.client
@@ -331,13 +357,15 @@ extension AppModel {
                     }
                 }
             } catch {
-                remaining.append(contentsOf: pendingNotifications[index...])
                 break
             }
+            // Removed by identity rather than by position: sending suspends,
+            // and a notification raised in the meantime is queued behind this
+            // one, so "the first one" is no longer necessarily this one.
+            pendingNotifications.removeAll { $0.id == notification.id }
         }
-        pendingNotifications = remaining
-        try? await pendingNotificationLibrary.save(remaining)
-        if remaining.isEmpty {
+        try? await pendingNotificationLibrary.save(pendingNotifications)
+        if pendingNotifications.isEmpty {
             await PebbleDiagnostics.shared.record(
                 category: "notification",
                 message: "Queued watch app notifications delivered"
@@ -361,16 +389,33 @@ extension AppModel {
         try await connection.client.sendAppMessage(applicationID: applicationID, tuples: tuples)
     }
 
+    /// Sends the messages a watch app raised while no watch was listening.
+    ///
+    /// Joined rather than repeated for the same reason as the notification
+    /// queue: two flushes at once each removed one message per message sent,
+    /// so half of them were dropped without ever reaching a watch.
     func flushPendingAppMessages() async {
-        guard let connection = activeConnections.first else { return }
-        while let message = pendingAppMessages.first {
+        if let flush = pendingAppMessageFlush {
+            await flush.value
+            return
+        }
+        let flush = Task { await self.deliverPendingAppMessages() }
+        pendingAppMessageFlush = flush
+        await flush.value
+        pendingAppMessageFlush = nil
+    }
+
+    private func deliverPendingAppMessages() async {
+        while let connection = activeConnections.first, let message = pendingAppMessages.first {
             do {
                 try await connection.client.sendAppMessage(
                     applicationID: message.applicationID,
                     tuples: message.tuples
                 )
-                pendingAppMessages.removeFirst()
             } catch { break }
+            // Removed by identity: sending suspends, so the message at the
+            // front of the queue afterwards need not be the one just sent.
+            pendingAppMessages.removeAll { $0.id == message.id }
         }
         try? await pendingAppMessageLibrary.save(pendingAppMessages)
     }

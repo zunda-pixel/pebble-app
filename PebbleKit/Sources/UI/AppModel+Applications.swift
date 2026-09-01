@@ -65,7 +65,13 @@ extension AppModel {
     }
 
     public func activateWatchface(_ application: PebbleApplication) async {
-        guard application.kind == .watchface, !activeConnections.isEmpty else { return }
+        guard application.kind == .watchface else { return }
+        guard !activeConnections.isEmpty else {
+            // A watchface becomes active by being launched, and there is
+            // nothing to launch it on.
+            applicationLibraryErrorMessage = "Connect a Pebble to change the watchface."
+            return
+        }
         do {
             for connection in activeConnections {
                 let client = connection.client
@@ -100,8 +106,18 @@ extension AppModel {
                 applicationLibraryErrorMessage = "Install and activate another watchface before removing the active one."
                 return
             }
-            await activateWatchface(fallback)
-            guard activeWatchfaceID == fallback.id else { return }
+            if activeConnections.isEmpty {
+                // The active watchface is remembered from the last session, so
+                // this is the ordinary offline case rather than an odd one.
+                // Nothing can be launched now, so the choice is recorded and
+                // the removal goes ahead; the next connection registers the
+                // library as it then stands and the watch runs what is left.
+                activeWatchfaceID = fallback.id
+                Defaults[.activeWatchfaceID] = fallback.id
+            } else {
+                await activateWatchface(fallback)
+                guard activeWatchfaceID == fallback.id else { return }
+            }
         }
         guard beginApplicationOperation(.removing(id)) else { return }
         defer { finishApplicationOperation(.removing(id)) }
@@ -128,10 +144,12 @@ extension AppModel {
                 url.stopAccessingSecurityScopedResource()
             }
         }
+        var importedApplicationID: UUID?
         do {
             let application = try await Task.detached(priority: .userInitiated) {
                 try PBWPackageImporter.application(from: url)
             }.value
+            importedApplicationID = application.id
             let snapshot = try await applicationLibrary.snapshot(applicationID: application.id)
             let applications = try await applicationLibrary.importPackage(from: url)
             updateApplications(applications)
@@ -149,6 +167,14 @@ extension AppModel {
             hasLoadedApplications = true
             applicationLibraryErrorMessage = nil
         } catch {
+            // Nothing has been transferred yet — the watch refused the
+            // registration, not the bytes — so the import stands, exactly as
+            // it would have if no watch had been connected at all. The
+            // snapshot stays only as long as a transfer might still start,
+            // which is what the success path allows it too.
+            if let importedApplicationID {
+                expirePendingSnapshot(applicationID: importedApplicationID)
+            }
             applicationLibraryErrorMessage = applicationErrorMessage(error)
         }
     }
@@ -325,6 +351,29 @@ extension AppModel {
         }.value
     }
 
+    /// Puts the library back the way it was before an import whose transfer to
+    /// the watch failed.
+    ///
+    /// Importing overwrites both the library entry and the stored `.pbw`, so a
+    /// reader who had version 1 and imports a version 2 the watch then refuses
+    /// was left with neither: the snapshot taken at import time was the only
+    /// copy of version 1, and it was thrown away unread.
+    func restorePendingSnapshot(applicationID: UUID) async {
+        guard let snapshot = pendingImportSnapshots.removeValue(forKey: applicationID) else {
+            return
+        }
+        do {
+            updateApplications(try await applicationLibrary.restore(snapshot))
+        } catch {
+            await PebbleDiagnostics.shared.record(
+                .error,
+                category: "application",
+                message: "Could not restore the application library after a failed transfer: "
+                    + String(reflecting: error)
+            )
+        }
+    }
+
     func expirePendingSnapshot(applicationID: UUID) {
         Task { [weak self] in
             try? await Task.sleep(for: .seconds(300))
@@ -366,10 +415,13 @@ extension AppModel {
             "The watch is busy. Please try changing the application order again."
         case is AppReorderClientError:
             "The watch rejected the application order. The previous order was restored."
+        // Restoration is what actually happens: the import is undone, so the
+        // reader keeps the version they had. Saying which of the two — an
+        // earlier version, or nothing — would need to know what was there.
         case PutBytesTransferError.negativeAcknowledgement:
-            "The watch rejected the application data. The previous version was restored."
+            "The watch rejected the application data. The application library was left as it was."
         case is PutBytesTransferError, is PutBytesCodecError:
-            "The application transfer was interrupted. The previous version was restored."
+            "The application transfer was interrupted. The application library was left as it was."
         case PBWManifestError.noCompatibleVariant:
             "This application does not support the connected Pebble model."
         case PBWPackageImportError.applicationIDMismatch:
@@ -430,6 +482,7 @@ extension AppModel {
         guard let packageURL = await applicationLibrary.storedPackageURL(
             applicationID: request.applicationID
         ) else {
+            await restorePendingSnapshot(applicationID: request.applicationID)
             try? await connection.client.respondToAppFetch(with: .noData)
             return
         }
@@ -472,7 +525,10 @@ extension AppModel {
             pendingImportSnapshots[request.applicationID] = nil
             applicationLibraryErrorMessage = nil
         } catch {
-            pendingImportSnapshots[request.applicationID] = nil
+            // The transfer failed, so the version the reader had is still the
+            // one to have — including when "the version they had" is none at
+            // all and the import has to be undone entirely.
+            await restorePendingSnapshot(applicationID: request.applicationID)
             applicationLibraryErrorMessage = applicationErrorMessage(error)
             try? await connection.client.respondToAppFetch(with: .noData)
         }

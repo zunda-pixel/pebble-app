@@ -104,6 +104,7 @@ extension AppModel {
             weatherCredit = try? await weatherBridge.credit()
         }
         var reports: [PebbleWeatherReport] = []
+        var placeFailed = false
         for place in weatherPlaces {
             var place = place
             // The entry that follows the phone is only useful where the phone
@@ -114,9 +115,10 @@ extension AppModel {
             }
             do {
                 reports.append(
-                    try await weatherBridge.report(for: place, inFahrenheit: weatherUsesFahrenheit)
+                    try await fetchWeatherReport(place, weatherUsesFahrenheit)
                 )
             } catch {
+                placeFailed = true
                 weatherStatusMessage = weatherFailureMessage(for: error, place: place.name)
                 // `localizedDescription` on a WeatherKit failure is usually
                 // "The operation couldn't be completed", which says nothing.
@@ -131,7 +133,10 @@ extension AppModel {
         guard !reports.isEmpty else { return }
         weatherReports = reports
         weatherUpdated = .now
-        weatherStatusMessage = nil
+        // A place whose forecast did not arrive shows a blank temperature and
+        // is left out of the ordering the watch is given, so its failure has
+        // to stay on screen even though the other places worked.
+        if !placeFailed { weatherStatusMessage = nil }
         for connection in activeConnections {
             await sendWeather(to: connection)
         }

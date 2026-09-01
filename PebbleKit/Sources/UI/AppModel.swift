@@ -170,6 +170,14 @@ public final class AppModel {
     let appCatalog = PebbleAppCatalog()
     let languagePackCatalog = PebbleLanguagePackCatalog()
     let weatherBridge = WeatherBridge()
+    /// How one place's forecast is fetched. Held as a function so a test can
+    /// answer for some places and refuse for others, which is the case that
+    /// matters and the one WeatherKit itself cannot be asked to produce.
+    @ObservationIgnored
+    var fetchWeatherReport: (WeatherPlace, Bool) async throws -> PebbleWeatherReport = {
+        place, usesFahrenheit in
+        try await WeatherBridge().report(for: place, inFahrenheit: usesFahrenheit)
+    }
     let phoneLocationSource = PhoneLocationSource()
     let pendingNotificationLibrary = PendingNotificationLibrary()
     let notificationPreferenceLibrary = NotificationPreferenceLibrary()
@@ -201,6 +209,13 @@ public final class AppModel {
     @ObservationIgnored var hasStarted = false
     @ObservationIgnored var recentNotificationFingerprints: [String: Date] = [:]
     @ObservationIgnored var pendingNotifications: [PebbleTimelineNotification] = []
+    /// The flush already running, if there is one. Both the app coming
+    /// forward and a watch finishing its synchronization ask for a flush, and
+    /// two of them at once would hand the watch every queued notification
+    /// twice and drop a queued message that was never sent, so the second
+    /// caller waits for the first instead of starting its own.
+    @ObservationIgnored var pendingNotificationFlush: Task<Void, Never>?
+    @ObservationIgnored var pendingAppMessageFlush: Task<Void, Never>?
     @ObservationIgnored lazy var companionRuntime = PebbleCompanionRuntime(
         openURLHandler: { [weak self] url in self?.openConfigurationURL(url) },
         appMessageHandler: { [weak self] applicationID, tuples in
@@ -368,6 +383,12 @@ public final class AppModel {
             )
             discoveredDevices.removeAll { $0.id == device.id }
             unknownBondedWatches.removeAll { $0.id == device.id }
+            // The watch is connected as of now. Leaving its id in
+            // `connectingDeviceIDs` until this function returns would rank the
+            // whole post-connect synchronization as "connecting", which is
+            // what held the Add Watch sheet on "Connecting…" — with every row
+            // greyed out — for as long as a first-time sync takes.
+            connectingDeviceIDs.remove(device.id)
             refreshConnectionState()
             await recordConnectedWatch(connectedDevice)
             await restorePendingNotifications()
@@ -455,13 +476,29 @@ public final class AppModel {
                 guard let self else { return }
                 do {
                     self.healthSamples = try await self.healthLibrary.merge(samples)
-                    self.dataSyncStatusMessage = "Received \(samples.count) health update(s) from the watch."
-                    #if os(iOS)
-                    try await self.healthKitBridge.synchronize(self.healthSamples)
-                    #endif
                 } catch {
                     self.dataSyncStatusMessage = "Watch health data could not be saved."
+                    return
                 }
+                // The samples are stored and charted whatever HealthKit does
+                // with them next, so that is said first and separately.
+                self.dataSyncStatusMessage = "Received \(samples.count) health update(s) from the watch."
+                #if os(iOS)
+                do {
+                    // The watch answered on its own account, so this must not
+                    // raise the permission sheet. A reader who wants the data
+                    // in Apple Health asks for it in Health.
+                    try await self.healthKitBridge.synchronize(
+                        self.healthSamples,
+                        authorization: .onlyWhatIsAlreadyGranted
+                    )
+                } catch HealthKitBridgeError.notGranted, HealthKitBridgeError.unavailable {
+                    // Nothing was asked for and nothing was written. Neither
+                    // is a failure of this synchronization.
+                } catch {
+                    self.dataSyncStatusMessage = "The watch's health data was saved, but Apple Health did not accept it."
+                }
+                #endif
             }
         case .appRunStateChanged(let event):
             switch event {
@@ -480,6 +517,13 @@ public final class AppModel {
                 else { return }
                 self.timelinePins.remove(at: index)
                 try? await self.timelineLibrary.save(self.timelinePins)
+                // Only the watch the action was taken on removed the pin for
+                // itself. Every other watch still holds it, and nothing else
+                // would ever mention it again: the pin is gone from
+                // `timelinePins`, so no later synchronization derives anything
+                // for it.
+                try? await self.queueTimelineOperation(.delete(invocation.itemID))
+                await self.synchronizeTimeline()
                 self.timelineActionStatusMessage = "Timeline action completed."
             }
         case .applicationLogReceived(let applicationID, let line):

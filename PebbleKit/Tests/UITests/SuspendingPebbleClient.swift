@@ -59,15 +59,19 @@ final class SuspendingPebbleClient: PebbleClient {
     }
 
     func frames() -> AsyncStream<PebbleProtocolFrame> {
-        AsyncStream { frameContinuation = $0 }
+        AsyncStream { continuation in frameContinuation = continuation }
     }
 
     func events() -> AsyncStream<PebbleClientEvent> {
-        AsyncStream { eventContinuation = $0 }
+        AsyncStream { continuation in eventContinuation = continuation }
     }
 
     func emit(_ event: PebbleClientEvent) {
         eventContinuation?.yield(event)
+    }
+
+    func emit(_ frame: PebbleProtocolFrame) {
+        frameContinuation?.yield(frame)
     }
 
     func sendNotification(_ notification: PebbleTimelineNotification) async throws {

@@ -65,6 +65,10 @@ struct DevicesView: View {
 struct AddWatchSheet: View {
     var model: AppModel
     @Environment(\.dismiss) private var dismiss
+    /// The watch the reader asked for, so the sheet can close the moment that
+    /// watch is connected rather than when everything the app then sends it
+    /// has been sent.
+    @State private var watchBeingAdded: String?
 
     var body: some View {
         NavigationStack {
@@ -84,12 +88,8 @@ struct AddWatchSheet: View {
                     Section {
                         ForEach(model.unknownBondedWatches) { watch in
                             Button {
-                                Task {
-                                    await model.connect(to: watch)
-                                    if model.connections.contains(where: { $0.device.id == watch.id }) {
-                                        dismiss()
-                                    }
-                                }
+                                watchBeingAdded = watch.id
+                                Task { await model.connect(to: watch) }
                             } label: {
                                 Label(watch.name, systemImage: "applewatch.radiowaves.left.and.right")
                             }
@@ -105,12 +105,8 @@ struct AddWatchSheet: View {
                 Section {
                     ForEach(model.discoveredDevices) { device in
                         DiscoveredDeviceRow(device: device) {
-                            Task {
-                                await model.connect(to: device)
-                                if model.connections.contains(where: { $0.device.id == device.id }) {
-                                    dismiss()
-                                }
-                            }
+                            watchBeingAdded = device.id
+                            Task { await model.connect(to: device) }
                         }
                         .disabled(isConnecting)
                     }
@@ -127,6 +123,10 @@ struct AddWatchSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
                 }
+            }
+            .onChange(of: model.connections.map(\.device.id)) { _, connectedIDs in
+                guard let watchBeingAdded, connectedIDs.contains(watchBeingAdded) else { return }
+                dismiss()
             }
         }
         #if os(macOS)

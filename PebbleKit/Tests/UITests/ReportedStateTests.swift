@@ -27,7 +27,7 @@ struct ReportedStateTests {
         // Already credited, so the refresh has no reason to reach WeatherKit
         // for the attribution it must show.
         model.weatherCredit = WeatherCredit(
-            serviceName: " Weather",
+            serviceName: "Test Weather",
             lightMarkURL: URL(string: "https://example.com/light")!,
             darkMarkURL: URL(string: "https://example.com/dark")!,
             legalPageURL: URL(string: "https://example.com/legal")!

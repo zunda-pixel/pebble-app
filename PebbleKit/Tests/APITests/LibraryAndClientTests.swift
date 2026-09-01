@@ -363,6 +363,63 @@ struct CompanionStorageTests {
         #expect(alarm.payload[typeIndex] == PebbleTimelineItemType.reminder.rawValue)
     }
 
+    @Test func aPinsTextIsCutOnACharacterAndNotInsideOne() throws {
+        // A cut that lands inside a multi-byte character leaves the watch a
+        // byte it cannot read as the start of one: `utf8_get_bounds` fails and
+        // the text layout draws the field as nothing at all, so a Japanese
+        // title one character too long would vanish rather than lose its tail.
+        let pin = PebbleTimelinePin(
+            parentApplicationID: UUID(),
+            timestamp: Date(timeIntervalSince1970: 0),
+            title: String(repeating: "石", count: 30),
+            subtitle: String(repeating: "音", count: 30),
+            body: nil
+        )
+
+        let attributes = Self.timelineAttributes(try pin.encoded())
+
+        #expect(attributes.map(\.id) == [0x01, 0x02])
+        #expect(attributes[0].bytes.count == 63)
+        #expect(String(bytes: attributes[0].bytes, encoding: .utf8)
+            == String(repeating: "石", count: 21))
+        #expect(attributes[1].bytes.count == 63)
+        #expect(String(bytes: attributes[1].bytes, encoding: .utf8)
+            == String(repeating: "音", count: 21))
+    }
+
+    @Test func aPinIsHeldToTheFirmwaresOwnAttributeLengths() throws {
+        // `MAX_ATTRIBUTE_LENGTHS`: title 64, subtitle 64, body 512. The
+        // firmware cuts anything longer itself, and cuts it mid-character.
+        let pin = PebbleTimelinePin(
+            parentApplicationID: UUID(),
+            timestamp: Date(timeIntervalSince1970: 0),
+            title: String(repeating: "t", count: 200),
+            subtitle: String(repeating: "s", count: 200),
+            body: String(repeating: "b", count: 600)
+        )
+
+        let attributes = Self.timelineAttributes(try pin.encoded())
+
+        #expect(attributes.map(\.id) == [0x01, 0x02, 0x03])
+        #expect(attributes.map(\.bytes.count) == [64, 64, 512])
+    }
+
+    /// The attributes of an encoded timeline item, which follow a header of a
+    /// fixed forty-six bytes.
+    private static func timelineAttributes(_ value: [UInt8]) -> [(id: UInt8, bytes: [UInt8])] {
+        var attributes: [(id: UInt8, bytes: [UInt8])] = []
+        var offset = 46
+        while offset + 3 <= value.count {
+            let id = value[offset]
+            let length = Int(value[offset + 1]) | Int(value[offset + 2]) << 8
+            offset += 3
+            guard offset + length <= value.count else { break }
+            attributes.append((id, Array(value[offset..<(offset + length)])))
+            offset += length
+        }
+        return attributes
+    }
+
     @Test func healthLibraryPersistsSamples() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         let url = directory.appending(path: "health.json")

@@ -14,10 +14,16 @@ struct HealthView: View {
                 ForEach(HealthAnalysisPeriod.allCases) { period in Text(period.title).tag(period) }
             }
             .pickerStyle(.segmented)
-            Section("Today") {
-                LabeledContent("Steps", value: model.healthSamples.last?.steps ?? 0, format: .number)
+            Section {
+                LabeledContent("Steps", value: newestSample?.steps ?? 0, format: .number)
                 LabeledContent("Sleep") {
-                    Text("\(model.healthSamples.last?.sleepMinutes ?? 0) min")
+                    Text("\(newestSample?.sleepMinutes ?? 0) min")
+                }
+            } header: {
+                if let summaryDate {
+                    Text("Last Recorded \(summaryDate, format: .dateTime.weekday(.abbreviated).month().day())")
+                } else {
+                    Text("Today")
                 }
             }
             Section("Steps") {
@@ -75,6 +81,23 @@ struct HealthView: View {
             guard case .success(let url) = result else { return }
             Task { await model.importHealthData(from: url) }
         }
+    }
+
+    /// The most recent day there is anything for, whatever day that is.
+    var newestSample: PebbleHealthSample? {
+        model.healthSamples.max { $0.date < $1.date }
+    }
+
+    /// The day the summary is actually showing, when that is not today.
+    ///
+    /// A watch only hands over what it recorded, so the newest day it knows
+    /// about can be days old: one last worn on Friday reports Friday. Saying
+    /// which day it is beats showing Friday's steps as this morning's.
+    var summaryDate: Date? {
+        guard let date = newestSample?.date, !Calendar.current.isDateInToday(date) else {
+            return nil
+        }
+        return date
     }
 
     private var filteredSamples: [PebbleHealthSample] {

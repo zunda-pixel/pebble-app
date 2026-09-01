@@ -20,10 +20,22 @@ extension AppModel {
         timelinePins.append(pin)
         do {
             try await timelineLibrary.save(timelinePins)
-            try await queueTimelineOperation(.upsert(pin))
-            if connectedDevice != nil { await synchronizeTimeline() }
+        } catch {
+            // Nothing was stored, so the list must not go on showing it.
+            timelinePins.removeAll { $0.id == pin.id }
+            dataSyncStatusMessage = "The timeline pin could not be saved."
+            return
+        }
+        // A queue write that fails is not lost work: `synchronizeTimeline`
+        // derives an upsert for every pin it holds, and this one is now one
+        // of them.
+        try? await queueTimelineOperation(.upsert(pin))
+        if connectedDevice != nil {
+            await synchronizeTimeline()
             dataSyncStatusMessage = "Timeline pin saved."
-        } catch { dataSyncStatusMessage = "Timeline pin queued for the next connection." }
+        } else {
+            dataSyncStatusMessage = "Timeline pin queued for the next connection."
+        }
     }
 
     /// Takes these pins off the timeline, here and on every watch.
@@ -83,10 +95,32 @@ extension AppModel {
             }
         }
         operations.append(operation)
-        if operations.count > 200 {
-            operations.removeFirst(operations.count - 200)
-        }
+        trimQueuedOperations(&operations)
         try await pendingTimelineOperationLibrary.save(operations)
+    }
+
+    /// Keeps the queue from growing without limit, dropping only what a later
+    /// synchronization can put back.
+    ///
+    /// An upsert is reconstructable: `synchronizeTimeline` derives one for
+    /// every pin the phone holds, so dropping the oldest ones costs nothing.
+    /// A delete has no such source — the pin it names is already gone from
+    /// `timelinePins`, and no later pass will ever mention it again — so
+    /// deletes are kept even past the cap, and the reader is told when the
+    /// queue is over it rather than left with pins that stay on the watch.
+    func trimQueuedOperations(_ operations: inout [PendingTimelineOperation]) {
+        let cap = 200
+        guard operations.count > cap else { return }
+        var droppable = operations.count - cap
+        operations.removeAll { operation in
+            guard droppable > 0, case .upsert = operation else { return false }
+            droppable -= 1
+            return true
+        }
+        if operations.count > cap {
+            dataSyncStatusMessage =
+                "The timeline queue is full. \(operations.count - cap) removed event(s) are still waiting for the watch."
+        }
     }
 
     public func synchronizeCalendar() async {
