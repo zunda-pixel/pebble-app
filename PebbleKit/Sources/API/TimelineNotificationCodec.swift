@@ -45,12 +45,7 @@ public struct PebbleTimelineNotification: Codable, Equatable, Sendable {
         value: String,
         maximumByteCount: Int
     ) -> [UInt8] {
-        var content: [UInt8] = []
-        for character in value {
-            let bytes = Array(String(character).utf8)
-            guard content.count + bytes.count <= maximumByteCount else { break }
-            content.append(contentsOf: bytes)
-        }
+        let content = value.utf8BytesEndingOnACharacter(maximumByteCount: maximumByteCount)
         return [id] + UInt16(content.count).littleEndianBytes + content
     }
 }

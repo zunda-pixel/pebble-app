@@ -50,7 +50,7 @@ public enum TimelineActionCodec {
     ) -> PebbleProtocolFrame {
         var attributes: [[UInt8]] = []
         if let subtitle {
-            let content = Array(subtitle.utf8.prefix(64))
+            let content = subtitle.utf8BytesEndingOnACharacter(maximumByteCount: 64)
             attributes.append([0x02] + UInt16(content.count).littleEndianBytes + content)
         }
         var payload: [UInt8] = [0x11]

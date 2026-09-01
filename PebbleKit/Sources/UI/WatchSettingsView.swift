@@ -113,15 +113,18 @@ struct WatchSettingsView: View {
                     }
                 ))
                 if model.heartRateSettings.isEnabled {
+                    // Off is left out of the choices: the watch keeps a separate
+                    // flag for that, which is the toggle above, and offering it
+                    // twice would let the two disagree.
                     Picker("Reading", selection: Binding(
-                        get: { model.heartRateSettings.interval },
+                        get: { model.heartRateSettings.interval == .off ? .everyTenMinutes : model.heartRateSettings.interval },
                         set: { interval in
                             var settings = model.heartRateSettings
                             settings.interval = interval
                             Task { await model.setHeartRateSettings(settings) }
                         }
                     )) {
-                        ForEach(PebbleHeartRateInterval.allCases, id: \.self) { interval in
+                        ForEach(PebbleHeartRateInterval.allCases.filter { $0 != .off }, id: \.self) { interval in
                             Text(interval.title).tag(interval)
                         }
                     }

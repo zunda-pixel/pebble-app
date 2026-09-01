@@ -46,6 +46,36 @@ struct ProtocolCodecTests {
         ])
     }
 
+    @Test func aSignedAppMessageValueIsWidenedByItsSignAndNotByAZero() throws {
+        // A watchapp writes a signed value in whatever width it asked for:
+        // `dict_write_int(iter, key, &value, 1, true)` with -1 sends the single
+        // byte 0xFF, which zero-extended would read as 255.
+        let header: [UInt8] = [
+            0x01, 0x01,
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+            0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF,
+            0x05,
+        ]
+        let payload = header
+            + [0x01, 0, 0, 0, 0x03, 0x01, 0x00, 0xFF]
+            + [0x02, 0, 0, 0, 0x03, 0x02, 0x00, 0xFF, 0xFF]
+            + [0x03, 0, 0, 0, 0x03, 0x04, 0x00, 0xFF, 0xFF, 0xFF, 0xFF]
+            + [0x04, 0, 0, 0, 0x03, 0x01, 0x00, 0x7F]
+            + [0x05, 0, 0, 0, 0x02, 0x01, 0x00, 0xFF]
+
+        let packet = try AppMessageCodec.decode(PebbleProtocolFrame(endpoint: 48, payload: payload))
+
+        guard case .push(let message) = packet else {
+            Issue.record("expected a push")
+            return
+        }
+        #expect(message.tuples.map(\.value) == [
+            .signed(-1), .signed(-1), .signed(-1), .signed(127),
+            // An unsigned value of the same width is still zero-extended.
+            .unsigned(255),
+        ])
+    }
+
     @Test func appMessageACKAndNACKRoundTrip() throws {
         let ack = AppMessageCodec.resultFrame(transactionID: 9, acknowledged: true)
         let nack = AppMessageCodec.resultFrame(transactionID: 10, acknowledged: false)
@@ -150,6 +180,17 @@ struct ProtocolCodecTests {
     @Test func appFetchBusyResponseUsesOfficialWireFormat() {
         let frame = AppFetchCodec.responseFrame(status: .busy)
         #expect(frame == PebbleProtocolFrame(endpoint: 6_001, payload: [0x01, 0x02]))
+    }
+
+    @Test func everyAppFetchAnswerHasItsOwnWordForItself() {
+        // `AppFetchInstallResult`: STARTING = 0x01, BUSY = 0x02,
+        // UUID_INVALID = 0x03, NO_DATA = 0x04. Saying "no data" with the
+        // starting value leaves the watch waiting for a transfer that will
+        // never come until it times out fifteen seconds later.
+        #expect(AppFetchCodec.responseFrame(status: .start).payload == [0x01, 0x01])
+        #expect(AppFetchCodec.responseFrame(status: .busy).payload == [0x01, 0x02])
+        #expect(AppFetchCodec.responseFrame(status: .invalidApplicationID).payload == [0x01, 0x03])
+        #expect(AppFetchCodec.responseFrame(status: .noData).payload == [0x01, 0x04])
     }
 
     @Test func appReorderRequestUsesOfficialWireFormat() throws {
@@ -428,5 +469,26 @@ struct ProtocolCodecTests {
         ))
         #expect(invocation == TimelineActionInvocation(itemID: id, actionID: 7))
         #expect(TimelineActionCodec.responseFrame(itemID: id, succeeded: true).payload.last == 0)
+    }
+
+    @Test func anActionsSubtitleIsCutOnACharacterAndNotInsideOne() throws {
+        // The watch draws nothing at all when a string begins mid-character,
+        // so the reply that says how the action went would come up blank.
+        let id = try #require(UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF"))
+        let frame = TimelineActionCodec.responseFrame(
+            itemID: id,
+            succeeded: true,
+            subtitle: String(repeating: "済", count: 30)
+        )
+
+        // Command, item, result and attribute count, then the attribute.
+        let attribute = Array(frame.payload.dropFirst(19))
+        let length = Int(attribute[1]) | Int(attribute[2]) << 8
+
+        #expect(frame.payload[18] == 1)
+        #expect(attribute[0] == 0x02)
+        #expect(length == 63)
+        #expect(String(bytes: attribute.dropFirst(3), encoding: .utf8)
+            == String(repeating: "済", count: 21))
     }
 }

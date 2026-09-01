@@ -28,6 +28,12 @@ public enum GetBytesCodec {
     static let objectInfoCommand: UInt8 = 0x01
     static let objectDataCommand: UInt8 = 0x02
 
+    /// More than any watch could have to send: the largest flash a Pebble has
+    /// is 32 MiB, and a coredump is a fraction of one. The size arrives as a
+    /// 32-bit number and is believed before a byte of the object has, so a
+    /// corrupt frame would otherwise have the app reserve four gigabytes.
+    static let maximumObjectByteCount = 32 * 1_024 * 1_024
+
     public static func requestFrame(_ request: GetBytesRequest, transactionID: UInt8) -> PebbleProtocolFrame {
         var payload: [UInt8] = [request.command, transactionID]
         if case .file(let name) = request {
@@ -66,6 +72,9 @@ public struct GetBytesCollector: Sendable {
             let error = frame.payload[2]
             guard error == 0 else { throw GetBytesError.refused(error) }
             let count = Int(UInt32(bigEndianBytes: frame.payload[3..<7]))
+            guard count <= GetBytesCodec.maximumObjectByteCount else {
+                throw GetBytesError.objectTooLarge(count)
+            }
             expectedByteCount = count
             bytes.reserveCapacity(count)
             // A watch with nothing to send says so by saying there is none of
@@ -89,6 +98,9 @@ public enum GetBytesError: Error, Equatable, Sendable {
     case unexpectedEndpoint
     case invalidPayload
     case outOfOrderChunk
+    /// The watch said the object is bigger than any watch could hold, which
+    /// means the frame is corrupt rather than that the object is real.
+    case objectTooLarge(Int)
     /// One means the watch did not understand the request, two that it is
     /// already sending something, three that there is no such object, four
     /// that what it has is corrupt.

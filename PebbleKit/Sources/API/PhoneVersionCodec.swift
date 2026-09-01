@@ -1,3 +1,4 @@
+/// The bits of `PebbleProtocolCapabilities`, in the firmware's own order.
 public enum PhoneCapability: Int, Equatable, Sendable, CaseIterable {
     case appRunStateProtocol = 0
     case infiniteLogDump = 1
@@ -11,6 +12,10 @@ public enum PhoneCapability: Int, Equatable, Sendable, CaseIterable {
     case notificationFiltering = 9
     case unreadCoreDump = 10
     case weatherApp = 11
+    case remindersApp = 12
+    case workoutApp = 13
+    case smoothFirmwareInstallProgress = 14
+    case customVibrationPattern = 15
 }
 
 public enum PhoneOperatingSystem: UInt32, Equatable, Sendable {
@@ -27,18 +32,27 @@ public enum PhoneVersionCodec {
 
     /// The capabilities this companion app actually implements.
     ///
-    /// The weather bit is not decoration: the firmware refuses a write to the
-    /// weather database from a phone that has not claimed it
-    /// (`weather_service_supported_by_phone`), and it reads the claim from the
-    /// answer given here, once, while connecting.
+    /// These are not decoration. The firmware reads the claim once, while
+    /// connecting, and then keeps whole features to itself unless it is there:
+    /// it refuses a write to the weather database from a phone that has not
+    /// claimed the weather app (`weather_service_supported_by_phone`), hides
+    /// the Reminders app from the launcher without the reminders bit
+    /// (`reminder_app_get_info`), reads only the first three fields of a
+    /// now-playing frame and reports no music capabilities at all without the
+    /// extended-music bit (`endpoint.c`), and falls back to the legacy
+    /// firmware-update path — ignoring the byte counts we send it — without the
+    /// smooth-progress bit (`system_message.c`).
     ///
     /// The send-text bit is deliberately absent: the watch hides that app from
     /// a phone that has not claimed it, and a phone that cannot send a message
-    /// has no business offering it.
+    /// has no business offering it. So are the language-pack, health-insight,
+    /// workout, custom-vibration and settings-sync bits, each of which stands
+    /// for a conversation this app does not yet hold up its end of.
     public static var supportedCapabilities: Set<PhoneCapability> {
         [
-            .appRunStateProtocol, .infiniteLogDump, .appMessage8k, .appDictation,
-            .notificationFiltering, .weatherApp,
+            .appRunStateProtocol, .infiniteLogDump, .extendedMusicProtocol,
+            .appMessage8k, .appDictation, .notificationFiltering, .unreadCoreDump,
+            .weatherApp, .remindersApp, .smoothFirmwareInstallProgress,
         ]
     }
 

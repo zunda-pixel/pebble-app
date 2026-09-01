@@ -25,8 +25,10 @@ public struct PebbleTimelinePin: Codable, Equatable, Identifiable, Sendable {
     public var kind: PebbleTimelineItemType = .pin
 
     public func encoded() throws -> [UInt8] {
+        // The firmware's own ceilings, from `MAX_ATTRIBUTE_LENGTHS`: it cuts
+        // anything longer itself, and cuts it mid-character when it does.
         var attributes = [textAttribute(id: 0x01, value: title, limit: 64)]
-        if let subtitle { attributes.append(textAttribute(id: 0x02, value: subtitle, limit: 128)) }
+        if let subtitle { attributes.append(textAttribute(id: 0x02, value: subtitle, limit: 64)) }
         if let body { attributes.append(textAttribute(id: 0x03, value: body, limit: 512)) }
         let attributeBytes = attributes.flatMap { $0 }
         guard let length = UInt16(exactly: attributeBytes.count) else { throw TimelinePinError.payloadTooLarge }
@@ -47,7 +49,7 @@ public struct PebbleTimelinePin: Codable, Equatable, Identifiable, Sendable {
     }
 
     private func textAttribute(id: UInt8, value: String, limit: Int) -> [UInt8] {
-        let content = Array(value.utf8.prefix(limit))
+        let content = value.utf8BytesEndingOnACharacter(maximumByteCount: limit)
         return [id] + UInt16(content.count).littleEndianBytes + content
     }
 }
@@ -119,4 +121,24 @@ public actor TimelinePinLibrary {
 public enum TimelinePinError: Error, Equatable, Sendable {
     case invalidTimestamp
     case payloadTooLarge
+}
+
+extension String {
+    /// As many of the leading UTF-8 bytes as will fit, stopping on a character
+    /// rather than partway through one.
+    ///
+    /// A cut that lands inside a multi-byte character leaves the watch with a
+    /// byte it cannot read as the start of one: `utf8_get_bounds` fails, the
+    /// text layout gives up, and the field is drawn as nothing at all. A
+    /// Japanese title that is one character too long would therefore vanish
+    /// rather than lose its tail, so the cut is made where the text allows.
+    func utf8BytesEndingOnACharacter(maximumByteCount limit: Int) -> [UInt8] {
+        var content: [UInt8] = []
+        for character in self {
+            let bytes = Array(String(character).utf8)
+            guard content.count + bytes.count <= limit else { break }
+            content.append(contentsOf: bytes)
+        }
+        return content
+    }
 }

@@ -89,11 +89,25 @@ public struct PebbleActivitySettings: Codable, Equatable, Sendable {
 }
 
 /// How often the watch reads a heart rate.
+///
+/// These four are the whole of `HRMonitoringInterval`, numbered as the firmware
+/// numbers them: the raw value is written straight into
+/// `ActivityHRMSettings.measurement_interval` and acted on as it stands, so a
+/// choice the watch has never heard of is not refused, it is obeyed as
+/// something else. There is no reading more often than every ten minutes.
 public enum PebbleHeartRateInterval: UInt8, CaseIterable, Codable, Sendable {
-    case off = 0
-    case everyTenMinutes = 1
-    case everyFiveMinutes = 2
-    case continuous = 3
+    case everyTenMinutes = 0
+    case everyThirtyMinutes = 1
+    case everyHour = 2
+    case off = 3
+
+    /// A preference stored before these numbers were the firmware's own reads
+    /// back as whatever the firmware means by that number, rather than failing
+    /// the whole settings record and losing the rest of it with it.
+    public init(from decoder: any Decoder) throws {
+        let rawValue = try decoder.singleValueContainer().decode(UInt8.self)
+        self = Self(rawValue: rawValue) ?? .everyTenMinutes
+    }
 }
 
 @MemberwiseInit(.public)
@@ -103,8 +117,16 @@ public struct PebbleHeartRateSettings: Codable, Equatable, Sendable {
     /// Whether the watch also reads a heart rate during a detected walk or run.
     public var isEnabledDuringActivity: Bool = true
 
+    /// Turning the reading off is written twice, because the watch reads the two
+    /// fields for different things: `enabled` only decides whether an app may
+    /// ask for a heart rate at all (`health_service.c`), while the sampling loop
+    /// itself consults nothing but the interval (`activity.c`, which stops the
+    /// sensor only for `HRMonitoringInterval_Disabled`). Sending the interval as
+    /// it stands with `enabled` false would leave the watch taking a reading
+    /// every ten minutes and spending the battery on it for nobody.
     public func encoded() -> [UInt8] {
-        [isEnabled ? 1 : 0, interval.rawValue, isEnabledDuringActivity ? 1 : 0]
+        let measured = isEnabled ? interval : .off
+        return [isEnabled ? 1 : 0, measured.rawValue, isEnabledDuringActivity ? 1 : 0]
     }
 }
 

@@ -102,10 +102,10 @@ public extension PebbleTimelineIcon {
 public extension PebbleHeartRateInterval {
     var title: LocalizedStringKey {
         switch self {
-        case .off: "Off"
         case .everyTenMinutes: "Every 10 Minutes"
-        case .everyFiveMinutes: "Every 5 Minutes"
-        case .continuous: "Continuous"
+        case .everyThirtyMinutes: "Every 30 Minutes"
+        case .everyHour: "Every Hour"
+        case .off: "Off"
         }
     }
 }

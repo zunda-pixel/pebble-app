@@ -42,6 +42,10 @@ public enum LogDumpCodec {
 
     /// The cookie comes back on every line of the answer, which is how a reply
     /// to an abandoned request is told apart from this one's.
+    ///
+    /// The watch copies the four bytes out of the request and back into every
+    /// reply without ever reading them as a number, so the order they go out in
+    /// only has to be the order they are read back in.
     public static func requestFrame(generation: UInt8, cookie: UInt32) -> PebbleProtocolFrame {
         PebbleProtocolFrame(
             endpoint: endpoint,
@@ -57,9 +61,9 @@ public enum LogDumpCodec {
         case noLogs
     }
 
-    /// The record is the firmware's own `LogBinaryMessage`, sent as it sits in
-    /// memory — so its numbers are little-endian, whichever way round the rest
-    /// of the protocol is.
+    /// The record is the firmware's own `LogBinaryMessage`, whose two numbers
+    /// `pbl_log_binary_format` puts through `htonl` and `htons` before it hands
+    /// the buffer over, so they arrive most significant byte first.
     public static func decode(_ frame: PebbleProtocolFrame, cookie: UInt32) throws -> Message? {
         guard frame.endpoint == endpoint else { throw WatchLogError.unexpectedEndpoint }
         guard frame.payload.count >= 5 else { throw WatchLogError.invalidPayload }
@@ -79,10 +83,10 @@ public enum LogDumpCodec {
 
     static func decodeLine(_ bytes: [UInt8]) throws -> WatchLogLine {
         guard bytes.count >= 24 else { throw WatchLogError.invalidPayload }
-        let timestamp = UInt32(littleEndianBytes: bytes[0..<4])
+        let timestamp = UInt32(bigEndianBytes: bytes[0..<4])
         let level = bytes[4]
         let length = Int(bytes[5])
-        let line = UInt16(littleEndianBytes: bytes[6..<8])
+        let line = UInt16(bigEndianBytes: bytes[6..<8])
         let file = String(decoding: bytes[8..<24].prefix { $0 != 0 }, as: UTF8.self)
         let message = String(decoding: bytes.dropFirst(24).prefix(length), as: UTF8.self)
         return WatchLogLine(

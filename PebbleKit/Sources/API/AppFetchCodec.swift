@@ -13,14 +13,19 @@ public enum AppFetchResponseStatus: Equatable, Sendable {
     case invalidApplicationID
     case noData
 
+    /// `AppFetchInstallResult` in the firmware's own order. Saying "no data"
+    /// with the starting value leaves the watch waiting for a transfer that
+    /// will never come, until it gives up fifteen seconds later.
     var wireValue: UInt8 {
         switch self {
-        case .start, .noData:
+        case .start:
             0x01
         case .busy:
             0x02
         case .invalidApplicationID:
             0x03
+        case .noData:
+            0x04
         }
     }
 }

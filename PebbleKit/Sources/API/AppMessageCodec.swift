@@ -86,6 +86,9 @@ public enum AppMessageCodec {
             data = value.littleEndianBytes
         case .signed(let value):
             type = 3
+            // Always the full four bytes: a narrower width would have to carry
+            // the sign in its own top bit, and there is nothing to be saved by
+            // making the watch work that out.
             data = UInt32(bitPattern: value).littleEndianBytes
         }
         guard let length = UInt16(exactly: data.count) else {
@@ -138,10 +141,21 @@ public enum AppMessageCodec {
         case 2:
             return .unsigned(try decodeUnsigned(data))
         case 3:
-            return .signed(Int32(bitPattern: try decodeUnsigned(data)))
+            return .signed(try decodeSigned(data))
         default:
             throw AppMessageCodecError.unknownTupleType
         }
+    }
+
+    /// A watchapp writes a signed value in whatever width it asked for, so the
+    /// sign sits in the top bit of the last byte that arrived rather than of a
+    /// four-byte word: `dict_write_int(iter, key, &value, 1, true)` with a value
+    /// of -1 arrives as the single byte 0xFF, and reading that as 255 turns a
+    /// small negative number into a large positive one.
+    private static func decodeSigned(_ data: [UInt8]) throws -> Int32 {
+        let value = try decodeUnsigned(data)
+        let unusedBits = 32 - data.count * 8
+        return Int32(bitPattern: value << unusedBits) >> unusedBits
     }
 
     private static func decodeUnsigned(_ data: [UInt8]) throws -> UInt32 {
