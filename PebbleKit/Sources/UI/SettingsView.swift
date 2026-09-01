@@ -21,6 +21,8 @@ struct SettingsView: View {
     var model: AppModel
     @State private var catalogSource = Defaults[.catalogSource]
         ?? PebbleAppCatalog.defaultSourceURL.absoluteString
+    @State private var permissions = PhonePermissions()
+    @Environment(\.scenePhase) private var scenePhase
 
     /// What the Weather row says before it is opened: how many places the watch
     /// is being told about.
@@ -34,10 +36,6 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("Support") {
-                LabeledContent("Supported Watches") { Text("3 models") }
-                LabeledContent("Connection") { Text("Bluetooth LE") }
-            }
             Section {
                 NavigationLink {
                     WeatherView(model: model)
@@ -47,13 +45,19 @@ struct SettingsView: View {
                     }
                 }
             }
-            Section("Permissions") {
-                LabeledContent("Bluetooth") { Text("Required to connect to Pebble") }
-                LabeledContent("Calendar") { Text("Used only when you sync timeline events") }
-                LabeledContent("Location") { Text("Used only for the weather where the phone is") }
+            Section {
+                permissionRow("Bluetooth", permissions.bluetooth)
+                permissionRow("Calendar", permissions.calendar)
+                permissionRow("Reminders", permissions.reminders)
+                permissionRow("Location", permissions.location)
+                permissionRow("Health", permissions.health)
                 Button("Open Privacy Settings", systemImage: "gear") {
                     openPrivacySettings()
                 }
+            } header: {
+                Text("Permissions")
+            } footer: {
+                Text("What this app has been allowed to read. Health shows whether it may write to your Health data: iOS gives no way to ask whether reading was allowed.")
             }
             Section {
                 Toggle("Watch App Notifications", isOn: Binding(
@@ -128,6 +132,27 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("Settings")
+        // Any of these can be changed in the system settings while this app is
+        // in the background, so they are read again on the way back rather than
+        // remembered from the first look.
+        .task { permissions = PhonePermissions.current() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { permissions = PhonePermissions.current() }
+        }
+    }
+
+    /// One permission, and what it is for when it has not been granted — the
+    /// name alone does not say what the app would do with it.
+    private func permissionRow(
+        _ name: LocalizedStringKey,
+        _ state: PhonePermissionState
+    ) -> some View {
+        LabeledContent {
+            Text(state.title)
+                .foregroundStyle(state.isSettled ? AnyShapeStyle(.secondary) : AnyShapeStyle(.orange))
+        } label: {
+            Text(name)
+        }
     }
 
     private func openPrivacySettings() {

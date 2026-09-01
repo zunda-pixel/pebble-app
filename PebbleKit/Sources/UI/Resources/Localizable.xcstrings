@@ -243,16 +243,6 @@
         }
       }
     },
-    "3 models" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "3モデル"
-          }
-        }
-      }
-    },
     "24-Hour Clock" : {
       "localizations" : {
         "ja" : {
@@ -479,6 +469,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "現在地を使うには、位置情報の利用を許可してください。"
+          }
+        }
+      }
+    },
+    "Allowed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "許可"
           }
         }
       }
@@ -730,16 +730,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "Bluetoothがオフか、一時的に利用できません。"
-          }
-        }
-      }
-    },
-    "Bluetooth LE" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "Bluetooth LE"
           }
         }
       }
@@ -2414,6 +2404,26 @@
         }
       }
     },
+    "Not Allowed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "許可しない"
+          }
+        }
+      }
+    },
+    "Not Asked Yet" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "未確認"
+          }
+        }
+      }
+    },
     "Not connected" : {
       "localizations" : {
         "ja" : {
@@ -2551,6 +2561,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "パックのバージョン"
+          }
+        }
+      }
+    },
+    "Partly Allowed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "一部許可"
           }
         }
       }
@@ -3031,16 +3051,6 @@
         }
       }
     },
-    "Required to connect to Pebble" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "Pebbleへの接続に必要です"
-          }
-        }
-      }
-    },
     "Reset" : {
       "localizations" : {
         "ja" : {
@@ -3087,6 +3097,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチを再起動"
+          }
+        }
+      }
+    },
+    "Restricted" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "制限あり"
           }
         }
       }
@@ -3377,26 +3397,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "停止"
-          }
-        }
-      }
-    },
-    "Support" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "サポート"
-          }
-        }
-      }
-    },
-    "Supported Watches" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "対応ウォッチ"
           }
         }
       }
@@ -4397,6 +4397,16 @@
         }
       }
     },
+    "Unavailable" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "利用不可"
+          }
+        }
+      }
+    },
     "Unknown" : {
       "localizations" : {
         "ja" : {
@@ -4473,26 +4483,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "現在地を使う"
-          }
-        }
-      }
-    },
-    "Used only for the weather where the phone is" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "現在地の天気にのみ使用します"
-          }
-        }
-      }
-    },
-    "Used only when you sync timeline events" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "タイムラインのイベントを同期するときのみ使用します"
           }
         }
       }
@@ -4713,6 +4703,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "オンのあいだにウォッチ上のアプリが書き出した内容です。ウォッチは次回の接続時にこの設定を忘れるため、接続のたびに設定し直します。"
+          }
+        }
+      }
+    },
+    "What this app has been allowed to read. Health shows whether it may write to your Health data: iOS gives no way to ask whether reading was allowed." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このアプリが読み取りを許可されている項目です。“ヘルスケア”は、ヘルスケアデータへの書き込みが許可されているかどうかを示します。iOSには、読み取りが許可されたかどうかを確認する手段がないためです。"
           }
         }
       }
