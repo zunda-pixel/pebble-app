@@ -1333,16 +1333,6 @@
         }
       }
     },
-    "Done" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "完了"
-          }
-        }
-      }
-    },
     "Download it, then install it." : {
       "localizations" : {
         "ja" : {

@@ -118,9 +118,7 @@ struct AddWatchSheet: View {
             }
             .navigationTitle("Add Watch")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
-                }
+                Button(role: .close) { dismiss() }
             }
             .onChange(of: model.connections.map(\.device.id)) { _, connectedIDs in
                 guard let watchBeingAdded, connectedIDs.contains(watchBeingAdded) else { return }

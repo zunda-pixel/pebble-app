@@ -115,23 +115,19 @@ struct TimelineItemComposer: View {
             .formStyle(.grouped)
             .navigationTitle(kind.newTitle)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
-                        let value = title
-                        let when = date
-                        dismiss()
-                        Task {
-                            switch kind {
-                            case .pins: await model.addTimelinePin(title: value, date: when)
-                            case .reminders: await model.addReminder(title: value, date: when)
-                            }
+                Button(role: .cancel) { dismiss() }
+                Button("Add", role: .confirm) {
+                    let value = title
+                    let when = date
+                    dismiss()
+                    Task {
+                        switch kind {
+                        case .pins: await model.addTimelinePin(title: value, date: when)
+                        case .reminders: await model.addReminder(title: value, date: when)
                         }
                     }
-                    .disabled(!isComplete)
                 }
+                .disabled(!isComplete)
             }
         }
     }

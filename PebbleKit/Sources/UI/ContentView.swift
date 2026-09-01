@@ -233,7 +233,7 @@ struct ConnectionStatusBanner: View {
                 .font(.callout)
                 .frame(maxWidth: .infinity, alignment: .leading)
             if case .reconnecting = state, let cancelReconnect {
-                Button("Cancel", action: cancelReconnect)
+                Button("Cancel", role: .cancel, action: cancelReconnect)
                     .font(.callout)
             }
         }

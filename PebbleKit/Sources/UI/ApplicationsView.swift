@@ -124,9 +124,10 @@ struct ApplicationsView: View {
                 }
                 .navigationTitle(model.configurationApplication?.displayName ?? "App Settings")
                 .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") { Task { await model.closeConfiguration() } }
-                    }
+                    // Closing, not confirming: the page has its own submit, and
+                    // whatever it posted has already been applied by the time
+                    // this is reachable.
+                    Button(role: .close) { Task { await model.closeConfiguration() } }
                 }
             }
         }
@@ -343,7 +344,7 @@ struct ApplicationListRow: View {
             titleVisibility: .visible
         ) {
             Button("Remove Application", role: .destructive, action: removeApplication)
-            Button("Cancel", role: .cancel) {}
+            Button(role: .cancel) {}
         } message: {
             Text("The application and its settings will be removed. A Pebble that is not connected is told the next time it is.")
         }

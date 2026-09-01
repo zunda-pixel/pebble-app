@@ -29,7 +29,7 @@ struct ConfirmingButton: View {
         }
         .confirmationDialog(question, isPresented: $isConfirming, titleVisibility: .visible) {
             Button(confirmationTitle, role: confirmationRole, action: action)
-            Button("Cancel", role: .cancel) {}
+            Button(role: .cancel) {}
         } message: {
             Text(explanation)
         }

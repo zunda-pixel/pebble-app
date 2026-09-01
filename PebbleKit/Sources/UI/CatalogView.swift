@@ -78,28 +78,24 @@ struct CatalogView: View {
         .searchable(text: $query)
         .navigationTitle("Catalog")
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Done") { dismiss() }
+            Button(role: .close) { dismiss() }
+            if let importApplication {
+                if isImportingApplication {
+                    ProgressView()
+                        .accessibilityLabel("Importing Pebble application")
+                } else {
+                    Button("Import", systemImage: "square.and.arrow.down", action: importApplication)
+                        .accessibilityHint("Choose a PBW package from Files")
+                        .disabled(isImportDisabled)
+                }
             }
-            ToolbarItemGroup {
-                if let importApplication {
-                    if isImportingApplication {
-                        ProgressView()
-                            .accessibilityLabel("Importing Pebble application")
-                    } else {
-                        Button("Import", systemImage: "square.and.arrow.down", action: importApplication)
-                            .accessibilityHint("Choose a PBW package from Files")
-                            .disabled(isImportDisabled)
-                    }
-                }
-                Button("Update All", systemImage: "arrow.down.app") {
-                    Task { await model.installCatalogUpdates() }
-                }
-                Button("Refresh", systemImage: "arrow.clockwise") {
-                    Task { await model.refreshCatalog() }
-                }
-                .disabled(model.isUpdatingCatalog)
+            Button("Update All", systemImage: "arrow.down.app") {
+                Task { await model.installCatalogUpdates() }
             }
+            Button("Refresh", systemImage: "arrow.clockwise") {
+                Task { await model.refreshCatalog() }
+            }
+            .disabled(model.isUpdatingCatalog)
         }
         .overlay {
             if filteredApplications.isEmpty {
