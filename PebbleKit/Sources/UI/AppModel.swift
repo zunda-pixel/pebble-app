@@ -70,14 +70,6 @@ public final class AppModel {
     public internal(set) var heartRateSettings = PebbleHeartRateSettings()
     public internal(set) var isReminderAppEnabled = true
     public internal(set) var watchSettingsStatusMessage: LocalizedStringKey?
-    /// The people the watch can write to, and everyone the phone could offer.
-    public internal(set) var contacts: [PebbleContact] = []
-    public internal(set) var availableContacts: [PebbleContact] = []
-    public internal(set) var contactStatusMessage: LocalizedStringKey?
-    /// The replies the watch offers instead of dictation.
-    public internal(set) var cannedReplies: [String] = []
-    /// Replies chosen on the watch that the phone has not been able to send.
-    public internal(set) var unsentReplies: [WatchReply] = []
     /// What the watch can tell about itself.
     public internal(set) var latestScreenshot: PebbleScreenshot?
     public internal(set) var screenshotURL: URL?
@@ -175,9 +167,6 @@ public final class AppModel {
         fileURL: URL.applicationSupportDirectory.appending(path: "Pebble/reminders.json")
     )
     let healthLibrary = PebbleHealthLibrary()
-    let contactLibrary = PebbleContactLibrary()
-    let replyLibrary = WatchReplyLibrary()
-    let contactsBridge = ContactsBridge()
     let appCatalog = PebbleAppCatalog()
     let languagePackCatalog = PebbleLanguagePackCatalog()
     let weatherBridge = WeatherBridge()
@@ -260,9 +249,6 @@ public final class AppModel {
         loadDownloadedFirmware()
         loadWeatherPlaces()
         loadWatchSettings()
-        loadCannedReplies()
-        await loadContacts()
-        await loadUnsentReplies()
         notificationSourceApps = (try? await notificationSourceAppLibrary.apps()) ?? []
         musicCoordinator.start()
         phoneCallCoordinator.start()
@@ -489,12 +475,9 @@ public final class AppModel {
             }
         case .timelineActionInvoked(let invocation):
             Task { [weak self] in
-                guard let self else { return }
-                if invocation.responseText != nil {
-                    await self.handleWatchReply(invocation, from: connection)
-                    return
-                }
-                guard let index = self.timelinePins.firstIndex(where: { $0.id == invocation.itemID }) else { return }
+                guard let self,
+                      let index = self.timelinePins.firstIndex(where: { $0.id == invocation.itemID })
+                else { return }
                 self.timelinePins.remove(at: index)
                 try? await self.timelineLibrary.save(self.timelinePins)
                 self.timelineActionStatusMessage = "Timeline action completed."
@@ -535,8 +518,6 @@ public final class AppModel {
         await synchronizeTimeline()
         await synchronizeReminders(on: connection)
         await synchronizeWatchSettings(on: connection)
-        await synchronizeContacts(on: connection)
-        await synchronizeCannedReplies(on: connection)
         await synchronizeApplicationLogging(on: connection)
         await sendWeather(to: connection)
         await requestHealthSync(on: connection)

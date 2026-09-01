@@ -5,20 +5,9 @@ import MemberwiseInit
 public struct TimelineActionInvocation: Equatable, Sendable {
     public var itemID: UUID
     public var actionID: UInt8
-    /// What the watch sent along with the action, by attribute id. A reply
-    /// carries the chosen text as the title, and the addressee as the sender.
+    /// What the watch sent along with the action, by attribute id — a snooze
+    /// carries the new time, for instance.
     public var attributes: [UInt8: [UInt8]] = [:]
-
-    /// The reply the reader picked on the watch.
-    public var responseText: String? {
-        attributes[1].map { String(decoding: $0, as: UTF8.self) }
-    }
-
-    /// Who the reply is for, as the watch knows them — the address the Send
-    /// Text app was opened on.
-    public var recipient: String? {
-        attributes[12].map { String(decoding: $0, as: UTF8.self) }
-    }
 }
 
 public enum TimelineActionCodec {
@@ -57,13 +46,9 @@ public enum TimelineActionCodec {
     public static func responseFrame(
         itemID: UUID,
         succeeded: Bool,
-        icon: PebbleTimelineIcon? = nil,
         subtitle: String? = nil
     ) -> PebbleProtocolFrame {
         var attributes: [[UInt8]] = []
-        if let icon {
-            attributes.append([0x06] + UInt16(4).littleEndianBytes + icon.resourceID.littleEndianBytes)
-        }
         if let subtitle {
             let content = Array(subtitle.utf8.prefix(64))
             attributes.append([0x02] + UInt16(content.count).littleEndianBytes + content)

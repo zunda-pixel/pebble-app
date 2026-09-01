@@ -73,18 +73,6 @@
         }
       }
     },
-    "NSContactsUsageDescription" : {
-      "comment" : "Privacy - Contacts Usage Description",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Pebble sends the people you choose to your watch, so its Send Text app can write to them."
-          }
-        }
-      }
-    },
     "NSHealthShareUsageDescription" : {
       "comment" : "Privacy - Health Share Usage Description",
       "extractionState" : "extracted_with_value",

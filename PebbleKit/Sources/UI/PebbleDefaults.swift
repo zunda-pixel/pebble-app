@@ -37,9 +37,6 @@ extension Defaults.Keys {
         default: PebbleHeartRateSettings()
     )
     static let reminderAppEnabled = Key<Bool>("reminderAppEnabled", default: true)
-    /// The short replies the watch offers. Empty means the reader has not
-    /// chosen any yet, not that they want none.
-    static let cannedReplies = Key<[String]>("cannedReplies", default: [])
 
     /// Whether notifications raised by installed watch apps are delivered.
     static let companionNotificationsEnabled = Key<Bool>("companionNotificationsEnabled", default: true)

@@ -307,7 +307,6 @@
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Pebble shows the current song on your watch and lets it control playback.";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Pebble uses Bluetooth to find, connect to, and synchronize with your watch.";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Pebble synchronizes upcoming calendar events to your watch timeline.";
-				INFOPLIST_KEY_NSContactsUsageDescription = "Pebble sends the people you choose to your watch, so its Send Text app can write to them.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Pebble reads steps and sleep data to keep your watch health history synchronized.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Pebble saves watch steps and sleep data to your Health data when you choose to synchronize.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Pebble reads your position only to fetch the weather it sends to your watch.";
@@ -366,7 +365,6 @@
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Pebble shows the current song on your watch and lets it control playback.";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Pebble uses Bluetooth to find, connect to, and synchronize with your watch.";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Pebble synchronizes upcoming calendar events to your watch timeline.";
-				INFOPLIST_KEY_NSContactsUsageDescription = "Pebble sends the people you choose to your watch, so its Send Text app can write to them.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Pebble reads steps and sleep data to keep your watch health history synchronized.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Pebble saves watch steps and sleep data to your Health data when you choose to synchronize.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Pebble reads your position only to fetch the weather it sends to your watch.";

@@ -99,26 +99,6 @@ struct SettingsView: View {
             } footer: {
                 Text("System notifications are delivered directly to a paired Pebble using Apple Notification Center Service. This switch controls notifications created by installed watch apps. Test notifications can be sent from each watch's detail page.")
             }
-            Section {
-                NavigationLink {
-                    ContactsView(model: model)
-                } label: {
-                    LabeledContent("Contacts") {
-                        Text("\(model.contacts.count) chosen")
-                    }
-                }
-                NavigationLink {
-                    RepliesView(model: model)
-                } label: {
-                    LabeledContent("Replies") {
-                        Text("\(model.cannedReplies.count) replies")
-                    }
-                }
-            } header: {
-                Text("Send Text")
-            } footer: {
-                Text("The watch's Send Text app writes to the people chosen here, using one of these replies.")
-            }
             if !model.notificationSourceApps.isEmpty {
                 Section {
                     ForEach(model.notificationSourceApps) { app in

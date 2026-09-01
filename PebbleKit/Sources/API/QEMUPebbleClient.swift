@@ -233,32 +233,6 @@ public final class QEMUPebbleClient: PebbleClient {
         try await send(WeatherCodec.reminderAppFrame(state: state, token: 1))
     }
 
-    public func writeContact(_ contact: PebbleContact) async throws {
-        try await send(ContactsCodec.insertFrame(contact, token: 1))
-    }
-
-    public func removeContact(id: UUID) async throws {
-        try await send(ContactsCodec.deleteFrame(id: id, token: 1))
-    }
-
-    public func writeSendTextContacts(_ contacts: [PebbleContact]) async throws {
-        try await send(SendTextPrefsCodec.insertFrame(contacts: contacts, token: 1))
-    }
-
-    public func respondToTimelineAction(
-        itemID: UUID,
-        succeeded: Bool,
-        icon: PebbleTimelineIcon?,
-        subtitle: String?
-    ) async throws {
-        try await send(TimelineActionCodec.responseFrame(
-            itemID: itemID,
-            succeeded: succeeded,
-            icon: icon,
-            subtitle: subtitle
-        ))
-    }
-
     public func sendImage(token: UInt8, kindValue: UInt8, image: PebbleEncodedImage?) async throws {
         for frame in ImagingCodec.responseFrames(token: token, kindValue: kindValue, image: image) {
             try await send(frame)
@@ -498,9 +472,7 @@ public final class QEMUPebbleClient: PebbleClient {
         } else if frame.endpoint == TimelineActionCodec.endpoint {
             let invocation = try TimelineActionCodec.decode(frame)
             eventContinuation?.yield(.timelineActionInvoked(invocation))
-            if invocation.responseText == nil {
-                Task { try? await send(TimelineActionCodec.responseFrame(itemID: invocation.itemID, succeeded: true)) }
-            }
+            Task { try? await send(TimelineActionCodec.responseFrame(itemID: invocation.itemID, succeeded: true)) }
         } else if frame.endpoint == ImagingCodec.endpoint {
             eventContinuation?.yield(.imageRequested(try ImagingCodec.decode(frame)))
         } else if frame.endpoint == AppRunStateCodec.endpoint {
