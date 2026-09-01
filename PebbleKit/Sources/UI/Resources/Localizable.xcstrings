@@ -233,6 +233,16 @@
         }
       }
     },
+    "%lld pins" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%lld件のピン"
+          }
+        }
+      }
+    },
     "%lld places" : {
       "localizations" : {
         "ja" : {
@@ -379,6 +389,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "アプリを追加"
+          }
+        }
+      }
+    },
+    "Add one on the Timeline screen, or sync the calendar." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“タイムライン”画面で追加するか、カレンダーを同期してください。"
           }
         }
       }
@@ -1494,6 +1514,16 @@
         }
       }
     },
+    "Everything the watch is showing on its timeline, including the events a calendar sync brought over." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチがタイムラインに表示している項目のすべてです。カレンダーの同期で取り込んだイベントも含まれます。"
+          }
+        }
+      }
+    },
     "Export Health Data" : {
       "localizations" : {
         "ja" : {
@@ -2380,6 +2410,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "デバイスなし"
+          }
+        }
+      }
+    },
+    "No Pins" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ピンなし"
           }
         }
       }

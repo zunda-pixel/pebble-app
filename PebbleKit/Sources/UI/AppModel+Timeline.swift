@@ -1,5 +1,5 @@
 import Algorithms
-import API
+public import API
 import AsyncAlgorithms
 import EventKit
 public import Foundation
@@ -26,9 +26,15 @@ extension AppModel {
         } catch { dataSyncStatusMessage = "Timeline pin queued for the next connection." }
     }
 
-    public func removeTimelinePins(at offsets: IndexSet) async {
-        let removed = offsets.compactMap { timelinePins.indices.contains($0) ? timelinePins[$0] : nil }
-        timelinePins.remove(atOffsets: offsets)
+    /// Takes these pins off the timeline, here and on every watch.
+    ///
+    /// Named rather than numbered because the list they were picked from may
+    /// be grouped or narrowed by a search, and a row's place on screen is not
+    /// its place here.
+    public func removeTimelinePins(_ removed: [PebbleTimelinePin]) async {
+        guard !removed.isEmpty else { return }
+        let identifiers = Set(removed.map(\.id))
+        timelinePins.removeAll { identifiers.contains($0.id) }
         try? await timelineLibrary.save(timelinePins)
         for pin in removed { try? await queueTimelineOperation(.delete(pin.id)) }
         if connectedDevice != nil { await synchronizeTimeline() }

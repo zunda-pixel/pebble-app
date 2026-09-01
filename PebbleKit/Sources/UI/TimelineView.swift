@@ -20,14 +20,16 @@ struct TimelineView: View {
                 }
                 .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
-            Section("Pins") {
-                ForEach(model.timelinePins) { pin in
-                    LabeledContent(pin.title) { Text(pin.timestamp, format: .dateTime) }
+            Section {
+                NavigationLink {
+                    TimelinePinsView(model: model)
+                } label: {
+                    LabeledContent("Pins") {
+                        Text("\(model.timelinePins.count) pins")
+                    }
                 }
-                .onDelete { offsets in Task { await model.removeTimelinePins(at: offsets) } }
-            }
-            if let message = model.timelineActionStatusMessage {
-                Text(message).foregroundStyle(.secondary)
+            } footer: {
+                Text("Everything the watch is showing on its timeline, including the events a calendar sync brought over.")
             }
             Section {
                 TextField("Title", text: $reminderTitle)
