@@ -259,11 +259,15 @@ extension AppModel {
         }
     }
 
-    public func removeNotificationSourceApps(at offsets: IndexSet) async {
-        let removed = offsets.compactMap { notificationSourceApps.indices.contains($0) ? notificationSourceApps[$0] : nil }
+    /// Forgets these apps, on the phone and on every watch that holds them.
+    ///
+    /// Named rather than numbered because the list they were picked from may
+    /// have been narrowed by a search, and a row's position there says nothing
+    /// about its position here.
+    public func removeNotificationSourceApps(_ removed: [NotificationSourceApp]) async {
         guard !removed.isEmpty else { return }
-        var apps = notificationSourceApps
-        apps.remove(atOffsets: offsets)
+        let identifiers = Set(removed.map(\.bundleID))
+        let apps = notificationSourceApps.filter { !identifiers.contains($0.bundleID) }
         try? await notificationSourceAppLibrary.save(apps)
         notificationSourceApps = (try? await notificationSourceAppLibrary.apps()) ?? apps
         for app in removed {

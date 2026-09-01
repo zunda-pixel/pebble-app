@@ -99,27 +99,16 @@ struct SettingsView: View {
             } footer: {
                 Text("System notifications are delivered directly to a paired Pebble using Apple Notification Center Service. This switch controls notifications created by installed watch apps. Test notifications can be sent from each watch's detail page.")
             }
-            if !model.notificationSourceApps.isEmpty {
-                Section {
-                    ForEach(model.notificationSourceApps) { app in
-                        NavigationLink {
-                            NotificationAppView(model: model, app: app)
-                        } label: {
-                            LabeledContent {
-                                Text(app.muteState.title)
-                            } label: {
-                                Text(verbatim: app.displayName)
-                            }
-                        }
+            Section {
+                NavigationLink {
+                    NotificationAppsView(model: model)
+                } label: {
+                    LabeledContent("Phone App Notifications") {
+                        Text("\(model.notificationSourceApps.count) apps")
                     }
-                    .onDelete { offsets in
-                        Task { await model.removeNotificationSourceApps(at: offsets) }
-                    }
-                } header: {
-                    Text("Phone App Notifications")
-                } footer: {
-                    Text("Apps the watch has seen sending notifications. Muting one tells the watch to filter that app's notifications.")
                 }
+            } footer: {
+                Text("Apps the watch has seen sending notifications, and what it does with each one.")
             }
             Section("Diagnostics") {
                 Button("Prepare Diagnostic Report", systemImage: "stethoscope") {
