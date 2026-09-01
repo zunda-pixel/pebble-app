@@ -1,16 +1,32 @@
 import API
 import SwiftUI
 
-/// The list is as long as the reader's diary — one calendar sync brings a
-/// month of events — so it is grouped and searchable.
 struct TimelinePinsView: View {
     var model: AppModel
+
+    var body: some View {
+        TimelinePinsContent(
+            pins: model.timelinePins,
+            statusMessage: model.timelineActionStatusMessage
+        ) { removed in
+            Task { await model.removeTimelinePins(removed) }
+        }
+    }
+}
+
+/// The list is as long as the reader's diary — one calendar sync brings a
+/// month of events — so it is grouped and searchable.
+struct TimelinePinsContent: View {
+    var pins: [PebbleTimelinePin]
+    var statusMessage: LocalizedStringKey?
+    var remove: ([PebbleTimelinePin]) -> Void
+
     @State private var search = ""
 
     private var matches: [PebbleTimelinePin] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return model.timelinePins }
-        return model.timelinePins.filter { $0.title.localizedCaseInsensitiveContains(query) }
+        guard !query.isEmpty else { return pins }
+        return pins.filter { $0.title.localizedCaseInsensitiveContains(query) }
     }
 
     private var days: [(date: Date, pins: [PebbleTimelinePin])] {
@@ -26,28 +42,31 @@ struct TimelinePinsView: View {
                 Section {
                     ForEach(day.pins) { pin in
                         LabeledContent(pin.title) {
-                            Text(pin.timestamp, format: pin.isAllDay ? .dateTime.day() : .dateTime.hour().minute())
+                            if pin.isAllDay {
+                                Text("All Day")
+                            } else {
+                                Text(pin.timestamp, format: .dateTime.hour().minute())
+                            }
                         }
                     }
                     .onDelete { offsets in
                         // The rows here are one day's worth of what a search left, and say nothing
                         // about their place in the whole list.
-                        let removed = offsets.compactMap { day.pins.indices.contains($0) ? day.pins[$0] : nil }
-                        Task { await model.removeTimelinePins(removed) }
+                        remove(offsets.compactMap { day.pins.indices.contains($0) ? day.pins[$0] : nil })
                     }
                 } header: {
                     Text(day.date, format: .dateTime.year().month().day())
                 }
             }
-            if let message = model.timelineActionStatusMessage {
+            if let statusMessage {
                 Section {
-                    Text(message).foregroundStyle(.secondary)
+                    Text(statusMessage).foregroundStyle(.secondary)
                 }
             }
         }
         .searchable(text: $search)
         .overlay {
-            if model.timelinePins.isEmpty {
+            if pins.isEmpty {
                 ContentUnavailableView(
                     "No Pins",
                     systemImage: "pin",
@@ -57,5 +76,20 @@ struct TimelinePinsView: View {
                 ContentUnavailableView.search(text: search)
             }
         }
+    }
+}
+
+#Preview("Pins") {
+    NavigationStack {
+        TimelinePinsContent(
+            pins: PreviewSamples.pins,
+            statusMessage: "Pebble 5209 snoozed a pin."
+        ) { _ in }
+    }
+}
+
+#Preview("No pins") {
+    NavigationStack {
+        TimelinePinsContent(pins: [], statusMessage: nil) { _ in }
     }
 }

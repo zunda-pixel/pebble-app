@@ -473,6 +473,16 @@
         }
       }
     },
+    "All Day" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "終日"
+          }
+        }
+      }
+    },
     "Allow Bluetooth access when requested." : {
       "localizations" : {
         "ja" : {

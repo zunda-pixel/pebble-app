@@ -1,17 +1,32 @@
 import API
 import SwiftUI
 
-/// Split at now: what is still coming is what the reader is looking for, and
-/// the watch is told about that half only.
 struct TimelineRemindersView: View {
     var model: AppModel
 
+    var body: some View {
+        TimelineRemindersContent(
+            reminders: model.reminders,
+            statusMessage: model.reminderStatusMessage
+        ) { removed in
+            Task { await model.removeReminders(removed) }
+        }
+    }
+}
+
+/// Split at now: what is still coming is what the reader is looking for, and
+/// the watch is told about that half only.
+struct TimelineRemindersContent: View {
+    var reminders: [PebbleTimelinePin]
+    var statusMessage: LocalizedStringKey?
+    var remove: ([PebbleTimelinePin]) -> Void
+
     private var upcoming: [PebbleTimelinePin] {
-        model.reminders.filter { $0.timestamp > .now }.sorted { $0.timestamp < $1.timestamp }
+        reminders.filter { $0.timestamp > .now }.sorted { $0.timestamp < $1.timestamp }
     }
 
     private var past: [PebbleTimelinePin] {
-        model.reminders.filter { $0.timestamp <= .now }.sorted { $0.timestamp > $1.timestamp }
+        reminders.filter { $0.timestamp <= .now }.sorted { $0.timestamp > $1.timestamp }
     }
 
     var body: some View {
@@ -32,14 +47,14 @@ struct TimelineRemindersView: View {
                     Text("A reminder whose time has gone is not sent to the watch.")
                 }
             }
-            if let message = model.reminderStatusMessage {
+            if let statusMessage {
                 Section {
-                    Text(message).foregroundStyle(.secondary)
+                    Text(statusMessage).foregroundStyle(.secondary)
                 }
             }
         }
         .overlay {
-            if model.reminders.isEmpty {
+            if reminders.isEmpty {
                 ContentUnavailableView(
                     "No Reminders",
                     systemImage: "bell.badge",
@@ -57,8 +72,22 @@ struct TimelineRemindersView: View {
         }
         .onDelete { offsets in
             // These rows are one half of the list, sorted their own way.
-            let removed = offsets.compactMap { reminders.indices.contains($0) ? reminders[$0] : nil }
-            Task { await model.removeReminders(removed) }
+            remove(offsets.compactMap { reminders.indices.contains($0) ? reminders[$0] : nil })
         }
+    }
+}
+
+#Preview("Reminders") {
+    NavigationStack {
+        TimelineRemindersContent(
+            reminders: PreviewSamples.reminders,
+            statusMessage: nil
+        ) { _ in }
+    }
+}
+
+#Preview("No reminders") {
+    NavigationStack {
+        TimelineRemindersContent(reminders: [], statusMessage: nil) { _ in }
     }
 }

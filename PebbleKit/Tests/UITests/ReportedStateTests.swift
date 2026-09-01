@@ -106,29 +106,42 @@ struct ReportedStateTests {
         #expect(await log.count == 4)
     }
 
+    private func healthContent(samples: [PebbleHealthSample]) -> HealthContent {
+        HealthContent(
+            samples: samples,
+            exportURL: nil,
+            statusMessage: nil,
+            isWatchConnected: false,
+            requestWatchSync: {},
+            synchronizeWithHealthKit: {},
+            importFromHealthKit: {},
+            export: {},
+            importArchive: { _ in },
+            deleteLocalData: {}
+        )
+    }
+
     @Test
     func healthSummaryNamesTheDayItIsShowingWhenThatIsNotToday() async throws {
-        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let model = makeModel(directory: directory)
-        let view = HealthView(model: model)
-
         let threeDaysAgo = try #require(
             Calendar.current.date(byAdding: .day, value: -3, to: Date())
         )
-        model.healthSamples = [
+        let stale = healthContent(samples: [
             PebbleHealthSample(date: threeDaysAgo, steps: 11_240, sleepMinutes: 420),
-        ]
+        ])
 
         // A watch last worn on Friday reports Friday, and Monday must not read
         // it as this morning.
-        #expect(view.summaryDate == threeDaysAgo)
-        #expect(view.newestSample?.steps == 11_240)
+        #expect(stale.summaryDate == threeDaysAgo)
+        #expect(stale.newestSample?.steps == 11_240)
 
-        model.healthSamples.append(PebbleHealthSample(date: Date(), steps: 900, sleepMinutes: 0))
+        let today = healthContent(samples: [
+            PebbleHealthSample(date: threeDaysAgo, steps: 11_240, sleepMinutes: 420),
+            PebbleHealthSample(date: Date(), steps: 900, sleepMinutes: 0),
+        ])
 
-        #expect(view.summaryDate == nil)
-        #expect(view.newestSample?.steps == 900)
+        #expect(today.summaryDate == nil)
+        #expect(today.newestSample?.steps == 900)
     }
 }
 

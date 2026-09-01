@@ -35,3 +35,16 @@ struct ConfirmingButton: View {
         }
     }
 }
+
+#Preview {
+    List {
+        ConfirmingButton(
+            title: "Forget This Watch",
+            systemImage: "trash",
+            role: .destructive,
+            question: "Forget Pebble 5209?",
+            explanation: "The watch is disconnected and removed from this phone. Its apps stay in the library.",
+            confirmationTitle: "Forget Watch"
+        ) {}
+    }
+}

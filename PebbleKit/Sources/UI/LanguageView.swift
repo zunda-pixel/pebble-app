@@ -4,48 +4,71 @@ import API
 struct LanguageView: View {
     var model: AppModel
     var watchID: String
-    @State private var isChoosingFile = false
 
     private var connection: WatchConnection? {
         model.connections.first { $0.device.id == watchID }
     }
 
-    private var isConnected: Bool {
-        connection?.isConnected == true
+    var body: some View {
+        LanguageContent(
+            packs: model.languagePacks(deviceID: watchID),
+            installedLocale: connection?.device.languageLocale,
+            installedVersion: connection?.device.languageVersion,
+            isConnected: connection?.isConnected == true,
+            isInstalling: model.isInstallingLanguagePack,
+            progress: model.installationProgress,
+            statusMessage: model.languageStatusMessage,
+            install: { pack in
+                Task { await model.installLanguagePack(pack, deviceID: watchID) }
+            },
+            installFile: { url in
+                Task { await model.installLanguagePack(from: url, deviceID: watchID) }
+            }
+        )
     }
+}
 
-    // An empty locale is the firmware's built-in English rather than a missing
-    // answer.
-    private var installedLocale: String? {
-        guard let locale = connection?.device.languageLocale, !locale.isEmpty else { return nil }
-        return locale
-    }
+struct LanguageContent: View {
+    var packs: [PebbleLanguagePack]
+    /// Empty is the firmware's built-in English; nil is a watch that has not
+    /// said.
+    var installedLocale: String?
+    var installedVersion: UInt16?
+    var isConnected: Bool
+    var isInstalling: Bool
+    var progress: PutBytesTransferProgress?
+    var statusMessage: LocalizedStringKey?
+    var install: (PebbleLanguagePack) -> Void
+    var installFile: (URL) -> Void
 
-    private var packs: [PebbleLanguagePack] {
-        model.languagePacks(deviceID: watchID)
+    @State private var isChoosingFile = false
+
+    private var installedPackLocale: String? {
+        guard let installedLocale, !installedLocale.isEmpty else { return nil }
+        return installedLocale
     }
 
     var body: some View {
         Form {
             Section {
                 LabeledContent("On the Watch") {
-                    if let installedLocale {
-                        Text(verbatim: languageName(for: installedLocale))
+                    if let installedPackLocale {
+                        Text(verbatim: languageName(for: installedPackLocale))
                     } else if isConnected {
                         Text("English (built in)")
                     } else {
                         Text("Unknown")
                     }
                 }
-                if let version = connection?.device.languageVersion, version > 0 {
-                    LabeledContent("Pack Version", value: version, format: .number)
+                if let installedVersion, installedVersion > 0 {
+                    LabeledContent("Pack Version", value: installedVersion, format: .number)
                 }
-                if let message = model.languageStatusMessage {
-                    Text(message)
+                if let statusMessage {
+                    Text(statusMessage)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
-                if let progress = model.installationProgress, progress.totalBytes > 0 {
+                if let progress, progress.totalBytes > 0 {
                     ProgressView(value: Double(progress.bytesSent), total: Double(progress.totalBytes))
                 }
             }
@@ -53,10 +76,10 @@ struct LanguageView: View {
             Section {
                 ForEach(packs) { pack in
                     Button {
-                        Task { await model.installLanguagePack(pack, deviceID: watchID) }
+                        install(pack)
                     } label: {
                         LabeledContent {
-                            if pack.locale == installedLocale {
+                            if pack.locale == installedPackLocale {
                                 Image(systemName: "checkmark")
                                     .foregroundStyle(.tint)
                                     .accessibilityLabel("Installed")
@@ -68,7 +91,7 @@ struct LanguageView: View {
                         .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
-                    .disabled(!isConnected || model.isInstallingLanguagePack)
+                    .disabled(!isConnected || isInstalling)
                 }
             } header: {
                 Text("Languages")
@@ -84,7 +107,7 @@ struct LanguageView: View {
                 Button("Install from a File…", systemImage: "folder") {
                     isChoosingFile = true
                 }
-                .disabled(!isConnected || model.isInstallingLanguagePack)
+                .disabled(!isConnected || isInstalling)
             } footer: {
                 Text("A PBL pack built for this watch's board. A pack built for another board installs but shows the wrong glyphs.")
             }
@@ -93,7 +116,7 @@ struct LanguageView: View {
         .navigationTitle("Language")
         .fileImporter(isPresented: $isChoosingFile, allowedContentTypes: [.pebbleLanguagePack]) { result in
             guard case .success(let url) = result else { return }
-            Task { await model.installLanguagePack(from: url, deviceID: watchID) }
+            installFile(url)
         }
     }
 
@@ -105,5 +128,37 @@ struct LanguageView: View {
         }
         let identifier = locale.replacingOccurrences(of: "_", with: "-")
         return Locale(identifier: identifier).localizedString(forIdentifier: identifier) ?? locale
+    }
+}
+
+#Preview("Japanese installed") {
+    NavigationStack {
+        LanguageContent(
+            packs: PebbleLanguagePackCatalog.packs(for: .obelixPVT),
+            installedLocale: "ja_JP",
+            installedVersion: 1,
+            isConnected: true,
+            isInstalling: false,
+            progress: nil,
+            statusMessage: nil,
+            install: { _ in },
+            installFile: { _ in }
+        )
+    }
+}
+
+#Preview("Installing, watch away") {
+    NavigationStack {
+        LanguageContent(
+            packs: PebbleLanguagePackCatalog.packs(for: .obelixPVT),
+            installedLocale: "",
+            installedVersion: 0,
+            isConnected: false,
+            isInstalling: true,
+            progress: PreviewSamples.transferProgress,
+            statusMessage: "日本語 is being sent to the watch.",
+            install: { _ in },
+            installFile: { _ in }
+        )
     }
 }

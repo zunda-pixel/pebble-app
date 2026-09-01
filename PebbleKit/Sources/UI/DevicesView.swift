@@ -425,3 +425,9 @@ struct DiscoveredDeviceRow: View {
         .accessibilityHint("Connects to this watch")
     }
 }
+
+#Preview("Discovered watch") {
+    List {
+        DiscoveredDeviceRow(device: PreviewSamples.discovered) {}
+    }
+}

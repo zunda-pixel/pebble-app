@@ -1,7 +1,6 @@
 import API
 import SwiftUI
 
-/// One phone app's notifications, as the watch shows them.
 struct NotificationAppView: View {
     var model: AppModel
     var app: NotificationSourceApp
@@ -11,18 +10,42 @@ struct NotificationAppView: View {
     }
 
     var body: some View {
+        NotificationAppContent(
+            app: current,
+            setMute: { state in
+                Task { await model.setNotificationSourceAppMute(bundleID: app.bundleID, muteState: state) }
+            },
+            setIcon: { icon in
+                Task { await model.setNotificationSourceAppIcon(bundleID: app.bundleID, icon: icon) }
+            },
+            setColours: { background, foreground in
+                Task {
+                    await model.setNotificationSourceAppColors(
+                        bundleID: app.bundleID,
+                        background: background,
+                        foreground: foreground
+                    )
+                }
+            }
+        )
+    }
+}
+
+/// One phone app's notifications, as the watch shows them.
+struct NotificationAppContent: View {
+    var app: NotificationSourceApp
+    var setMute: (NotificationAppMuteState) -> Void
+    var setIcon: (PebbleTimelineIcon?) -> Void
+    var setColours: (_ background: PebbleColor?, _ foreground: PebbleColor?) -> Void
+
+    private var current: NotificationSourceApp { app }
+
+    var body: some View {
         Form {
             Section {
                 Picker("Mute", selection: Binding(
                     get: { current.muteState },
-                    set: { state in
-                        Task {
-                            await model.setNotificationSourceAppMute(
-                                bundleID: app.bundleID,
-                                muteState: state
-                            )
-                        }
-                    }
+                    set: { state in setMute(state) }
                 )) {
                     ForEach(NotificationAppMuteState.allCases, id: \.self) { state in
                         Text(state.title).tag(state)
@@ -35,11 +58,7 @@ struct NotificationAppView: View {
             Section {
                 Picker("Icon", selection: Binding(
                     get: { current.icon },
-                    set: { icon in
-                        Task {
-                            await model.setNotificationSourceAppIcon(bundleID: app.bundleID, icon: icon)
-                        }
-                    }
+                    set: { icon in setIcon(icon) }
                 )) {
                     Text("Chosen by the Watch").tag(PebbleTimelineIcon?.none)
                     ForEach(PebbleTimelineIcon.choosable, id: \.self) { icon in
@@ -55,15 +74,7 @@ struct NotificationAppView: View {
             Section {
                 ColourGrid(
                     selection: current.backgroundColor,
-                    onChoose: { colour in
-                        Task {
-                            await model.setNotificationSourceAppColors(
-                                bundleID: app.bundleID,
-                                background: colour,
-                                foreground: current.foregroundColor
-                            )
-                        }
-                    }
+                    onChoose: { colour in setColours(colour, current.foregroundColor) }
                 )
             } header: {
                 Text("Background")
@@ -74,15 +85,7 @@ struct NotificationAppView: View {
             Section {
                 ColourGrid(
                     selection: current.foregroundColor,
-                    onChoose: { colour in
-                        Task {
-                            await model.setNotificationSourceAppColors(
-                                bundleID: app.bundleID,
-                                background: current.backgroundColor,
-                                foreground: colour
-                            )
-                        }
-                    }
+                    onChoose: { colour in setColours(current.backgroundColor, colour) }
                 )
             } header: {
                 Text("Text")
@@ -140,4 +143,22 @@ struct ColourGrid: View {
         let (red, green, blue) = colour.components
         return Color(red: red, green: green, blue: blue)
     }
+}
+
+#Preview("App") {
+    NavigationStack {
+        NotificationAppContent(
+            app: PreviewSamples.notificationApps[1],
+            setMute: { _ in },
+            setIcon: { _ in },
+            setColours: { _, _ in }
+        )
+    }
+}
+
+#Preview("Colours") {
+    Form {
+        ColourGrid(selection: PebbleColor(red: 3, green: 0, blue: 0)) { _ in }
+    }
+    .formStyle(.grouped)
 }

@@ -287,3 +287,15 @@ struct SectionContent: View {
         }
     }
 }
+
+#Preview("Reconnecting") {
+    ConnectionStatusBanner(state: .reconnecting(deviceID: PreviewSamples.watch.id)) {}
+}
+
+#Preview("Connected") {
+    ConnectionStatusBanner(state: .connected(PreviewSamples.watch))
+}
+
+#Preview("Onboarding") {
+    OnboardingView {}
+}

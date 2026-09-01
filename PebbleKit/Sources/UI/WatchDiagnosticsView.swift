@@ -1,7 +1,6 @@
 import API
 import SwiftUI
 
-/// What the watch can be asked about itself.
 struct WatchDiagnosticsView: View {
     var model: AppModel
     var watchID: String
@@ -11,13 +10,52 @@ struct WatchDiagnosticsView: View {
     }
 
     var body: some View {
+        WatchDiagnosticsContent(
+            isConnected: isConnected,
+            screenshot: model.latestScreenshot,
+            screenshotURL: model.screenshotURL,
+            isTakingScreenshot: model.isTakingScreenshot,
+            watchLogLineCount: model.watchLogLines.count,
+            watchLogsURL: model.watchLogsURL,
+            isGatheringWatchLogs: model.isGatheringWatchLogs,
+            isApplicationLoggingEnabled: model.isApplicationLoggingEnabled,
+            applicationLogLines: model.applicationLogLines,
+            coredumpURL: model.coredumpURL,
+            isCollectingCoredump: model.isCollectingCoredump,
+            statusMessage: model.watchDiagnosticsStatusMessage,
+            takeScreenshot: { Task { await model.takeScreenshot(deviceID: watchID) } },
+            gatherWatchLogs: { Task { await model.gatherWatchLogs(deviceID: watchID) } },
+            setApplicationLogging: { isOn in Task { await model.setApplicationLoggingEnabled(isOn) } },
+            collectCoredump: { Task { await model.collectCoredump(deviceID: watchID) } }
+        )
+    }
+}
+
+/// What the watch can be asked about itself.
+struct WatchDiagnosticsContent: View {
+    var isConnected: Bool
+    var screenshot: PebbleScreenshot?
+    var screenshotURL: URL?
+    var isTakingScreenshot: Bool
+    var watchLogLineCount: Int
+    var watchLogsURL: URL?
+    var isGatheringWatchLogs: Bool
+    var isApplicationLoggingEnabled: Bool
+    var applicationLogLines: [WatchLogLine]
+    var coredumpURL: URL?
+    var isCollectingCoredump: Bool
+    var statusMessage: LocalizedStringKey?
+    var takeScreenshot: () -> Void
+    var gatherWatchLogs: () -> Void
+    var setApplicationLogging: (Bool) -> Void
+    var collectCoredump: () -> Void
+
+    var body: some View {
         List {
             Section {
-                Button("Take Screenshot", systemImage: "camera") {
-                    Task { await model.takeScreenshot(deviceID: watchID) }
-                }
-                .disabled(!isConnected || model.isTakingScreenshot)
-                if let screenshot = model.latestScreenshot,
+                Button("Take Screenshot", systemImage: "camera", action: takeScreenshot)
+                    .disabled(!isConnected || isTakingScreenshot)
+                if let screenshot,
                    let image = WatchScreenshotImage(screenshot: screenshot).image {
                     image
                         .interpolation(.none)
@@ -27,23 +65,21 @@ struct WatchDiagnosticsView: View {
                         .frame(maxWidth: .infinity)
                         .accessibilityLabel("The watch's screen")
                 }
-                if let url = model.screenshotURL {
-                    ShareLink(item: url) { Label("Share Screenshot", systemImage: "square.and.arrow.up") }
+                if let screenshotURL {
+                    ShareLink(item: screenshotURL) { Label("Share Screenshot", systemImage: "square.and.arrow.up") }
                 }
             } header: {
                 Text("Screen")
             }
 
             Section {
-                Button("Gather Watch Logs", systemImage: "doc.text.magnifyingglass") {
-                    Task { await model.gatherWatchLogs(deviceID: watchID) }
+                Button("Gather Watch Logs", systemImage: "doc.text.magnifyingglass", action: gatherWatchLogs)
+                    .disabled(!isConnected || isGatheringWatchLogs)
+                if watchLogLineCount > 0 {
+                    LabeledContent("Lines") { Text("\(watchLogLineCount)") }
                 }
-                .disabled(!isConnected || model.isGatheringWatchLogs)
-                if !model.watchLogLines.isEmpty {
-                    LabeledContent("Lines") { Text("\(model.watchLogLines.count)") }
-                }
-                if let url = model.watchLogsURL {
-                    ShareLink(item: url) { Label("Share Logs", systemImage: "square.and.arrow.up") }
+                if let watchLogsURL {
+                    ShareLink(item: watchLogsURL) { Label("Share Logs", systemImage: "square.and.arrow.up") }
                 }
             } header: {
                 Text("Watch Logs")
@@ -53,10 +89,10 @@ struct WatchDiagnosticsView: View {
 
             Section {
                 Toggle("App Logs", isOn: Binding(
-                    get: { model.isApplicationLoggingEnabled },
-                    set: { isOn in Task { await model.setApplicationLoggingEnabled(isOn) } }
+                    get: { isApplicationLoggingEnabled },
+                    set: { isOn in setApplicationLogging(isOn) }
                 ))
-                ForEach(model.applicationLogLines.suffix(50).reversed()) { line in
+                ForEach(applicationLogLines.suffix(50).reversed()) { line in
                     Text(verbatim: line.formatted)
                         .font(.caption.monospaced())
                         .lineLimit(3)
@@ -68,12 +104,10 @@ struct WatchDiagnosticsView: View {
             }
 
             Section {
-                Button("Collect Crash Report", systemImage: "exclamationmark.triangle") {
-                    Task { await model.collectCoredump(deviceID: watchID) }
-                }
-                .disabled(!isConnected || model.isCollectingCoredump)
-                if let url = model.coredumpURL {
-                    ShareLink(item: url) { Label("Share Crash Report", systemImage: "square.and.arrow.up") }
+                Button("Collect Crash Report", systemImage: "exclamationmark.triangle", action: collectCoredump)
+                    .disabled(!isConnected || isCollectingCoredump)
+                if let coredumpURL {
+                    ShareLink(item: coredumpURL) { Label("Share Crash Report", systemImage: "square.and.arrow.up") }
                 }
             } header: {
                 Text("Crash Report")
@@ -81,9 +115,9 @@ struct WatchDiagnosticsView: View {
                 Text("The dump the watch saved the last time it restarted unexpectedly. It is marked as read once collected, so a second attempt finds nothing.")
             }
 
-            if let message = model.watchDiagnosticsStatusMessage {
+            if let statusMessage {
                 Section {
-                    Label(message, systemImage: "info.circle").foregroundStyle(.secondary)
+                    Label(statusMessage, systemImage: "info.circle").foregroundStyle(.secondary)
                 }
             }
         }
@@ -98,5 +132,51 @@ struct WatchScreenshotImage {
     var image: Image? {
         guard let cgImage = WatchImageRenderer.makeImage(screenshot) else { return nil }
         return Image(decorative: cgImage, scale: 1)
+    }
+}
+
+#Preview("Connected") {
+    NavigationStack {
+        WatchDiagnosticsContent(
+            isConnected: true,
+            screenshot: nil,
+            screenshotURL: nil,
+            isTakingScreenshot: false,
+            watchLogLineCount: PreviewSamples.logLines.count,
+            watchLogsURL: nil,
+            isGatheringWatchLogs: false,
+            isApplicationLoggingEnabled: true,
+            applicationLogLines: PreviewSamples.logLines,
+            coredumpURL: nil,
+            isCollectingCoredump: false,
+            statusMessage: "3 log line(s) collected.",
+            takeScreenshot: {},
+            gatherWatchLogs: {},
+            setApplicationLogging: { _ in },
+            collectCoredump: {}
+        )
+    }
+}
+
+#Preview("Away") {
+    NavigationStack {
+        WatchDiagnosticsContent(
+            isConnected: false,
+            screenshot: nil,
+            screenshotURL: nil,
+            isTakingScreenshot: false,
+            watchLogLineCount: 0,
+            watchLogsURL: nil,
+            isGatheringWatchLogs: false,
+            isApplicationLoggingEnabled: false,
+            applicationLogLines: [],
+            coredumpURL: nil,
+            isCollectingCoredump: false,
+            statusMessage: nil,
+            takeScreenshot: {},
+            gatherWatchLogs: {},
+            setApplicationLogging: { _ in },
+            collectCoredump: {}
+        )
     }
 }

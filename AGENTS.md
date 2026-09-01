@@ -88,6 +88,34 @@ Not `NSLock`, and not `nonisolated(unsafe)`.
   toolbar cannot mix bare views with `ToolbarItem`/`ToolbarItemGroup`; make the
   whole closure views.
 
+## Views and previews
+
+**A view without a `#Preview` is not finished.** Every state worth looking at
+gets one — populated, empty, mid-transfer, watch away — because that is the only
+way most of this UI is ever seen: a real watch is needed to reach it in the app,
+and the Mac and the phone lay it out differently.
+
+Which means a view has to be previewable without a watch, and that shapes the
+code:
+
+- **Split each screen in two.** A thin `SomethingView` that reads `AppModel` and
+  hands the pieces down, and a `SomethingContent` that takes plain values and
+  closures — `pins: [PebbleTimelinePin]`, `remove: ([PebbleTimelinePin]) -> Void`
+  — and holds the layout. The content view is what gets the previews, and what a
+  test can construct.
+- **Never reach for `AppModel` from inside the layout.** A screen that loads its
+  own data in `.task` previews as empty whatever sample data is handed to it, and
+  a test of it needs a model, a client and a directory on disk.
+- **Sample values live in `PreviewSamples.swift`**, one place, so a screen and
+  the rows it is made of are previewed against the same data and a changed type
+  is one compile error instead of a dozen.
+- Previews are not `#if DEBUG`-guarded: they compile with everything else, so
+  `RunAllTests` and `BuildProject` catch a preview that has gone stale.
+- `RenderPreview` renders one for real, and is worth doing: it caught an all-day
+  pin whose time column read "3" because the format was `.dateTime.day()`. Note
+  that it switches the run destination to the device, so set it back to `My Mac`
+  before testing.
+
 ## Where each explanation belongs
 
 Four places, four jobs. They repeat each other otherwise, and the copies go

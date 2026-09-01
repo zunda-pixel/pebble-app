@@ -5,6 +5,54 @@ import UniformTypeIdentifiers
 
 struct HealthView: View {
     var model: AppModel
+
+    var body: some View {
+        HealthContent(
+            samples: model.healthSamples,
+            exportURL: model.healthExportURL,
+            statusMessage: model.dataSyncStatusMessage,
+            isWatchConnected: model.connectedDevice != nil,
+            requestWatchSync: { Task { await model.requestHealthSync() } },
+            synchronizeWithHealthKit: synchronizeWithHealthKit,
+            importFromHealthKit: importFromHealthKit,
+            export: { Task { await model.exportHealthData() } },
+            importArchive: { url in Task { await model.importHealthData(from: url) } },
+            deleteLocalData: { Task { await model.deleteHealthData() } }
+        )
+        .task { await model.loadHealth() }
+    }
+
+    // Apple Health is on the phone only; the buttons that reach it are compiled
+    // out elsewhere, and so is the work behind them.
+    private var synchronizeWithHealthKit: () -> Void {
+        #if os(iOS)
+        { Task { await model.synchronizeWithHealthKit() } }
+        #else
+        {}
+        #endif
+    }
+
+    private var importFromHealthKit: () -> Void {
+        #if os(iOS)
+        { Task { await model.importFromHealthKit() } }
+        #else
+        {}
+        #endif
+    }
+}
+
+struct HealthContent: View {
+    var samples: [PebbleHealthSample]
+    var exportURL: URL?
+    var statusMessage: LocalizedStringKey?
+    var isWatchConnected: Bool
+    var requestWatchSync: () -> Void
+    var synchronizeWithHealthKit: () -> Void
+    var importFromHealthKit: () -> Void
+    var export: () -> Void
+    var importArchive: (URL) -> Void
+    var deleteLocalData: () -> Void
+
     @State private var period: HealthAnalysisPeriod = .week
     @State private var isImportingArchive = false
 
@@ -45,22 +93,14 @@ struct HealthView: View {
                 }
                 LabeledContent("Tracked Days", value: trackedSleepDays, format: .number)
             }
-            Button("Sync Health Data", systemImage: "arrow.triangle.2.circlepath") {
-                Task { await model.requestHealthSync() }
-            }
-            .disabled(model.connectedDevice == nil)
+            Button("Sync Health Data", systemImage: "arrow.triangle.2.circlepath", action: requestWatchSync)
+                .disabled(!isWatchConnected)
             #if os(iOS)
-            Button("Sync with Apple Health", systemImage: "heart.fill") {
-                Task { await model.synchronizeWithHealthKit() }
-            }
-            Button("Import from Apple Health", systemImage: "square.and.arrow.down") {
-                Task { await model.importFromHealthKit() }
-            }
+            Button("Sync with Apple Health", systemImage: "heart.fill", action: synchronizeWithHealthKit)
+            Button("Import from Apple Health", systemImage: "square.and.arrow.down", action: importFromHealthKit)
             #endif
-            Button("Export Health Data", systemImage: "square.and.arrow.up") {
-                Task { await model.exportHealthData() }
-            }
-            if let url = model.healthExportURL { ShareLink(item: url) { Text("Share Export") } }
+            Button("Export Health Data", systemImage: "square.and.arrow.up", action: export)
+            if let exportURL { ShareLink(item: exportURL) { Text("Share Export") } }
             Button("Import Health Archive", systemImage: "square.and.arrow.down.on.square") {
                 isImportingArchive = true
             }
@@ -69,22 +109,20 @@ struct HealthView: View {
                 role: .destructive,
                 question: "Delete all local health data?",
                 explanation: "This removes locally stored step and sleep history. This action cannot be undone.",
-                confirmationTitle: "Delete Health Data"
-            ) {
-                Task { await model.deleteHealthData() }
-            }
-            if let message = model.dataSyncStatusMessage { Text(message).foregroundStyle(.secondary) }
+                confirmationTitle: "Delete Health Data",
+                action: deleteLocalData
+            )
+            if let statusMessage { Text(statusMessage).foregroundStyle(.secondary) }
         }
         .navigationTitle("Health")
-        .task { await model.loadHealth() }
         .fileImporter(isPresented: $isImportingArchive, allowedContentTypes: [.json]) { result in
             guard case .success(let url) = result else { return }
-            Task { await model.importHealthData(from: url) }
+            importArchive(url)
         }
     }
 
     var newestSample: PebbleHealthSample? {
-        model.healthSamples.max { $0.date < $1.date }
+        samples.max { $0.date < $1.date }
     }
 
     /// A watch only hands over what it recorded, so the newest day it knows about
@@ -98,7 +136,7 @@ struct HealthView: View {
 
     private var filteredSamples: [PebbleHealthSample] {
         let start = Calendar.current.date(byAdding: .day, value: -period.days, to: Date()) ?? .distantPast
-        return model.healthSamples.filter { $0.date >= start }
+        return samples.filter { $0.date >= start }
     }
 
     private var averageSteps: Int {
@@ -114,4 +152,38 @@ struct HealthView: View {
     }
 
     private var trackedSleepDays: Int { filteredSamples.count { $0.sleepMinutes > 0 } }
+}
+
+#Preview("Two weeks") {
+    NavigationStack {
+        HealthContent(
+            samples: PreviewSamples.healthSamples,
+            exportURL: nil,
+            statusMessage: "Received 3 health update(s) from the watch.",
+            isWatchConnected: true,
+            requestWatchSync: {},
+            synchronizeWithHealthKit: {},
+            importFromHealthKit: {},
+            export: {},
+            importArchive: { _ in },
+            deleteLocalData: {}
+        )
+    }
+}
+
+#Preview("Nothing recorded") {
+    NavigationStack {
+        HealthContent(
+            samples: [],
+            exportURL: nil,
+            statusMessage: nil,
+            isWatchConnected: false,
+            requestWatchSync: {},
+            synchronizeWithHealthKit: {},
+            importFromHealthKit: {},
+            export: {},
+            importArchive: { _ in },
+            deleteLocalData: {}
+        )
+    }
 }

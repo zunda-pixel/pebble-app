@@ -1,16 +1,35 @@
 import API
 import SwiftUI
 
-/// The list is as long as the reader's phone is busy, so it is searchable
-/// rather than one run of rows.
 struct NotificationAppsView: View {
     var model: AppModel
+
+    var body: some View {
+        NotificationAppsContent(
+            apps: model.notificationSourceApps,
+            remove: { removed in
+                Task { await model.removeNotificationSourceApps(removed) }
+            },
+            destination: { app in
+                NotificationAppView(model: model, app: app)
+            }
+        )
+    }
+}
+
+/// The list is as long as the reader's phone is busy, so it is searchable
+/// rather than one run of rows.
+struct NotificationAppsContent<Destination: View>: View {
+    var apps: [NotificationSourceApp]
+    var remove: ([NotificationSourceApp]) -> Void
+    @ViewBuilder var destination: (NotificationSourceApp) -> Destination
+
     @State private var search = ""
 
     private var matches: [NotificationSourceApp] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return model.notificationSourceApps }
-        return model.notificationSourceApps.filter {
+        guard !query.isEmpty else { return apps }
+        return apps.filter {
             $0.displayName.localizedCaseInsensitiveContains(query)
                 || $0.bundleID.localizedCaseInsensitiveContains(query)
         }
@@ -21,7 +40,7 @@ struct NotificationAppsView: View {
             Section {
                 ForEach(matches) { app in
                     NavigationLink {
-                        NotificationAppView(model: model, app: app)
+                        destination(app)
                     } label: {
                         LabeledContent {
                             Text(app.muteState.title)
@@ -32,8 +51,7 @@ struct NotificationAppsView: View {
                 }
                 .onDelete { offsets in
                     // The rows on screen are the ones a search left.
-                    let removed = offsets.compactMap { matches.indices.contains($0) ? matches[$0] : nil }
-                    Task { await model.removeNotificationSourceApps(removed) }
+                    remove(offsets.compactMap { matches.indices.contains($0) ? matches[$0] : nil })
                 }
             } footer: {
                 Text("Apps the watch has seen sending notifications. Muting one tells the watch to filter that app's notifications.")
@@ -41,7 +59,7 @@ struct NotificationAppsView: View {
         }
         .searchable(text: $search)
         .overlay {
-            if model.notificationSourceApps.isEmpty {
+            if apps.isEmpty {
                 ContentUnavailableView(
                     "No Apps Yet",
                     systemImage: "app.badge",
@@ -52,5 +70,25 @@ struct NotificationAppsView: View {
             }
         }
         .navigationTitle("Phone App Notifications")
+    }
+}
+
+#Preview("Apps") {
+    NavigationStack {
+        NotificationAppsContent(
+            apps: PreviewSamples.notificationApps,
+            remove: { _ in },
+            destination: { app in Text(verbatim: app.bundleID) }
+        )
+    }
+}
+
+#Preview("No apps") {
+    NavigationStack {
+        NotificationAppsContent(
+            apps: [],
+            remove: { _ in },
+            destination: { _ in EmptyView() }
+        )
     }
 }

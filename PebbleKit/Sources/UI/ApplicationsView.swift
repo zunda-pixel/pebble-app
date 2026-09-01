@@ -431,3 +431,72 @@ struct ApplicationPlaceholderRow: View {
         .frame(minHeight: 44)
     }
 }
+
+#Preview("Library") {
+    NavigationStack {
+        ApplicationsContent(
+            watchApplications: PreviewSamples.watchApplications,
+            watchfaces: PreviewSamples.watchfaces,
+            activeWatchfaceID: PreviewSamples.watchfaces.first?.id,
+            favoriteWatchfaceIDs: Set(PreviewSamples.watchfaces.map(\.id)),
+            installedApplicationIDs: Set(PreviewSamples.watchApplications.prefix(1).map(\.id)),
+            isLoading: false,
+            errorMessage: nil,
+            operationStatusMessage: nil,
+            isOperationInProgress: false,
+            installingApplicationName: nil,
+            installationProgress: nil,
+            removeApplication: { _ in },
+            reorderApplications: { _, _, _ in },
+            configureApplication: { _ in },
+            activateWatchface: { _ in },
+            toggleFavoriteWatchface: { _ in }
+        )
+    }
+}
+
+#Preview("Installing") {
+    NavigationStack {
+        ApplicationsContent(
+            watchApplications: PreviewSamples.watchApplications,
+            watchfaces: [],
+            activeWatchfaceID: nil,
+            favoriteWatchfaceIDs: [],
+            installedApplicationIDs: nil,
+            isLoading: false,
+            errorMessage: nil,
+            operationStatusMessage: "Sending Timeline Weather to Pebble 5209.",
+            isOperationInProgress: true,
+            installingApplicationName: "Timeline Weather",
+            installationProgress: PreviewSamples.transferProgress,
+            removeApplication: { _ in },
+            reorderApplications: { _, _, _ in },
+            configureApplication: { _ in },
+            activateWatchface: { _ in },
+            toggleFavoriteWatchface: { _ in }
+        )
+    }
+}
+
+#Preview("Empty") {
+    NavigationStack {
+        ApplicationsContent(
+            watchApplications: [],
+            watchfaces: [],
+            activeWatchfaceID: nil,
+            favoriteWatchfaceIDs: [],
+            installedApplicationIDs: nil,
+            isLoading: false,
+            errorMessage: nil,
+            operationStatusMessage: nil,
+            isOperationInProgress: false,
+            installingApplicationName: nil,
+            installationProgress: nil,
+            removeApplication: { _ in },
+            reorderApplications: { _, _, _ in },
+            configureApplication: { _ in },
+            activateWatchface: { _ in },
+            toggleFavoriteWatchface: { _ in }
+        )
+    }
+}

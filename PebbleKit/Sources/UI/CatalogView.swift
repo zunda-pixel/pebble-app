@@ -224,3 +224,12 @@ struct CatalogApplicationDetailView: View {
     private var canInstall: Bool { state == .available || state == .updateAvailable }
     private var installButtonTitle: LocalizedStringKey { state == .updateAvailable ? "Update" : "Install" }
 }
+
+#Preview("Catalog rows") {
+    List {
+        CatalogApplicationRow(application: PreviewSamples.catalogApplication, state: .available)
+        CatalogApplicationRow(application: PreviewSamples.catalogApplication, state: .installed)
+        CatalogApplicationRow(application: PreviewSamples.catalogApplication, state: .updateAvailable)
+        CatalogApplicationRow(application: PreviewSamples.catalogApplication, state: .incompatible)
+    }
+}

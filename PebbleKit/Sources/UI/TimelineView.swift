@@ -67,7 +67,14 @@ struct TimelineView: View {
             }
             .navigationTitle("Timeline")
             .sheet(item: $composing) { kind in
-                TimelineItemComposer(model: model, kind: kind)
+                TimelineItemComposer(kind: kind) { title, date in
+                    Task {
+                        switch kind {
+                        case .pins: await model.addTimelinePin(title: title, date: date)
+                        case .reminders: await model.addReminder(title: title, date: date)
+                        }
+                    }
+                }
             }
             .task {
                 await model.loadTimeline()
@@ -87,8 +94,8 @@ struct TimelineView: View {
 }
 
 struct TimelineItemComposer: View {
-    var model: AppModel
     var kind: TimelineListKind
+    var add: (String, Date) -> Void
     @State private var title = ""
     @State private var date = Date()
     @Environment(\.dismiss) private var dismiss
@@ -120,15 +127,18 @@ struct TimelineItemComposer: View {
                     let value = title
                     let when = date
                     dismiss()
-                    Task {
-                        switch kind {
-                        case .pins: await model.addTimelinePin(title: value, date: when)
-                        case .reminders: await model.addReminder(title: value, date: when)
-                        }
-                    }
+                    add(value, when)
                 }
                 .disabled(!isComplete)
             }
         }
     }
+}
+
+#Preview("New pin") {
+    TimelineItemComposer(kind: .pins) { _, _ in }
+}
+
+#Preview("New reminder") {
+    TimelineItemComposer(kind: .reminders) { _, _ in }
 }
