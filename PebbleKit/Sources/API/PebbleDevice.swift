@@ -1,10 +1,7 @@
 import MemberwiseInit
 
-/// One board revision, as firmware packages name it.
-///
 /// Several revisions share a watch model — a Pebble Time 2 can be any of the
-/// obelix boards — and firmware is built per revision, so a package is matched
-/// on this rather than on the model.
+/// obelix boards — and firmware is built per board.
 public enum PebbleWatchBoard: String, CaseIterable, Codable, Sendable {
     case asterix
     case obelixEVT = "obelix_evt"
@@ -71,23 +68,15 @@ public struct PebbleDevice: Identifiable, Hashable, Sendable {
     public var firmwareVersion: String?
     public var batteryLevel: Int?
     public var serialNumber: String? = nil
-    /// Whether the watch booted its recovery firmware. Such a watch rejects
-    /// every endpoint except version and ping, so the companion app can only
-    /// offer it a firmware install.
+    /// A watch in recovery firmware rejects every endpoint except version and
+    /// ping, so it can only be offered a firmware install.
     public var isRunningRecoveryFirmware: Bool = false
-    /// Which firmware slot is running on a dual-slot watch, or nil when it has
-    /// only one. Firmware is installed into the other slot.
+    /// Nil when the watch has only one. Firmware is installed into the other.
     public var runningFirmwareSlot: Int? = nil
-    /// The board this watch is built on, which is what firmware packages are
-    /// named and matched by.
     public var board: PebbleWatchBoard? = nil
-    /// The locale of the language pack the watch runs, empty when it runs the
-    /// firmware's built-in English.
+    /// Empty when the watch runs the firmware's built-in English.
     public var languageLocale: String = ""
-    /// The version of that pack, as whoever built it counted.
     public var languageVersion: UInt16 = 0
-    /// What the watch says it can do, which is how the app knows whether to
-    /// offer language packs or write weather at all.
     public var capabilities: UInt64 = 0
 
     public var supportsLanguagePacks: Bool {
@@ -98,7 +87,6 @@ public struct PebbleDevice: Identifiable, Hashable, Sendable {
         WatchCapability.weatherApp.isSet(in: capabilities)
     }
 
-    /// The slot a firmware update targets: the one that is not running.
     public var firmwareUpdateSlot: Int? {
         switch runningFirmwareSlot {
         case 0: 1

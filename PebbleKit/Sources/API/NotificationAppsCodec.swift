@@ -12,9 +12,8 @@ public enum NotificationAppMuteState: UInt8, Codable, Equatable, Sendable, CaseI
     }
 }
 
-/// An iOS app that produces notifications, as tracked by the watch's ANCS
-/// filtering database. The watch inserts records for apps it sees; the phone
-/// syncs mute preferences back.
+/// The watch inserts a record for every app it sees sending notifications; the
+/// phone writes back the parts of it that are the reader's to choose.
 @MemberwiseInit(.public)
 public struct NotificationSourceApp: Codable, Equatable, Sendable, Identifiable {
     public var bundleID: String
@@ -22,12 +21,8 @@ public struct NotificationSourceApp: Codable, Equatable, Sendable, Identifiable 
     public var muteState: NotificationAppMuteState = .never
     public var muteExpiration: Date? = nil
     public var stateUpdated: Date = .now
-    /// The icon the watch shows beside this app's notifications, in place of
-    /// the one the firmware would pick for itself. Nil leaves that choice to
-    /// the watch.
+    /// Nil leaves the choice of icon to the watch.
     public var icon: PebbleTimelineIcon? = nil
-    /// What the watch paints behind this app's notifications, and what it
-    /// writes on top. Nil leaves the firmware's own choice for the app alone.
     public var backgroundColor: PebbleColor? = nil
     public var foregroundColor: PebbleColor? = nil
 
@@ -73,8 +68,8 @@ public enum NotificationAppsCodec {
 
         var value: [UInt8] = UInt32(0).littleEndianBytes
         value.append(UInt8(attributes.count))
-        // No actions: the watch's own reply action would need the phone to send
-        // the message, which iOS does not allow.
+        // No actions: the watch's own reply action would need the phone to send the
+        // message, which iOS does not allow.
         value.append(0)
         value.append(contentsOf: attributes.flatMap { $0 })
         return value
@@ -172,7 +167,6 @@ public enum BlobDB2Message: Equatable, Sendable {
 
 @MemberwiseInit(.public)
 public struct BlobDB2Write: Equatable, Sendable {
-    /// Raw token bytes, echoed verbatim into the response.
     public var tokenBytes: [UInt8]
     public var databaseID: UInt8
     public var timestamp: UInt32
@@ -180,9 +174,8 @@ public struct BlobDB2Write: Equatable, Sendable {
     public var value: [UInt8]
 }
 
-/// The watch-initiated side of BlobDB synchronization: the watch pushes its
-/// own records (for example ANCS notification apps) to the phone on this
-/// endpoint and expects an acknowledgement per command.
+/// The watch pushes its own records on this endpoint and expects an
+/// acknowledgement for each.
 public enum BlobDB2Codec {
     public static var endpoint: UInt16 { 0xB2DB }
 
@@ -280,9 +273,6 @@ public actor NotificationSourceAppLibrary {
         try PersistentJSON.save(apps.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }, to: fileURL)
     }
 
-    /// Stores a record the phone changed, whole. This is the other half of
-    /// `merge`: what the reader chooses here wins, because the watch's copy of
-    /// the record never carried it.
     public func update(_ app: NotificationSourceApp) throws -> [NotificationSourceApp] {
         var apps = try apps()
         if let index = apps.firstIndex(where: { $0.bundleID == app.bundleID }) {
@@ -294,16 +284,13 @@ public actor NotificationSourceAppLibrary {
         return try self.apps()
     }
 
-    /// Applies a record written by the watch, keeping the newer state when the
-    /// same app already exists locally. Returns the updated list.
     public func merge(_ app: NotificationSourceApp) throws -> [NotificationSourceApp] {
         var apps = try apps()
         if let index = apps.firstIndex(where: { $0.bundleID == app.bundleID }) {
             if app.stateUpdated > apps[index].stateUpdated {
                 var merged = app
-                // The watch's record says nothing about the icon or the
-                // colours, which are the phone's to choose; taking the record
-                // whole would quietly throw them away.
+                // The watch's record says nothing about the icon or the colours, which are
+                // the phone's to choose.
                 merged.icon = apps[index].icon
                 merged.backgroundColor = apps[index].backgroundColor
                 merged.foregroundColor = apps[index].foregroundColor

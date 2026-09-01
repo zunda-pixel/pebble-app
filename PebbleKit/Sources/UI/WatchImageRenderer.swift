@@ -4,11 +4,8 @@ public import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
-/// Turns a picture the phone has into one the watch can show.
-///
-/// The watch asks for an exact size, so the picture is cropped to that shape
-/// from the middle and scaled to fit — letterboxing would spend the watch's few
-/// pixels on empty bands.
+/// The watch asks for an exact size, so a picture is cropped to that shape
+/// from the middle rather than squashed into it.
 public enum WatchImageRenderer {
     public static func encode(_ image: CGImage, width: Int, height: Int) -> PebbleEncodedImage? {
         guard width > 0, height > 0,
@@ -19,7 +16,6 @@ public enum WatchImageRenderer {
         return PebbleImageEncoder.encode(argb: pixels, width: width, height: height)
     }
 
-    /// A picture the watch sent, as a PNG.
     public static func pngData(_ screenshot: PebbleScreenshot) -> Data? {
         guard screenshot.width > 0, screenshot.height > 0,
               screenshot.pixels.count >= screenshot.width * screenshot.height,
@@ -54,7 +50,6 @@ public enum WatchImageRenderer {
         }
     }
 
-    /// The picture as `0xAARRGGBB` a row at a time.
     static func argbPixels(_ image: CGImage, width: Int, height: Int) -> [UInt32]? {
         var pixels = [UInt32](repeating: 0, count: width * height)
         let drawn: Bool = pixels.withUnsafeMutableBytes { buffer -> Bool in
@@ -77,8 +72,7 @@ public enum WatchImageRenderer {
         return drawn ? pixels : nil
     }
 
-    /// Where to put the picture so that the middle of it fills the space,
-    /// which for a square watch icon means cutting the long side off.
+    // For a square watch icon this means cutting the long side off.
     static func cropRect(_ image: CGImage, width: Int, height: Int) -> CGRect {
         let target = CGSize(width: width, height: height)
         let source = CGSize(width: image.width, height: image.height)

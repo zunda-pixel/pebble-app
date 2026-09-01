@@ -24,8 +24,6 @@ struct SettingsView: View {
     @State private var permissions = PhonePermissions()
     @Environment(\.scenePhase) private var scenePhase
 
-    /// What the Weather row says before it is opened: how many places the watch
-    /// is being told about.
     private var weatherSummary: Text {
         switch model.weatherPlaces.count {
         case 0: Text("Off")
@@ -132,17 +130,14 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("Settings")
-        // Any of these can be changed in the system settings while this app is
-        // in the background, so they are read again on the way back rather than
-        // remembered from the first look.
+        // Any of these can be changed in the system settings while the app is in the
+        // background.
         .task { permissions = PhonePermissions.current() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { permissions = PhonePermissions.current() }
         }
     }
 
-    /// One permission, and what it is for when it has not been granted — the
-    /// name alone does not say what the app would do with it.
     private func permissionRow(
         _ name: LocalizedStringKey,
         _ state: PhonePermissionState

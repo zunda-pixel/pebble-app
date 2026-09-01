@@ -22,23 +22,15 @@ private final class NotificationObserverStorage: @unchecked Sendable {
 
 @MainActor
 public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
-    /// Which side of the link hosts the protocol service.
     private enum TransportMode: Equatable {
-        /// The watch hosts it and the phone writes to a characteristic.
         case reversed
-        /// The phone hosts it and notifies the watch, which subscribed to it.
         case forward
     }
 
-    /// Where a connection stands with the watch's pairing service.
     private enum PairingState: Equatable {
-        /// Services have not been inspected yet.
         case unknown
-        /// Waiting for the watch to report its connectivity status.
         case checking
-        /// The watch has been asked to pair; waiting for the user to accept.
         case pairing
-        /// The link is bonded, or the watch has no pairing service.
         case ready
     }
 
@@ -65,12 +57,10 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var activePairingTriggerCharacteristic: CBCharacteristic?
     private var ppogNotifyCharacteristicToSubscribe: CBCharacteristic?
     private var pairingState = PairingState.unknown
-    /// Which side hosts the protocol service for this connection.
     private var transportMode = TransportMode.reversed
     private var pairingTimeoutTask: Task<Void, Never>?
-    /// Whether this link already answered a reset request. The side that
-    /// answers one must not send a second ResetComplete afterwards; the watch
-    /// reads that as a request to tear the session down again.
+    // The side that answers a reset request must not send a second ResetComplete
+    // afterwards; the watch reads that as a request to tear the session down.
     private var hasSentResetComplete = false
     private var connectedPeripheral: CBPeripheral?
     private var connectedDevice: PebbleDevice?
@@ -124,15 +114,12 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var getBytesCollector: GetBytesCollector?
     private var getBytesContinuation: CheckedContinuation<[UInt8], any Error>?
     private var nextGetBytesTransactionID: UInt8 = 1
-    /// Each pull keeps its own clock: the watch answers a screenshot in one
-    /// burst and a coredump over a minute or more, so one timeout for both
-    /// would either give up early or hang about.
+    // The watch answers a screenshot in one burst and a coredump over a minute or
+    // more, so one clock for both would either give up early or hang about.
     private var screenshotTimeoutTask: Task<Void, Never>?
     private var logDumpTimeoutTask: Task<Void, Never>?
     private var getBytesTimeoutTask: Task<Void, Never>?
 
-    /// Identifies this client in diagnostics. Several clients can be alive at
-    /// once, one per watch, and their logs are otherwise indistinguishable.
     private let clientTag: String
 
     public init(restoreIdentifier: String = "dev.pebble.central") {
@@ -149,9 +136,8 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         PebbleGattServer.shared.start()
     }
 
-    /// Single funnel for dropping a link, so diagnostics always name whoever
-    /// did it. A locally cancelled link arrives back as a disconnect with no
-    /// error, which is indistinguishable from the watch going away.
+    /// A locally cancelled link arrives back as a disconnect with no error,
+    /// which is indistinguishable from the watch going away.
     private func cancelLink(_ peripheral: CBPeripheral, reason: String) {
         Task { [tag = clientTag] in
             await PebbleDiagnostics.shared.record(
@@ -204,8 +190,6 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         var retrieved: [DiscoveredPebble] = []
         for peripheral in peripherals {
             let id = peripheral.identifier.uuidString
-            // The model is not recoverable without advertisement data, so only
-            // hinted watches can be returned.
             guard let hint = hintsByID[id], !retrieved.contains(where: { $0.id == id }) else {
                 continue
             }
@@ -231,7 +215,6 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         if let connectedDevice, connectedDevice.id == device.id {
             return connectedDevice
         }
-        // A manual connect supersedes any automatic reconnection in flight.
         reconnectTask?.cancel()
         reconnectTask = nil
         reconnectDevice = nil
@@ -250,8 +233,6 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
 
         centralManager.stopScan()
-        // CoreBluetooth knows the name of a bonded watch even when the caller
-        // only had a stored one, or none at all.
         pendingDevice = DiscoveredPebble(
             id: device.id,
             name: peripheral.name ?? device.name,
@@ -429,15 +410,11 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         try await transferObject(bytes, objectType: objectType, appBankID: appBankID, filename: nil)
     }
 
-    /// Asks the watch to describe itself again. What it answers — firmware
-    /// version, language pack, capabilities — arrives as `deviceUpdated`.
     public func refreshDeviceInformation() async throws {
         guard let peripheral = connectedPeripheral else { throw PebbleConnectionError.disconnected }
         try sendFrame(WatchVersionCodec.requestFrame(), to: peripheral)
     }
 
-    /// Sends a named file, which the watch keeps under that name once the
-    /// install command lands. A language pack is filed as `lang`.
     public func installFile(_ bytes: [UInt8], filename: String) async throws {
         try await transferObject(bytes, objectType: .file, appBankID: 0, filename: filename)
     }
@@ -478,12 +455,8 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     }
 
     public func installFirmware(_ package: PBZFirmwarePackage) async throws {
-        // Two installs at once would share one slot for the control reply and
-        // one flag for "an install is running": the second would strand the
-        // first on a continuation nobody holds, and clearing the flag on the
-        // way out would then suppress every keepalive for the rest of the
-        // link. Claiming the flag here, with nothing awaited in between, keeps
-        // it to one.
+        // Claimed with nothing awaited in between: a second install would take
+        // over the control reply slot and strand the first.
         guard !isInstallingFirmware else {
             throw PutBytesClientError.firmwareUpdateAlreadyInProgress
         }
@@ -547,7 +520,6 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     }
 
     public func writeNotificationSourceApp(_ app: NotificationSourceApp) async throws {
-        // A stale record means the watch already holds this app's setting.
         try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
             NotificationAppsCodec.insertFrame(app: app, token: token)
         }
@@ -560,7 +532,6 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     }
 
     public func writeWeather(_ report: PebbleWeatherReport) async throws {
-        // A stale record means the watch already holds exactly this forecast.
         try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
             WeatherCodec.insertFrame(report: report, token: token)
         }
@@ -684,9 +655,6 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
                     GetBytesCodec.requestFrame(request, transactionID: transactionID),
                     to: peripheral
                 )
-                // A coredump is a hundred kilobytes over a link that manages a
-                // few of them a second, so this waits for the watch to go quiet
-                // rather than for the whole thing.
                 getBytesTimeoutTask = quietTimeout(seconds: 60) { [weak self] in
                     self?.finishGetBytes(.failure(PebbleConnectionError.connectionTimedOut))
                 }
@@ -710,8 +678,6 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
     }
 
-    /// Everything the watch was in the middle of sending is over when the link
-    /// is: none of it resumes, and a caller left waiting would wait for ever.
     private func failPulls(_ error: any Error) {
         finishScreenshot(.failure(error))
         finishLogDump(.failure(error))
@@ -869,10 +835,6 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         startNextAppMessageIfPossible()
     }
 
-    /// Routes a transport failure on a specific peripheral: an in-flight
-    /// initial connect fails immediately, while an established (or
-    /// automatically reconnecting) link is torn down at the Bluetooth level so
-    /// that didDisconnectPeripheral drives the reconnect/backoff flow.
     private func abortLink(_ peripheral: CBPeripheral, error: PebbleConnectionError) {
         if connectionContinuation != nil {
             failConnection(error)
@@ -961,14 +923,10 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         _ actions: [PPoGSessionAction],
         peripheral: CBPeripheral
     ) throws {
-        // A batch is worked through to the end before any failure in it is
-        // raised. The watch coalesces frames for unrelated endpoints into one
-        // delivery and the session queues the acknowledgement behind that
-        // delivery, so giving up on the first unusable frame would drop the
-        // reply the app is waiting for — and drop the acknowledgement, which
-        // makes the watch retransmit the whole window. The first failure is
-        // still raised, so callers keep reporting it the way they always did;
-        // it just waits until there is nothing left to lose by it.
+        // The watch coalesces frames for unrelated endpoints into one delivery,
+        // and the session queues the acknowledgement behind them, so giving up
+        // on the first unusable frame loses the reply a caller is waiting for
+        // and makes the watch retransmit the window.
         var firstFailure: (any Error)?
         for action in actions {
             switch action {
@@ -1154,13 +1112,9 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
 
         if frame.endpoint == PutBytesCodec.endpoint, pendingInstallCookie != nil {
-            // The cookie that comes back is zero, so only the result means
-            // anything. The firmware answers install from `prv_do_install`
-            // through `prv_cleanup_and_send_response`, which sends the token
-            // held in its transfer state — and the commit that had to come
-            // first already cleared that state. Holding out for the cookie that
-            // was sent leaves the install hanging after the watch has written
-            // the firmware and reached 100%.
+            // The install cookie comes back as zero: the firmware answers from
+            // `prv_cleanup_and_send_response`, whose transfer state the
+            // preceding commit already cleared.
             let response = try PutBytesCodec.decodeResponse(frame)
             pendingInstallCookie = nil
             response.result == .acknowledgement
@@ -1182,9 +1136,8 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             return
         }
 
-        // A version response can also arrive after the connection is up,
-        // because the app asked again — the watch changes what it reports when
-        // a language pack is installed, and that is how the app finds out.
+        // The watch changes what it reports when a language pack is installed, which
+        // is how the app finds out.
         if frame.endpoint == WatchVersionCodec.endpoint,
            pendingDevice == nil,
            let device = connectedDevice {
@@ -1255,7 +1208,6 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
                 finishActiveAppMessage(throwing: AppMessageClientError.negativeAcknowledgement)
             }
         } catch {
-            // Ignore malformed peer packets without terminating the transport.
         }
     }
 
@@ -1349,11 +1301,8 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         guard pendingPingCookie == nil else {
             return
         }
-        // A transfer in flight already proves the link is alive, and it can
-        // keep the watch busy for longer than the pong deadline — a firmware
-        // install is megabytes. Pinging through one only risks dropping it.
-        // The install also has gaps between its transfers, while the watch
-        // commits what it was sent, so the whole install counts.
+        // A transfer can keep the watch busy for longer than the pong deadline,
+        // and an install has gaps between transfers while the watch commits.
         guard activeTransferSession == nil, !isInstallingFirmware else {
             return
         }
@@ -1539,12 +1488,8 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         // no longer send; saying so now beats a timeout ten seconds later that
         // blames the deadline instead of the dropped link.
         finishFirmwareControl(throwing: PebbleConnectionError.disconnected)
-        // A send that was in flight when the link went is over, and so is
-        // everything queued behind it. `AppModel` keeps its own list of
-        // messages it could not deliver and flushes that on the next
-        // connection, so a copy held here would be sent twice — and a caller
-        // left awaiting one would wait for a link that may never come back,
-        // with nothing left able to resume it.
+        // `AppModel` keeps its own list of undelivered messages and flushes it
+        // on the next connection, so a copy held here would be sent twice.
         failAllAppMessages(PebbleConnectionError.disconnected)
     }
 
@@ -1562,8 +1507,6 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         eventContinuation?.yield(.reconnecting(deviceID: device.id))
         centralManager.connect(peripheral)
 
-        // A stalled handshake would otherwise sit in "reconnecting" forever:
-        // drop the link after a while so the backoff loop retries.
         connectionTimeoutTask?.cancel()
         connectionTimeoutTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(30))
@@ -1703,7 +1646,6 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
             if connectionContinuation != nil {
                 failConnection(.bluetoothUnavailable)
             } else if connectedDevice != nil || isAutomaticReconnect {
-                // Keep reconnectDevice so the link resumes when power returns.
                 reconnectTask?.cancel()
                 reconnectTask = nil
                 connectionTimeoutTask?.cancel()
@@ -1807,7 +1749,6 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
             if wasConnected {
                 reconnect(to: deviceToReconnect, using: peripheral)
             } else {
-                // The reconnect handshake itself failed; back off before retrying.
                 scheduleReconnect(to: deviceToReconnect, using: peripheral)
             }
             return
@@ -1863,10 +1804,8 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
             )
         }
 
-        // The pairing service tells us whether the link is bonded and lets us
-        // ask the watch to start pairing. A watch that is not bonded yet only
-        // exposes this one, so the protocol service is looked for again once
-        // pairing finishes.
+        // A watch that is not bonded yet exposes only this service, so the protocol
+        // one is looked for again once pairing finishes.
         if pairingState == .unknown {
             if let pairingService = services.first(where: { $0.uuid == Self.pairingService }) {
                 pairingState = .checking
@@ -1890,10 +1829,9 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
                 for: service
             )
         } else {
-            // No protocol service of its own: the watch expects the phone to
-            // host one and will connect to it as a GATT client. This has to be
-            // decided now, because the watch inspects the phone's services
-            // right after connecting and does not come back for a second look.
+            // The watch expects the phone to host the service and connects to it as a
+            // GATT client. It inspects the phone right after connecting and does not come
+            // back for a second look.
             startForwardTransport(on: peripheral)
         }
 
@@ -1931,8 +1869,6 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
             guard error == nil,
                   let characteristics = service.characteristics,
                   let connectivity = characteristics.first(where: { $0.uuid == Self.connectivityCharacteristic }) else {
-                // Without the connectivity characteristic there is nothing to
-                // wait for; a watch that needs pairing will fail later anyway.
                 pairingState = .ready
                 startProtocolIfReady(on: peripheral)
                 return
@@ -1940,7 +1876,6 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
             activePairingTriggerCharacteristic = characteristics.first {
                 $0.uuid == Self.pairingTriggerCharacteristic
             }
-            // Asking for a faster connection interval, as the reference does.
             // Older firmware, including recovery, may not offer this at all.
             if let parameters = characteristics.first(where: {
                 $0.uuid == Self.connectionParametersCharacteristic
@@ -1972,8 +1907,8 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
         startProtocolIfReady(on: peripheral)
     }
 
-    /// Subscribes to the protocol characteristic once the link is known to be
-    /// bonded. Subscribing before that fails on a watch that is not paired yet.
+    // Subscribing before the link is known to be bonded fails on a watch that is
+    // not paired yet.
     private func startProtocolIfReady(on peripheral: CBPeripheral) {
         guard pairingState == .ready, ppogSession == nil else {
             return
@@ -1986,8 +1921,6 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
             ppogNotifyCharacteristicToSubscribe = nil
             peripheral.setNotifyValue(true, for: notifyCharacteristic)
         case .forward:
-            // The session opens as soon as the watch subscribes to the
-            // phone-hosted characteristic; until then there is nowhere to send.
             guard PebbleGattServer.shared.isSubscribed(centralID: peripheral.identifier.uuidString) else {
                 return
             }
@@ -1995,8 +1928,6 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
         }
     }
 
-    /// Publishes the phone's own protocol service and waits for the watch to
-    /// subscribe to it.
     private func startForwardTransport(on peripheral: CBPeripheral) {
         guard transportMode != .forward else {
             return
@@ -2024,23 +1955,9 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
         )
     }
 
-    /// Hands the transport back to the watch after the phone had stood in for
-    /// it, which is what an unbonded watch forces: it publishes its protocol
-    /// service only once the link is encrypted, so the first discovery sees the
-    /// pairing service alone and the phone reasonably concludes it has to host
-    /// the transport itself. When the watch's service turns up after all, that
-    /// guess has to be undone — otherwise `startProtocolIfReady` keeps waiting
-    /// for a subscription to the phone's characteristic that will never come,
-    /// never subscribes to the watch's, and the connect dies on its deadline.
-    ///
-    /// Tearing the forward transport down, rather than merely preferring the
-    /// other one, is what makes this safe: the registration's unsubscribe
-    /// callback would otherwise drop the link, its receive callback would feed
-    /// packets in from a transport no longer in use, and `write` would keep
-    /// aiming at a characteristic nobody is subscribed to.
-    ///
-    /// Only while no session exists. Once one is running, the transport it was
-    /// opened on is the only one either side knows about.
+    /// Torn down rather than merely deselected: the registration's unsubscribe
+    /// callback would otherwise drop the link, and its receive callback would
+    /// feed packets in from a transport no longer in use.
     private func endForwardTransport(on peripheral: CBPeripheral) {
         guard transportMode == .forward, ppogSession == nil else {
             return
@@ -2059,9 +1976,8 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
         guard transportMode == .forward, ppogSession == nil, pairingState == .ready else {
             return
         }
-        // On this transport the watch opens the session: it sends the reset
-        // request once it has subscribed. Starting one from here too leaves
-        // both sides mid-handshake, and the watch then drops the link.
+        // On this transport the watch sends the reset request once it has subscribed;
+        // starting one from here too leaves both sides mid-handshake.
         Task { [tag = clientTag] in
             await PebbleDiagnostics.shared.record(
                 category: "pairing",
@@ -2092,8 +2008,6 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
             let wasPairing = pairingState == .pairing
             pairingState = .ready
             if wasPairing {
-                // Pairing replaced the connect deadline with its own; give the
-                // rest of the handshake a fresh one now that it is done.
                 connectionTimeoutTask?.cancel()
                 connectionTimeoutTask = Task { [weak self] in
                     try? await Task.sleep(for: .seconds(30))
@@ -2119,8 +2033,7 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
                 type: trigger.properties.contains(.write) ? .withResponse : .withoutResponse
             )
         }
-        // Pairing needs the user to accept a prompt, so it gets its own, much
-        // longer deadline than the rest of connecting.
+        // Pairing waits on the reader accepting a prompt.
         connectionTimeoutTask?.cancel()
         connectionTimeoutTask = nil
         pairingTimeoutTask?.cancel()
@@ -2192,8 +2105,6 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
         handleIncomingProtocolBytes([UInt8](value), from: peripheral)
     }
 
-    /// Feeds one received PPoG packet into the session, whichever transport it
-    /// arrived on.
     private func handleIncomingProtocolBytes(_ bytes: [UInt8], from peripheral: CBPeripheral) {
         do {
             let packet = try PPoGPacket(decoding: bytes)
@@ -2246,8 +2157,6 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
                     )
                 }
                 ppogSession = session
-                // A session always starts on a frame boundary; anything the
-                // decoder still holds belongs to a session that is gone.
                 frameDecoder = PebbleProtocolFrameDecoder()
                 connectedPeripheral = peripheral
                 try sendFrame(WatchVersionCodec.requestFrame(), to: peripheral)
@@ -2273,17 +2182,12 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
                 }
                 return
             }
-            // Still handshaking, so there is no session to fall back on.
             abortLink(peripheral, error: .protocolNegotiationFailed)
         }
     }
 
-    /// Handles a reset the watch sends once a session is already running, which
-    /// it only does after its own acknowledgement timeouts have run out. The
-    /// session cannot be salvaged from this side, so the link is dropped and
-    /// the reconnect flow builds a fresh one.
-    /// Records a PPoG handshake packet. The watch judges a session by this
-    /// exchange, and data and acknowledgements are far too frequent to log.
+    // The watch judges a session by this exchange, and data and acknowledgements
+    // are far too frequent to log.
     private func recordPPoGPacket(_ packet: PPoGPacket, direction: String) {
         let description: String
         switch packet {

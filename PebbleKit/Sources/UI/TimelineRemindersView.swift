@@ -1,11 +1,8 @@
 import API
 import SwiftUI
 
-/// The reminders the watch buzzes for.
-///
 /// Split at now: what is still coming is what the reader is looking for, and
-/// what has passed is only there to be tidied away. The watch is told about the
-/// first group and not the second.
+/// the watch is told about that half only.
 struct TimelineRemindersView: View {
     var model: AppModel
 
@@ -59,8 +56,7 @@ struct TimelineRemindersView: View {
             }
         }
         .onDelete { offsets in
-            // Named rather than counted: these rows are one half of the list,
-            // sorted their own way.
+            // These rows are one half of the list, sorted their own way.
             let removed = offsets.compactMap { reminders.indices.contains($0) ? reminders[$0] : nil }
             Task { await model.removeReminders(removed) }
         }

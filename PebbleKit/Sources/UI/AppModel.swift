@@ -36,10 +36,6 @@ public final class AppModel {
     public internal(set) var applicationLibraryErrorMessage: LocalizedStringKey?
     public internal(set) var installingApplicationID: UUID?
     public internal(set) var installingApplicationName: String?
-    /// The watch an application is being transferred to, and the watch whose
-    /// firmware is being installed. Progress belongs to the connection it
-    /// arrives on; naming the watch each piece of work runs on is what keeps
-    /// one watch's transfer from being read as the other's.
     var applicationTransferDeviceID: String?
     var firmwareTransferDeviceID: String?
     public internal(set) var applicationManagementOperation: ApplicationManagementOperation?
@@ -52,25 +48,17 @@ public final class AppModel {
     public internal(set) var notificationStatusMessage: LocalizedStringKey?
     public internal(set) var notificationPreferences = NotificationDeliveryPreferences()
     public internal(set) var savedWatches: [SavedPebbleWatch] = []
-    /// Watches this phone is bonded to that the app has no record of, offered
-    /// for the reader to add.
     public internal(set) var unknownBondedWatches: [UnknownBondedWatch] = []
     public internal(set) var watchManagementErrorMessage: LocalizedStringKey?
     public internal(set) var watchResetStatusMessage: LocalizedStringKey?
     public internal(set) var timelinePins: [PebbleTimelinePin] = []
-    /// Reminders the watch buzzes for at a set time, kept apart from pins
-    /// because the watch files them separately and shows them differently.
     public internal(set) var reminders: [PebbleTimelinePin] = []
     public internal(set) var reminderStatusMessage: LocalizedStringKey?
-    /// The watch's own settings, kept by the phone and written on every
-    /// connection. Keyed by name so a setting the app stops offering does not
-    /// strand a stored value.
     public internal(set) var watchSettings: [String: Bool] = [:]
     public internal(set) var activitySettings = PebbleActivitySettings()
     public internal(set) var heartRateSettings = PebbleHeartRateSettings()
     public internal(set) var isReminderAppEnabled = true
     public internal(set) var watchSettingsStatusMessage: LocalizedStringKey?
-    /// What the watch can tell about itself.
     public internal(set) var latestScreenshot: PebbleScreenshot?
     public internal(set) var screenshotURL: URL?
     public internal(set) var watchLogLines: [WatchLogLine] = []
@@ -91,12 +79,9 @@ public final class AppModel {
     public internal(set) var firmwareUpdateJournal: FirmwareUpdateJournal?
     public internal(set) var firmwareRequiresConfirmation = false
     public internal(set) var availableFirmwareRelease: PebbleOSFirmwareRelease?
-    /// Firmware already fetched from PebbleOS, waiting to be installed.
     public internal(set) var downloadedFirmware: DownloadedFirmware?
     public internal(set) var languageStatusMessage: LocalizedStringKey?
     public internal(set) var isInstallingLanguagePack = false
-    /// The places the watch shows weather for, the forecasts last fetched for
-    /// them, and what Apple requires be shown alongside.
     public internal(set) var weatherPlaces: [WeatherPlace] = []
     public internal(set) var weatherReports: [PebbleWeatherReport] = []
     public internal(set) var weatherCredit: WeatherCredit?
@@ -108,7 +93,6 @@ public final class AppModel {
     public internal(set) var timelineActionStatusMessage: LocalizedStringKey?
     public internal(set) var healthExportURL: URL?
     public internal(set) var notificationSourceApps: [NotificationSourceApp] = []
-    /// Application IDs known to be registered on each watch, keyed by watch ID.
     public internal(set) var installedApplicationIDsByWatch: [String: Set<UUID>] = [:]
 
     public var isScanningOrConnecting: Bool {
@@ -124,9 +108,6 @@ public final class AppModel {
         activeConnections.map(\.device)
     }
 
-    /// The primary watch: the first connected one. Flows that can only target
-    /// a single watch (PBW configuration pages, the catalog compatibility
-    /// filter) use it.
     public var connectedDevice: PebbleDevice? {
         activeConnections.first?.device
     }
@@ -135,15 +116,13 @@ public final class AppModel {
         connections.filter(\.isConnected)
     }
 
-    /// How far the application being sent to a watch has got. Nothing is
-    /// reported unless a transfer is running: `connection(for:)` falls back to
-    /// the first watch when given nothing, which is not an answer here.
+    // `connection(for:)` falls back to the first watch when given nothing,
+    // which is not an answer here.
     public var installationProgress: PutBytesTransferProgress? {
         guard let applicationTransferDeviceID else { return nil }
         return connection(for: applicationTransferDeviceID)?.transferProgress
     }
 
-    /// How far the firmware being installed on a watch has got.
     public var firmwareUpdateProgress: PutBytesTransferProgress? {
         guard let firmwareTransferDeviceID else { return nil }
         return connection(for: firmwareTransferDeviceID)?.transferProgress
@@ -161,8 +140,6 @@ public final class AppModel {
     let applicationLibrary: PebbleApplicationLibrary
     let watchLibrary: PebbleWatchLibrary
     let timelineLibrary = TimelinePinLibrary()
-    /// Reminders live beside the pins, in a file of their own so the two lists
-    /// cannot overwrite each other.
     let reminderLibrary = TimelinePinLibrary(
         fileURL: URL.applicationSupportDirectory.appending(path: "Pebble/reminders.json")
     )
@@ -170,9 +147,8 @@ public final class AppModel {
     let appCatalog = PebbleAppCatalog()
     let languagePackCatalog = PebbleLanguagePackCatalog()
     let weatherBridge = WeatherBridge()
-    /// How one place's forecast is fetched. Held as a function so a test can
-    /// answer for some places and refuse for others, which is the case that
-    /// matters and the one WeatherKit itself cannot be asked to produce.
+    // Held as a function so a test can answer for some places and refuse for
+    // others, which WeatherKit itself cannot be asked to produce.
     @ObservationIgnored
     var fetchWeatherReport: (WeatherPlace, Bool) async throws -> PebbleWeatherReport = {
         place, usesFahrenheit in
@@ -209,11 +185,8 @@ public final class AppModel {
     @ObservationIgnored var hasStarted = false
     @ObservationIgnored var recentNotificationFingerprints: [String: Date] = [:]
     @ObservationIgnored var pendingNotifications: [PebbleTimelineNotification] = []
-    /// The flush already running, if there is one. Both the app coming
-    /// forward and a watch finishing its synchronization ask for a flush, and
-    /// two of them at once would hand the watch every queued notification
-    /// twice and drop a queued message that was never sent, so the second
-    /// caller waits for the first instead of starting its own.
+    // Both the app coming forward and a watch finishing its synchronization ask
+    // for a flush; two at once hand the watch everything twice.
     @ObservationIgnored var pendingNotificationFlush: Task<Void, Never>?
     @ObservationIgnored var pendingAppMessageFlush: Task<Void, Never>?
     @ObservationIgnored lazy var companionRuntime = PebbleCompanionRuntime(
@@ -307,8 +280,6 @@ public final class AppModel {
         do {
             await loadSavedWatches()
             var devices = try await scannerClient.scan()
-            // Bonded watches do not advertise, so scanning alone never finds
-            // them again; look the saved ones up by identifier as well.
             let connectedIDs = Set(connections.map(\.device.id))
             let missingSavedWatches = savedWatches
                 .filter { saved in
@@ -383,11 +354,8 @@ public final class AppModel {
             )
             discoveredDevices.removeAll { $0.id == device.id }
             unknownBondedWatches.removeAll { $0.id == device.id }
-            // The watch is connected as of now. Leaving its id in
-            // `connectingDeviceIDs` until this function returns would rank the
-            // whole post-connect synchronization as "connecting", which is
-            // what held the Add Watch sheet on "Connecting…" — with every row
-            // greyed out — for as long as a first-time sync takes.
+            // Leaving the id here until this function returns would rank the whole
+            // post-connect synchronization as "connecting".
             connectingDeviceIDs.remove(device.id)
             refreshConnectionState()
             await recordConnectedWatch(connectedDevice)
@@ -453,15 +421,12 @@ public final class AppModel {
         case .appMessageReceived(let message):
             Task { [weak self] in await self?.handleAppMessage(message, from: connection) }
         case .transferProgress:
-            // The connection has already recorded it. Which transfer the bytes
-            // belong to follows from the watch they arrived from, not from
-            // whichever kind of work happens to be running somewhere.
             break
         case .reconnecting:
             refreshConnectionState()
             needsApplicationSynchronization = true
-            // Operations interrupted by the link drop would otherwise leave
-            // the app-management UI busy forever.
+            // Operations interrupted by the drop would otherwise leave the
+            // app-management UI busy forever.
             clearBusyOperationState()
         case .disconnected(let error):
             connections.removeAll { $0 === connection }
@@ -480,21 +445,16 @@ public final class AppModel {
                     self.dataSyncStatusMessage = "Watch health data could not be saved."
                     return
                 }
-                // The samples are stored and charted whatever HealthKit does
-                // with them next, so that is said first and separately.
                 self.dataSyncStatusMessage = "Received \(samples.count) health update(s) from the watch."
                 #if os(iOS)
                 do {
-                    // The watch answered on its own account, so this must not
-                    // raise the permission sheet. A reader who wants the data
-                    // in Apple Health asks for it in Health.
+                    // The watch answered on its own account, so this must not raise the
+                    // permission sheet.
                     try await self.healthKitBridge.synchronize(
                         self.healthSamples,
                         authorization: .onlyWhatIsAlreadyGranted
                     )
                 } catch HealthKitBridgeError.notGranted, HealthKitBridgeError.unavailable {
-                    // Nothing was asked for and nothing was written. Neither
-                    // is a failure of this synchronization.
                 } catch {
                     self.dataSyncStatusMessage = "The watch's health data was saved, but Apple Health did not accept it."
                 }
@@ -517,11 +477,8 @@ public final class AppModel {
                 else { return }
                 self.timelinePins.remove(at: index)
                 try? await self.timelineLibrary.save(self.timelinePins)
-                // Only the watch the action was taken on removed the pin for
-                // itself. Every other watch still holds it, and nothing else
-                // would ever mention it again: the pin is gone from
-                // `timelinePins`, so no later synchronization derives anything
-                // for it.
+                // Only the watch the action was taken on removed the pin for itself, and
+                // the pin is about to be gone from `timelinePins` for good.
                 try? await self.queueTimelineOperation(.delete(invocation.itemID))
                 await self.synchronizeTimeline()
                 self.timelineActionStatusMessage = "Timeline action completed."
@@ -535,12 +492,8 @@ public final class AppModel {
         }
     }
 
-    /// Brings a watch up to date once it is connected, whether that is the
-    /// first connection or a reconnect.
-    ///
-    /// A watch running its recovery firmware rejects every endpoint this uses
-    /// and drops the link a few seconds after being flooded with them, so it is
-    /// only offered a firmware install.
+    // A watch running its recovery firmware rejects every endpoint this uses
+    // and drops the link a few seconds after connecting.
     func synchronizeEverything(on connection: WatchConnection) async {
         if connection.device.isRunningRecoveryFirmware {
             watchManagementErrorMessage =

@@ -18,9 +18,8 @@ public struct PutBytesTransferSession: Sendable {
     public var appBankID: UInt32
     public var chunkSize: Int
 
-    /// The name the watch files the object under. Only a `file` object has one,
-    /// and it is what tells the firmware that a language pack is a language
-    /// pack rather than any other file.
+    /// Only a `file` object has one, and it is what tells the firmware that a
+    /// language pack is a language pack rather than an unknown blob.
     public var filename: String?
 
     private var state: State = .ready
@@ -43,8 +42,8 @@ public struct PutBytesTransferSession: Sendable {
         self.chunkSize = chunkSize
         self.crc = PebbleCRC32.calculate(bytes)
         self.usesApplicationInitialization = [.appResource, .appExecutable, .worker].contains(objectType)
-        // A named file has to be installed as well as committed; the firmware
-        // only moves it into place when the install command arrives.
+        // The firmware only moves a named file into place when the install command
+        // arrives.
         self.sendsInstall = self.usesApplicationInitialization || filename != nil
     }
 
@@ -106,8 +105,7 @@ public struct PutBytesTransferSession: Sendable {
             completedCookie = cookie
             return [.finished]
         case .awaitingInstall(let cookie):
-            // The watch does not echo the transfer cookie in the install
-            // acknowledgement, so only the ACK itself is meaningful here.
+            // The watch does not echo the transfer cookie in the install acknowledgement.
             state = .finished
             completedCookie = cookie
             return [.finished]
@@ -154,9 +152,8 @@ public enum PebbleCRC32 {
             offset += 4
         }
         if offset < bytes.count {
-            // A trailing partial word is zero-padded on the left and then read
-            // back little-endian, which reverses the remaining bytes. Packing
-            // them in place instead produces a CRC the watch rejects.
+            // A trailing partial word is zero-padded on the left and then read back
+            // little-endian, which reverses the remaining bytes.
             var word: UInt32 = 0
             for (index, byte) in bytes[offset...].reversed().enumerated() {
                 word |= UInt32(byte) << (UInt32(index) * 8)

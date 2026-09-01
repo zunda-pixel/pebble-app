@@ -1,9 +1,8 @@
 public import Foundation
 import MemberwiseInit
 
-/// What a timeline item is, as the firmware numbers them. The number decides
-/// how the watch presents the item, and has to agree with the database it is
-/// filed in: a pin in the reminder database is neither one thing nor the other.
+/// The number decides how the watch presents the item, and has to agree with
+/// the database it is filed in.
 public enum PebbleTimelineItemType: UInt8, Codable, Equatable, Sendable {
     case notification = 1
     case pin = 2
@@ -20,13 +19,11 @@ public struct PebbleTimelinePin: Codable, Equatable, Identifiable, Sendable {
     public var subtitle: String?
     public var body: String?
     public var isAllDay: Bool = false
-    /// Whether the watch shows this as a pin on the timeline or as a reminder,
-    /// which is a different database and a different presentation.
     public var kind: PebbleTimelineItemType = .pin
 
     public func encoded() throws -> [UInt8] {
-        // The firmware's own ceilings, from `MAX_ATTRIBUTE_LENGTHS`: it cuts
-        // anything longer itself, and cuts it mid-character when it does.
+        // `MAX_ATTRIBUTE_LENGTHS`. The firmware cuts anything longer itself, and cuts
+        // it mid-character.
         var attributes = [textAttribute(id: 0x01, value: title, limit: 64)]
         if let subtitle { attributes.append(textAttribute(id: 0x02, value: subtitle, limit: 64)) }
         if let body { attributes.append(textAttribute(id: 0x03, value: body, limit: 512)) }
@@ -55,8 +52,7 @@ public struct PebbleTimelinePin: Codable, Equatable, Identifiable, Sendable {
 }
 
 public enum TimelinePinCodec {
-    /// Pins live in their own database. They were being written to the
-    /// reminder database, which stores them but shows them as something else.
+    /// The reminder database stores a pin but shows it as something else.
     public static var databaseID: UInt8 { 0x01 }
 
     public static func insertFrame(_ pin: PebbleTimelinePin, token: UInt16) throws -> PebbleProtocolFrame {
@@ -73,9 +69,8 @@ public enum TimelinePinCodec {
     }
 }
 
-/// A reminder is the same item in a database of its own: the watch keeps a
-/// window of them around the present and shows each one when its time comes,
-/// rather than listing it on the timeline.
+/// The watch keeps a window of reminders around the present and shows each one
+/// when its time comes, rather than listing it on the timeline.
 public enum TimelineReminderCodec {
     public static var databaseID: UInt8 { 0x03 }
 
@@ -124,14 +119,10 @@ public enum TimelinePinError: Error, Equatable, Sendable {
 }
 
 extension String {
-    /// As many of the leading UTF-8 bytes as will fit, stopping on a character
-    /// rather than partway through one.
-    ///
-    /// A cut that lands inside a multi-byte character leaves the watch with a
-    /// byte it cannot read as the start of one: `utf8_get_bounds` fails, the
-    /// text layout gives up, and the field is drawn as nothing at all. A
-    /// Japanese title that is one character too long would therefore vanish
-    /// rather than lose its tail, so the cut is made where the text allows.
+    /// A cut inside a multi-byte character leaves the watch a byte it cannot read
+    /// as the start of one: `utf8_get_bounds` fails and the text layout draws
+    /// nothing at all, so a Japanese title one character too long would vanish
+    /// rather than lose its tail.
     func utf8BytesEndingOnACharacter(maximumByteCount limit: Int) -> [UInt8] {
         var content: [UInt8] = []
         for character in self {

@@ -1,14 +1,8 @@
 public enum PebbleAdvertisement {
-    /// Manufacturer identifiers used by Pebble and Core Devices watches.
     public static var vendorIdentifiers: Set<UInt16> { [0x0154, 0x0EEA] }
 
-    /// Decides whether a scan result belongs to a Pebble we can talk to, and
-    /// returns the model to show for it.
-    ///
-    /// The model is a best guess for display only: the real one arrives with
-    /// the watch version right after connecting. A watch that has just been
-    /// reset advertises a generic name and may omit the extended scan record,
-    /// so an unrecognisable model must not hide it from the list.
+    /// The model is a best guess for display only: the real one arrives with the
+    /// version response once connected.
     public static func model(
         advertisesPebbleService: Bool,
         localName: String?,
@@ -22,14 +16,14 @@ public enum PebbleAdvertisement {
             return nil
         }
 
-        // Payload: type(1) + serial(12), then the extended record whose first
-        // byte is the hardware platform. Older firmware omits the extension,
-        // and platform 0 means the watch did not report one.
+        // Payload: type(1) + serial(12), then an extended record whose first byte is
+        // the hardware platform. Older firmware omits it, and platform 0 means the
+        // watch did not say.
         let hardwarePlatformOffset = (containsCompanyIdentifier ? 2 : 0) + 13
         if manufacturerData.indices.contains(hardwarePlatformOffset),
            manufacturerData[hardwarePlatformOffset] != 0 {
-            // A watch that names its platform is trusted, even when that means
-            // rejecting a model this app cannot drive.
+            // A watch that names its platform is trusted, even when that means rejecting
+            // a model this app cannot drive.
             return PebbleWatchModel(hardwarePlatform: manufacturerData[hardwarePlatformOffset])
         }
         return model(fromName: localName) ?? .pebbleTime2

@@ -1,7 +1,7 @@
 public import API
 import Foundation
 // `WatchConnection` is public and `@Observable`, so the conformance the macro
-// writes is public too, and the protocol behind it has to be visible with it.
+// writes is public too.
 public import Observation
 
 public enum WatchConnectionPhase: Equatable, Sendable {
@@ -10,19 +10,16 @@ public enum WatchConnectionPhase: Equatable, Sendable {
     case disconnected(PebbleConnectionError)
 }
 
-/// One live link to a watch. Each connection owns its own transport client,
-/// event/frame observation, and per-watch companion state, so several watches
-/// can be connected at the same time.
+/// Each connection owns its own transport client, event observation and
+/// per-watch companion state, so several watches can be connected at once.
 @MainActor
 @Observable
 public final class WatchConnection: Identifiable {
     public let client: any PebbleClient
     public private(set) var device: PebbleDevice
     public private(set) var phase: WatchConnectionPhase = .connected
-    /// How far the transfer running on this watch has got, whether it carries
-    /// an application or firmware. The watch is the thing doing the work, so
-    /// the count belongs to it; what the bytes are for is known to whatever
-    /// started the transfer.
+    /// The watch is the thing doing the work, so the count belongs to it rather
+    /// than to whichever kind of transfer is running somewhere.
     public private(set) var transferProgress: PutBytesTransferProgress?
 
     @ObservationIgnored var synchronizedNotificationAppRecords: [String: [UInt8]] = [:]
@@ -97,8 +94,8 @@ public final class WatchConnection: Identifiable {
         }
     }
 
-    /// Starts counting a transfer from nothing, so a bar appears at once and
-    /// the count left by the last transfer is not mistaken for this one.
+    // So a bar appears at once and the count left by the last transfer is not
+    // mistaken for this one.
     func beginTransfer() {
         transferProgress = PutBytesTransferProgress(bytesSent: 0, totalBytes: 0)
     }
@@ -107,8 +104,6 @@ public final class WatchConnection: Identifiable {
         transferProgress = nil
     }
 
-    /// Returns whether the watch just came back from a reconnect (and
-    /// therefore needs a full data resync), clearing the flag.
     func consumePostReconnectSync() -> Bool {
         defer { needsPostReconnectSync = false }
         return needsPostReconnectSync

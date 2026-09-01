@@ -40,10 +40,7 @@ public enum PebbleClientEvent: Equatable, Sendable {
     case healthSamplesReceived([PebbleHealthSample])
     case timelineActionInvoked(TimelineActionInvocation)
     case appRunStateChanged(AppRunStateEvent)
-    /// The watch has somewhere to show a picture and is asking for one.
     case imageRequested(PebbleImageRequest)
-    /// A line an app running on the watch wrote, which only arrives while app
-    /// logging is turned on.
     case applicationLogReceived(applicationID: UUID, line: WatchLogLine)
 }
 
@@ -59,10 +56,8 @@ public enum PebbleConnectionError: Error, Equatable, Sendable {
     case protocolNegotiationFailed
     case disconnected
 
-    /// Whether the same request could succeed if it were sent again in a
-    /// moment. A link that is gone, or a radio that is off, will not come back
-    /// within the few hundred milliseconds a retry waits, so that work belongs
-    /// in the queue that waits for the next connection instead of in a loop.
+    /// A link that is gone, or a radio that is off, will not come back
+    /// within the few hundred milliseconds a retry waits.
     public var isWorthAnotherAttempt: Bool {
         switch self {
         case .bluetoothUnavailable, .bluetoothUnsupported, .permissionDenied, .disconnected:
@@ -77,10 +72,8 @@ public enum PebbleConnectionError: Error, Equatable, Sendable {
 @MainActor
 public protocol PebbleClient: Sendable {
     func scan() async throws -> [DiscoveredPebble]
-    /// Makes previously paired watches connectable again without a scan.
-    /// A bonded Pebble usually does not advertise, so scanning alone can
-    /// never rediscover it; implementations look the watches up by their
-    /// stored identifiers instead. Returns the hints that were found.
+    /// A bonded Pebble usually does not advertise, so scanning alone can never
+    /// rediscover it; it has to be looked up by its stored identifier.
     func retrieveKnownDevices(_ hints: [DiscoveredPebble]) async throws -> [DiscoveredPebble]
     func connect(to device: DiscoveredPebble) async throws -> PebbleDevice
     func disconnect(from device: PebbleDevice) async
@@ -95,8 +88,6 @@ public protocol PebbleClient: Sendable {
     func sendNotification(_ notification: PebbleTimelineNotification) async throws
     func upsertTimelinePin(_ pin: PebbleTimelinePin) async throws
     func deleteTimelinePin(id: UUID) async throws
-    /// Writes a reminder, which the watch shows when its time comes rather
-    /// than listing on the timeline.
     func upsertTimelineReminder(_ reminder: PebbleTimelinePin) async throws
     func deleteTimelineReminder(id: UUID) async throws
     func launchApplication(id: UUID) async throws
@@ -106,55 +97,35 @@ public protocol PebbleClient: Sendable {
         appBankID: UInt32
     ) async throws
     func installFirmware(_ package: PBZFirmwarePackage) async throws
-    /// Sends a named file. A language pack goes under the name `lang`, which is
-    /// how the firmware knows what it is.
+    /// A language pack goes under the name `lang`, which is how the firmware
+    /// knows what it is.
     func installFile(_ bytes: [UInt8], filename: String) async throws
-    /// Asks the watch what it is running now. The answer arrives as a
-    /// `deviceUpdated` event, which is how a change the watch made — a new
-    /// language pack, a firmware slot — becomes visible.
     func refreshDeviceInformation() async throws
-    /// Writes one phone app's notification setting into the watch's database,
-    /// and waits for the watch to say whether it took it.
     func writeNotificationSourceApp(_ app: NotificationSourceApp) async throws
     func removeNotificationSourceApp(bundleID: String) async throws
-    /// Writes one location's forecast into the watch's weather database, and
-    /// waits for the watch to say whether it took it.
     func writeWeather(_ report: PebbleWeatherReport) async throws
     func removeWeather(id: UUID) async throws
-    /// Tells the weather app which locations to show, and in what order. A
-    /// forecast the watch holds but this list does not name is not shown.
+    /// A forecast the watch holds but this list does not name is not shown.
     func writeWeatherLocationOrder(_ orderedIDs: [UUID]) async throws
-    /// Changes one of the watch's own settings. Only the settings the firmware
-    /// lists as syncable are accepted.
+    /// Only the settings the firmware lists as syncable are accepted.
     func writeWatchSetting(_ setting: WatchSetting, isOn: Bool) async throws
-    /// Writes the watch's health tracking preferences, which the firmware
-    /// stores as one record and therefore takes whole.
     func writeActivitySettings(_ settings: PebbleActivitySettings) async throws
     func writeHeartRateSettings(_ settings: PebbleHeartRateSettings) async throws
-    /// Gives the watch's health app a day it did not see for itself.
     func writeHealthDay(_ day: PebbleHealthDay) async throws
-    /// Turns the watch's Reminders app on, which is what makes a reminder
-    /// visible there rather than only buzzing.
     func writeReminderAppState(_ state: PebbleReminderAppState) async throws
-    /// Answers a request for a picture. A nil image says there is none, which
-    /// is what lets the watch stop waiting and show what it has.
+    /// A nil image says there is none, which is what lets the watch stop
+    /// waiting.
     func sendImage(
         token: UInt8,
         kindValue: UInt8,
         image: PebbleEncodedImage?
     ) async throws
-    /// Says this kind of picture is never coming, so the watch stops asking.
     func declineImageKind(token: UInt8, kindValue: UInt8) async throws
-    /// Asks the watch for what is on its screen.
     func takeScreenshot() async throws -> PebbleScreenshot
-    /// Reads back one generation of the watch's own log — zero being the run it
-    /// is in now, one the run before that. Returns nil once asked for further
-    /// back than the watch goes.
+    /// Generation zero is the run the watch is in now, one the run before it.
+    /// Nil once asked for further back than the watch goes.
     func readLogGeneration(_ generation: UInt8) async throws -> [WatchLogLine]?
-    /// Turns on the watch sending the log lines its apps write. They arrive as
-    /// `applicationLogReceived` events.
     func setApplicationLoggingEnabled(_ isEnabled: Bool) async throws
-    /// Pulls a whole object off the watch: a crash dump, or a file.
     func getBytes(_ request: GetBytesRequest) async throws -> [UInt8]
     func registerApplication(_ metadata: PebbleAppMetadata) async throws
     func unregisterApplication(applicationID: UUID) async throws
@@ -165,7 +136,6 @@ public extension PebbleClient {
         []
     }
 
-    /// A transport with nothing to ask does nothing.
     func refreshDeviceInformation() async throws {}
 }
 
@@ -179,11 +149,8 @@ public enum AppReorderClientError: Error, Equatable, Sendable {
     case rejected(AppReorderResult)
 }
 
-/// Reading something back off the watch — a screenshot, a log, a crash dump.
 public enum WatchPullError: Error, Equatable, Sendable {
-    /// The watch sends one of these at a time, and is already sending one.
     case operationAlreadyInProgress
-    /// This transport has nothing to read back.
     case notSupported
 }
 
@@ -192,8 +159,6 @@ public enum AppMessageClientError: Error, Equatable, Sendable {
 }
 
 public extension PebbleConnectionError {
-    /// A short, untranslated name for diagnostics and logs. The sentence shown
-    /// to the reader lives in the UI layer, where it can be localized.
     var logDescription: String {
         String(describing: self)
     }

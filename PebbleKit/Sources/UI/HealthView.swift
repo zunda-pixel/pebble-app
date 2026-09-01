@@ -83,16 +83,12 @@ struct HealthView: View {
         }
     }
 
-    /// The most recent day there is anything for, whatever day that is.
     var newestSample: PebbleHealthSample? {
         model.healthSamples.max { $0.date < $1.date }
     }
 
-    /// The day the summary is actually showing, when that is not today.
-    ///
-    /// A watch only hands over what it recorded, so the newest day it knows
-    /// about can be days old: one last worn on Friday reports Friday. Saying
-    /// which day it is beats showing Friday's steps as this morning's.
+    /// A watch only hands over what it recorded, so the newest day it knows about
+    /// can be days ago.
     var summaryDate: Date? {
         guard let date = newestSample?.date, !Calendar.current.isDateInToday(date) else {
             return nil

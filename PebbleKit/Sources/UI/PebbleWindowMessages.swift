@@ -1,18 +1,14 @@
 public import Foundation
 public import SwiftUI
 
-/// A menu command asking the Devices screen to look for watches.
-///
 /// The model a window is showing is the message's subject, so a command only
-/// reaches the windows that are showing that model. `NotificationCenter`
-/// requires a class for a subject, which the model already is.
+/// reaches the windows showing that model.
 public struct PebbleScanRequest: NotificationCenter.MainActorMessage {
     public typealias Subject = AppModel
 
     public init() {}
 }
 
-/// A menu command asking a window to show one of the primary sections.
 public struct PebbleSectionRequest: NotificationCenter.MainActorMessage {
     public typealias Subject = AppModel
 
@@ -24,7 +20,6 @@ public struct PebbleSectionRequest: NotificationCenter.MainActorMessage {
 }
 
 public extension View {
-    /// Runs `action` for every message of this type posted for `model`.
     func onPebbleMessage<Message: NotificationCenter.MainActorMessage>(
         _ messageType: Message.Type,
         from model: AppModel,

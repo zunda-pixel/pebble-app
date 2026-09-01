@@ -21,8 +21,6 @@ protocol SystemMusicSource: AnyObject {
     func start()
     func stop()
     func perform(_ action: MusicAction)
-    /// The cover of what is playing, at the size the watch asked for, or nil
-    /// when the track has none.
     func artwork(width: Int, height: Int) -> CGImage?
 }
 
@@ -30,8 +28,6 @@ extension SystemMusicSource {
     func artwork(width: Int, height: Int) -> CGImage? { nil }
 }
 
-/// Forwards the system's now-playing state to the watch's music endpoint and
-/// applies playback actions the watch sends back.
 @MainActor
 final class MusicCoordinator {
     private let send: (PebbleProtocolFrame) async throws -> Void
@@ -65,7 +61,6 @@ final class MusicCoordinator {
         schedulePush(force: true)
     }
 
-    /// The cover art of what is playing, ready for the watch.
     func artwork(width: Int, height: Int) -> PebbleEncodedImage? {
         guard let image = source.artwork(width: width, height: height) else { return nil }
         return WatchImageRenderer.encode(image, width: width, height: height)
@@ -84,13 +79,9 @@ final class MusicCoordinator {
     }
 
     private func schedulePush(force: Bool) {
-        // Forgetting the last snapshot is the whole of what `force` does: it
-        // makes the next push send every field rather than a diff. It has to
-        // happen even when a debounced push is already on its way, because
-        // that push is the one that will run — a watch connecting during the
-        // second after a track change would otherwise be sent the difference
-        // between two states it never saw, which is usually nothing at all,
-        // and its music screen would stay blank.
+        // Forgetting the last snapshot is the whole of what `force` does, and it has
+        // to happen even when a debounced push is already pending: that push would
+        // otherwise send a diff to a watch that has just connected.
         if force {
             lastSnapshot = nil
         }
@@ -98,7 +89,6 @@ final class MusicCoordinator {
             return
         }
         pushTask = Task { [weak self] in
-            // Collapse bursts of change notifications into one update per second.
             try? await Task.sleep(for: .seconds(1))
             guard let self, !Task.isCancelled else { return }
             self.pushTask = nil
@@ -133,7 +123,6 @@ final class MusicCoordinator {
                 try await send(MusicControlCodec.nowPlayingFrame(snapshot.nowPlaying))
             }
         } catch {
-            // The next change or watch request retries automatically.
             lastSnapshot = previous
         }
     }
@@ -224,8 +213,8 @@ final class MediaPlayerMusicSource: SystemMusicSource {
 
     func artwork(width: Int, height: Int) -> CGImage? {
         guard let artwork = player.nowPlayingItem?.artwork else { return nil }
-        // Asking for the size the watch wants lets the store hand back the
-        // smallest copy that will do rather than a full-sized cover.
+        // Asking for the size the watch wants lets the store hand back the smallest
+        // copy that will do.
         return artwork.image(at: CGSize(width: width, height: height))?.cgImage
     }
 
@@ -242,15 +231,14 @@ final class MediaPlayerMusicSource: SystemMusicSource {
         case .previousTrack:
             player.skipToPreviousItem()
         case .volumeUp, .volumeDown:
-            // System volume has no public control API; the watch's request is ignored.
+            // System volume has no public control API.
             break
         }
     }
 }
 #endif
 
-/// Platforms without a system now-playing API (macOS, visionOS) report no
-/// music state, mirroring the reference implementation's behavior there.
+// macOS and visionOS have no system now-playing API.
 @MainActor
 final class UnsupportedMusicSource: SystemMusicSource {
     var onChange: (() -> Void)?

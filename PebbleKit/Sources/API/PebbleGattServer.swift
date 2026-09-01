@@ -1,14 +1,9 @@
 public import CoreBluetooth
 import Foundation
 
-/// Hosts the protocol service on the phone so a watch that does not publish
-/// one of its own can talk to it as a GATT client ("forward" transport).
-///
-/// A freshly reset watch, and any watch running recovery firmware, only
-/// exposes its pairing service and expects the phone to carry the session.
-/// Watches inspect the phone's GATT database right after connecting, so the
-/// service has to be published before any connection is attempted — hence the
-/// single shared instance, published at launch and shared by every connection.
+/// Hosts the protocol service on the phone, which a watch that does not
+/// publish one of its own — a freshly reset one, or any watch running recovery
+/// firmware — connects to as a GATT client.
 @MainActor
 public final class PebbleGattServer: NSObject {
     public static let shared = PebbleGattServer()
@@ -20,27 +15,23 @@ public final class PebbleGattServer: NSObject {
     /// Its contents are never used; only its presence matters.
     public static var fakeServiceUUID: CBUUID { CBUUID(string: "BADBADBA-DBAD-BADB-ADBA-BADBADBADBAD") }
 
-    /// The answer to any read on the phone's server. The watch checks the shape
-    /// of this value while setting the session up and gives up on anything else.
+    /// The watch checks the shape of this value while setting the session up and
+    /// gives up on anything else.
     private static let metaResponse = Data([
         0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     ])
 
-    /// Callbacks for one watch, keyed by the identifier CoreBluetooth uses for
-    /// it in both the central and peripheral roles.
+    /// Keyed by the identifier CoreBluetooth uses for a watch in both the central
+    /// and peripheral roles.
     private struct Registration {
         var onReceive: (_ bytes: [UInt8]) -> Void
         var onSubscribe: () -> Void
         var onUnsubscribe: () -> Void
     }
 
-    /// Called when a watch subscribes that no connection is handling yet.
-    ///
     /// A watch that has been set up reconnects on its own and starts talking to
-    /// the phone's service without the app having scanned for it. Until the app
-    /// opens its own link to the same watch there is nothing to hand its
-    /// packets to, so they would be dropped and the watch would keep retrying.
+    /// the phone's service without the app having scanned for it.
     public var onUnclaimedWatch: ((_ centralID: String) -> Void)?
 
     private var peripheralManager: CBPeripheralManager!
@@ -61,8 +52,6 @@ public final class PebbleGattServer: NSObject {
         )
     }
 
-    /// Publishes the service. Safe to call repeatedly and before the radio is
-    /// available; publishing then happens as soon as it powers on.
     public func start() {
         guard peripheralManager.state == .poweredOn, !isServicePublished else {
             return
@@ -110,7 +99,6 @@ public final class PebbleGattServer: NSObject {
             onSubscribe: onSubscribe,
             onUnsubscribe: onUnsubscribe
         )
-        // The watch may have subscribed before the connection got this far.
         if subscribedCentrals[centralID] != nil {
             onSubscribe()
         }
@@ -119,9 +107,8 @@ public final class PebbleGattServer: NSObject {
     func unregister(centralID: String) {
         registrations[centralID] = nil
         pendingNotifications.removeAll(for: centralID)
-        // A disconnected central holds no subscription, and iOS does not
-        // always say so; leaving the record would make the next link look
-        // ready before the watch has subscribed to it.
+        // iOS does not always report an unsubscribe, and leaving the record would
+        // make the next link look ready before the watch has subscribed to it.
         subscribedCentrals[centralID] = nil
     }
 
@@ -129,9 +116,8 @@ public final class PebbleGattServer: NSObject {
         subscribedCentrals[centralID] != nil
     }
 
-    /// Removes and re-adds the service, which sends a service-changed
-    /// indication. A watch that inspected this phone before the service
-    /// existed caches that result and only looks again when told to.
+    // Removing and re-adding sends a service-changed indication. A watch that
+    // inspected this phone before the service existed caches that result.
     func republish() {
         guard peripheralManager.state == .poweredOn else {
             return
@@ -143,7 +129,6 @@ public final class PebbleGattServer: NSObject {
             )
         }
         peripheralManager.removeAllServices()
-        // Subscriptions do not survive the service they belong to.
         subscribedCentrals.removeAll()
         pendingNotifications.removeAll()
         dataCharacteristic = nil
@@ -151,13 +136,10 @@ public final class PebbleGattServer: NSObject {
         start()
     }
 
-    /// The largest notification the watch will accept, which depends on the
-    /// MTU it negotiated.
     func maximumPacketSize(centralID: String) -> Int {
         subscribedCentrals[centralID]?.maximumUpdateValueLength ?? 20
     }
 
-    /// Sends one PPoG packet to a subscribed watch.
     @discardableResult
     func send(_ bytes: [UInt8], to centralID: String) -> Bool {
         guard let dataCharacteristic, let central = subscribedCentrals[centralID] else {
@@ -173,7 +155,6 @@ public final class PebbleGattServer: NSObject {
             for: dataCharacteristic,
             onSubscribedCentrals: [central]
         ) else {
-            // The transmit queue is full; retry once CoreBluetooth drains it.
             pendingNotifications.append(value, for: centralID)
             return true
         }
@@ -206,10 +187,8 @@ extension PebbleGattServer: CBPeripheralManagerDelegate {
         guard peripheral.state == .poweredOn else {
             return
         }
-        // A service iOS restored from the previous launch is still in the
-        // database, but no watch was told about it. Re-publishing sends a
-        // service-changed indication so a watch that cached the old database
-        // discovers the service again.
+        // A service iOS restored from the previous launch is in the database, but no
+        // watch was told about it.
         if didRestoreService, !hasRefreshedRestoredService {
             hasRefreshedRestoredService = true
             republish()
@@ -251,7 +230,6 @@ extension PebbleGattServer: CBPeripheralManagerDelegate {
         guard error != nil else {
             return
         }
-        // Publishing failed; let a later attempt try again.
         isServicePublished = false
     }
 

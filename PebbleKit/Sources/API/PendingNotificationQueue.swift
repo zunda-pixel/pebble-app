@@ -1,11 +1,8 @@
 public import Foundation
 import DequeModule
 
-/// PPoG packets waiting for CoreBluetooth to drain its transmit queue.
-///
 /// Order is the whole point: the protocol numbers its packets, and one
-/// overtaking another stalls the session until the watch times out. So once a
-/// packet for a watch is waiting, every later packet for that watch waits too.
+/// overtaking another stalls the session until it times out.
 struct PendingNotificationQueue: Equatable, Sendable {
     private var packets: Deque<(centralID: String, value: Data)> = []
 
@@ -17,8 +14,6 @@ struct PendingNotificationQueue: Equatable, Sendable {
         packets.first
     }
 
-    /// Whether a packet for this watch has to join the queue rather than being
-    /// sent straight away.
     func holdsPackets(for centralID: String) -> Bool {
         packets.contains { $0.centralID == centralID }
     }

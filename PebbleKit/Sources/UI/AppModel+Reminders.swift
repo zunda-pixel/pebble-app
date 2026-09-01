@@ -2,13 +2,6 @@ public import API
 public import Foundation
 import SwiftUI
 
-/// Reminders the watch buzzes for at a set time.
-///
-/// A reminder is the same record as a timeline pin in a database of its own.
-/// The difference is what the watch does with it: a pin is something to find on
-/// the timeline, a reminder is something the watch brings up when its moment
-/// arrives. The watch keeps a window of them — a few days either side of now —
-/// and drops the rest, so old ones need no tidying here.
 extension AppModel {
     public func loadReminders() async {
         reminders = (try? await reminderLibrary.pins()) ?? []
@@ -35,10 +28,8 @@ extension AppModel {
         }
     }
 
-    /// Forgets these reminders, here and on every watch that holds them.
-    ///
-    /// Named rather than numbered: the list they were picked from is sorted and
-    /// split for reading, so a row's place on screen is not its place here.
+    // Named rather than numbered: the list they were picked from is sorted and
+    // split for reading.
     public func removeReminders(_ removed: [PebbleTimelinePin]) async {
         guard !removed.isEmpty else { return }
         let identifiers = Set(removed.map(\.id))
@@ -51,9 +42,8 @@ extension AppModel {
         }
     }
 
-    /// Writes the reminders that are still ahead to a watch that has just
-    /// connected. One in the past has already been shown, or missed, and
-    /// sending it would only make the watch buzz about yesterday.
+    // One in the past has already been shown, or missed, and sending it would
+    // only make the watch buzz for it now.
     func synchronizeReminders(on connection: WatchConnection) async {
         guard connection.isConnected else { return }
         await loadReminders()

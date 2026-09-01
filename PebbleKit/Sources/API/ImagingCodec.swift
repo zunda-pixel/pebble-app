@@ -1,22 +1,18 @@
 public import Foundation
 import MemberwiseInit
 
-/// What the watch is asking for a picture of.
 public enum PebbleImageKind: UInt8, Equatable, Sendable {
     case albumArt = 0
     case notification = 1
 }
 
-/// A picture the watch asked the phone for.
-///
-/// The watch pulls rather than the phone pushing: it asks when it has somewhere
-/// to show the picture and knows how big that is, which saves sending anything
-/// it would only throw away.
+/// The watch pulls rather than the phone pushing: it asks when it has
+/// somewhere to show the picture and knows how big that is.
 public enum PebbleImageRequest: Equatable, Sendable {
     case albumArt(PebbleImageRequestHeader, title: String, artist: String)
     case notification(PebbleImageRequestHeader, itemID: UUID)
-    /// A kind this app has never heard of. It still has a token, and the watch
-    /// waits on that token until it is told there is nothing coming.
+    /// A kind this app has never heard of still has a token, and the watch waits
+    /// on that token until it is told there is nothing coming.
     case unsupported(PebbleImageRequestHeader)
 
     public var header: PebbleImageRequestHeader {
@@ -38,13 +34,10 @@ public struct PebbleImageRequestHeader: Equatable, Sendable {
     public var kind: PebbleImageKind? { PebbleImageKind(rawValue: kindValue) }
 }
 
-/// A picture in the only shape the watch reads: sixteen colours from its own
-/// palette, two pixels to the byte.
 @MemberwiseInit(.public)
 public struct PebbleEncodedImage: Equatable, Sendable {
     public var width: Int
     public var height: Int
-    /// Up to sixteen `GColor8` bytes.
     public var palette: [UInt8]
     /// Four-bit indices into the palette, the even column in the high nibble,
     /// each row padded out to a whole byte.
@@ -62,10 +55,10 @@ public enum ImagingCodec {
     static let noImageFlag: UInt8 = 0x04
     static let unsupportedFlag: UInt8 = 0x08
 
-    /// The watch clamps what it asks for to this, and so does this app: a
-    /// request outside it is answered with nothing rather than trusted.
+    /// The watch clamps what it asks for to this; a request outside it is answered
+    /// with nothing rather than trusted.
     public static let maximumDimension = 300
-    /// Pixels per chunk, which keeps a chunk near a kilobyte.
+    /// Keeps a chunk near a kilobyte.
     static let pixelsPerChunk = 1_000
 
     public static func decode(_ frame: PebbleProtocolFrame) throws -> PebbleImageRequest {
@@ -97,8 +90,6 @@ public enum ImagingCodec {
         }
     }
 
-    /// The frames that answer one request. A picture goes in several: the
-    /// first carries its size and palette, the last says so.
     public static func responseFrames(
         token: UInt8,
         kindValue: UInt8,
@@ -132,8 +123,6 @@ public enum ImagingCodec {
         return frames
     }
 
-    /// Tells the watch this kind of picture is never coming, so it stops asking
-    /// for the rest of the connection.
     public static func unsupportedFrame(token: UInt8, kindValue: UInt8) -> PebbleProtocolFrame {
         flagsFrame(token: token, kindValue: kindValue, flags: unsupportedFlag)
     }
@@ -149,8 +138,8 @@ public enum ImagingCodec {
         )
     }
 
-    /// The kind rides in the top nibble: the watch can have several requests
-    /// out at once and the token alone does not say which one an answer is for.
+    // The watch can have several requests out at once, and the token alone does
+    // not say which one an answer is for.
     static func flagsByte(kindValue: UInt8, flags: UInt8) -> UInt8 {
         flags | ((kindValue & 0x0F) << 4)
     }

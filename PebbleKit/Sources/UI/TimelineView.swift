@@ -1,12 +1,8 @@
 import API
 import SwiftUI
 
-/// The two lists the watch keeps for things that happen at a time: the pins on
-/// its timeline, and the reminders it buzzes for.
-///
-/// Two databases on the watch and two different behaviours, but one question
-/// for the reader — what is coming up — so they share a screen and are swapped
-/// between rather than stacked.
+/// Two databases on the watch and two behaviours, but one question for the
+/// reader — what is coming up — so they share a screen.
 enum TimelineListKind: String, CaseIterable, Identifiable {
     case pins
     case reminders
@@ -20,7 +16,6 @@ enum TimelineListKind: String, CaseIterable, Identifiable {
         }
     }
 
-    /// What the sheet that adds one is called.
     var newTitle: LocalizedStringKey {
         switch self {
         case .pins: "New Pin"
@@ -91,8 +86,6 @@ struct TimelineView: View {
     }
 }
 
-/// Adds one pin, or one reminder. The same two fields either way: what it is,
-/// and when.
 struct TimelineItemComposer: View {
     var model: AppModel
     var kind: TimelineListKind

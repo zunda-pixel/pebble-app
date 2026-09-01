@@ -1,13 +1,12 @@
 public import Foundation
 import MemberwiseInit
 
-/// A line the watch wrote to its own log.
 @MemberwiseInit(.public)
 public struct WatchLogLine: Equatable, Sendable, Identifiable {
     public var id: UUID = UUID()
     public var date: Date
-    /// The firmware's level, counted the way its own logging does: 1 is an
-    /// error, 50 a warning, 100 informational, 200 debug.
+    /// Counted the way the firmware's own logging does: 1 is an error, 50 a
+    /// warning, 100 informational, 200 debug.
     public var level: UInt8
     public var file: String
     public var line: UInt16
@@ -23,15 +22,13 @@ public struct WatchLogLine: Equatable, Sendable, Identifiable {
         }
     }
 
-    /// The line as it would look in a log file.
     public var formatted: String {
         "\(levelName) \(date.formatted(.iso8601)) \(file):\(line)> \(message)"
     }
 }
 
-/// The watch's log, which it keeps in flash and hands over a generation at a
-/// time — generation zero being the run it is in now, one the run before it,
-/// and so on back until it has no more.
+/// Generation zero is the run the watch is in now, one the run before it, and
+/// so on back until it has no more.
 public enum LogDumpCodec {
     public static var endpoint: UInt16 { 2_002 }
 
@@ -40,12 +37,9 @@ public enum LogDumpCodec {
     static let doneCommand: UInt8 = 0x81
     static let noLogsCommand: UInt8 = 0x82
 
-    /// The cookie comes back on every line of the answer, which is how a reply
-    /// to an abandoned request is told apart from this one's.
-    ///
-    /// The watch copies the four bytes out of the request and back into every
-    /// reply without ever reading them as a number, so the order they go out in
-    /// only has to be the order they are read back in.
+    // The watch copies these four bytes out of the request into every line of the
+    // answer without reading them as a number, so a reply to an abandoned request
+    // can be told apart from this one's.
     public static func requestFrame(generation: UInt8, cookie: UInt32) -> PebbleProtocolFrame {
         PebbleProtocolFrame(
             endpoint: endpoint,
@@ -56,17 +50,14 @@ public enum LogDumpCodec {
     public enum Message: Equatable, Sendable {
         case line(WatchLogLine)
         case done
-        /// There is no such generation: the watch has been asked for further
-        /// back than it goes.
+        /// The watch has been asked for further back than it goes.
         case noLogs
     }
 
-    /// Not little-endian, whatever the record's provenance suggests: it is the
-    /// firmware's own `LogBinaryMessage`, written to flash and dumped verbatim
-    /// on an ARM watch, so reading it the way the struct is laid out is the
-    /// obvious move and the wrong one. `pbl_log_binary_format` puts the
-    /// timestamp and the line number through `htonl` and `htons` before it
-    /// hands the buffer over.
+    /// Not little-endian: the record is the firmware's own `LogBinaryMessage`,
+    /// written to flash and dumped verbatim on an ARM watch, but
+    /// `pbl_log_binary_format` puts the timestamp and line number through `htonl`
+    /// and `htons` first.
     public static func decode(_ frame: PebbleProtocolFrame, cookie: UInt32) throws -> Message? {
         guard frame.endpoint == endpoint else { throw WatchLogError.unexpectedEndpoint }
         guard frame.payload.count >= 5 else { throw WatchLogError.invalidPayload }
@@ -102,8 +93,6 @@ public enum LogDumpCodec {
     }
 }
 
-/// The log of the apps running on the watch, which the watch only sends while
-/// it has been asked to.
 public enum AppLogCodec {
     public static var endpoint: UInt16 { 2_006 }
 
@@ -111,8 +100,6 @@ public enum AppLogCodec {
         PebbleProtocolFrame(endpoint: endpoint, payload: [isEnabled ? 1 : 0])
     }
 
-    /// The same record as a firmware log line, behind the identifier of the app
-    /// that wrote it.
     public static func decode(_ frame: PebbleProtocolFrame) throws -> (applicationID: UUID, line: WatchLogLine) {
         guard frame.endpoint == endpoint else { throw WatchLogError.unexpectedEndpoint }
         guard frame.payload.count >= 16 else { throw WatchLogError.invalidPayload }

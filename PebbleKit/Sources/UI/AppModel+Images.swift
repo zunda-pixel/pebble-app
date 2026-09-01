@@ -1,12 +1,8 @@
 import API
 import Foundation
 
-/// Pictures the watch asks for.
-///
 /// The watch pulls: when it has somewhere to show a picture it says how big
-/// that space is and waits for an answer on that token. Every request is
-/// answered, even when there is no picture — a token left unanswered is a watch
-/// left waiting.
+/// that space is and waits for an answer on that token.
 extension AppModel {
     func answerImageRequest(_ request: PebbleImageRequest, on connection: WatchConnection) async {
         let header = request.header
@@ -31,9 +27,8 @@ extension AppModel {
                 image: image
             )
         case .notification, .unsupported:
-            // Notifications reaching this app carry no picture: what iOS hands
-            // over has no attachment, and there is nothing to look up by item.
-            // Saying so once stops the watch asking again this connection.
+            // What iOS hands over has no attachment, and there is nothing to look up by
+            // item, so saying so once stops the watch asking again.
             try? await connection.client.declineImageKind(
                 token: header.token,
                 kindValue: header.kindValue

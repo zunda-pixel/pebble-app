@@ -8,16 +8,14 @@ import SwiftUI
 import HealthKit
 #endif
 
-/// Where one of the phone's permissions stands.
 public enum PhonePermissionState: Equatable, Sendable {
     case notDetermined
     case allowed
-    /// Allowed, but only as far as this app needs it in one direction — a
-    /// calendar it may add to but not read.
+    /// Allowed in one direction only — a calendar this app may add to but not
+    /// read.
     case partly
     case denied
-    /// Denied by someone other than the reader: a device policy, or a phone
-    /// with no such hardware.
+    /// Denied by a device policy, or a phone with no such hardware.
     case restricted
     case unavailable
     /// Apple provides no way to read this one back.
@@ -38,11 +36,6 @@ public enum PhonePermissionState: Equatable, Sendable {
     var isSettled: Bool { self == .allowed }
 }
 
-/// What the phone has been allowed to hand over.
-///
-/// Read rather than remembered: the reader can change any of these in the
-/// system settings while the app is in the background, so it is asked again
-/// whenever the screen comes back.
 @MemberwiseInit(.public)
 public struct PhonePermissions: Equatable, Sendable {
     public var bluetooth: PhonePermissionState = .notDetermined
@@ -62,8 +55,8 @@ public struct PhonePermissions: Equatable, Sendable {
         )
     }
 
-    /// Reading this does not ask: `CBManager.authorization` is a look at what
-    /// has already been decided.
+    // `CBManager.authorization` is a look at what has already been decided, not
+    // a request.
     private static func bluetoothState() -> PhonePermissionState {
         switch CBManager.authorization {
         case .notDetermined: .notDetermined
@@ -78,8 +71,7 @@ public struct PhonePermissions: Equatable, Sendable {
         switch EKEventStore.authorizationStatus(for: entity) {
         case .notDetermined: .notDetermined
         case .fullAccess: .allowed
-        // The app reads events to make pins of them, so write-only is not
-        // enough for what it does.
+        // The app reads events to make pins of them, so write-only is not enough.
         case .writeOnly: .partly
         case .denied: .denied
         case .restricted: .restricted
@@ -106,9 +98,8 @@ public struct PhonePermissions: Equatable, Sendable {
         guard HKHealthStore.isHealthDataAvailable(),
               let steps = HKQuantityType.quantityType(forIdentifier: .stepCount)
         else { return .unavailable }
-        // Only the writing side can be read back. Apple deliberately gives no
-        // way to ask whether reading was allowed, so that an app cannot tell
-        // "no data" apart from "not allowed to look".
+        // Only the writing side can be read back: Apple deliberately gives no way to
+        // tell "no data" apart from "not allowed".
         switch HKHealthStore().authorizationStatus(for: steps) {
         case .notDetermined: return .notDetermined
         case .sharingAuthorized: return .allowed

@@ -3,14 +3,11 @@ import AsyncOperations
 import Foundation
 import SwiftUI
 
-/// Remembered watches and per-watch actions.
 extension AppModel {
     public func loadSavedWatches() async {
         do {
             savedWatches = try await watchLibrary.allWatches()
             watchManagementErrorMessage = nil
-            // One independent read per watch, so they do not have to queue up
-            // behind each other.
             let library = applicationLibrary
             let states = await savedWatches
                 .filter { installedApplicationIDsByWatch[$0.id] == nil }
@@ -26,12 +23,8 @@ extension AppModel {
         }
     }
 
-    /// Notices a watch that came back on its own.
-    ///
     /// A watch that has been set up does not advertise and does not wait to be
-    /// found: it reconnects and subscribes to the phone's protocol service by
-    /// itself. Only the app's own link carries the session, though, so until it
-    /// opens one the watch's packets have nowhere to go and it keeps retrying.
+    /// found: it reconnects and subscribes to the phone's protocol service.
     func observeWatchesReconnectingThemselves() {
         PebbleGattServer.shared.onUnclaimedWatch = { [weak self] centralID in
             guard let self else { return }
@@ -39,8 +32,7 @@ extension AppModel {
         }
     }
 
-    /// The watch and the peripheral share an identifier, so a subscription
-    /// names the watch it came from.
+    // The watch and the peripheral share an identifier.
     func noteWatchThatReconnectedItself(centralID: String) async {
         if let watch = savedWatches.first(where: { $0.id == centralID }) {
             await PebbleDiagnostics.shared.record(
@@ -50,11 +42,8 @@ extension AppModel {
             await connect(to: watch)
             return
         }
-        // A watch this phone is bonded to that the app has no record of, after
-        // being forgotten or after a reinstall. Connecting to it is the reader's
-        // call, so it is only offered: it goes in the list of watches to add,
-        // which is the only way it can appear there, since a bonded watch never
-        // turns up in a scan.
+        // Connecting to a watch the app has no record of is the reader's call, so it
+        // is only offered.
         guard !unknownBondedWatches.contains(where: { $0.id == centralID }) else {
             return
         }
@@ -66,21 +55,18 @@ extension AppModel {
         )
     }
 
-    /// Connects to a watch offered in the list of watches to add.
     public func connect(to watch: UnknownBondedWatch) async {
         await connect(to: provisionalDevice(id: watch.id, name: watch.name))
     }
 
-    /// The name the system already holds for a bonded peripheral.
     private func bondedWatchName(centralID: String) async -> String {
         let hint = provisionalDevice(id: centralID, name: "Pebble")
         let retrieved = try? await scannerClient.retrieveKnownDevices([hint])
         return retrieved?.first { $0.id == centralID }?.name ?? hint.name
     }
 
-    /// Connecting needs a model before the watch has said what it is. Only the
-    /// identifier and the name are real; the version the watch reports on
-    /// connecting replaces the rest, and is what gets saved.
+    // Only the identifier and the name are real; the version the watch reports
+    // on connecting replaces the rest.
     private func provisionalDevice(id: String, name: String) -> DiscoveredPebble {
         DiscoveredPebble(id: id, name: name, model: .pebble2Duo, signalStrength: 0)
     }
@@ -95,8 +81,7 @@ extension AppModel {
     }
 
     public func forgetWatch(id: String) async {
-        // Closing the connection also stops any background reconnect loop; a
-        // successful reconnect would otherwise re-save the forgotten entry.
+        // A successful reconnect would otherwise re-save the forgotten entry.
         if let connection = connections.first(where: { $0.device.id == id }) {
             await close(connection)
         }
@@ -142,9 +127,7 @@ extension AppModel {
         }
     }
 
-    /// Sends a reset command to a watch. The watch reboots without answering,
-    /// so the connection is closed locally and the app reconnects afterwards
-    /// if the watch is set to connect automatically.
+    // The watch reboots without answering, so the connection is closed locally.
     public func resetWatch(_ kind: PebbleResetKind, deviceID: String? = nil) async {
         guard let connection = connection(for: deviceID), connection.isConnected else {
             watchManagementErrorMessage = "Connect the watch before resetting it."
@@ -154,7 +137,6 @@ extension AppModel {
         do {
             try await connection.client.send(ResetCodec.frame(kind))
             if kind == .factoryReset {
-                // Everything the watch held is gone; drop our record of it too.
                 try? await applicationLibrary.setSynchronizedApplicationIDs([], deviceID: device.id)
                 installedApplicationIDsByWatch[device.id] = []
             }

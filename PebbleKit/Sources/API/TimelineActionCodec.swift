@@ -5,8 +5,7 @@ import MemberwiseInit
 public struct TimelineActionInvocation: Equatable, Sendable {
     public var itemID: UUID
     public var actionID: UInt8
-    /// What the watch sent along with the action, by attribute id — a snooze
-    /// carries the new time, for instance.
+    /// By attribute id — a snooze carries the new time, for instance.
     public var attributes: [UInt8: [UInt8]] = [:]
 }
 
@@ -39,10 +38,8 @@ public enum TimelineActionCodec {
         )
     }
 
-    /// Tells the watch how the action went, and what to show while it says so.
-    ///
-    /// Zero is the acknowledgement and one the refusal — the way round that
-    /// reads backwards, and was backwards here.
+    /// Zero is the acknowledgement and one the refusal, which is the way round
+    /// that reads backwards from every other status in this protocol.
     public static func responseFrame(
         itemID: UUID,
         succeeded: Bool,

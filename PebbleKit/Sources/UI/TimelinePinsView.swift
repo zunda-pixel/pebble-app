@@ -1,11 +1,8 @@
 import API
 import SwiftUI
 
-/// Everything on the watch's timeline, by day.
-///
-/// The list is as long as the reader's diary — one calendar sync brings a month
-/// of events at a time — so it is grouped and searchable rather than one run of
-/// rows.
+/// The list is as long as the reader's diary — one calendar sync brings a
+/// month of events — so it is grouped and searchable.
 struct TimelinePinsView: View {
     var model: AppModel
     @State private var search = ""
@@ -16,7 +13,6 @@ struct TimelinePinsView: View {
         return model.timelinePins.filter { $0.title.localizedCaseInsensitiveContains(query) }
     }
 
-    /// Grouped by day, in the order the watch shows them.
     private var days: [(date: Date, pins: [PebbleTimelinePin])] {
         let calendar = Calendar.current
         return Dictionary(grouping: matches) { calendar.startOfDay(for: $0.timestamp) }
@@ -34,8 +30,7 @@ struct TimelinePinsView: View {
                         }
                     }
                     .onDelete { offsets in
-                        // A pin is named rather than counted: the rows here are
-                        // one day's worth of what a search left, and say nothing
+                        // The rows here are one day's worth of what a search left, and say nothing
                         // about their place in the whole list.
                         let removed = offsets.compactMap { day.pins.indices.contains($0) ? day.pins[$0] : nil }
                         Task { await model.removeTimelinePins(removed) }

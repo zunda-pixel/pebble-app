@@ -12,12 +12,8 @@ final class HealthKitBridge {
         set { Defaults[.healthKitLastExportDate] = newValue }
     }
 
-    /// Whether writing to HealthKit may ask for permission first.
-    ///
-    /// Asking puts a full-screen sheet over whatever the reader is doing, so
-    /// only something the reader started may do it. Health data arriving from
-    /// a watch is not that: it turns up whenever a watch answers a
-    /// synchronization request, in the middle of any screen.
+    /// Asking puts a full-screen sheet over whatever the reader is doing, so only
+    /// something the reader started may ask.
     enum Authorization {
         case mayAsk
         case onlyWhatIsAlreadyGranted
@@ -36,8 +32,7 @@ final class HealthKitBridge {
         case .mayAsk:
             try await store.requestAuthorization(toShare: [stepsType, sleepType], read: [stepsType, sleepType])
         case .onlyWhatIsAlreadyGranted:
-            // Writing is the one side HealthKit lets an app read back, and it
-            // is the side used here.
+            // Writing is the one side HealthKit lets an app read back.
             guard store.authorizationStatus(for: stepsType) == .sharingAuthorized else {
                 throw HealthKitBridgeError.notGranted
             }
@@ -138,8 +133,8 @@ final class HealthKitBridge {
 
 enum HealthKitBridgeError: Error {
     case unavailable
-    /// Writing has not been allowed, and this is not a moment when the reader
-    /// may be asked. Nothing was written and nothing is wrong.
+    /// Writing has not been allowed and this is not a moment when the reader may
+    /// be asked.
     case notGranted
 }
 #endif

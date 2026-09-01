@@ -18,8 +18,6 @@ protocol SystemCallSource: AnyObject {
     func perform(_ action: PhoneCallAction)
 }
 
-/// Announces phone call state transitions on the watch's phone-control
-/// endpoint and forwards watch actions back to the call source.
 @MainActor
 final class PhoneCallCoordinator {
     private let send: (PebbleProtocolFrame) async throws -> Void
@@ -100,8 +98,7 @@ final class CallKitCallSource: NSObject, SystemCallSource, CXCallObserverDelegat
     }
 
     func perform(_ action: PhoneCallAction) {
-        // iOS does not let third-party apps answer or end carrier calls;
-        // the watch's request has to be handled on the phone itself.
+        // iOS does not let third-party apps answer or end carrier calls.
     }
 
     nonisolated func callObserver(_ callObserver: CXCallObserver, callChanged call: CXCall) {
@@ -131,8 +128,7 @@ final class CallKitCallSource: NSObject, SystemCallSource, CXCallObserverDelegat
             connectedCalls.insert(uuid)
             onEvent?(.connected(cookie: cookie))
         } else if !isOutgoing {
-            // CallKit never exposes the caller's number or name to companion
-            // apps, so the watch shows a generic incoming-call banner.
+            // CallKit never exposes the caller's number or name to a companion app.
             onEvent?(.ringing(
                 cookie: cookie,
                 callerNumber: "",

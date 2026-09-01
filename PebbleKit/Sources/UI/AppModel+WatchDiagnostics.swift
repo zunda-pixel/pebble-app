@@ -2,13 +2,6 @@ import API
 import Foundation
 import SwiftUI
 
-/// What the watch can tell about itself: a picture of its screen, the log it
-/// keeps in flash, the log its apps write, and the dump it saves when it
-/// crashes.
-///
-/// All four are pulls — the watch sends nothing until asked — and all four take
-/// a while, so each reports where it has got to rather than leaving the screen
-/// still.
 extension AppModel {
     public func takeScreenshot(deviceID: String? = nil) async {
         guard let connection = connection(for: deviceID), connection.isConnected else {
@@ -32,11 +25,8 @@ extension AppModel {
         }
     }
 
-    /// Reads the watch's log back, one generation at a time.
-    ///
-    /// Generation zero is the run it is in now, one the run before that, and so
-    /// on until the watch says it has no more — which is the only way to know
-    /// how far back it goes.
+    /// Generation zero is the run the watch is in now, one the run before that,
+    /// and so on until the watch says it has no more.
     public func gatherWatchLogs(deviceID: String? = nil) async {
         guard let connection = connection(for: deviceID), connection.isConnected else {
             watchDiagnosticsStatusMessage = "Connect the watch before gathering its logs."
@@ -55,8 +45,7 @@ extension AppModel {
             watchLogsURL = try writeWatchLogs(name: connection.device.name)
             watchDiagnosticsStatusMessage = nil
         } catch {
-            // Whatever arrived before the failure is still worth keeping: a log
-            // that stops halfway is more use than none.
+            // A log that stops halfway is more use than none.
             watchLogsURL = try? writeWatchLogs(name: connection.device.name)
             watchDiagnosticsStatusMessage = "The watch stopped part way through its logs."
             await PebbleDiagnostics.shared.record(
@@ -67,8 +56,8 @@ extension AppModel {
         }
     }
 
-    /// The watch only sends what its apps log while it has been told to, and it
-    /// forgets on the next connection, so this is asked for again each time.
+    // The watch forgets on the next connection, so this is asked for again each
+    // time.
     public func setApplicationLoggingEnabled(_ isEnabled: Bool) async {
         isApplicationLoggingEnabled = isEnabled
         for connection in activeConnections {
@@ -94,11 +83,9 @@ extension AppModel {
         }
     }
 
-    /// Pulls the dump the watch wrote when it last crashed.
-    ///
-    /// The unread one is asked for first: the watch marks a dump as read once
-    /// it has handed it over, so asking for that one tells us whether this is a
-    /// crash nobody has looked at yet.
+    // The unread dump is asked for first: the watch marks one as read once it has
+    // handed it over, so asking for that one leaves a dump already collected
+    // alone.
     public func collectCoredump(deviceID: String? = nil) async {
         guard let connection = connection(for: deviceID), connection.isConnected else {
             watchDiagnosticsStatusMessage = "Connect the watch before collecting a crash report."
@@ -133,8 +120,6 @@ extension AppModel {
         return try write(Array(text.utf8), name: "\(name)-logs.txt")
     }
 
-    /// The picture as a PNG, which is what anything the reader sends it to will
-    /// expect.
     private func writeScreenshot(_ screenshot: PebbleScreenshot, name: String) throws -> URL {
         guard let data = WatchImageRenderer.pngData(screenshot) else {
             throw WatchDiagnosticsError.pictureCouldNotBeWritten

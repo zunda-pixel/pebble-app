@@ -185,8 +185,8 @@ public enum VoiceControlCodec {
 }
 
 public enum AudioStreamMessage: Equatable, Sendable {
-    /// One blob per packet: every encoded frame carries a 1-byte quality header
-    /// and the watch concatenates them after the frame count byte.
+    /// Every encoded frame carries a 1-byte quality header and the watch
+    /// concatenates them after the frame count byte.
     case data(sessionID: UInt16, bytes: [UInt8])
     case stop(sessionID: UInt16)
 }
@@ -239,9 +239,6 @@ public protocol PebbleVoiceTranscriptionProvider: Sendable {
     func transcribe(encoderInfo: SpeexEncoderInfo, audioFrames: [[UInt8]]) async -> VoiceTranscriptionOutcome
 }
 
-/// Handles the watch's dictation sessions: accepts or rejects the setup,
-/// collects Speex audio until the stream stops, and reports the transcription
-/// (or a protocol-level error) back to the watch.
 @MainActor
 public final class VoiceSessionCoordinator {
     private struct ActiveSession {
@@ -272,7 +269,6 @@ public final class VoiceSessionCoordinator {
         guard let request = try? VoiceControlCodec.decodeSessionSetup(frame) else {
             return
         }
-        // A new setup supersedes any session still in flight.
         reset()
         let applicationInitiated = request.applicationID != nil
 

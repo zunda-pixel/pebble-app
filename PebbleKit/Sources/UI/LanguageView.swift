@@ -1,7 +1,6 @@
 import SwiftUI
 import API
 
-/// The language one watch shows its own menus and notifications in.
 struct LanguageView: View {
     var model: AppModel
     var watchID: String
@@ -15,8 +14,8 @@ struct LanguageView: View {
         connection?.isConnected == true
     }
 
-    /// What the watch says it is running. An empty locale is the firmware's
-    /// built-in English rather than a missing answer.
+    // An empty locale is the firmware's built-in English rather than a missing
+    // answer.
     private var installedLocale: String? {
         guard let locale = connection?.device.languageLocale, !locale.isEmpty else { return nil }
         return locale
@@ -98,9 +97,8 @@ struct LanguageView: View {
         }
     }
 
-    /// The name a locale reads as, taken from the list where there is one and
-    /// from the system otherwise — a watch may be running a pack this app does
-    /// not offer.
+    // A watch may be running a pack this app does not offer, so the system's own
+    // name stands in where the list has none.
     private func languageName(for locale: String) -> String {
         if let pack = packs.first(where: { $0.locale == locale }) {
             return pack.localName

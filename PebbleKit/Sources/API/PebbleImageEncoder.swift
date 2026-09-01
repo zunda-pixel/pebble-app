@@ -1,11 +1,5 @@
-/// Turns a picture into the sixteen colours the watch can show.
-///
-/// The watch's screen has two bits per channel — sixty-four colours — and a
-/// picture may use no more than sixteen of them at once. Choosing which sixteen
-/// is done by median cut over the colours the picture actually uses, and the
-/// difference between what was wanted and what was available is spread into the
-/// neighbouring pixels rather than dropped, which is what keeps a gradient from
-/// turning into bands.
+/// The watch's screen has two bits per channel — sixty-four colours — and
+/// reads no more than sixteen of them per picture, from a palette sent with it.
 public enum PebbleImageEncoder {
     static let maximumColours = 16
 
@@ -26,10 +20,8 @@ public enum PebbleImageEncoder {
         for y in 0..<height {
             for x in 0..<width {
                 let pixel = argb[y * width + x]
-                // The error is added before matching and clamped into range, and
-                // what is left over is measured from the clamped value: measuring
-                // it from an out-of-range one makes the error grow along a
-                // saturated edge until the dithering crawls.
+                // Clamped before the error is measured: measuring from an out-of-range value
+                // makes the error grow instead of settle.
                 let red = clampChannel(Int((pixel >> 16) & 0xFF) + Int(currentError[x * 3]))
                 let green = clampChannel(Int((pixel >> 8) & 0xFF) + Int(currentError[x * 3 + 1]))
                 let blue = clampChannel(Int(pixel & 0xFF) + Int(currentError[x * 3 + 2]))
@@ -73,7 +65,6 @@ public enum PebbleImageEncoder {
         )
     }
 
-    /// A box of colours the picture uses, and how many pixels each accounts for.
     private struct Box {
         var colours: [(red: Int, green: Int, blue: Int, count: Int)]
 
@@ -103,10 +94,8 @@ public enum PebbleImageEncoder {
         }
     }
 
-    /// The sixteen colours, chosen by splitting the picture's colours along
-    /// whichever axis they are most spread over, weighted by how much of the
-    /// picture each accounts for — so a large flat area does not lose its
-    /// colour to a handful of stray pixels.
+    // Split along whichever axis the picture's colours are most spread over,
+    // weighted by how much of the picture each accounts for.
     private static func choosePalette(argb: [UInt32]) -> [UInt8] {
         var counts: [UInt8: Int] = [:]
         for pixel in argb {
@@ -151,8 +140,6 @@ public enum PebbleImageEncoder {
         return palette.isEmpty ? [0] : palette
     }
 
-    /// Where to cut a box so that half its pixels fall either side, never
-    /// leaving one side empty.
     private static func splitPoint(_ box: Box) -> Int {
         let half = box.population / 2
         var running = 0
@@ -201,8 +188,7 @@ public enum PebbleImageEncoder {
         error[x * 3 + 2] += blue * weight
     }
 
-    /// Eight bits down to the two the screen has, rounded to the nearest of
-    /// 0, 85, 170 and 255.
+    // Eight bits down to the two the screen has: 0, 85, 170, 255.
     private static func quantise(_ value: Int) -> Int { (min(max(value, 0), 255) * 3 + 127) / 255 }
     private static func expand(_ value: UInt8) -> Int { Int(value) * 85 }
     private static func clampChannel(_ value: Int) -> Int { min(max(value, 0), 255) }
@@ -210,7 +196,7 @@ public enum PebbleImageEncoder {
         count == 0 ? 0 : (sum * 2 + count) / (count * 2)
     }
 
-    /// A `GColor8`: opaque, then two bits each of red, green and blue.
+    // A `GColor8`: opaque, then two bits each of red, green and blue.
     private static func colour(_ red: UInt8, _ green: UInt8, _ blue: UInt8) -> UInt8 {
         0b1100_0000 | (red << 4) | (green << 2) | blue
     }

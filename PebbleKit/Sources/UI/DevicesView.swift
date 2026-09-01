@@ -5,7 +5,6 @@ struct DevicesView: View {
     var model: AppModel
     @State private var isAddingWatch = false
 
-    // Saved watches plus any connected watch that has not been saved yet.
     private var listedWatchIDs: [String] {
         let savedIDs = model.savedWatches.map(\.id)
         let unsavedConnected = model.connections
@@ -65,9 +64,8 @@ struct DevicesView: View {
 struct AddWatchSheet: View {
     var model: AppModel
     @Environment(\.dismiss) private var dismiss
-    /// The watch the reader asked for, so the sheet can close the moment that
-    /// watch is connected rather than when everything the app then sends it
-    /// has been sent.
+    // So the sheet can close the moment that watch is connected, rather than when
+    // everything the app then sends it has been sent.
     @State private var watchBeingAdded: String?
 
     var body: some View {
@@ -133,11 +131,8 @@ struct AddWatchSheet: View {
         .frame(minWidth: 420, minHeight: 420)
         #endif
         .task {
-            // Scan for the whole lifetime of the sheet; the task is cancelled
-            // when the sheet closes and the loop ends after the current pass.
-            // Every pass has to suspend, including the ones that return early
-            // because a scan from a previous sheet is still running, otherwise
-            // the loop starves the main actor and the app stops responding.
+            // Every pass has to suspend, including the failing one, or a transport that
+            // refuses immediately spins.
             while !Task.isCancelled {
                 await model.scan()
                 do {
@@ -224,8 +219,7 @@ struct WatchDetailView: View {
         connection?.device.name ?? savedWatch?.name ?? watchID
     }
 
-    /// What the Firmware row says before it is opened. A version is a version
-    /// in any language, so it is the one part of this that is not translated.
+    // A version is a version in any language, so it is not translated.
     private var firmwareSummary: Text {
         if let journal = model.firmwareUpdateJournal, journal.deviceID == watchID {
             return journal.phase == .transferring || journal.phase == .installing
@@ -244,8 +238,7 @@ struct WatchDetailView: View {
         return Text(verbatim: version)
     }
 
-    /// What the Language row says before it is opened. A language reads best in
-    /// itself, so the name is not translated either.
+    // A language reads best in itself, so the name is not translated.
     private var languageSummary: Text {
         guard let locale = connection?.device.languageLocale, !locale.isEmpty else {
             return connection?.isConnected == true ? Text("English") : Text("Unknown")

@@ -7,9 +7,7 @@ enum HTTPFileDownloadError: Error, Equatable, Sendable {
     case invalidRequest
     case unsuccessfulReply(HTTPResponse.Status)
 
-    /// Whether asking again could get the file. The status the service gave is
-    /// what decides it; a refused URL, or a request that could not be built at
-    /// all, fails the same way every time.
+    /// A refused URL, or a request that could not be built at all, fails for good.
     var isWorthAnotherAttempt: Bool {
         switch self {
         case .insecureURL, .invalidRequest:
@@ -20,12 +18,8 @@ enum HTTPFileDownloadError: Error, Equatable, Sendable {
     }
 }
 
-/// Fetches a file over HTTPS into a temporary location.
-///
-/// The body streams to disk rather than into memory, which is what keeps an
-/// oversized reply from being buffered — so this uses `URLSession.download`,
-/// which has no `HTTPRequest` form. Bridging the typed request and reading the
-/// reply's status therefore happens here, once, for every caller.
+/// The body streams to disk rather than into memory, which keeps an oversized
+/// reply from being buffered.
 func downloadFile(
     from url: URL,
     using session: URLSession

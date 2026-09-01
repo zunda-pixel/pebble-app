@@ -1,14 +1,10 @@
 public import SwiftUI
 public import API
 
-/// How the protocol layer's types read on screen. Those types have no string
-/// catalog of their own, so they name their cases for the logs and leave the
-/// sentence to this file, where it is localized.
+/// The protocol layer has no string catalog of its own: it names its cases for
+/// the logs and leaves the sentence to this layer.
 public extension PebbleConnectionError {
-    /// What the reader is told when a connection attempt fails.
-    ///
-    /// The protocol layer has no string catalog, so it only names the case for
-    /// the logs; the sentence belongs here, where it is localized.
+    /// See above: the case is named for the logs, the sentence belongs here.
     var message: LocalizedStringKey {
         switch self {
         case .bluetoothUnavailable:
@@ -46,8 +42,6 @@ public extension HealthAnalysisPeriod {
 }
 
 public extension WatchSetting {
-    /// What each setting is called on screen. The firmware's own names for
-    /// them are keys, not sentences.
     var title: LocalizedStringKey {
         switch self {
         case .clock24Hour: "24-Hour Clock"
@@ -75,8 +69,6 @@ public extension NotificationAppMuteState {
 }
 
 public extension PebbleTimelineIcon {
-    /// What the icon stands for, for the ones the app offers. The rest are
-    /// company logos the watch picks by itself and no one has to name.
     var title: LocalizedStringKey {
         switch self {
         case .generic: "Notification"

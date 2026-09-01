@@ -4,7 +4,6 @@ public import Foundation
 import Retry
 import SwiftUI
 
-/// Notifications sent to a watch, and messages coming back.
 extension AppModel {
     public func setCompanionNotificationsEnabled(_ enabled: Bool) {
         companionNotificationsEnabled = enabled
@@ -55,8 +54,6 @@ extension AppModel {
         }
     }
 
-    /// Sends a frame to every connected watch, throwing only when no watch
-    /// received it.
     func broadcast(_ frame: PebbleProtocolFrame) async throws {
         var delivered = false
         for connection in activeConnections {
@@ -110,10 +107,9 @@ extension AppModel {
                 }
             }
         } catch {
-            // Rethrowing loses the notification: the only caller is a
-            // `try?`-ed task in the companion runtime, which has nowhere to
-            // put it. A watch that would not take it now is in the same
-            // position as one that was not there at all, so it is queued.
+            // The only caller is a `try?`-ed task in the companion runtime, which has
+            // nowhere to put a throw. A watch that would not take it now is in the same
+            // position as one that was not there at all.
             await queue(notification, reason: "the watch would not take it")
             return
         }
@@ -123,8 +119,6 @@ extension AppModel {
         )
     }
 
-    /// Keeps a notification for the next flush, capped so a phone that has
-    /// been away for a long time does not hand a watch a day's backlog.
     private func queue(_ notification: PebbleTimelineNotification, reason: String) async {
         pendingNotifications.append(notification)
         if pendingNotifications.count > 20 {
@@ -175,12 +169,10 @@ extension AppModel {
                ),
                let apps = try? await notificationSourceAppLibrary.merge(app) {
                 notificationSourceApps = apps
-                // The watch already holds this record; skip echoing it back.
                 connection.synchronizedNotificationAppRecords[app.bundleID] = NotificationAppsCodec.value(
                     for: apps.first { $0.bundleID == app.bundleID } ?? app
                 )
                 succeeded = true
-                // Other connected watches still need the updated record.
                 for other in activeConnections where other !== connection {
                     await synchronizeNotificationSourceApps(on: other)
                 }
@@ -198,10 +190,8 @@ extension AppModel {
                 continue
             }
             do {
-                // Awaited rather than posted and forgotten: the record is only
-                // recorded as synchronized once the watch says it took it, so
-                // a refusal is retried on the next pass instead of being
-                // remembered as done.
+                // Recorded as synchronized only once the watch says it took it, so a
+                // refusal is retried on the next pass.
                 try await connection.client.writeNotificationSourceApp(app)
                 connection.synchronizedNotificationAppRecords[app.bundleID] = value
             } catch {
@@ -216,8 +206,6 @@ extension AppModel {
         }
     }
 
-    /// Chooses which of the watch's own icons stands for an app's
-    /// notifications, in place of the one the firmware would pick.
     public func setNotificationSourceAppIcon(bundleID: String, icon: PebbleTimelineIcon?) async {
         guard var app = notificationSourceApps.first(where: { $0.bundleID == bundleID }) else {
             return
@@ -232,8 +220,6 @@ extension AppModel {
         }
     }
 
-    /// Chooses what the watch paints behind this app's notifications, and what
-    /// it writes on top.
     public func setNotificationSourceAppColors(
         bundleID: String,
         background: PebbleColor?,
@@ -260,9 +246,8 @@ extension AppModel {
         app.muteState = muteState
         app.muteExpiration = nil
         app.stateUpdated = .now
-        // The reader changed this here, on the phone, so it is stored whole
-        // rather than merged: `merge` is for records the watch sends, and its
-        // timestamp gate can discard a change made in the same second.
+        // `merge` is for records the watch sends, and its timestamp gate can
+        // discard a change made in the same second.
         if let apps = try? await notificationSourceAppLibrary.update(app) {
             notificationSourceApps = apps
         }
@@ -271,11 +256,8 @@ extension AppModel {
         }
     }
 
-    /// Forgets these apps, on the phone and on every watch that holds them.
-    ///
-    /// Named rather than numbered because the list they were picked from may
-    /// have been narrowed by a search, and a row's position there says nothing
-    /// about its position here.
+    // Named rather than numbered: the list they were picked from may have been
+    // narrowed by a search.
     public func removeNotificationSourceApps(_ removed: [NotificationSourceApp]) async {
         guard !removed.isEmpty else { return }
         let identifiers = Set(removed.map(\.bundleID))
@@ -331,11 +313,6 @@ extension AppModel {
         }
     }
 
-    /// Hands the watch everything queued while it was away, once.
-    ///
-    /// A flush already running is joined rather than repeated: the two callers
-    /// overlap in practice, and each one working from its own snapshot of the
-    /// queue is what made the watch buzz twice for every queued notification.
     func flushPendingNotifications() async {
         if let flush = pendingNotificationFlush {
             await flush.value
@@ -359,9 +336,8 @@ extension AppModel {
             } catch {
                 break
             }
-            // Removed by identity rather than by position: sending suspends,
-            // and a notification raised in the meantime is queued behind this
-            // one, so "the first one" is no longer necessarily this one.
+            // Removed by identity: sending suspends, so the notification at the front
+            // afterwards need not be this one.
             pendingNotifications.removeAll { $0.id == notification.id }
         }
         try? await pendingNotificationLibrary.save(pendingNotifications)
@@ -389,11 +365,6 @@ extension AppModel {
         try await connection.client.sendAppMessage(applicationID: applicationID, tuples: tuples)
     }
 
-    /// Sends the messages a watch app raised while no watch was listening.
-    ///
-    /// Joined rather than repeated for the same reason as the notification
-    /// queue: two flushes at once each removed one message per message sent,
-    /// so half of them were dropped without ever reaching a watch.
     func flushPendingAppMessages() async {
         if let flush = pendingAppMessageFlush {
             await flush.value
@@ -413,8 +384,8 @@ extension AppModel {
                     tuples: message.tuples
                 )
             } catch { break }
-            // Removed by identity: sending suspends, so the message at the
-            // front of the queue afterwards need not be the one just sent.
+            // Removed by identity: sending suspends, so the message at the front
+            // afterwards need not be the one just sent.
             pendingAppMessages.removeAll { $0.id == message.id }
         }
         try? await pendingAppMessageLibrary.save(pendingAppMessages)

@@ -1,10 +1,6 @@
-/// An icon from the watch's own resource pack, as a timeline item can ask for.
-///
-/// The numbers are the firmware's `TimelineResourceId`s, which are generated per
-/// board — and the ones added most recently do not line up between boards. Only
-/// the icons that have the same number on every board are listed here: an icon
-/// whose number moved would show up as a different picture on half the watches,
-/// which is worse than not offering it.
+/// The numbers are the firmware's `TimelineResourceId`s, which are generated
+/// per board; these are the ones that come out the same on asterix, obelix and
+/// gabbro.
 public enum PebbleTimelineIcon: UInt32, CaseIterable, Codable, Sendable {
     case generic = 1
     case missedCall = 2
@@ -69,22 +65,19 @@ public enum PebbleTimelineIcon: UInt32, CaseIterable, Codable, Sendable {
     case swarm = 139
     case tapo = 140
 
-    /// The value that goes on the wire. The high bit marks a resource of the
-    /// system's rather than one of an app's own.
+    /// The high bit marks a resource of the system's rather than one of an app's.
     public var resourceID: UInt32 { 0x8000_0000 | rawValue }
 
-    /// The ones worth offering to choose from. The watch already knows the
-    /// apps whose own logo it has, so what is left to choose is the kind of
-    /// thing a notification is — which is a short list, not sixty logos.
+    /// The watch already knows the apps whose own logo it has, so what is left to
+    /// choose is the kind of thing a notification is.
     public static let choosable: [PebbleTimelineIcon] = [
         .generic, .sms, .email, .calendar, .reminder, .alarmClock, .duringPhoneCall,
         .missedCall, .musicEvent, .newsEvent, .payBill, .scheduledEvent, .warning,
         .question, .flag,
     ]
 
-    /// The icon the firmware would pick for an iOS app by itself
-    /// (`ancs_known_apps.h`), so the app can show what the watch already does
-    /// before the reader chooses anything.
+    /// What the firmware would pick for an iOS app by itself
+    /// (`ancs_known_apps.h`).
     public static func suggested(forBundleID bundleID: String) -> PebbleTimelineIcon? {
         knownApplications[bundleID]
     }

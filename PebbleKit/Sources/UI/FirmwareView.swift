@@ -1,8 +1,6 @@
 import SwiftUI
 import API
 
-/// Everything about one watch's firmware, on its own screen: what it runs now,
-/// what PebbleOS publishes for it, and how far an install has got.
 struct FirmwareView: View {
     var model: AppModel
     var watchID: String
@@ -20,7 +18,6 @@ struct FirmwareView: View {
         connection?.isConnected == true
     }
 
-    /// The update this watch has going, if the one on record is its own.
     private var journal: FirmwareUpdateJournal? {
         guard let journal = model.firmwareUpdateJournal, journal.deviceID == watchID else {
             return nil
@@ -107,8 +104,7 @@ struct FirmwareView: View {
                     if let previousVersion = journal.previousVersion {
                         LabeledContent("Replacing", value: previousVersion)
                     }
-                    // Recovery firmware leaves the watch unusable until the
-                    // transfer finishes, so it is never started unasked.
+                    // Recovery firmware leaves the watch unusable until the transfer finishes.
                     if model.firmwareRequiresConfirmation {
                         ConfirmingButton(
                             title: "Start the Recovery Install",
@@ -158,9 +154,8 @@ struct FirmwareView: View {
         }
     }
 
-    /// What the reader most needs to know, picked from the state that matters
-    /// most: an install under way beats one that stopped, which beats a watch
-    /// that cannot run anything else, which beats an update simply being there.
+    // An install under way beats one that stopped, which beats a watch that
+    // cannot run the newest firmware.
     private var status: FirmwareStatus {
         if let journal, journal.phase == .transferring || journal.phase == .installing {
             return FirmwareStatus(

@@ -1,11 +1,8 @@
 import API
 import SwiftUI
 
-/// The phone's apps the watch has seen sending notifications.
-///
-/// The list is as long as the reader's phone is busy — dozens of rows on a
-/// well-used phone — so it lives on a page of its own rather than in the middle
-/// of the settings.
+/// The list is as long as the reader's phone is busy, so it is searchable
+/// rather than one run of rows.
 struct NotificationAppsView: View {
     var model: AppModel
     @State private var search = ""
@@ -34,9 +31,7 @@ struct NotificationAppsView: View {
                     }
                 }
                 .onDelete { offsets in
-                    // The rows on screen are the ones a search left, so the
-                    // offsets are turned back into the apps they stand for
-                    // before anything is removed.
+                    // The rows on screen are the ones a search left.
                     let removed = offsets.compactMap { matches.indices.contains($0) ? matches[$0] : nil }
                     Task { await model.removeNotificationSourceApps(removed) }
                 }

@@ -3,14 +3,11 @@ import CoreLocation
 public import Foundation
 import WeatherKit
 
-/// Where a forecast is wanted: the phone's own position, or a place the reader
-/// named and this app looked up once.
 public struct WeatherPlace: Codable, Equatable, Identifiable, Sendable {
     public var id: UUID
     public var name: String
     public var latitude: Double
     public var longitude: Double
-    /// True for the entry that follows the phone rather than a fixed point.
     public var followsPhone: Bool
 
     var coordinate: CLLocation {
@@ -18,8 +15,8 @@ public struct WeatherPlace: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
-/// What the reader must be shown alongside anything from WeatherKit: Apple's
-/// mark and a link to the sources behind the data.
+/// Apple requires the mark and a link to the sources be shown alongside
+/// anything from WeatherKit.
 public struct WeatherCredit: Equatable, Sendable {
     public var serviceName: String
     public var lightMarkURL: URL
@@ -27,12 +24,9 @@ public struct WeatherCredit: Equatable, Sendable {
     public var legalPageURL: URL
 }
 
-/// Apple's weather, in the terms the watch understands.
 struct WeatherBridge {
-    /// Reads one place's forecast and shapes it into a record for the watch.
-    ///
-    /// Two days are enough: the watch shows today and tomorrow, and asking for
-    /// less than the daily forecast is not possible anyway.
+    /// Two days are enough for what the watch shows, and asking for less than the
+    /// daily forecast is not something WeatherKit offers.
     func report(
         for place: WeatherPlace,
         inFahrenheit: Bool,
@@ -83,9 +77,8 @@ struct WeatherBridge {
         )
     }
 
-    /// The watch has nine icons. Everything Apple reports has to land on one of
-    /// them, so conditions are grouped by what they look like out of a window:
-    /// how wet, how frozen, how much sky.
+    // The watch has nine icons, so conditions are grouped by what they look like
+    // out of a window: how wet, how frozen, how violent.
     static func watchType(for condition: WeatherCondition, isDaylight: Bool) -> PebbleWeatherType {
         switch condition {
         case .clear, .hot:
@@ -111,10 +104,8 @@ struct WeatherBridge {
     }
 }
 
-/// The phone's own position, asked for once at a time.
-///
 /// Weather needs a rough position and nothing more, so this asks for the
-/// coarse authorization the system offers and never keeps updates running.
+/// coarse authorization the system offers.
 @MainActor
 @Observable
 final class PhoneLocationSource: NSObject, CLLocationManagerDelegate {
@@ -153,8 +144,6 @@ final class PhoneLocationSource: NSObject, CLLocationManagerDelegate {
         #endif
     }
 
-    /// The phone's position now. Throws rather than waiting forever when the
-    /// reader has not allowed it.
     func currentLocation() async throws -> CLLocation {
         guard isAllowed else { throw WeatherSourceError.locationNotAllowed }
         if let known = manager.location, known.timestamp.timeIntervalSinceNow > -900 {

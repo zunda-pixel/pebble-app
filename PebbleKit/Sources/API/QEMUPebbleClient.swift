@@ -22,7 +22,6 @@ public final class QEMUPebbleClient: PebbleClient {
     private var transferSession: PutBytesTransferSession?
     private var completedTransferCookie: UInt32?
     private var waitingForFirmwareStart = false
-    /// Set for the whole of `installFirmware`, transfers and all.
     private var isInstallingFirmware = false
     private var pendingInstallCookie: UInt32?
     private var nextAppMessageTransactionID: UInt8 = 0
@@ -55,9 +54,8 @@ public final class QEMUPebbleClient: PebbleClient {
 
     private func establishConnection(to device: DiscoveredPebble) async throws -> PebbleDevice {
         guard connection == nil else { throw PebbleConnectionError.connectionAlreadyInProgress }
-        // Nothing survives the socket that carried it: half a message and half
-        // a frame belong to the link that dropped, and a data-logging session
-        // id means only what the emulator said it meant on that link.
+        // Half a message and half a frame belong to the link that dropped, and a
+        // data-logging session id means only what the emulator said on that link.
         receiveBuffer.removeAll()
         frameDecoder = PebbleProtocolFrameDecoder()
         healthDataLoggingProcessor = HealthDataLoggingProcessor()
@@ -251,8 +249,6 @@ public final class QEMUPebbleClient: PebbleClient {
         try await send(ImagingCodec.unsupportedFrame(token: token, kindValue: kindValue))
     }
 
-    // The emulator has no screen to photograph, no flash log and no crash to
-    // hand over.
     public func takeScreenshot() async throws -> PebbleScreenshot {
         throw WatchPullError.notSupported
     }
@@ -270,7 +266,6 @@ public final class QEMUPebbleClient: PebbleClient {
     }
 
     public func installFile(_ bytes: [UInt8], filename: String) async throws {
-        // The emulator has no filesystem the app can write into.
         throw PutBytesTransferError.invalidConfiguration
     }
 
@@ -293,10 +288,8 @@ public final class QEMUPebbleClient: PebbleClient {
     }
 
     public func installFirmware(_ package: PBZFirmwarePackage) async throws {
-        // An install is a sequence of operations with gaps between them, and
-        // every step shares the same transfer state and install cookie. A
-        // second install slipping into one of those gaps would take both over
-        // and leave the first waiting on a reply that is no longer its own.
+        // Every step of an install shares the same transfer state and install cookie,
+        // and there are gaps between them for a second install to slip into.
         guard !isInstallingFirmware else {
             throw PutBytesClientError.firmwareUpdateAlreadyInProgress
         }
@@ -458,9 +451,8 @@ public final class QEMUPebbleClient: PebbleClient {
     }
 
     private func consumePebbleProtocol(_ bytes: [UInt8]) {
-        // Every frame in the chunk gets its own attempt: one unusable frame
-        // must not swallow the reply an operation is waiting for, which may
-        // well have arrived in the same read.
+        // One unusable frame must not swallow the reply an operation is waiting for,
+        // which may well have arrived in the same read.
         let batch = frameDecoder.append(bytes)
         var firstFailure: (any Error)?
         if let failure = batch.failure {
@@ -585,10 +577,8 @@ public final class QEMUPebbleClient: PebbleClient {
         waitingForFirmwareStart = false
         operationContinuation?.resume(throwing: error)
         operationContinuation = nil
-        // The version handshake shares this one timeout task, so abandoning an
-        // operation abandons the handshake's only deadline. Anything that gives
-        // up on an operation has given up on the handshake too, and `connect`
-        // is sitting on the other end of it.
+        // The version handshake shares this one timeout task, so anything that gives
+        // up on an operation has given up on the handshake too.
         finishVersion(throwing: error)
     }
 }

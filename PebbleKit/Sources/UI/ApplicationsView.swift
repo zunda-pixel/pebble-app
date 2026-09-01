@@ -8,8 +8,7 @@ struct ApplicationsView: View {
     @State private var isShowingCatalog = false
     @State private var selectedWatchID: String?
 
-    // The watch whose install state is shown: the picked one while it stays
-    // connected, otherwise the primary connection.
+    // The picked watch while it stays connected, otherwise the primary one.
     private var displayedWatchID: String? {
         if let selectedWatchID,
            model.connectedDevices.contains(where: { $0.id == selectedWatchID }) {
@@ -139,7 +138,7 @@ struct ApplicationsContent: View {
     var watchfaces: [PebbleApplication]
     var activeWatchfaceID: UUID?
     var favoriteWatchfaceIDs: Set<UUID>
-    /// nil when no watch is connected: install state is unknown, not shown.
+    /// Nil when no watch is connected: install state is unknown, not shown.
     var installedApplicationIDs: Set<UUID>?
     var isLoading: Bool
     var errorMessage: LocalizedStringKey?
@@ -286,8 +285,6 @@ struct ApplicationSection: View {
     }
 }
 
-/// One row of the application list, with the swipe action, the context menu and
-/// the removal confirmation that belong to it.
 struct ApplicationListRow: View {
     var application: PebbleApplication
     var isActive: Bool
@@ -360,7 +357,7 @@ struct ApplicationRow: View {
     var kind: PebbleApplicationKind
     var isActive: Bool
     var isFavorite: Bool
-    /// nil when no watch is connected.
+    /// Nil when no watch is connected.
     var isInstalled: Bool?
     var isConfigurable: Bool
     var configure: () -> Void

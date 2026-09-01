@@ -1,11 +1,7 @@
-/// What to ask the watch for.
 public enum GetBytesRequest: Equatable, Sendable {
-    /// The last crash the watch saved, whether or not it has been read before.
     case coredump
-    /// The last crash, but only if nobody has read it yet. The watch marks one
-    /// as read once it has handed it over.
+    /// The watch marks a crash as read once it has handed it over.
     case unreadCoredump
-    /// A file from the watch's own filesystem.
     case file(name: String)
 
     var command: UInt8 {
@@ -17,21 +13,16 @@ public enum GetBytesRequest: Equatable, Sendable {
     }
 }
 
-/// Pulling a whole object off the watch: a crash dump, or a file.
-///
 /// The watch answers with how many bytes there are and then sends them in
-/// chunks, each saying where it belongs. Nothing marks the last one, so the end
-/// is the byte count being reached.
+/// chunks, each saying where it belongs.
 public enum GetBytesCodec {
     public static var endpoint: UInt16 { 9_000 }
 
     static let objectInfoCommand: UInt8 = 0x01
     static let objectDataCommand: UInt8 = 0x02
 
-    /// More than any watch could have to send: the largest flash a Pebble has
-    /// is 32 MiB, and a coredump is a fraction of one. The size arrives as a
-    /// 32-bit number and is believed before a byte of the object has, so a
-    /// corrupt frame would otherwise have the app reserve four gigabytes.
+    // The size arrives as a 32-bit number and is believed before a byte of the
+    // object has; the largest flash a Pebble has is 32 MiB.
     static let maximumObjectByteCount = 32 * 1_024 * 1_024
 
     public static func requestFrame(_ request: GetBytesRequest, transactionID: UInt8) -> PebbleProtocolFrame {
@@ -45,7 +36,6 @@ public enum GetBytesCodec {
     }
 }
 
-/// Reads an object as it arrives.
 public struct GetBytesCollector: Sendable {
     private let transactionID: UInt8
     private var expectedByteCount: Int?
@@ -55,11 +45,8 @@ public struct GetBytesCollector: Sendable {
         self.transactionID = transactionID
     }
 
-    /// Takes one frame, and returns the object once the last of it is in.
-    ///
-    /// A frame for another transaction is ignored rather than refused: an
-    /// answer to a request that has already been given up on is not this
-    /// caller's to complain about.
+    // A frame for another transaction is ignored rather than refused: an answer
+    // to a request that has already been given up on is not an error.
     public mutating func accept(_ frame: PebbleProtocolFrame) throws -> [UInt8]? {
         guard frame.endpoint == GetBytesCodec.endpoint else {
             throw GetBytesError.unexpectedEndpoint
@@ -77,8 +64,7 @@ public struct GetBytesCollector: Sendable {
             }
             expectedByteCount = count
             bytes.reserveCapacity(count)
-            // A watch with nothing to send says so by saying there is none of
-            // it, and then sends no chunks at all.
+            // A watch with nothing to send says there is none of it and sends no chunks.
             return count == 0 ? [] : nil
         case GetBytesCodec.objectDataCommand:
             guard frame.payload.count >= 6, let expected = expectedByteCount else {
@@ -98,11 +84,9 @@ public enum GetBytesError: Error, Equatable, Sendable {
     case unexpectedEndpoint
     case invalidPayload
     case outOfOrderChunk
-    /// The watch said the object is bigger than any watch could hold, which
-    /// means the frame is corrupt rather than that the object is real.
     case objectTooLarge(Int)
-    /// One means the watch did not understand the request, two that it is
-    /// already sending something, three that there is no such object, four
-    /// that what it has is corrupt.
+    /// One means the watch did not understand the request, two that it is already
+    /// sending something, three that there is no such object, four that what it
+    /// has is corrupt.
     case refused(UInt8)
 }

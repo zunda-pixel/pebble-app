@@ -3,15 +3,10 @@ import Defaults
 public import Foundation
 import SwiftUI
 
-/// Choosing, downloading and transferring watch firmware.
 extension AppModel {
-    /// Validates a firmware package and either installs it right away or keeps
-    /// it for the watch's next connection.
-    ///
     /// Staging matters for a watch running its recovery firmware: it stays
     /// connected for only a few seconds at a time, which is not long enough to
-    /// pick a file, so the file is chosen first and the transfer starts as soon
-    /// as the watch appears.
+    /// choose a file in.
     public func installFirmware(from url: URL, deviceID: String? = nil) async {
         let connection = connection(for: deviceID).flatMap { $0.isConnected ? $0 : nil }
         let target: (id: String, board: PebbleWatchBoard, firmwareVersion: String?, slot: Int?)
@@ -19,8 +14,8 @@ extension AppModel {
             let device = connection.device
             target = (device.id, board, device.firmwareVersion, device.firmwareUpdateSlot)
         } else if let saved = savedWatch(for: deviceID), let board = saved.board {
-            // The slot is only known while connected; without it any manifest
-            // for this board is accepted and the watch has the last word.
+            // The slot is only known while connected; without it any manifest for this
+            // board is accepted and the watch has the last word.
             target = (saved.id, board, saved.firmwareVersion, nil)
         } else {
             firmwareUpdateStatusMessage =
@@ -61,7 +56,6 @@ extension AppModel {
         }
     }
 
-    /// Looks up the newest firmware published for a watch's board.
     public func checkForFirmwareUpdate(deviceID: String? = nil) async {
         guard let board = board(for: deviceID) else {
             firmwareUpdateStatusMessage =
@@ -79,9 +73,8 @@ extension AppModel {
         }
     }
 
-    /// Fetches the published firmware and keeps it. Installing it is a
-    /// separate step: the download only needs the network, the install needs
-    /// the watch, and a watch in recovery firmware is not around for long.
+    /// A separate step from installing: the download only needs the network, the
+    /// install needs the watch.
     public func downloadAvailableFirmware(deviceID: String? = nil) async {
         guard let release = availableFirmwareRelease else {
             await checkForFirmwareUpdate(deviceID: deviceID)
@@ -100,8 +93,6 @@ extension AppModel {
         }
     }
 
-    /// Installs what was downloaded earlier, which is the same path a chosen
-    /// file takes.
     public func installDownloadedFirmware(deviceID: String? = nil) async {
         guard let firmware = downloadedFirmware else {
             firmwareUpdateStatusMessage = "Download the firmware first."
@@ -110,7 +101,6 @@ extension AppModel {
         await installFirmware(from: firmware.url, deviceID: deviceID)
     }
 
-    /// Picks up a download from an earlier run, unless the file is gone.
     func loadDownloadedFirmware() {
         guard let firmware = Defaults[.downloadedFirmware] else { return }
         guard FileManager.default.fileExists(atPath: firmware.url.path(percentEncoded: false)) else {
@@ -120,7 +110,6 @@ extension AppModel {
         downloadedFirmware = firmware
     }
 
-    /// The board of the watch a firmware action targets, connected or not.
     func board(for deviceID: String?) -> PebbleWatchBoard? {
         if let connection = connection(for: deviceID), let board = connection.device.board {
             return board
@@ -128,7 +117,6 @@ extension AppModel {
         return savedWatch(for: deviceID)?.board
     }
 
-    /// The saved watch a firmware action targets when none is connected.
     func savedWatch(for deviceID: String?) -> SavedPebbleWatch? {
         guard let deviceID else {
             return savedWatches.count == 1 ? savedWatches.first : nil
@@ -180,12 +168,9 @@ extension AppModel {
         }
         try await pendingFirmwareUpdateLibrary.updatePhase(.transferring)
         firmwareUpdateJournal = try await pendingFirmwareUpdateLibrary.journal()
-        // One transfer at a time. Two can be asked for at once — a staged
-        // update starting itself the moment the watch reconnects, while the
-        // reader taps Install — and the second would take over the task and
-        // the transfer flags the first is using, leaving that one waiting on a
-        // reply nobody is holding. The claim is made in the same step as the
-        // check, with nothing awaited in between, so only one caller gets past.
+        // One at a time. Two can be asked for at once — a staged update starting
+        // itself as the watch reconnects, while the reader taps Install — and the
+        // second would take over the task and flags the first is using.
         guard firmwareUpdateTask == nil else {
             firmwareUpdateStatusMessage = "This firmware is already being transferred."
             return
@@ -204,9 +189,8 @@ extension AppModel {
         do {
             try await task.value
         } catch {
-            // Record the failure, so the next connection offers the update
-            // again instead of silently starting the whole transfer over.
-            // A cancelled journal already says what happened.
+            // So the next connection offers the update again instead of silently
+            // starting the whole transfer over.
             let stopped = try? await pendingFirmwareUpdateLibrary.journal()
             if stopped?.phase == .transferring {
                 try? await pendingFirmwareUpdateLibrary.updatePhase(.failed)
@@ -220,11 +204,7 @@ extension AppModel {
         await pendingFirmwareUpdateLibrary.clear()
     }
 
-    /// Starts an update that was accepted while the watch was away, as soon as
-    /// it turns up. Only that case runs unasked: it is the whole point of
-    /// staging one, and a watch in recovery firmware stays connected for too
-    /// short a time to be caught by hand. An update that already ran and
-    /// stopped waits to be started again.
+    // The only case that runs unasked, which is the whole point of staging one.
     func resumePendingFirmwareUpdate(on connection: WatchConnection) async {
         let device = connection.device
         guard let package = try? await pendingFirmwareUpdateLibrary.package(),
@@ -251,7 +231,6 @@ extension AppModel {
         }
     }
 
-    /// Starts an update that stopped part-way, at the reader's request.
     public func resumeFirmwareUpdate(deviceID: String? = nil) async {
         guard let package = try? await pendingFirmwareUpdateLibrary.package(),
               let journal = try? await pendingFirmwareUpdateLibrary.journal(),

@@ -1,13 +1,8 @@
 public import Foundation
 import MemberwiseInit
 
-/// How the watch is set up, as the phone can change it.
-///
-/// The firmware keeps these in its shell preferences and accepts writes for a
-/// whitelisted set of keys only (`settings_blob_db.c`). A value is written
-/// straight into the preference, so its bytes have to be exactly the size the
-/// firmware declared: a boolean is one byte, and a preference sent at the wrong
-/// width is refused.
+/// The firmware accepts writes for a whitelisted set of keys only
+/// (`settings_blob_db.c`); anything else is refused.
 public enum WatchSetting: String, CaseIterable, Codable, Sendable {
     case clock24Hour = "clock24h"
     case standbyMode = "stationaryMode"
@@ -19,9 +14,6 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
     case musicShowVolumeControls = "musicShowVolumeControls"
     case musicShowProgressBar = "musicShowProgressBar"
 
-    /// Every setting the app offers happens to be a switch. The firmware has
-    /// wider ones — backlight timeout, text size — but they are enumerations
-    /// whose meaning has to be got exactly right, so they wait.
     public var defaultValue: Bool {
         switch self {
         case .clock24Hour, .menuScrollWrapAround, .musicShowProgressBar:
@@ -58,11 +50,8 @@ public enum WatchSettingsCodec {
     }
 }
 
-/// What the watch's health tracking is set to.
-///
-/// The firmware stores this as one packed record, so it is written whole: send
-/// it with a height of zero and the watch has a wearer with no height. The
-/// numbers therefore come from the reader rather than from defaults.
+/// The firmware keeps this as one packed record and takes it whole: sent
+/// with a height of zero, the watch has a wearer with no height.
 @MemberwiseInit(.public)
 public struct PebbleActivitySettings: Codable, Equatable, Sendable {
     public var heightMillimetres: Int16 = 1_700
@@ -88,22 +77,18 @@ public struct PebbleActivitySettings: Codable, Equatable, Sendable {
     }
 }
 
-/// How often the watch reads a heart rate.
-///
-/// These four are the whole of `HRMonitoringInterval`, numbered as the firmware
-/// numbers them: the raw value is written straight into
-/// `ActivityHRMSettings.measurement_interval` and acted on as it stands, so a
-/// choice the watch has never heard of is not refused, it is obeyed as
-/// something else. There is no reading more often than every ten minutes.
+/// The whole of `HRMonitoringInterval`, numbered as the firmware numbers it.
+/// The raw value is acted on as it stands, so a value the watch has never
+/// heard of is not refused, it is obeyed as something else.
 public enum PebbleHeartRateInterval: UInt8, CaseIterable, Codable, Sendable {
     case everyTenMinutes = 0
     case everyThirtyMinutes = 1
     case everyHour = 2
     case off = 3
 
-    /// A preference stored before these numbers were the firmware's own reads
-    /// back as whatever the firmware means by that number, rather than failing
-    /// the whole settings record and losing the rest of it with it.
+    /// A value stored under the app's own earlier numbering reads back as
+    /// whatever the firmware means by that number, rather than failing the whole
+    /// record.
     public init(from decoder: any Decoder) throws {
         let rawValue = try decoder.singleValueContainer().decode(UInt8.self)
         self = Self(rawValue: rawValue) ?? .everyTenMinutes
@@ -114,24 +99,17 @@ public enum PebbleHeartRateInterval: UInt8, CaseIterable, Codable, Sendable {
 public struct PebbleHeartRateSettings: Codable, Equatable, Sendable {
     public var isEnabled: Bool = true
     public var interval: PebbleHeartRateInterval = .everyTenMinutes
-    /// Whether the watch also reads a heart rate during a detected walk or run.
     public var isEnabledDuringActivity: Bool = true
 
-    /// Turning the reading off is written twice, because the watch reads the two
-    /// fields for different things: `enabled` only decides whether an app may
-    /// ask for a heart rate at all (`health_service.c`), while the sampling loop
-    /// itself consults nothing but the interval (`activity.c`, which stops the
-    /// sensor only for `HRMonitoringInterval_Disabled`). Sending the interval as
-    /// it stands with `enabled` false would leave the watch taking a reading
-    /// every ten minutes and spending the battery on it for nobody.
+    /// `enabled` gates only what an app may ask for (`health_service.c`); the
+    /// sampling loop consults the interval alone (`activity.c`), so turning the
+    /// reading off has to be written into both.
     public func encoded() -> [UInt8] {
         let measured = isEnabled ? interval : .off
         return [isEnabled ? 1 : 0, measured.rawValue, isEnabledDuringActivity ? 1 : 0]
     }
 }
 
-/// The health preferences, which live in the preferences database rather than
-/// with the health history.
 public enum HealthSettingsCodec {
     public static var databaseID: UInt8 { 0x07 }
     public static var activityKey: String { "activityPreferences" }
@@ -162,11 +140,6 @@ public enum HealthSettingsCodec {
     }
 }
 
-/// A day's activity as the watch's health app reads it back.
-///
-/// The watch collects its own steps; what the phone adds is the rest of the
-/// week — the days the watch did not see, and the typical values it compares
-/// today against.
 @MemberwiseInit(.public)
 public struct PebbleHealthDay: Equatable, Sendable {
     /// Sunday is 0, as the firmware's weekday names are ordered.
@@ -182,7 +155,6 @@ public struct PebbleHealthDay: Equatable, Sendable {
 }
 
 public enum HealthStatsCodec {
-    /// The health database, which holds a week of days keyed by their name.
     public static var databaseID: UInt8 { 0x0A }
 
     static let recordVersion: UInt32 = 1
@@ -247,8 +219,6 @@ public enum HealthStatsCodec {
     }
 }
 
-/// Whether the watch shows its Reminders app, which is a preference of that
-/// app rather than a setting of the watch.
 public enum PebbleReminderAppState: UInt8, Codable, Equatable, Sendable {
     case notEnabled = 0
     case notConfigured = 1
@@ -256,8 +226,6 @@ public enum PebbleReminderAppState: UInt8, Codable, Equatable, Sendable {
 }
 
 public extension WeatherCodec {
-    /// The reminders app's own preference, filed in the same database as the
-    /// weather app's location order and under its own name.
     static func reminderAppFrame(
         state: PebbleReminderAppState,
         token: UInt16

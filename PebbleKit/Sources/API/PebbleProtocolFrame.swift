@@ -5,16 +5,9 @@ public struct PebbleProtocolFrame: Equatable, Sendable {
     public var endpoint: UInt16
     public var payload: [UInt8]
 
-    /// The endpoint this frame refuses, when it is the watch saying it will not
-    /// answer there. The firmware's meta endpoint replies on endpoint 0 with a
-    /// reason and the endpoint that was addressed, big-endian: `DC` for one it
-    /// does not implement and `DD` for one it implements but will not serve.
-    /// Both mean no answer is coming, and both prove the watch is listening —
-    /// recovery firmware refuses nearly everything this way, so a refusal is
-    /// often the only reply a request gets.
-    ///
-    /// A corrupted-message reply (`D0`) carries no endpoint, so it is not one
-    /// of these.
+    /// The firmware's meta endpoint replies on endpoint 0 with a reason and the
+    /// endpoint it is refusing, which is how a watch in recovery firmware answers
+    /// anything it does not implement.
     public var rejectedEndpoint: UInt16? {
         guard endpoint == 0, payload.count >= 3, payload[0] == 0xDC || payload[0] == 0xDD else {
             return nil
@@ -40,16 +33,12 @@ public struct PebbleProtocolFrame: Equatable, Sendable {
     }
 }
 
-/// What one chunk of received bytes decoded into.
-///
-/// The frames and the failure travel together on purpose. The watch packs
-/// frames for unrelated endpoints into a single delivery, so a length prefix
-/// that cannot begin a frame must not take the frames decoded before it down
-/// with it: the reply the app is waiting on is very often one of them.
+/// The frames and the failure travel together: the watch packs frames for
+/// unrelated endpoints into a single delivery, so a length prefix that cannot
+/// begin a frame must not take the frames decoded before it down with it.
 @MemberwiseInit(.public)
 public struct PebbleProtocolFrameBatch: Equatable, Sendable {
     public var frames: [PebbleProtocolFrame] = []
-    /// Why decoding stopped short of the end of the buffer, if it did.
     public var failure: PebbleProtocolFrameError? = nil
 }
 
@@ -64,10 +53,8 @@ public struct PebbleProtocolFrameDecoder: Sendable {
         while buffer.count >= 4 {
             let payloadLength = Int(UInt16(buffer[0]) << 8 | UInt16(buffer[1]))
             guard payloadLength > 0 else {
-                // A zero length says the stream is no longer sitting on a
-                // frame boundary. Drop the prefix so the next chunk has a
-                // chance to resynchronise, and report the break rather than
-                // discarding the frames that had already come out whole.
+                // A zero length says the stream is no longer on a frame boundary. Drop the
+                // prefix so the next chunk can resynchronise.
                 buffer.removeFirst(4)
                 return PebbleProtocolFrameBatch(frames: frames, failure: .emptyPayload)
             }

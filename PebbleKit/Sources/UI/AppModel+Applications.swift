@@ -6,7 +6,6 @@ public import Foundation
 import Retry
 import SwiftUI
 
-/// The installed application library and its transfers to a watch.
 extension AppModel {
     func openConfigurationURL(_ url: URL) {
         guard url.scheme?.lowercased() == "https",
@@ -67,8 +66,8 @@ extension AppModel {
     public func activateWatchface(_ application: PebbleApplication) async {
         guard application.kind == .watchface else { return }
         guard !activeConnections.isEmpty else {
-            // A watchface becomes active by being launched, and there is
-            // nothing to launch it on.
+            // A watchface becomes active by being launched, and there is nothing to
+            // launch it on.
             applicationLibraryErrorMessage = "Connect a Pebble to change the watchface."
             return
         }
@@ -107,11 +106,9 @@ extension AppModel {
                 return
             }
             if activeConnections.isEmpty {
-                // The active watchface is remembered from the last session, so
-                // this is the ordinary offline case rather than an odd one.
-                // Nothing can be launched now, so the choice is recorded and
-                // the removal goes ahead; the next connection registers the
-                // library as it then stands and the watch runs what is left.
+                // The active watchface is remembered from the last session, so this is the
+                // ordinary offline case: record the choice and let the next connection
+                // register the library as it then stands.
                 activeWatchfaceID = fallback.id
                 Defaults[.activeWatchfaceID] = fallback.id
             } else {
@@ -156,8 +153,7 @@ extension AppModel {
             if !activeConnections.isEmpty {
                 pendingImportSnapshots[application.id] = snapshot
                 try await synchronizeAllWatches()
-                // The watch only asks for the binary when it tries to run the
-                // app, so launching it is what actually starts the transfer.
+                // The watch only asks for the binary when it tries to run the app.
                 for connection in activeConnections
                 where compatibleApplications([application], with: connection.device.model).isEmpty == false {
                     try? await connection.client.launchApplication(id: application.id)
@@ -167,11 +163,8 @@ extension AppModel {
             hasLoadedApplications = true
             applicationLibraryErrorMessage = nil
         } catch {
-            // Nothing has been transferred yet — the watch refused the
-            // registration, not the bytes — so the import stands, exactly as
-            // it would have if no watch had been connected at all. The
-            // snapshot stays only as long as a transfer might still start,
-            // which is what the success path allows it too.
+            // The watch refused the registration, not the bytes, so nothing has been
+            // transferred and the import stands.
             if let importedApplicationID {
                 expirePendingSnapshot(applicationID: importedApplicationID)
             }
@@ -264,9 +257,6 @@ extension AppModel {
         }
     }
 
-    /// Reconciles the local application library with every connected watch.
-    /// The library is the source of truth; each watch gets the compatible
-    /// subset registered in order.
     func synchronizeAllWatches() async throws {
         for connection in activeConnections {
             try await performApplicationSynchronization(on: connection)
@@ -300,11 +290,8 @@ extension AppModel {
         for applicationID in synchronizedIDs where !localIDs.contains(applicationID) {
             try await connection.client.unregisterApplication(applicationID: applicationID)
         }
-        // Reading and unzipping a package is disk work that has nothing to do
-        // with the watch, so the packages are decoded a few at a time while
-        // `asyncMap` keeps them in library order. The watch is then handed them
-        // one by one, because the order they arrive in is the order they appear
-        // in its menu.
+        // Reading and unzipping a package is disk work with nothing to do with the
+        // watch, so a few run at once while `asyncMap` keeps them in library order.
         let library = applicationLibrary
         let watchModel = device.model
         let packages = try await compatibleApplications
@@ -351,13 +338,6 @@ extension AppModel {
         }.value
     }
 
-    /// Puts the library back the way it was before an import whose transfer to
-    /// the watch failed.
-    ///
-    /// Importing overwrites both the library entry and the stored `.pbw`, so a
-    /// reader who had version 1 and imports a version 2 the watch then refuses
-    /// was left with neither: the snapshot taken at import time was the only
-    /// copy of version 1, and it was thrown away unread.
     func restorePendingSnapshot(applicationID: UUID) async {
         guard let snapshot = pendingImportSnapshots.removeValue(forKey: applicationID) else {
             return
@@ -415,9 +395,6 @@ extension AppModel {
             "The watch is busy. Please try changing the application order again."
         case is AppReorderClientError:
             "The watch rejected the application order. The previous order was restored."
-        // Restoration is what actually happens: the import is undone, so the
-        // reader keeps the version they had. Saying which of the two — an
-        // earlier version, or nothing — would need to know what was there.
         case PutBytesTransferError.negativeAcknowledgement:
             "The watch rejected the application data. The application library was left as it was."
         case is PutBytesTransferError, is PutBytesCodecError:
@@ -525,9 +502,8 @@ extension AppModel {
             pendingImportSnapshots[request.applicationID] = nil
             applicationLibraryErrorMessage = nil
         } catch {
-            // The transfer failed, so the version the reader had is still the
-            // one to have — including when "the version they had" is none at
-            // all and the import has to be undone entirely.
+            // Including when "the version they had" is none at all and the import has
+            // to be undone entirely.
             await restorePendingSnapshot(applicationID: request.applicationID)
             applicationLibraryErrorMessage = applicationErrorMessage(error)
             try? await connection.client.respondToAppFetch(with: .noData)

@@ -4,7 +4,6 @@ import HTTPTypesFoundation
 import MemberwiseInit
 import Retry
 
-/// A firmware package that has been fetched and is waiting on disk.
 @MemberwiseInit(.public)
 public struct DownloadedFirmware: Codable, Equatable, Sendable {
     public var versionTag: String
@@ -12,7 +11,6 @@ public struct DownloadedFirmware: Codable, Equatable, Sendable {
     public var url: URL
 }
 
-/// One firmware package published for a board.
 @MemberwiseInit(.public)
 public struct PebbleOSFirmwareRelease: Equatable, Sendable {
     public var versionTag: String
@@ -22,15 +20,11 @@ public struct PebbleOSFirmwareRelease: Equatable, Sendable {
     public var releaseNotesURL: URL?
 }
 
-/// Finds firmware on the PebbleOS releases page.
-///
 /// PebbleOS publishes a package per board with every release, and the download
-/// needs no credentials — unlike the update services the official app uses,
-/// which are the reason firmware cannot be fetched from there.
+/// needs no credentials.
 public struct PebbleOSFirmwareCatalog: Sendable {
-    /// Assets are named `normal_<board>_<version>.pbz`. A dual-slot board also
-    /// publishes `_slot0`/`_slot1` variants holding one slot each; the plain
-    /// one holds both, so it suits any watch.
+    // Assets are named `normal_<board>_<version>.pbz`. A dual-slot board also
+    // publishes `_slot0`/`_slot1` variants; the plain one holds both.
     static let assetPrefix = "normal_"
 
     private let releasesURL: URL
@@ -44,15 +38,14 @@ public struct PebbleOSFirmwareCatalog: Sendable {
         if let session {
             self.session = session
         } else {
-            // A firmware package is megabytes; the default request timeout is
-            // not enough on a slow link.
+            // A firmware package is megabytes; the default request timeout is not enough
+            // on a slow link.
             let configuration = URLSessionConfiguration.default
             configuration.timeoutIntervalForRequest = 120
             self.session = URLSession(configuration: configuration)
         }
     }
 
-    /// The newest firmware published for a board.
     public func latestRelease(for board: PebbleWatchBoard) async throws -> PebbleOSFirmwareRelease {
         try await retry(with: .networkFetch) {
             let request = HTTPRequest(
@@ -67,7 +60,6 @@ public struct PebbleOSFirmwareCatalog: Sendable {
             }
             let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
             guard let asset = Self.asset(for: board, in: release.assets) else {
-                // The release is published and has no package for this board.
                 // Asking again returns the same list.
                 throw NotRetryable(PebbleOSFirmwareCatalogError.noFirmwareForBoard(board))
             }
@@ -81,23 +73,21 @@ public struct PebbleOSFirmwareCatalog: Sendable {
         }
     }
 
-    /// Picks the package that covers every slot of a board.
     static func asset(for board: PebbleWatchBoard, in assets: [GitHubReleaseAsset]) -> GitHubReleaseAsset? {
         assets.first { asset in
             guard asset.name.hasSuffix(".pbz"), asset.name.hasPrefix(assetPrefix) else {
                 return false
             }
             let remainder = asset.name.dropFirst(assetPrefix.count).dropLast(".pbz".count)
-            // The version follows the board, and a per-slot package adds a
-            // suffix after that: `normal_obelix_pvt_v4.36.2_slot0`.
+            // The version follows the board, and a per-slot package adds a suffix after
+            // that: `normal_obelix_pvt_v4.36.2_slot0`.
             guard remainder.hasPrefix("\(board.rawValue)_") else { return false }
             return !remainder.hasSuffix("_slot0") && !remainder.hasSuffix("_slot1")
         }
     }
 
-    /// Downloads a package to a file the firmware importer can read.
-    /// Fetches a release and keeps it, so it can be installed later — on a
-    /// watch that is not here yet, or after a first attempt stopped.
+    /// Kept on disk so it can be installed later — on a watch that is not here
+    /// yet, or after a first attempt failed.
     public func download(_ release: PebbleOSFirmwareRelease) async throws -> DownloadedFirmware {
         let temporaryURL = try await retry(with: .networkFetch) {
             do {
@@ -109,8 +99,7 @@ public struct PebbleOSFirmwareCatalog: Sendable {
                     ? PebbleOSFirmwareCatalogError.releasesUnavailable
                     : NotRetryable(PebbleOSFirmwareCatalogError.releasesUnavailable)
             } catch {
-                // A dropped link mid-download; the file is megabytes, so this
-                // is the failure most worth another attempt.
+                // The file is megabytes, so this is the failure most worth another attempt.
                 throw PebbleOSFirmwareCatalogError.releasesUnavailable
             }
         }
@@ -126,9 +115,8 @@ public struct PebbleOSFirmwareCatalog: Sendable {
         )
     }
 
-    /// Downloads live in Application Support rather than the temporary
-    /// directory: the system empties that one whenever it likes, and a package
-    /// waiting for a watch to turn up may wait a while.
+    // Not the temporary directory: the system empties that whenever it likes, and
+    // a package waiting for a watch may wait days.
     private static func downloadDirectory() throws -> URL {
         let directory = try FileManager.default.url(
             for: .applicationSupportDirectory,

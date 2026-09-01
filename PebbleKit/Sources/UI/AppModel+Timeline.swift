@@ -6,7 +6,6 @@ public import Foundation
 import Retry
 import SwiftUI
 
-/// Timeline pins, and the calendar they are drawn from.
 extension AppModel {
     public func loadTimeline() async {
         do { timelinePins = try await timelineLibrary.pins() }
@@ -21,14 +20,12 @@ extension AppModel {
         do {
             try await timelineLibrary.save(timelinePins)
         } catch {
-            // Nothing was stored, so the list must not go on showing it.
             timelinePins.removeAll { $0.id == pin.id }
             dataSyncStatusMessage = "The timeline pin could not be saved."
             return
         }
-        // A queue write that fails is not lost work: `synchronizeTimeline`
-        // derives an upsert for every pin it holds, and this one is now one
-        // of them.
+        // `synchronizeTimeline` derives an upsert for every pin it holds, so a queue
+        // write that fails is not lost work.
         try? await queueTimelineOperation(.upsert(pin))
         if connectedDevice != nil {
             await synchronizeTimeline()
@@ -38,11 +35,8 @@ extension AppModel {
         }
     }
 
-    /// Takes these pins off the timeline, here and on every watch.
-    ///
-    /// Named rather than numbered because the list they were picked from may
-    /// be grouped or narrowed by a search, and a row's place on screen is not
-    /// its place here.
+    // Named rather than numbered: the list they were picked from may be grouped
+    // or narrowed by a search.
     public func removeTimelinePins(_ removed: [PebbleTimelinePin]) async {
         guard !removed.isEmpty else { return }
         let identifiers = Set(removed.map(\.id))
@@ -99,15 +93,9 @@ extension AppModel {
         try await pendingTimelineOperationLibrary.save(operations)
     }
 
-    /// Keeps the queue from growing without limit, dropping only what a later
-    /// synchronization can put back.
-    ///
-    /// An upsert is reconstructable: `synchronizeTimeline` derives one for
-    /// every pin the phone holds, so dropping the oldest ones costs nothing.
-    /// A delete has no such source — the pin it names is already gone from
-    /// `timelinePins`, and no later pass will ever mention it again — so
-    /// deletes are kept even past the cap, and the reader is told when the
-    /// queue is over it rather than left with pins that stay on the watch.
+    /// An upsert is reconstructable — `synchronizeTimeline` derives one for every
+    /// pin — and a delete is not: nothing else remembers a pin the phone has
+    /// already let go of.
     func trimQueuedOperations(_ operations: inout [PendingTimelineOperation]) {
         let cap = 200
         guard operations.count > cap else { return }
@@ -143,11 +131,8 @@ extension AppModel {
     func observeCalendarChanges() {
         calendarChangesTask?.cancel()
         calendarChangesTask = Task { [weak self] in
-            // EventKit reports a change per store write, so editing one event
-            // arrives as a burst. Each one would otherwise re-read every
-            // calendar and rewrite the watch's timeline, so wait for the burst
-            // to settle. Only the fact that something changed matters, which is
-            // also what makes these ticks safe to hand to `debounce`.
+            // EventKit reports a change per store write, so editing one event arrives as
+            // a burst, each of which would re-read every calendar.
             let ticks = AsyncStream<Void> { continuation in
                 let observation = Task {
                     for await _ in NotificationCenter.default.notifications(named: .EKEventStoreChanged) {

@@ -16,9 +16,8 @@ public func makeDefaultPebbleClient() -> any PebbleClient {
     CoreBluetoothPebbleClient()
 }
 
-/// Creates one Bluetooth client per watch so several watches can stay
-/// connected at the same time. The restoration identifier must be stable and
-/// unique per watch for CoreBluetooth state restoration.
+// The restoration identifier has to be stable and unique per watch, or iOS
+// hands one client another's restored state.
 @MainActor
 public func makeDefaultPebbleClientFactory() -> @MainActor (String) -> any PebbleClient {
     { deviceID in
@@ -69,7 +68,6 @@ public enum AppSection: String, CaseIterable, Identifiable {
     case health
     case settings
 
-    /// The sections a window can show. Settings is a separate scene.
     public static var windowSections: [AppSection] {
         allCases.filter { $0 != .settings }
     }
@@ -91,7 +89,6 @@ public enum AppSection: String, CaseIterable, Identifiable {
         }
     }
 
-    /// The Command-number shortcut that picks this section from the menu bar.
     public var keyboardShortcut: KeyEquivalent {
         switch self {
         case .devices: "1"
@@ -247,10 +244,8 @@ struct ConnectionStatusBanner: View {
         .accessibilityValue(title)
     }
 
-    /// The line is a `Text` rather than a key because the failure reads as two
-    /// sentences: what happened, and what the connection layer said about it.
-    /// One of those is already a localized phrase, and a localized phrase
-    /// cannot be interpolated into another one.
+    // A `Text` rather than a key: the failure reads as two sentences, and one of
+    // them comes from the connection layer already localized.
     private var title: Text {
         switch state {
         case .idle: Text("Not connected")
