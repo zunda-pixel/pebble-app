@@ -180,6 +180,16 @@ extension AppModel {
         }
         try await pendingFirmwareUpdateLibrary.updatePhase(.transferring)
         firmwareUpdateJournal = try await pendingFirmwareUpdateLibrary.journal()
+        // One transfer at a time. Two can be asked for at once — a staged
+        // update starting itself the moment the watch reconnects, while the
+        // reader taps Install — and the second would take over the task and
+        // the transfer flags the first is using, leaving that one waiting on a
+        // reply nobody is holding. The claim is made in the same step as the
+        // check, with nothing awaited in between, so only one caller gets past.
+        guard firmwareUpdateTask == nil else {
+            firmwareUpdateStatusMessage = "This firmware is already being transferred."
+            return
+        }
         firmwareUpdateStatusMessage = "Transferring verified firmware…"
         firmwareTransferDeviceID = connection.device.id
         connection.beginTransfer()

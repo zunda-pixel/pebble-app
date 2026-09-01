@@ -40,19 +40,36 @@ public struct PebbleProtocolFrame: Equatable, Sendable {
     }
 }
 
+/// What one chunk of received bytes decoded into.
+///
+/// The frames and the failure travel together on purpose. The watch packs
+/// frames for unrelated endpoints into a single delivery, so a length prefix
+/// that cannot begin a frame must not take the frames decoded before it down
+/// with it: the reply the app is waiting on is very often one of them.
+@MemberwiseInit(.public)
+public struct PebbleProtocolFrameBatch: Equatable, Sendable {
+    public var frames: [PebbleProtocolFrame] = []
+    /// Why decoding stopped short of the end of the buffer, if it did.
+    public var failure: PebbleProtocolFrameError? = nil
+}
+
 @MemberwiseInit(.public)
 public struct PebbleProtocolFrameDecoder: Sendable {
     @Init(.ignore) private var buffer: [UInt8] = []
 
-    public mutating func append(_ bytes: [UInt8]) throws -> [PebbleProtocolFrame] {
+    public mutating func append(_ bytes: [UInt8]) -> PebbleProtocolFrameBatch {
         buffer.append(contentsOf: bytes)
         var frames: [PebbleProtocolFrame] = []
 
         while buffer.count >= 4 {
             let payloadLength = Int(UInt16(buffer[0]) << 8 | UInt16(buffer[1]))
             guard payloadLength > 0 else {
+                // A zero length says the stream is no longer sitting on a
+                // frame boundary. Drop the prefix so the next chunk has a
+                // chance to resynchronise, and report the break rather than
+                // discarding the frames that had already come out whole.
                 buffer.removeFirst(4)
-                throw PebbleProtocolFrameError.emptyPayload
+                return PebbleProtocolFrameBatch(frames: frames, failure: .emptyPayload)
             }
 
             let frameLength = payloadLength + 4
@@ -66,7 +83,7 @@ public struct PebbleProtocolFrameDecoder: Sendable {
             buffer.removeFirst(frameLength)
         }
 
-        return frames
+        return PebbleProtocolFrameBatch(frames: frames)
     }
 }
 

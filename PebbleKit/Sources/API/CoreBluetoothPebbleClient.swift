@@ -180,6 +180,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
                 options: [CBCentralManagerScanOptionAllowDuplicatesKey: false]
             )
 
+            scanTimeoutTask?.cancel()
             scanTimeoutTask = Task { [weak self] in
                 try? await Task.sleep(for: .seconds(8))
                 guard !Task.isCancelled else {
@@ -264,6 +265,10 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             connectionContinuation = continuation
             centralManager.connect(peripheral)
 
+            // A reconnect in flight has its own deadline armed here, and it
+            // tears the link down when it expires. Left running it would
+            // outlive this connect and drop the healthy link it produced.
+            connectionTimeoutTask?.cancel()
             connectionTimeoutTask = Task { [weak self] in
                 try? await Task.sleep(for: .seconds(15))
                 guard !Task.isCancelled else {
@@ -474,6 +479,15 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     }
 
     public func installFirmware(_ package: PBZFirmwarePackage) async throws {
+        // Two installs at once would share one slot for the control reply and
+        // one flag for "an install is running": the second would strand the
+        // first on a continuation nobody holds, and clearing the flag on the
+        // way out would then suppress every keepalive for the rest of the
+        // link. Claiming the flag here, with nothing awaited in between, keeps
+        // it to one.
+        guard !isInstallingFirmware else {
+            throw PutBytesClientError.firmwareUpdateAlreadyInProgress
+        }
         isInstallingFirmware = true
         defer { isInstallingFirmware = false }
         let total = package.firmware.count + (package.resources?.count ?? 0)
@@ -503,6 +517,9 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
 
     private func sendFirmwareControl(_ frame: PebbleProtocolFrame, waitingForStart: Bool) async throws {
         guard let peripheral = connectedPeripheral else { throw PebbleConnectionError.disconnected }
+        guard firmwareResponseContinuation == nil else {
+            throw PutBytesClientError.firmwareUpdateAlreadyInProgress
+        }
         self.waitingForFirmwareStart = waitingForStart
         try await withCheckedThrowingContinuation { continuation in
             firmwareResponseContinuation = continuation
@@ -894,12 +911,15 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         pendingGattWrites.removeAll()
         acknowledgementTimeoutTask?.cancel()
         acknowledgementTimeoutTask = nil
+        healthDataLoggingProcessor = HealthDataLoggingProcessor()
+        completedTransferCookie = nil
         stopHealthChecks()
         failTransfer(error)
         failBlobDBOperation(error)
         failPulls(error)
         failAppReorder(error)
         failAllAppMessages(error)
+        finishFirmwareControl(throwing: error)
     }
 
     private func model(from advertisementData: [String: Any]) -> PebbleWatchModel? {
@@ -942,19 +962,40 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         _ actions: [PPoGSessionAction],
         peripheral: CBPeripheral
     ) throws {
+        // A batch is worked through to the end before any failure in it is
+        // raised. The watch coalesces frames for unrelated endpoints into one
+        // delivery and the session queues the acknowledgement behind that
+        // delivery, so giving up on the first unusable frame would drop the
+        // reply the app is waiting for — and drop the acknowledgement, which
+        // makes the watch retransmit the whole window. The first failure is
+        // still raised, so callers keep reporting it the way they always did;
+        // it just waits until there is nothing left to lose by it.
+        var firstFailure: (any Error)?
         for action in actions {
             switch action {
             case .send(let packet):
                 try write(packet, to: peripheral)
             case .deliver(let bytes):
-                let frames = try frameDecoder.append(bytes)
-                for frame in frames {
-                    try process(frame, peripheral: peripheral)
+                let batch = frameDecoder.append(bytes)
+                if firstFailure == nil, let failure = batch.failure {
+                    firstFailure = failure
+                }
+                for frame in batch.frames {
+                    do {
+                        try process(frame, peripheral: peripheral)
+                    } catch {
+                        if firstFailure == nil {
+                            firstFailure = error
+                        }
+                    }
                     frameContinuation?.yield(frame)
                 }
             case .resetRequired:
                 throw PebbleConnectionError.protocolNegotiationFailed
             }
+        }
+        if let firstFailure {
+            throw firstFailure
         }
     }
 
@@ -1328,6 +1369,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         do {
             try sendFrame(PingPongCodec.frame(for: .ping(cookie: cookie)), to: peripheral)
             pendingPingCookie = cookie
+            pongTimeoutTask?.cancel()
             pongTimeoutTask = Task { [weak self] in
                 try? await Task.sleep(for: .seconds(15))
                 guard !Task.isCancelled, self?.pendingPingCookie == cookie else {
@@ -1463,19 +1505,16 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     }
 
     private func clearTransportState() {
-        appMessageTimeoutTask?.cancel()
-        appMessageTimeoutTask = nil
-        if let activeAppMessage {
-            queuedAppMessages.insert(activeAppMessage, at: 0)
-        }
-        activeAppMessage = nil
-        activeAppMessageTransactionID = nil
         activeWriteCharacteristic = nil
         activeBatteryCharacteristic = nil
         activePairingTriggerCharacteristic = nil
         ppogNotifyCharacteristicToSubscribe = nil
         hasSentResetComplete = false
         pairingState = .unknown
+        // Which side hosts the transport is decided per link, from the watch's
+        // service list; carrying last link's answer into the next one would
+        // send the handshake down a transport nobody is listening on.
+        transportMode = .reversed
         pairingTimeoutTask?.cancel()
         pairingTimeoutTask = nil
         connectedPeripheral = nil
@@ -1486,11 +1525,28 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         pendingGattWrites.removeAll()
         acknowledgementTimeoutTask?.cancel()
         acknowledgementTimeoutTask = nil
+        // A session id only means something inside the session that opened it.
+        // After a reconnect the watch reuses low ids freely, and reading new
+        // records with an old session's tag and item size turns them into
+        // nonsense instead of a rejection.
+        healthDataLoggingProcessor = HealthDataLoggingProcessor()
+        completedTransferCookie = nil
         stopHealthChecks()
         failTransfer(PebbleConnectionError.disconnected)
         failBlobDBOperation(PebbleConnectionError.disconnected)
         failPulls(PebbleConnectionError.disconnected)
         failAppReorder(PebbleConnectionError.disconnected)
+        // A firmware control exchange is waiting on a reply that the watch can
+        // no longer send; saying so now beats a timeout ten seconds later that
+        // blames the deadline instead of the dropped link.
+        finishFirmwareControl(throwing: PebbleConnectionError.disconnected)
+        // A send that was in flight when the link went is over, and so is
+        // everything queued behind it. `AppModel` keeps its own list of
+        // messages it could not deliver and flushes that on the next
+        // connection, so a copy held here would be sent twice — and a caller
+        // left awaiting one would wait for a link that may never come back,
+        // with nothing left able to resume it.
+        failAllAppMessages(PebbleConnectionError.disconnected)
     }
 
     private func reconnect(to device: DiscoveredPebble, using peripheral: CBPeripheral) {
@@ -1622,6 +1678,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
 
 public enum PutBytesClientError: Error, Equatable, Sendable {
     case transferAlreadyInProgress
+    case firmwareUpdateAlreadyInProgress
 }
 
 extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
@@ -1742,7 +1799,6 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
         pendingDevice = nil
         clearTransportState()
         if wasIntentional {
-            failAllAppMessages(PebbleConnectionError.disconnected)
             reconnectDevice = nil
             reconnectBackoff.reset()
             isAutomaticReconnect = false
@@ -1829,6 +1885,7 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
         }
 
         if let service = services.first(where: { $0.uuid == Self.ppogService }) {
+            endForwardTransport(on: peripheral)
             peripheral.discoverCharacteristics(
                 [Self.ppogNotifyCharacteristic, Self.ppogWriteCharacteristic],
                 for: service
@@ -1966,6 +2023,37 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
                 self.abortLink(peripheral, error: .disconnected)
             }
         )
+    }
+
+    /// Hands the transport back to the watch after the phone had stood in for
+    /// it, which is what an unbonded watch forces: it publishes its protocol
+    /// service only once the link is encrypted, so the first discovery sees the
+    /// pairing service alone and the phone reasonably concludes it has to host
+    /// the transport itself. When the watch's service turns up after all, that
+    /// guess has to be undone — otherwise `startProtocolIfReady` keeps waiting
+    /// for a subscription to the phone's characteristic that will never come,
+    /// never subscribes to the watch's, and the connect dies on its deadline.
+    ///
+    /// Tearing the forward transport down, rather than merely preferring the
+    /// other one, is what makes this safe: the registration's unsubscribe
+    /// callback would otherwise drop the link, its receive callback would feed
+    /// packets in from a transport no longer in use, and `write` would keep
+    /// aiming at a characteristic nobody is subscribed to.
+    ///
+    /// Only while no session exists. Once one is running, the transport it was
+    /// opened on is the only one either side knows about.
+    private func endForwardTransport(on peripheral: CBPeripheral) {
+        guard transportMode == .forward, ppogSession == nil else {
+            return
+        }
+        transportMode = .reversed
+        PebbleGattServer.shared.unregister(centralID: peripheral.identifier.uuidString)
+        Task { [tag = clientTag] in
+            await PebbleDiagnostics.shared.record(
+                category: "pairing",
+                message: "[\(tag)] the watch published its own protocol service; using that instead"
+            )
+        }
     }
 
     private func handleForwardTransportReady(on peripheral: CBPeripheral) {

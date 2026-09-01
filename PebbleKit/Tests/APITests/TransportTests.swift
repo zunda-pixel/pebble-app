@@ -184,8 +184,33 @@ struct TransportTests {
         let bytes = try frame.encoded()
         var decoder = PebbleProtocolFrameDecoder()
 
-        #expect(try decoder.append(Array(bytes.prefix(3))).isEmpty)
-        #expect(try decoder.append(Array(bytes.dropFirst(3))) == [frame])
+        #expect(decoder.append(Array(bytes.prefix(3))).frames.isEmpty)
+        #expect(decoder.append(Array(bytes.dropFirst(3))) == PebbleProtocolFrameBatch(frames: [frame]))
+    }
+
+    @Test
+    func pebbleProtocolDecoderKeepsTheFramesItDecodedBeforeABadLengthPrefix() throws {
+        // The watch packs frames for unrelated endpoints into one delivery, so
+        // an unusable length prefix part-way through used to cost the app the
+        // reply it was waiting for as well.
+        let good = PebbleProtocolFrame(endpoint: 45, payload: [0x01, 0x02])
+        var decoder = PebbleProtocolFrameDecoder()
+
+        let batch = decoder.append(try good.encoded() + [0x00, 0x00, 0x00, 0x0B])
+
+        #expect(batch.frames == [good])
+        #expect(batch.failure == .emptyPayload)
+    }
+
+    @Test
+    func pebbleProtocolDecoderResynchronisesAfterABadLengthPrefix() throws {
+        // Only the four bytes that could not begin a frame are dropped, so a
+        // stream that comes back onto a frame boundary decodes again.
+        let next = PebbleProtocolFrame(endpoint: 6, payload: [0x07])
+        var decoder = PebbleProtocolFrameDecoder()
+
+        #expect(decoder.append([0x00, 0x00, 0x00, 0x0B]).failure == .emptyPayload)
+        #expect(decoder.append(try next.encoded()) == PebbleProtocolFrameBatch(frames: [next]))
     }
 
     @Test
@@ -212,9 +237,42 @@ struct TransportTests {
         let second = PebbleProtocolFrame(endpoint: 18, payload: [0x01, 0x02])
         var decoder = PebbleProtocolFrameDecoder()
 
-        let frames = try decoder.append(first.encoded() + second.encoded())
+        let batch = decoder.append(try first.encoded() + second.encoded())
 
-        #expect(frames == [first, second])
+        #expect(batch.frames == [first, second])
+        #expect(batch.failure == nil)
+    }
+
+    @Test
+    func healthDataLoggingRefusesASessionItWasNeverOpenedFor() throws {
+        // A session id means something only inside the session that opened it,
+        // and the watch reuses low ids freely across links. This is the
+        // property the client leans on when it throws its processor away on a
+        // disconnect: records for an id it has not been told about are refused,
+        // so the watch opens the session again rather than having its records
+        // read with a previous session's tag and item size.
+        let sessionID: UInt8 = 3
+        var open = [UInt8](repeating: 0, count: 29)
+        open[0] = 0x01
+        open[1] = sessionID
+        // Tag 81 is the step record stream; six bytes an item.
+        open[22] = 81
+        open[27] = 6
+        var data = [UInt8](repeating: 0, count: 10)
+        data[0] = 0x02
+        data[1] = sessionID
+        let openFrame = PebbleProtocolFrame(endpoint: HealthDataLoggingCodec.endpoint, payload: open)
+        let dataFrame = PebbleProtocolFrame(endpoint: HealthDataLoggingCodec.endpoint, payload: data)
+
+        var established = HealthDataLoggingProcessor()
+        #expect(try established.process(openFrame).response
+            == HealthDataLoggingCodec.ackFrame(sessionID: sessionID))
+        #expect(try established.process(dataFrame).response
+            == HealthDataLoggingCodec.ackFrame(sessionID: sessionID))
+
+        var reconnected = HealthDataLoggingProcessor()
+        #expect(try reconnected.process(dataFrame).response
+            == HealthDataLoggingCodec.nackFrame(sessionID: sessionID))
     }
 
     @Test func pendingNotificationsStayInOrderPerWatch() {
