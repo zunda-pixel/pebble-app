@@ -291,14 +291,16 @@ struct ContactsTests {
         #expect(SendTextPrefsCodec.value(for: []) == [0])
     }
 
-    @Test func onlyNumbersAreOfferedToTheSendTextApp() {
+    @Test func anEmailAddressIsOfferedAlongsideANumber() {
         var withEmail = contact()
         withEmail.addresses.append(PebbleContactAddress(id: UUID(), kind: .email, value: "a@b.c"))
 
-        // The app sends a text; an email address in the list would be a row
-        // that cannot be used.
-        #expect(SendTextPrefsCodec.value(for: [withEmail])[0] == 1)
+        // The app shows the address and never looks at its kind, so an email
+        // address is a row that works — and is what sends an iMessage.
+        #expect(SendTextPrefsCodec.value(for: [withEmail])[0] == 2)
+        #expect(SendTextPrefsCodec.value(for: [withEmail]).count == 1 + 66)
         #expect(ContactsCodec.value(for: withEmail)[21] == 2)
+        #expect(Array(ContactsCodec.value(for: withEmail).suffix(5)) == Array("a@b.c".utf8))
     }
 }
 

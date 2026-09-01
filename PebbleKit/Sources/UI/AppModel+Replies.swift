@@ -9,20 +9,51 @@ import SwiftUI
 public struct WatchReply: Codable, Equatable, Sendable, Identifiable {
     public var id: UUID = UUID()
     public var text: String
-    /// Who it is for, as the watch had them — the number the Send Text app was
-    /// opened on.
+    /// Who it is for, as the watch had them: the number or the address the Send
+    /// Text app was opened on.
     public var recipient: String?
     public var date: Date = .now
 
-    /// Messages, opened at a new message to that number with the reply already
-    /// written. Sending it is still a tap: iOS has no way for an app to send a
-    /// message on its own.
+    /// Messages, opened at a new message with the reply already written.
+    ///
+    /// The body rides on `&`, not `?`: the `sms:` scheme is not a URL with a
+    /// query, and Messages ignores a body handed to it as one. Which also means
+    /// the whole thing is escaped here and handed over as it stands — left to
+    /// escape it, Foundation escapes the escapes.
     public var composeURL: URL? {
-        var components = URLComponents()
-        components.scheme = "sms"
-        components.path = recipient?.filter { $0.isNumber || $0 == "+" } ?? ""
-        components.queryItems = [URLQueryItem(name: "body", value: text)]
-        return components.url
+        let address = (recipient ?? "").filter { !$0.isWhitespace }
+        guard let escaped = text.addingPercentEncoding(
+            withAllowedCharacters: .alphanumerics.union(.init(charactersIn: "-._~@"))
+        ) else { return nil }
+        return URL(string: "sms:\(address)&body=\(escaped)", encodingInvalidCharacters: false)
+    }
+}
+
+/// The replies waiting to be sent, kept on disk.
+///
+/// A reply can arrive while the app is in the background and be read minutes
+/// later; holding it in memory alone loses it the moment iOS reclaims the app.
+actor WatchReplyLibrary {
+    private var fileURL: URL
+
+    init(fileURL: URL? = nil) {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        self.fileURL = fileURL
+            ?? base.appending(path: "Pebble", directoryHint: .isDirectory).appending(path: "replies.json")
+    }
+
+    func replies() throws -> [WatchReply] {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return [] }
+        return try JSONDecoder().decode([WatchReply].self, from: Data(contentsOf: fileURL))
+    }
+
+    func save(_ replies: [WatchReply]) throws {
+        try FileManager.default.createDirectory(
+            at: fileURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try JSONEncoder().encode(replies).write(to: fileURL, options: .atomic)
     }
 }
 
@@ -38,18 +69,22 @@ extension AppModel {
     /// in the watch's language rather than the phone's.
     public static var defaultCannedReplies: [String] {
         [
-            String(localized: "OK"),
-            String(localized: "Yes"),
-            String(localized: "No"),
-            String(localized: "Call me"),
-            String(localized: "I'll call you later"),
-            String(localized: "On my way"),
+            String(localized: "OK", bundle: .module),
+            String(localized: "Yes", bundle: .module),
+            String(localized: "No", bundle: .module),
+            String(localized: "Call me", bundle: .module),
+            String(localized: "I'll call you later", bundle: .module),
+            String(localized: "On my way", bundle: .module),
         ]
     }
 
     func loadCannedReplies() {
         let stored = Defaults[.cannedReplies]
         cannedReplies = stored.isEmpty ? Self.defaultCannedReplies : stored
+    }
+
+    func loadUnsentReplies() async {
+        unsentReplies = (try? await replyLibrary.replies()) ?? []
     }
 
     public func setCannedReplies(_ replies: [String]) async {
@@ -96,13 +131,14 @@ extension AppModel {
         let reply = WatchReply(text: text, recipient: invocation.recipient)
         unsentReplies.append(reply)
         if unsentReplies.count > 20 { unsentReplies.removeFirst(unsentReplies.count - 20) }
+        try? await replyLibrary.save(unsentReplies)
         // Answered as a failure because it is one: the message has not been
         // sent, and saying otherwise would leave the reader believing it had.
         try? await connection.client.respondToTimelineAction(
             itemID: invocation.itemID,
             succeeded: false,
             icon: .failed,
-            subtitle: String(localized: "Finish in the app")
+            subtitle: String(localized: "Finish in the app", bundle: .module)
         )
         await PebbleDiagnostics.shared.record(
             category: "notification",
@@ -112,5 +148,7 @@ extension AppModel {
 
     public func discardReply(_ reply: WatchReply) {
         unsentReplies.removeAll { $0.id == reply.id }
+        let remaining = unsentReplies
+        Task { [replyLibrary] in try? await replyLibrary.save(remaining) }
     }
 }

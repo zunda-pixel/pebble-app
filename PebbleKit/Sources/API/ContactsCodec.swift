@@ -91,11 +91,15 @@ public enum SendTextPrefsCodec {
     public static var databaseID: UInt8 { 9 }
     public static var key: String { "sendTextApp" }
 
+    /// Every address the reader chose, whichever kind it is. The app shows the
+    /// string and does not look at the kind, so an email address is a row that
+    /// works — and an email address is what sends an iMessage rather than a
+    /// text.
     public static func value(for contacts: [PebbleContact]) -> [UInt8] {
         var records: [UInt8] = []
         var count = 0
         for contact in contacts {
-            for address in contact.addresses where address.kind == .phoneNumber {
+            for address in contact.addresses {
                 guard count < Int(UInt8.max) else { break }
                 records += BlobDBCodec.uuidBytes(contact.id)
                 records += BlobDBCodec.uuidBytes(address.id)

@@ -4,9 +4,9 @@ import Foundation
 
 /// The phone's address book, as far as the watch needs it.
 ///
-/// Only people with a phone number are of any use: the watch's Send Text app
-/// sends to a number, and a contact without one would be a name that cannot be
-/// chosen.
+/// Only people the phone can write to are of any use — someone with a number or
+/// an email address. A contact with neither would be a name on the watch that
+/// leads nowhere.
 @MainActor
 public struct ContactsBridge: Sendable {
     public init() {}
@@ -47,15 +47,22 @@ public struct ContactsBridge: Sendable {
             let previous = known[contact.identifier]
 
             var addresses: [PebbleContactAddress] = []
-            for number in contact.phoneNumbers {
-                let value = number.value.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !value.isEmpty else { continue }
+            func add(_ value: String, kind: PebbleContactAddressKind) {
+                let value = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !value.isEmpty else { return }
+                let known = previous?.addresses.first { $0.value == value }
                 addresses.append(PebbleContactAddress(
-                    id: previous?.addresses.first { $0.value == value }?.id ?? UUID(),
-                    kind: .phoneNumber,
+                    id: known?.id ?? UUID(),
+                    kind: kind,
                     value: value,
-                    isFavourite: previous?.addresses.first { $0.value == value }?.isFavourite ?? false
+                    isFavourite: known?.isFavourite ?? false
                 ))
+            }
+            for number in contact.phoneNumbers {
+                add(number.value.stringValue, kind: .phoneNumber)
+            }
+            for email in contact.emailAddresses {
+                add(email.value as String, kind: .email)
             }
             guard !addresses.isEmpty else { return }
 

@@ -67,7 +67,7 @@ struct ContactsView: View {
             } header: {
                 Text("Address Book")
             } footer: {
-                Text("Only people with a phone number are shown: the watch sends to a number.")
+                Text("Only people with a phone number or an email address are shown. An email address goes as an iMessage.")
             }
 
             if let message = model.contactStatusMessage {

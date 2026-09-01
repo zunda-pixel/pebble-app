@@ -176,6 +176,7 @@ public final class AppModel {
     )
     let healthLibrary = PebbleHealthLibrary()
     let contactLibrary = PebbleContactLibrary()
+    let replyLibrary = WatchReplyLibrary()
     let contactsBridge = ContactsBridge()
     let appCatalog = PebbleAppCatalog()
     let languagePackCatalog = PebbleLanguagePackCatalog()
@@ -261,6 +262,7 @@ public final class AppModel {
         loadWatchSettings()
         loadCannedReplies()
         await loadContacts()
+        await loadUnsentReplies()
         notificationSourceApps = (try? await notificationSourceAppLibrary.apps()) ?? []
         musicCoordinator.start()
         phoneCallCoordinator.start()

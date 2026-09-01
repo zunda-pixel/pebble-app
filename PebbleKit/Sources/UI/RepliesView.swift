@@ -5,6 +5,7 @@ import SwiftUI
 struct RepliesView: View {
     var model: AppModel
     @State private var draft = ""
+    @State private var replyBeingSent: WatchReply?
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -41,10 +42,13 @@ struct RepliesView: View {
                                 Text(verbatim: recipient).font(.footnote).foregroundStyle(.secondary)
                             }
                             HStack {
-                                if let url = reply.composeURL {
+                                if MessageComposer.isAvailable {
+                                    Button("Send in Messages", systemImage: "square.and.pencil") {
+                                        replyBeingSent = reply
+                                    }
+                                } else if let url = reply.composeURL {
                                     Button("Open in Messages", systemImage: "square.and.pencil") {
                                         openURL(url)
-                                        model.discardReply(reply)
                                     }
                                 }
                                 Button("Discard", systemImage: "trash", role: .destructive) {
@@ -63,5 +67,14 @@ struct RepliesView: View {
             }
         }
         .navigationTitle("Replies")
+        .sheet(item: $replyBeingSent) { reply in
+            MessageComposer(recipient: reply.recipient, message: reply.text) { wasSent in
+                // A reply that was not sent stays on the list: the reader may
+                // have meant to change it, and losing it would be worse than
+                // showing it twice.
+                if wasSent { model.discardReply(reply) }
+                replyBeingSent = nil
+            }
+        }
     }
 }

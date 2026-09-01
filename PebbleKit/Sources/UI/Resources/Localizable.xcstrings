@@ -2655,11 +2655,22 @@
       }
     },
     "Only people with a phone number are shown: the watch sends to a number." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "電話番号が登録されている人だけが表示されます。ウォッチは番号宛てに送信するためです。"
+          }
+        }
+      }
+    },
+    "Only people with a phone number or an email address are shown. An email address goes as an iMessage." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "電話番号またはメールアドレスが登録されている人だけが表示されます。メールアドレス宛ての場合は、iMessageとして送信されます。"
           }
         }
       }
@@ -3326,6 +3337,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "スクリーンショット"
+          }
+        }
+      }
+    },
+    "Send in Messages" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“メッセージ”で送信"
           }
         }
       }

@@ -664,6 +664,31 @@ struct UITests {
     }
 
     @Test
+    func aReplyIsHandedToMessagesWithItsBodyOnAnAmpersand() {
+        let reply = WatchReply(text: "On my way", recipient: "+1 555 1234")
+
+        // The `sms:` scheme is not a URL with a query: Messages ignores a body
+        // handed to it after a question mark.
+        #expect(reply.composeURL?.absoluteString == "sms:+15551234&body=On%20my%20way")
+        // An email address is what makes it an iMessage, and it survives the
+        // trip unescaped.
+        #expect(WatchReply(text: "Ok", recipient: "a@b.c").composeURL?.absoluteString
+            == "sms:a@b.c&body=Ok")
+    }
+
+    @Test
+    func aReplyChosenOnTheWatchOutlivesTheApp() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let library = WatchReplyLibrary(fileURL: directory.appending(path: "replies.json"))
+        let reply = WatchReply(text: "Ok", recipient: "+1", date: Date(timeIntervalSince1970: 1))
+
+        try await library.save([reply])
+
+        #expect(try await library.replies() == [reply])
+    }
+
+    @Test
     func foregroundRecoveryKeepsConnectedSessionHealthy() async throws {
         let client = MockPebbleClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
