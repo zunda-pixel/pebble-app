@@ -43,6 +43,7 @@ public final class WatchConnection: Identifiable {
     @ObservationIgnored var appFetchTask: Task<Void, Never>?
 
     @ObservationIgnored var synchronizedNotificationAppRecords: [String: [UInt8]] = [:]
+    @ObservationIgnored var synchronizedAppGlances: [UUID: [UInt8]] = [:]
     @ObservationIgnored private var needsPostReconnectSync = false
     @ObservationIgnored let voiceCoordinator: VoiceSessionCoordinator
     @ObservationIgnored private var eventsTask: Task<Void, Never>?
@@ -121,10 +122,12 @@ public final class WatchConnection: Identifiable {
             phase = .reconnecting
             needsPostReconnectSync = true
             synchronizedNotificationAppRecords = [:]
+            synchronizedAppGlances = [:]
             endTransfer()
         case .disconnected(let error):
             phase = .disconnected(error)
             synchronizedNotificationAppRecords = [:]
+            synchronizedAppGlances = [:]
             endTransfer()
             cancelApplicationFetch()
             voiceCoordinator.reset()

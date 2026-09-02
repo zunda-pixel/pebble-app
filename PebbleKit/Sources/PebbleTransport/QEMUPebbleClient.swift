@@ -208,6 +208,14 @@ public final class QEMUPebbleClient: PebbleClient {
         throw BlobDBClientError.rejected(.notSupported)
     }
 
+    public func writeAppGlance(_ glance: PebbleAppGlance) async throws {
+        throw BlobDBClientError.rejected(.notSupported)
+    }
+
+    public func removeAppGlance(applicationID: UUID) async throws {
+        throw BlobDBClientError.rejected(.notSupported)
+    }
+
     public func upsertTimelineReminder(_ reminder: PebbleTimelinePin) async throws {
         try await send(try TimelineReminderCodec.insertFrame(reminder, token: 1))
     }

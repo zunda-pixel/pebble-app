@@ -110,6 +110,8 @@ public final class AppModel {
     public internal(set) var timelineActionStatusMessage: LocalizedStringKey?
     public internal(set) var healthExportURL: URL?
     public internal(set) var notificationSourceApps: [NotificationSourceApp] = []
+    /// The line each watchapp shows in the launcher, for the apps that have one.
+    public internal(set) var appGlances: [PebbleAppGlance] = []
     public internal(set) var installedApplicationIDsByWatch: [String: Set<UUID>] = [:]
 
     public var isScanningOrConnecting: Bool {
@@ -207,6 +209,7 @@ public final class AppModel {
     let healthKitBridge = HealthKitBridge()
     #endif
     let notificationSourceAppLibrary = NotificationSourceAppLibrary()
+    let appGlanceLibrary: AppGlanceLibrary
     let speechBridge = SpeechBridge()
     var voiceTranscriptionReadiness = VoiceTranscriptionReadiness.turnedOff
     @ObservationIgnored lazy var musicCoordinator = MusicCoordinator(
@@ -250,6 +253,7 @@ public final class AppModel {
         client: any PebbleClient,
         applicationLibrary: PebbleApplicationLibrary = PebbleApplicationLibrary(),
         watchLibrary: PebbleWatchLibrary = PebbleWatchLibrary(),
+        appGlanceLibrary: AppGlanceLibrary = AppGlanceLibrary(),
         clientFactory: (@MainActor (String) -> any PebbleClient)? = nil
     ) {
         self.scannerClient = client
@@ -258,6 +262,7 @@ public final class AppModel {
         self.clientFactory = clientFactory ?? { _ in client }
         self.applicationLibrary = applicationLibrary
         self.watchLibrary = watchLibrary
+        self.appGlanceLibrary = appGlanceLibrary
         companionNotificationsEnabled = Defaults[.companionNotificationsEnabled]
         activeWatchfaceID = Defaults[.activeWatchfaceID]
         favoriteWatchfaceIDs = Set(Defaults[.favoriteWatchfaceIDs])
@@ -279,6 +284,7 @@ public final class AppModel {
         loadWatchSettings()
         notificationSourceApps = (try? await notificationSourceAppLibrary.apps()) ?? []
         sentNotifications = (try? await sentNotificationLibrary.notifications()) ?? []
+        await loadAppGlances()
         musicCoordinator.start()
         phoneCallCoordinator.start()
         observeWatchesReconnectingThemselves()
@@ -567,6 +573,9 @@ public final class AppModel {
         await synchronizeApplicationLogging(on: connection)
         await sendWeather(to: connection)
         await requestHealthSync(on: connection)
+        // After the applications, which is what says whether the watch has the
+        // app a glance belongs to.
+        await synchronizeAppGlances(on: connection)
         await resumePendingFirmwareUpdate(on: connection)
     }
 

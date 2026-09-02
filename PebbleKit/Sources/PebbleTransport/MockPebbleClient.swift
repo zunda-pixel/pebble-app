@@ -33,6 +33,7 @@ public final class MockPebbleClient: PebbleClient {
     public var logGenerations: [[WatchLogLine]] = []
     public var bytesToReturn: [UInt8] = []
     public private(set) var writtenNotificationSourceApps: [NotificationSourceApp] = []
+    public private(set) var writtenAppGlances: [PebbleAppGlance] = []
     public private(set) var registeredApplications: [PebbleAppMetadata] = []
     public private(set) var unregisteredApplicationIDs: [UUID] = []
     public private(set) var disconnectedDevices: [PebbleDevice] = []
@@ -191,6 +192,15 @@ public final class MockPebbleClient: PebbleClient {
 
     public func removeNotificationSourceApp(bundleID: String) async throws {
         writtenNotificationSourceApps.removeAll { $0.bundleID == bundleID }
+    }
+
+    public func writeAppGlance(_ glance: PebbleAppGlance) async throws {
+        writtenAppGlances.removeAll { $0.applicationID == glance.applicationID }
+        writtenAppGlances.append(glance)
+    }
+
+    public func removeAppGlance(applicationID: UUID) async throws {
+        writtenAppGlances.removeAll { $0.applicationID == applicationID }
     }
 
     public func upsertTimelineReminder(_ reminder: PebbleTimelinePin) async throws {

@@ -130,6 +130,8 @@ final class SuspendingPebbleClient: PebbleClient {
     func installFile(_ bytes: [UInt8], filename: String) async throws {}
     func writeNotificationSourceApp(_ app: NotificationSourceApp) async throws {}
     func removeNotificationSourceApp(bundleID: String) async throws {}
+    func writeAppGlance(_ glance: PebbleAppGlance) async throws {}
+    func removeAppGlance(applicationID: UUID) async throws {}
     func writeWeather(_ report: PebbleWeatherReport) async throws {}
     func removeWeather(id: UUID) async throws {}
     func writeWeatherLocationOrder(_ orderedIDs: [UUID]) async throws {}

@@ -111,6 +111,10 @@ public protocol PebbleClient: Sendable {
     func refreshDeviceInformation() async throws
     func writeNotificationSourceApp(_ app: NotificationSourceApp) async throws
     func removeNotificationSourceApp(bundleID: String) async throws
+    /// The line the launcher shows under a watchapp. The watch refuses one for
+    /// an app it does not have installed.
+    func writeAppGlance(_ glance: PebbleAppGlance) async throws
+    func removeAppGlance(applicationID: UUID) async throws
     func writeWeather(_ report: PebbleWeatherReport) async throws
     func removeWeather(id: UUID) async throws
     /// A forecast the watch holds but this list does not name is not shown.

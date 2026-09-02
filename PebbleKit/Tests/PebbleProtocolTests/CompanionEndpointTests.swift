@@ -758,6 +758,100 @@ struct WeatherTests {
 
 @Suite
 @MainActor
+struct AppGlanceTests {
+    @Test func aGlanceIsAVersionATimeAndItsSlices() {
+        let glance = PebbleAppGlance(
+            applicationID: UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF")!,
+            slices: [PebbleAppGlanceSlice(
+                subtitleTemplate: "Hi",
+                icon: .sms,
+                expires: Date(timeIntervalSince1970: 0x6a98b880)
+            )],
+            updatedAt: Date(timeIntervalSince1970: 0x680dc9ed)
+        )
+
+        #expect(AppGlanceCodec.key(for: glance.applicationID).count == 16)
+        #expect(AppGlanceCodec.value(for: glance) == [
+            0x01,
+            0xED, 0xC9, 0x0D, 0x68,
+            // The slice counts its own four-byte header in the size it gives:
+            // 4 and then 7, 5 and 7 for the three attributes.
+            0x17, 0x00, 0x00, 0x03,
+            37, 0x04, 0x00, 0x80, 0xB8, 0x98, 0x6A,
+            47, 0x02, 0x00, 0x48, 0x69,
+            48, 0x04, 0x00, 45, 0x00, 0x00, 0x80,
+        ])
+    }
+
+    @Test func aLineThatNeverStopsBeingTrueStillCarriesTheAttribute() {
+        let glance = PebbleAppGlance(
+            applicationID: UUID(),
+            slices: [PebbleAppGlanceSlice(subtitleTemplate: "Kyoto 18°")],
+            updatedAt: Date(timeIntervalSince1970: 0)
+        )
+
+        let value = AppGlanceCodec.value(for: glance)
+
+        // The line and its expiry, which is written even though there is none:
+        // zero is how the firmware spells never
+        // (`APP_GLANCE_SLICE_NO_EXPIRATION`), and a slice carrying no
+        // attributes at all is below the smallest size it accepts.
+        #expect(value[8] == 2)
+        #expect(Array(value[9..<16]) == [37, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00])
+    }
+
+    @Test func moreSlicesThanTheWatchKeepsAreNotSent() {
+        let glance = PebbleAppGlance(
+            applicationID: UUID(),
+            slices: (0..<12).map { PebbleAppGlanceSlice(subtitleTemplate: "line \($0)") }
+        )
+
+        // The firmware trims what it is given past eight, saying in a comment
+        // that a phone has no way of knowing the limit. This one does.
+        let sliceCount = AppGlanceCodec.value(for: glance)[5...]
+            .indices
+            .isEmpty ? 0 : countSlices(in: AppGlanceCodec.value(for: glance))
+        #expect(sliceCount == 8)
+    }
+
+    @Test func aLineIsCutOnACharacterAndNotInsideOne() {
+        // Fifty three-byte characters is 150 bytes, which is all the firmware
+        // keeps; the fifty-first would be cut in half by a byte count.
+        let glance = PebbleAppGlance(
+            applicationID: UUID(),
+            slices: [PebbleAppGlanceSlice(subtitleTemplate: String(repeating: "石", count: 60))]
+        )
+
+        let value = AppGlanceCodec.value(for: glance)
+        let subtitleLength = Int(value[17]) | Int(value[18]) << 8
+
+        #expect(subtitleLength == 150)
+        #expect(String(decoding: value[19..<(19 + subtitleLength)], as: UTF8.self).count == 50)
+    }
+
+    @Test func insertAndDeleteTargetTheGlanceDatabase() {
+        let id = UUID()
+        let insert = AppGlanceCodec.insertFrame(PebbleAppGlance(applicationID: id), token: 0x0102)
+        let delete = AppGlanceCodec.deleteFrame(applicationID: id, token: 0x0102)
+
+        #expect(insert.endpoint == 0xB1DB)
+        #expect(Array(insert.payload.prefix(4)) == [0x01, 0x01, 0x02, 11])
+        #expect(Array(delete.payload.prefix(4)) == [0x04, 0x01, 0x02, 11])
+    }
+
+    private func countSlices(in value: [UInt8]) -> Int {
+        var offset = 5
+        var count = 0
+        while offset + 4 <= value.count {
+            offset += Int(value[offset]) | Int(value[offset + 1]) << 8
+            count += 1
+        }
+        return count
+    }
+}
+
+@Suite
+@MainActor
 struct NotificationAppsTests {
     @Test func recordValueUsesTimelineAttributeLayout() {
         let app = NotificationSourceApp(

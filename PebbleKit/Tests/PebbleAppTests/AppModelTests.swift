@@ -363,6 +363,46 @@ struct AppModelTests {
     }
 
     @Test
+    func aLauncherLineGoesOnlyToAWatchThatHasTheApp() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: client,
+            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json")),
+            appGlanceLibrary: AppGlanceLibrary(fileURL: directory.appending(path: "glances.json"))
+        )
+        await model.scan()
+        let discovered = try #require(model.discoveredDevices.first)
+        await model.connect(to: discovered)
+        let connection = try #require(model.connections.first)
+
+        // The watch refuses a glance for an app it does not have, so asking is
+        // pointless and the refusal would stop the rest of the pass.
+        let absent = UUID()
+        await model.setAppGlance(PebbleAppGlance(
+            applicationID: absent,
+            slices: [PebbleAppGlanceSlice(subtitleTemplate: "Kyoto 18°")]
+        ))
+        #expect(client.writtenAppGlances.isEmpty)
+
+        model.installedApplicationIDsByWatch[connection.device.id] = [absent]
+        await model.synchronizeAppGlances(on: connection)
+
+        #expect(client.writtenAppGlances.map(\.applicationID) == [absent])
+
+        // A line the reader emptied is one the watch is still showing.
+        await model.setAppGlance(PebbleAppGlance(
+            applicationID: absent,
+            slices: [PebbleAppGlanceSlice(subtitleTemplate: "   ")]
+        ))
+
+        #expect(model.appGlances.isEmpty)
+        #expect(client.writtenAppGlances.isEmpty)
+    }
+
+    @Test
     func oneWatchWaitingForAnAppDoesNotMakeAnotherWatchBusy() async throws {
         let scanner = MockPebbleClient()
         var connectionClients: [String: MockPebbleClient] = [:]

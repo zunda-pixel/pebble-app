@@ -7,6 +7,7 @@ struct ApplicationsView: View {
     @State private var isChoosingPackage = false
     @State private var isShowingCatalog = false
     @State private var selectedWatchID: String?
+    @State private var glanceApplication: PebbleApplication?
 
     // The picked watch while it stays connected, otherwise the primary one.
     private var displayedWatchID: String? {
@@ -33,6 +34,9 @@ struct ApplicationsView: View {
                 .padding(.vertical, 8)
             }
             applicationsContent
+        }
+        .sheet(item: $glanceApplication) { application in
+            AppGlanceView(model: model, application: application)
         }
     }
 
@@ -70,6 +74,7 @@ struct ApplicationsView: View {
             configureApplication: { application in
                 Task { await model.configureApplication(application) }
             },
+            editGlance: { application in glanceApplication = application },
             activateWatchface: { application in
                 Task { await model.activateWatchface(application) }
             },
@@ -156,6 +161,7 @@ struct ApplicationsContent: View {
     var removeApplication: (UUID) -> Void
     var reorderApplications: (PebbleApplicationKind, IndexSet, Int) -> Void
     var configureApplication: (PebbleApplication) -> Void
+    var editGlance: (PebbleApplication) -> Void
     var activateWatchface: (PebbleApplication) -> Void
     var toggleFavoriteWatchface: (PebbleApplication) -> Void
 
@@ -201,6 +207,7 @@ struct ApplicationsContent: View {
                         isOperationInProgress: isOperationInProgress,
                         removeApplication: removeApplication,
                         configureApplication: configureApplication,
+                        editGlance: editGlance,
                         activateWatchface: activateWatchface,
                         toggleFavoriteWatchface: toggleFavoriteWatchface,
                         moveApplications: { offsets, destination in
@@ -218,6 +225,7 @@ struct ApplicationsContent: View {
                         isOperationInProgress: isOperationInProgress,
                         removeApplication: removeApplication,
                         configureApplication: configureApplication,
+                        editGlance: editGlance,
                         activateWatchface: activateWatchface,
                         toggleFavoriteWatchface: toggleFavoriteWatchface,
                         moveApplications: { offsets, destination in
@@ -267,6 +275,7 @@ struct ApplicationSection: View {
     var isOperationInProgress: Bool
     var removeApplication: (UUID) -> Void
     var configureApplication: (PebbleApplication) -> Void
+    var editGlance: (PebbleApplication) -> Void
     var activateWatchface: (PebbleApplication) -> Void
     var toggleFavoriteWatchface: (PebbleApplication) -> Void
     var moveApplications: (IndexSet, Int) -> Void
@@ -282,6 +291,7 @@ struct ApplicationSection: View {
                     isOperationInProgress: isOperationInProgress,
                     removeApplication: { removeApplication(application.id) },
                     configureApplication: { configureApplication(application) },
+                    editGlance: { editGlance(application) },
                     activateWatchface: { activateWatchface(application) },
                     toggleFavoriteWatchface: { toggleFavoriteWatchface(application) }
                 )
@@ -300,6 +310,7 @@ struct ApplicationListRow: View {
     var isOperationInProgress: Bool
     var removeApplication: () -> Void
     var configureApplication: () -> Void
+    var editGlance: () -> Void
     var activateWatchface: () -> Void
     var toggleFavoriteWatchface: () -> Void
 
@@ -328,6 +339,9 @@ struct ApplicationListRow: View {
         .contextMenu {
             if application.isConfigurable {
                 Button("Configure", systemImage: "gearshape", action: configureApplication)
+            }
+            if application.kind == .watchapp {
+                Button("Launcher Line", systemImage: "text.line.first.and.arrowtriangle.forward", action: editGlance)
             }
             if application.kind == .watchface {
                 Button(isActive ? "Active" : "Activate", systemImage: "play.circle", action: activateWatchface)
@@ -455,6 +469,7 @@ struct ApplicationPlaceholderRow: View {
             removeApplication: { _ in },
             reorderApplications: { _, _, _ in },
             configureApplication: { _ in },
+            editGlance: { _ in },
             activateWatchface: { _ in },
             toggleFavoriteWatchface: { _ in }
         )
@@ -478,6 +493,7 @@ struct ApplicationPlaceholderRow: View {
             removeApplication: { _ in },
             reorderApplications: { _, _, _ in },
             configureApplication: { _ in },
+            editGlance: { _ in },
             activateWatchface: { _ in },
             toggleFavoriteWatchface: { _ in }
         )
@@ -501,6 +517,7 @@ struct ApplicationPlaceholderRow: View {
             removeApplication: { _ in },
             reorderApplications: { _, _, _ in },
             configureApplication: { _ in },
+            editGlance: { _ in },
             activateWatchface: { _ in },
             toggleFavoriteWatchface: { _ in }
         )

@@ -469,6 +469,18 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
     }
 
+    public func writeAppGlance(_ glance: PebbleAppGlance) async throws {
+        try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
+            AppGlanceCodec.insertFrame(glance, token: token)
+        }
+    }
+
+    public func removeAppGlance(applicationID: UUID) async throws {
+        try await performBlobDBOperation(acceptedStatuses: [.success, .keyDoesNotExist]) { token in
+            AppGlanceCodec.deleteFrame(applicationID: applicationID, token: token)
+        }
+    }
+
     public func writeWeather(_ report: PebbleWeatherReport) async throws {
         try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
             WeatherCodec.insertFrame(report: report, token: token)

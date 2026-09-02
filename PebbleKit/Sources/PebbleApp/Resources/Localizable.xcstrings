@@ -279,6 +279,26 @@
         }
       }
     },
+    "A line may hold a countdown the watch keeps up to date on its own. Give the moment in seconds since 1970." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "一行にはカウントダウンを埋め込めます。ウォッチが自動的に更新します。時刻は1970年からの秒数で指定してください。"
+          }
+        }
+      }
+    },
+    "A line that has expired is not shown, and the app goes back to its name alone." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "期限を過ぎた一行は表示されなくなり、アプリ名だけの表示に戻ります。"
+          }
+        }
+      }
+    },
     "A notification the watch is about to show is dropped when one of these is found in it." : {
       "localizations" : {
         "ja" : {
@@ -735,6 +755,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチが通知の送信を検出したアプリの一覧です。ミュートすると、そのアプリの通知はウォッチでフィルタリングされます。"
+          }
+        }
+      }
+    },
+    "At" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "期限"
           }
         }
       }
@@ -1405,6 +1435,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このウォッチに接続します"
+          }
+        }
+      }
+    },
+    "Counting Down" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "カウントダウン"
           }
         }
       }
@@ -2469,12 +2509,32 @@
         }
       }
     },
+    "Launcher Line" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ランチャーの一行"
+          }
+        }
+      }
+    },
     "Leave both alone until the watch restarts by itself." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチが自動的に再起動するまで、どちらも操作せずに待ちます。"
+          }
+        }
+      }
+    },
+    "Line" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "表示する一行"
           }
         }
       }
@@ -3875,6 +3935,16 @@
         }
       }
     },
+    "Shown in the launcher beside the app, so that its state can be read without opening it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ランチャーでアプリ名の隣に表示されます。アプリを開かなくても状態が分かります。"
+          }
+        }
+      }
+    },
     "Sleep" : {
       "localizations" : {
         "ja" : {
@@ -4005,6 +4075,16 @@
         }
       }
     },
+    "Stops Being True" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "有効期限を設ける"
+          }
+        }
+      }
+    },
     "Sync Calendar" : {
       "localizations" : {
         "ja" : {
@@ -4131,6 +4211,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "アプリカタログを更新できませんでした。"
+          }
+        }
+      }
+    },
+    "The App's Own" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリのアイコン"
           }
         }
       }
@@ -5061,6 +5151,16 @@
         }
       }
     },
+    "This watch does not have the app installed and will refuse a line for it. Install the app first." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このウォッチにはアプリがインストールされていないため、一行を受け付けません。先にアプリをインストールしてください。"
+          }
+        }
+      }
+    },
     "This watch started its recovery firmware. It works again once PebbleOS is installed." : {
       "localizations" : {
         "ja" : {
@@ -5307,6 +5407,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "利用不可"
+          }
+        }
+      }
+    },
+    "Under the App's Name" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリ名の下"
           }
         }
       }
