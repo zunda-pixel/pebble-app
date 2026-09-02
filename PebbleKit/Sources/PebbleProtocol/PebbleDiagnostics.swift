@@ -93,9 +93,10 @@ public actor PebbleDiagnostics {
             applications: applications,
             entries: entries
         )
-        let formatter = ISO8601DateFormatter()
-        let filename = "pebble-diagnostics-\(formatter.string(from: report.generatedAt)).json"
-            .replacingOccurrences(of: ":", with: "-")
+        // A colon is a path separator to some of the places a report is sent on
+        // to, so the time is written without one rather than repaired after.
+        let when = report.generatedAt.formatted(.iso8601.timeSeparator(.omitted))
+        let filename = "pebble-diagnostics-\(when).json"
         let url = directory.appending(path: filename, directoryHint: .notDirectory)
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
