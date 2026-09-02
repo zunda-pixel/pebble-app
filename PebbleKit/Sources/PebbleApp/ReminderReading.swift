@@ -28,25 +28,57 @@ enum ReminderReading {
     /// transcribing has already spent some of that.
     static let modelDeadline = Duration.seconds(5)
 
+    private enum ModelAnswer {
+        case read(UnderstoodReminder)
+        /// The model was asked and gave nothing back. Why is recorded where it
+        /// happened.
+        case nothing
+        case tooSlow
+    }
+
     static func readWithModel(_ spoken: String, now: Date = Date()) async -> SpokenReminder {
         let detected = read(spoken, now: now)
-        guard SystemLanguageModel.default.isAvailable else { return detected }
-        let understood = await withTaskGroup(of: UnderstoodReminder??.self) { group in
+        if case .unavailable(let reason) = SystemLanguageModel.default.availability {
+            // Which reader answered is the first thing to know when a reminder
+            // comes out as the whole sentence: the detector cuts a time and
+            // nothing else.
+            await PebbleDiagnostics.shared.record(
+                category: "voice",
+                message: "no language model on this phone (\(reason)); the date detector read the reminder alone"
+            )
+            return detected
+        }
+        let answer = await withTaskGroup(of: ModelAnswer.self) { group in
             group.addTask { await understand(spoken, now: now) }
             group.addTask {
                 try? await Task.sleep(for: modelDeadline)
-                return .some(nil)
+                return .tooSlow
             }
-            let first = await group.next() ?? nil
+            let first = await group.next() ?? .nothing
             group.cancelAll()
-            return first ?? nil
+            return first
         }
-        guard let understood else { return detected }
+        guard case .read(let understood) = answer else {
+            if case .tooSlow = answer {
+                await PebbleDiagnostics.shared.record(
+                    category: "voice",
+                    message: "the model was still reading the reminder after \(modelDeadline);"
+                        + " the date detector answered instead"
+                )
+            }
+            return detected
+        }
         let title = understood.title.trimmingCharacters(in: .whitespacesAndNewlines)
         // A model that hands the sentence back whole has read nothing out of
         // it, and the detector has at least cut the time it found: 「五時に起こ
         // して」 came back untouched where the detector had 「起こして」.
         let shortened = !title.isEmpty && title != spoken.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !shortened {
+            await PebbleDiagnostics.shared.record(
+                category: "voice",
+                message: "the model found nothing to cut out of the reminder"
+            )
+        }
         return SpokenReminder(
             // Cutting the time out leaves the same loose word behind whoever
             // did the cutting: the model answered "meeting at".
@@ -168,7 +200,7 @@ enum ReminderReading {
         return numbers
     }
 
-    private static func understand(_ spoken: String, now: Date) async -> UnderstoodReminder?? {
+    private static func understand(_ spoken: String, now: Date) async -> ModelAnswer {
         let session = LanguageModelSession(
             instructions: """
                 You read what someone said out loud into a reminder. \
@@ -189,13 +221,13 @@ enum ReminderReading {
                 to: "It is \(clock). They said: \(spoken)",
                 generating: UnderstoodReminder.self
             )
-            return .some(response.content)
+            return .read(response.content)
         } catch {
             await PebbleDiagnostics.shared.record(
                 category: "voice",
                 message: "The model would not read the reminder: \(error)"
             )
-            return .some(nil)
+            return .nothing
         }
     }
 
