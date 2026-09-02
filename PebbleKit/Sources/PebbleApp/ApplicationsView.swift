@@ -36,6 +36,12 @@ struct ApplicationsView: View {
         }
     }
 
+    /// What the watch on screen is being sent, if anything. A transfer to another
+    /// watch is that watch's to show.
+    private var transfer: ApplicationTransfer? {
+        displayedWatchID.flatMap { model.applicationTransfer(on: $0) }
+    }
+
     private var applicationsContent: some View {
         ApplicationsContent(
             watchApplications: model.watchApplications,
@@ -47,8 +53,8 @@ struct ApplicationsView: View {
             errorMessage: model.applicationLibraryErrorMessage,
             operationStatusMessage: model.applicationManagementStatusMessage,
             isOperationInProgress: model.isApplicationManagementBusy,
-            installingApplicationName: model.installingApplicationName,
-            installationProgress: model.installationProgress,
+            installingApplicationName: transfer?.name,
+            installationProgress: transfer?.progress,
             removeApplication: { applicationID in
                 Task { await model.removeApplication(id: applicationID) }
             },

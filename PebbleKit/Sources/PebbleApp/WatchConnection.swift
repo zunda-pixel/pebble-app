@@ -1,5 +1,5 @@
 public import PebbleProtocol
-import Foundation
+public import Foundation
 // `WatchConnection` is public and `@Observable`, so the conformance the macro
 // writes is public too.
 public import Observation
@@ -8,6 +8,18 @@ public enum WatchConnectionPhase: Equatable, Sendable {
     case connected
     case reconnecting
     case disconnected(PebbleConnectionError)
+}
+
+/// What the bytes going to a watch are for.
+///
+/// A count on its own cannot be shown anywhere: the same watch takes an
+/// application, a firmware image and a language pack through the same transfer,
+/// and two watches can be taking different ones at the same moment. Knowing
+/// which of them a progress belongs to is what lets a screen show its own.
+public enum WatchTransferKind: Equatable, Sendable {
+    case application(UUID)
+    case firmware
+    case languagePack
 }
 
 /// Each connection owns its own transport client, event observation and
@@ -21,6 +33,14 @@ public final class WatchConnection: Identifiable {
     /// The watch is the thing doing the work, so the count belongs to it rather
     /// than to whichever kind of transfer is running somewhere.
     public private(set) var transferProgress: PutBytesTransferProgress?
+    public private(set) var transferKind: WatchTransferKind?
+
+    /// The app this watch asked for, while it is being sent.
+    ///
+    /// Per watch because the request is: two watches launching two apps ask
+    /// separately, and one of them waiting is no reason to answer the other with
+    /// "busy".
+    @ObservationIgnored var appFetchTask: Task<Void, Never>?
 
     @ObservationIgnored var synchronizedNotificationAppRecords: [String: [UInt8]] = [:]
     @ObservationIgnored private var needsPostReconnectSync = false
@@ -36,6 +56,20 @@ public final class WatchConnection: Identifiable {
 
     public var isConnected: Bool {
         phase == .connected
+    }
+
+    public var isFetchingApplication: Bool {
+        appFetchTask != nil
+    }
+
+    public func transferProgress(for kind: WatchTransferKind) -> PutBytesTransferProgress? {
+        transferKind == kind ? transferProgress : nil
+    }
+
+    /// The application being sent to this watch, if that is what the transfer is.
+    public var applicationBeingSent: UUID? {
+        guard case .application(let id) = transferKind else { return nil }
+        return id
     }
 
     init(client: any PebbleClient, device: PebbleDevice) {
@@ -83,11 +117,12 @@ public final class WatchConnection: Identifiable {
             phase = .reconnecting
             needsPostReconnectSync = true
             synchronizedNotificationAppRecords = [:]
-            transferProgress = nil
+            endTransfer()
         case .disconnected(let error):
             phase = .disconnected(error)
             synchronizedNotificationAppRecords = [:]
-            transferProgress = nil
+            endTransfer()
+            cancelApplicationFetch()
             voiceCoordinator.reset()
         default:
             break
@@ -96,12 +131,19 @@ public final class WatchConnection: Identifiable {
 
     // So a bar appears at once and the count left by the last transfer is not
     // mistaken for this one.
-    func beginTransfer() {
+    func beginTransfer(_ kind: WatchTransferKind) {
+        transferKind = kind
         transferProgress = PutBytesTransferProgress(bytesSent: 0, totalBytes: 0)
     }
 
     func endTransfer() {
         transferProgress = nil
+        transferKind = nil
+    }
+
+    func cancelApplicationFetch() {
+        appFetchTask?.cancel()
+        appFetchTask = nil
     }
 
     func consumePostReconnectSync() -> Bool {
@@ -114,6 +156,8 @@ public final class WatchConnection: Identifiable {
         eventsTask = nil
         framesTask?.cancel()
         framesTask = nil
+        cancelApplicationFetch()
+        endTransfer()
         voiceCoordinator.reset()
         await client.disconnect(from: device)
     }

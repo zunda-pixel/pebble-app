@@ -16,7 +16,7 @@ struct LanguageView: View {
             installedVersion: connection?.device.languageVersion,
             isConnected: connection?.isConnected == true,
             isInstalling: model.isInstallingLanguagePack,
-            progress: model.installationProgress,
+            progress: model.languagePackTransferProgress(on: watchID),
             statusMessage: model.languageStatusMessage,
             install: { pack in
                 Task { await model.installLanguagePack(pack, deviceID: watchID) }

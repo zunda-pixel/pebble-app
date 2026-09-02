@@ -428,7 +428,9 @@ extension AppModel {
         let operationAllowsFetch = applicationManagementOperation == nil
             || applicationManagementOperation == .synchronizing
             || pendingImportSnapshots[request.applicationID] != nil
-        guard appFetchTask == nil, operationAllowsFetch else {
+        // This watch's own request, not any watch's: another watch waiting for an
+        // app of its own is no reason to answer this one with "busy".
+        guard !connection.isFetchingApplication, operationAllowsFetch else {
             Task { try? await connection.client.respondToAppFetch(with: .busy) }
             return
         }
@@ -438,14 +440,12 @@ extension AppModel {
             applicationManagementOperation = .installing(request.applicationID)
             applicationManagementStatusMessage = statusMessage(for: .installing(request.applicationID))
         }
-        isHandlingAppFetch = true
-        appFetchTask = Task { [weak self] in
+        connection.appFetchTask = Task { [weak self] in
             guard let self else {
                 return
             }
             await self.handleAppFetchRequest(request, from: connection)
-            self.appFetchTask = nil
-            self.isHandlingAppFetch = false
+            connection.appFetchTask = nil
             if ownsOperation {
                 self.finishApplicationOperation(.installing(request.applicationID))
             }
@@ -464,18 +464,8 @@ extension AppModel {
             return
         }
 
-        installingApplicationID = request.applicationID
-        installingApplicationName = (watchApplications + watchfaces)
-            .first { $0.id == request.applicationID }?
-            .displayName
-        applicationTransferDeviceID = connection.device.id
-        connection.beginTransfer()
-        defer {
-            installingApplicationID = nil
-            installingApplicationName = nil
-            applicationTransferDeviceID = nil
-            connection.endTransfer()
-        }
+        connection.beginTransfer(.application(request.applicationID))
+        defer { connection.endTransfer() }
 
         do {
             let model = connection.device.model

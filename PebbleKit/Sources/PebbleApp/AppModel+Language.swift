@@ -59,10 +59,8 @@ extension AppModel {
             return
         }
         languageStatusMessage = "Sending \(name) to the watch…"
-        applicationTransferDeviceID = connection.device.id
-        connection.beginTransfer()
+        connection.beginTransfer(.languagePack)
         defer {
-            applicationTransferDeviceID = nil
             connection.endTransfer()
         }
         do {

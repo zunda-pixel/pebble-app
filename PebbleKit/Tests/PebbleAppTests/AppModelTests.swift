@@ -296,7 +296,7 @@ struct AppModelTests {
         #expect(sent.filename == "lang")
         #expect(sent.bytes == [1, 2, 3, 4])
         // The transfer is over, so nothing claims to still be running.
-        #expect(model.installationProgress == nil)
+        #expect(model.languagePackTransferProgress(on: discovered.id) == nil)
     }
 
     @Test
@@ -363,6 +363,49 @@ struct AppModelTests {
     }
 
     @Test
+    func oneWatchWaitingForAnAppDoesNotMakeAnotherWatchBusy() async throws {
+        let scanner = MockPebbleClient()
+        var connectionClients: [String: MockPebbleClient] = [:]
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: scanner,
+            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json")),
+            clientFactory: { deviceID in
+                let client = MockPebbleClient()
+                connectionClients[deviceID] = client
+                return client
+            }
+        )
+
+        await model.scan()
+        let devices = model.discoveredDevices
+        let first = try #require(devices.first)
+        let second = try #require(devices.dropFirst().first)
+        await model.connect(to: first)
+        await model.connect(to: second)
+        let firstConnection = try #require(model.connections.first { $0.device.id == first.id })
+        let secondConnection = try #require(model.connections.first { $0.device.id == second.id })
+
+        // The first watch launched an app and is being sent it.
+        firstConnection.appFetchTask = Task { try? await Task.sleep(for: .seconds(60)) }
+        defer { firstConnection.cancelApplicationFetch() }
+
+        model.beginHandlingAppFetchRequest(
+            AppFetchRequest(applicationID: UUID(), appBankID: 0),
+            from: secondConnection
+        )
+        try await Task.sleep(for: .milliseconds(50))
+
+        // The second watch is answered on its own account: there is no such app,
+        // which is what it is told. "Busy" was the answer while the phone kept
+        // one fetch slot for every watch at once.
+        #expect(connectionClients[second.id]?.appFetchResponses == [.noData])
+        #expect(connectionClients[first.id]?.appFetchResponses.isEmpty == true)
+    }
+
+    @Test
     func transferProgressStaysWithTheWatchItCameFrom() async throws {
         let scanner = MockPebbleClient()
         var connectionClients: [String: MockPebbleClient] = [:]
@@ -389,31 +432,38 @@ struct AppModelTests {
         await model.connect(to: second)
 
         // Firmware going onto one watch while an application goes onto another.
-        model.firmwareTransferDeviceID = first.id
-        model.applicationTransferDeviceID = second.id
+        let firstConnection = try #require(model.connections.first { $0.device.id == first.id })
+        let secondConnection = try #require(model.connections.first { $0.device.id == second.id })
+        let applicationID = UUID()
+        firstConnection.beginTransfer(.firmware)
+        secondConnection.beginTransfer(.application(applicationID))
 
         connectionClients[second.id]?.emit(.transferProgress(
             PutBytesTransferProgress(bytesSent: 30, totalBytes: 100)
         ))
         try await Task.sleep(for: .milliseconds(20))
 
-        // The application's bytes must not be read as the firmware's.
-        #expect(model.installationProgress == PutBytesTransferProgress(bytesSent: 30, totalBytes: 100))
-        #expect(model.firmwareUpdateProgress == nil)
+        // The application's bytes must not be read as the firmware's, on either
+        // watch.
+        #expect(model.applicationTransfer(on: second.id)?.progress == PutBytesTransferProgress(bytesSent: 30, totalBytes: 100))
+        #expect(model.applicationTransfer(on: second.id)?.applicationID == applicationID)
+        #expect(model.firmwareTransferProgress(on: second.id) == nil)
+        #expect(model.firmwareTransferProgress(on: first.id) == PutBytesTransferProgress(bytesSent: 0, totalBytes: 0))
+        #expect(model.applicationTransfer(on: first.id) == nil)
 
         connectionClients[first.id]?.emit(.transferProgress(
             PutBytesTransferProgress(bytesSent: 4, totalBytes: 4096)
         ))
         try await Task.sleep(for: .milliseconds(20))
 
-        #expect(model.firmwareUpdateProgress == PutBytesTransferProgress(bytesSent: 4, totalBytes: 4096))
-        #expect(model.installationProgress == PutBytesTransferProgress(bytesSent: 30, totalBytes: 100))
+        #expect(model.firmwareTransferProgress(on: first.id) == PutBytesTransferProgress(bytesSent: 4, totalBytes: 4096))
+        #expect(model.applicationTransfer(on: second.id)?.progress == PutBytesTransferProgress(bytesSent: 30, totalBytes: 100))
 
         // Nothing is reported once the work that owned the transfer is over.
-        model.firmwareTransferDeviceID = nil
-        model.applicationTransferDeviceID = nil
-        #expect(model.firmwareUpdateProgress == nil)
-        #expect(model.installationProgress == nil)
+        firstConnection.endTransfer()
+        secondConnection.endTransfer()
+        #expect(model.firmwareTransferProgress(on: first.id) == nil)
+        #expect(model.applicationTransfer(on: second.id) == nil)
     }
 
     @Test

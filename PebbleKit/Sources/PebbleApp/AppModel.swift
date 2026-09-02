@@ -12,6 +12,13 @@ public enum ApplicationManagementOperation: Equatable, Sendable {
     case synchronizing
 }
 
+/// An application on its way to one watch.
+public struct ApplicationTransfer: Equatable, Sendable {
+    public var applicationID: UUID
+    public var name: String?
+    public var progress: PutBytesTransferProgress
+}
+
 public enum CatalogInstallationState: Equatable, Sendable {
     case available
     case installed
@@ -34,13 +41,13 @@ public final class AppModel {
     public internal(set) var isLoadingApplications = false
     public internal(set) var isImportingApplication = false
     public internal(set) var applicationLibraryErrorMessage: LocalizedStringKey?
-    public internal(set) var installingApplicationID: UUID?
-    public internal(set) var installingApplicationName: String?
-    var applicationTransferDeviceID: String?
-    var firmwareTransferDeviceID: String?
+    /// The library operations — importing, removing, reordering, synchronizing —
+    /// are phone-side and take turns: each rewrites the one library and then
+    /// pushes it to every watch, so this stays a single value rather than moving
+    /// onto a connection. What belongs to a watch is the transfer, and that lives
+    /// on `WatchConnection`.
     public internal(set) var applicationManagementOperation: ApplicationManagementOperation?
     public internal(set) var applicationManagementStatusMessage: LocalizedStringKey?
-    public internal(set) var isHandlingAppFetch = false
     public internal(set) var configurationApplication: PebbleApplication?
     public internal(set) var configurationURL: URL?
     public internal(set) var diagnosticReportURL: URL?
@@ -116,16 +123,37 @@ public final class AppModel {
         connections.filter(\.isConnected)
     }
 
-    // `connection(for:)` falls back to the first watch when given nothing,
-    // which is not an answer here.
-    public var installationProgress: PutBytesTransferProgress? {
-        guard let applicationTransferDeviceID else { return nil }
-        return connection(for: applicationTransferDeviceID)?.transferProgress
+    /// What one watch is being sent, for the screen showing that watch.
+    ///
+    /// Named rather than found: `connection(for:)` falls back to the first watch
+    /// when given nothing, and "whichever watch is first" is not an answer to
+    /// "what is this one doing".
+    public func applicationTransfer(on deviceID: String) -> ApplicationTransfer? {
+        guard let connection = connections.first(where: { $0.device.id == deviceID }),
+              let applicationID = connection.applicationBeingSent,
+              let progress = connection.transferProgress else {
+            return nil
+        }
+        return ApplicationTransfer(
+            applicationID: applicationID,
+            name: (watchApplications + watchfaces).first { $0.id == applicationID }?.displayName,
+            progress: progress
+        )
     }
 
-    public var firmwareUpdateProgress: PutBytesTransferProgress? {
-        guard let firmwareTransferDeviceID else { return nil }
-        return connection(for: firmwareTransferDeviceID)?.transferProgress
+    public func firmwareTransferProgress(on deviceID: String) -> PutBytesTransferProgress? {
+        connections.first { $0.device.id == deviceID }?.transferProgress(for: .firmware)
+    }
+
+    public func languagePackTransferProgress(on deviceID: String) -> PutBytesTransferProgress? {
+        connections.first { $0.device.id == deviceID }?.transferProgress(for: .languagePack)
+    }
+
+    /// Whether any watch is being sent an application it asked for. The library
+    /// operations wait on this, because they would rewrite the package under a
+    /// transfer already reading it.
+    public var isHandlingAppFetch: Bool {
+        connections.contains { $0.isFetchingApplication }
     }
 
     func connection(for deviceID: String?) -> WatchConnection? {
@@ -178,7 +206,6 @@ public final class AppModel {
     )
     @ObservationIgnored var lastConnectionError: PebbleConnectionError?
     @ObservationIgnored var firmwareUpdateTask: Task<Void, any Error>?
-    @ObservationIgnored var appFetchTask: Task<Void, Never>?
     @ObservationIgnored var hasLoadedApplications = false
     @ObservationIgnored var pendingImportSnapshots: [UUID: PebbleApplicationLibrarySnapshot] = [:]
     @ObservationIgnored var needsApplicationSynchronization = false
@@ -393,15 +420,13 @@ public final class AppModel {
 
     #endif
 
-    func clearBusyOperationState() {
-        appFetchTask?.cancel()
-        appFetchTask = nil
-        isHandlingAppFetch = false
+    /// Drops the work a watch was in the middle of when its link went, and the
+    /// library operation that was driving it.
+    func clearBusyOperationState(on connection: WatchConnection) {
+        connection.cancelApplicationFetch()
+        connection.endTransfer()
         applicationManagementOperation = nil
         applicationManagementStatusMessage = nil
-        installingApplicationID = nil
-        installingApplicationName = nil
-        applicationTransferDeviceID = nil
     }
 
     func handleEvent(_ event: PebbleClientEvent, from connection: WatchConnection) {
@@ -427,13 +452,13 @@ public final class AppModel {
             needsApplicationSynchronization = true
             // Operations interrupted by the drop would otherwise leave the
             // app-management UI busy forever.
-            clearBusyOperationState()
+            clearBusyOperationState(on: connection)
         case .disconnected(let error):
             connections.removeAll { $0 === connection }
             lastConnectionError = error
             refreshConnectionState()
             needsApplicationSynchronization = true
-            clearBusyOperationState()
+            clearBusyOperationState(on: connection)
         case .healthSyncCompleted(let succeeded):
             dataSyncStatusMessage = succeeded ? "Health synchronization completed." : "The watch rejected health synchronization."
         case .healthSamplesReceived(let samples):

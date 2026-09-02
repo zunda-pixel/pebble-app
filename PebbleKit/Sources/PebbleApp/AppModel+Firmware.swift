@@ -176,14 +176,12 @@ extension AppModel {
             return
         }
         firmwareUpdateStatusMessage = "Transferring verified firmware…"
-        firmwareTransferDeviceID = connection.device.id
-        connection.beginTransfer()
+        connection.beginTransfer(.firmware)
         let client = connection.client
         let task = Task { try await client.installFirmware(package) }
         firmwareUpdateTask = task
         defer {
             firmwareUpdateTask = nil
-            firmwareTransferDeviceID = nil
             connection.endTransfer()
         }
         do {

@@ -30,7 +30,7 @@ struct FirmwareView: View {
             availableRelease: model.availableFirmwareRelease,
             downloadedFirmware: model.downloadedFirmware,
             journal: journal,
-            progress: journal == nil ? nil : model.firmwareUpdateProgress,
+            progress: journal == nil ? nil : model.firmwareTransferProgress(on: watchID),
             statusMessage: model.firmwareUpdateStatusMessage,
             requiresConfirmation: model.firmwareRequiresConfirmation,
             checkForUpdates: { Task { await model.checkForFirmwareUpdate(deviceID: watchID) } },

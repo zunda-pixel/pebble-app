@@ -87,7 +87,7 @@ struct FirmwareLifecycleTests {
         // The transfer that is already running still owns the slot, and no
         // progress display was hijacked from it.
         #expect(model.firmwareUpdateTask != nil)
-        #expect(model.firmwareTransferDeviceID == nil)
+        #expect(model.firmwareTransferProgress(on: device.id) == nil)
         #expect(model.firmwareUpdateStatusMessage == "This firmware is already being transferred.")
 
         running.cancel()

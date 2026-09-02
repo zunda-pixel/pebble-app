@@ -111,7 +111,7 @@ extension AppModel {
     func close(_ connection: WatchConnection) async {
         connections.removeAll { $0 === connection }
         await connection.close()
-        clearBusyOperationState()
+        clearBusyOperationState(on: connection)
         needsApplicationSynchronization = true
         lastConnectionError = nil
         refreshConnectionState()

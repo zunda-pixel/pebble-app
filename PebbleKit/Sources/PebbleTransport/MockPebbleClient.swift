@@ -6,6 +6,7 @@ public final class MockPebbleClient: PebbleClient {
     public private(set) var sentFrames: [PebbleProtocolFrame] = []
     public private(set) var sentAppMessages: [AppMessageData] = []
     public private(set) var appMessageResponses: [(transactionID: UInt8, acknowledged: Bool)] = []
+    public private(set) var appFetchResponses: [AppFetchResponseStatus] = []
     public private(set) var reorderedApplicationIDs: [[UUID]] = []
     public private(set) var sentNotifications: [PebbleTimelineNotification] = []
     public private(set) var timelinePins: [PebbleTimelinePin] = []
@@ -113,7 +114,9 @@ public final class MockPebbleClient: PebbleClient {
         reorderedApplicationIDs.append(applicationIDs)
     }
 
-    public func respondToAppFetch(with status: AppFetchResponseStatus) async throws {}
+    public func respondToAppFetch(with status: AppFetchResponseStatus) async throws {
+        appFetchResponses.append(status)
+    }
 
     public func sendAppMessage(applicationID: UUID, tuples: [AppMessageTuple]) async throws {
         sentAppMessages.append(AppMessageData(
