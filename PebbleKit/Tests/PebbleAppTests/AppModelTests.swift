@@ -551,7 +551,31 @@ struct AppModelTests {
         #expect(model.connections.isEmpty)
         #expect(client.disconnectedDevices.map(\.id) == [discovered.id])
         #expect(model.installedApplicationIDs(on: discovered.id).isEmpty)
-        #expect(model.watchResetStatusMessage != nil)
+        #expect(model.watchResetStatusMessages[discovered.id] != nil)
+    }
+
+    @Test
+    func aWatchThatHasFinishedRestartingStopsSayingItIsRestarting() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+
+        await model.scan()
+        let discovered = try #require(model.discoveredDevices.first)
+        await model.connect(to: discovered)
+        await model.resetWatch(.restart, deviceID: discovered.id)
+        #expect(model.watchResetStatusMessages[discovered.id] != nil)
+
+        // The watch says nothing on its way back: the link returning is the
+        // whole of the news, and until it was read as news the screen said the
+        // watch was restarting for as long as the app was running.
+        await model.scan()
+        await model.connect(to: try #require(model.discoveredDevices.first))
+
+        #expect(model.watchResetStatusMessages[discovered.id] == nil)
     }
 
     @Test

@@ -90,6 +90,7 @@ extension AppModel {
             savedWatches = try await watchLibrary.remove(watchID: id)
             installedApplicationIDsByWatch[id] = nil
             connectionFailures[id] = nil
+            watchResetStatusMessages[id] = nil
             watchManagementErrorMessage = nil
         } catch {
             watchManagementErrorMessage = "The watch could not be forgotten."
@@ -149,19 +150,22 @@ extension AppModel {
             )
             watchManagementErrorMessage = nil
             await close(connection)
-            watchResetStatusMessage = switch kind {
+            watchResetStatusMessages[device.id] = switch kind {
             case .restart: "The watch is restarting."
             case .recoveryFirmware: "The watch is restarting into recovery firmware."
             case .factoryReset:
                 "The watch is erasing itself. It has forgotten this device, so it cannot reconnect until it is forgotten here too."
             }
         } catch {
-            watchResetStatusMessage = nil
+            watchResetStatusMessages[device.id] = nil
             watchManagementErrorMessage = "The reset command could not be sent."
         }
     }
 
     func recordConnectedWatch(_ device: PebbleDevice) async {
+        // A watch that is talking again has finished restarting, whoever opened
+        // the link. Every way back in passes through here.
+        watchResetStatusMessages[device.id] = nil
         do {
             savedWatches = try await watchLibrary.record(device)
             watchManagementErrorMessage = nil

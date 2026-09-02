@@ -29,7 +29,7 @@ struct WatchDetailView: View {
             downloadedFirmwareVersion: model.downloadedFirmware?.versionTag,
             languageName: languageName,
             notificationStatusMessage: model.notificationStatusMessage,
-            resetStatusMessage: model.watchResetStatusMessage,
+            resetStatusMessage: model.watchResetStatusMessages[watchID],
             connectionErrorMessage: model.connectionFailures[watchID]?.message,
             connect: {
                 guard let saved = model.savedWatches.first(where: { $0.id == watchID }) else { return }

@@ -61,7 +61,10 @@ public final class AppModel {
     public internal(set) var savedWatches: [SavedPebbleWatch] = []
     public internal(set) var unknownBondedWatches: [UnknownBondedWatch] = []
     public internal(set) var watchManagementErrorMessage: LocalizedStringKey?
-    public internal(set) var watchResetStatusMessage: LocalizedStringKey?
+    /// What each watch was last told to do to itself, until it comes back. A
+    /// restart says nothing on its way out and nothing on its way in, so the
+    /// only news the reader gets is the link returning.
+    public internal(set) var watchResetStatusMessages: [String: LocalizedStringKey] = [:]
     public internal(set) var timelinePins: [PebbleTimelinePin] = []
     public internal(set) var reminders: [PebbleTimelinePin] = []
     public internal(set) var reminderStatusMessage: LocalizedStringKey?
