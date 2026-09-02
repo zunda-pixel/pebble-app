@@ -1,5 +1,5 @@
 public import PebbleProtocol
-import CSpeex
+import speex
 
 /// What the watch's microphone sent, turned back into samples.
 ///

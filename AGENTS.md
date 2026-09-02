@@ -11,8 +11,7 @@ targets iOS 27 and macOS 27; the app target also builds for visionOS.
 | `Pebble/` | App target: `MainApp.swift`, `Info.plist`, entitlements, app-level strings. |
 | `PebbleKit/` | Local Swift package with everything else. Its only product, `PebbleKit`, exports the `PebbleApp` target. |
 | `PebbleKit/Sources/PebbleProtocol` | What the watch says and what the phone says back: frames, PPoG, the endpoint codecs, the package formats (`.pbw`, `.pbz`), the persistence and the catalogues. **Foundation only** — no CoreBluetooth, no SwiftUI, so it holds anywhere and a test of it needs no radio. |
-| `PebbleKit/Sources/CSpeex` | libspeex 1.2.1, vendored. Upstream sources unmodified; `config.h` and `COPYING` are the only additions. |
-| `PebbleKit/Sources/PebbleAudio` | What the watch's microphone sent, turned back into samples: the Swift face of `CSpeex`, and the only place that touches it. |
+| `PebbleKit/Sources/PebbleAudio` | What the watch's microphone sent, turned back into samples: the only place that imports `speex`. |
 | `PebbleKit/Sources/PebbleTransport` | How those bytes reach a watch: the CoreBluetooth client in both roles, the phone-hosted GATT server, the emulator socket, and the mock a test or a preview stands in. |
 | `PebbleKit/Sources/PebbleApp` | The app: `AppModel` (split across `AppModel+*.swift`), the screens, and the phone's own frameworks (HealthKit, EventKit, MediaPlayer, CallKit, WebKit). |
 | `PebbleKit/Tests/PebbleProtocolTests` | Swift Testing suites for the protocol and transport layers, grouped by what they exercise. |
@@ -241,16 +240,18 @@ swift-algorithms, swift-async-algorithms, swift-collections (`DequeModule`),
 swift-async-operations (`asyncMap` and friends, for concurrent work that has to
 stay in order), swift-http-types (typed `HTTPRequest` for every network call),
 swift-retry (`DMRetry`), Defaults (typed keys in `PebbleDefaults.swift`), Valet
-(keychain, in `PebbleTokenStore.swift`), MemberwiseInit, ZIPFoundation.
+(keychain, in `PebbleTokenStore.swift`), MemberwiseInit, ZIPFoundation,
+CSpeex (libspeex, imported as `speex`, used only by `PebbleAudio`).
 
-Vendored C is the last resort, for a format the watch dictates and no Apple
-framework reads: today only Speex. Take it from the same upstream the firmware
-builds, leave every source file exactly as it came, and add nothing but a
-`config.h` and the licence — a local patch is a bug nobody upstream can fix.
-Configure it the way the firmware does, so both ends do the same arithmetic.
-Vendor the encoder alongside the decoder if that is what lets a test produce
-what the watch would have sent; bytes recorded once and trusted forever are not
-a test of a codec.
+A C library is the last resort, for a format the watch dictates and no Apple
+framework reads: today only Speex. Prefer a package to a copy in this
+repository. When one exists, read what it actually ships before depending on
+it — a packaging tagged with the library's release version says nothing about
+which commit of that library it holds, and a release that is years old may
+predate fixes on the paths this app takes (issue #41). Whichever way the
+library arrives, the test that proves the decoder should encode with the same
+library, configured the way the firmware configures it: bytes recorded once and
+trusted forever are not a test of a codec.
 
 Work sent to a watch is retried with `retry(with: .watchWork)`
 (`WatchWorkRetry.swift`), not with a hand-written loop. Add a reason to
