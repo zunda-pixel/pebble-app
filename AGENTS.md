@@ -301,6 +301,13 @@ the code that depends on it.
   extended-music bit it reads only the first three fields of a now-playing frame,
   without the smooth-progress bit it ignores the byte counts an update sends.
   Claim a bit only where the code behind it exists — and remember to claim it.
+- **An endpoint the phone answers is not one the phone may send.** A ping to
+  endpoint 2001 puts a modal "Ping" dialog in front of the reader every time —
+  `prv_push_window` in `services/ping/service.c`, with no flag to suppress it —
+  so it belongs to the watch, which sends one an hour and drops a link that goes
+  unanswered. Before using an endpoint as a keepalive, read its receive handler
+  and check it draws nothing. `system_version_protocol_msg_callback` (endpoint
+  16) is the silent one, and PRF answers it too.
 - **Some endpoints are Android-only.** `music_endpoint_handle_mobile_app_info_event`
   returns unless the phone reported `RemoteOSAndroid`, so Pebble Protocol music
   control never activates for a phone that truthfully reports iOS or macOS
