@@ -71,11 +71,15 @@ actor SpeechBridge: PebbleVoiceTranscriptionProvider {
     }
 
     func canServeSession(_ sessionType: VoiceSessionType) async -> Bool {
-        // A reminder session needs the transcript read as well as heard, which
-        // this app cannot do yet, and answering it with words the Reminders app
-        // will not take is worse than saying so.
-        guard sessionType != .naturalLanguage else { return false }
-        return await readiness() == .ready
+        await readiness() == .ready
+    }
+
+    func interpretReminder(_ words: [VoiceTranscriptionWord]) async -> VoiceReminderOutcome {
+        let spoken = words.map(\.text).joined(separator: " ")
+        guard !spoken.isEmpty else { return .failed(.recognizerError) }
+        let reminder = await ReminderReading.readWithModel(spoken)
+        guard !reminder.text.isEmpty else { return .failed(.recognizerError) }
+        return .understood(reminder: reminder.text, time: reminder.time)
     }
 
     func transcribe(
