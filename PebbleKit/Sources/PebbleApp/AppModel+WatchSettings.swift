@@ -76,7 +76,8 @@ extension AppModel {
 
     func sendHealthDays(to connection: WatchConnection) async {
         guard connection.isConnected else { return }
-        for day in healthDays() {
+        let days = healthDays()
+        for day in days {
             do {
                 try await connection.client.writeHealthDay(day)
             } catch {
@@ -88,6 +89,22 @@ extension AppModel {
                 return
             }
         }
+        guard !days.isEmpty else { return }
+        // Which fields were filled, not what was in them: four of the six come
+        // from Apple Health and are zero until the reader allows it, and a week
+        // of zeroes on the watch looks the same as a week that never arrived.
+        let measured = [
+            days.contains { $0.steps > 0 } ? "steps" : nil,
+            days.contains { $0.sleepSeconds > 0 } ? "sleep" : nil,
+            days.contains { $0.activeKilocalories + $0.restingKilocalories > 0 } ? "energy" : nil,
+            days.contains { $0.distanceMetres > 0 } ? "distance" : nil,
+            days.contains { $0.activeSeconds > 0 } ? "exercise" : nil,
+        ].compactMap { $0 }
+        await PebbleDiagnostics.shared.record(
+            category: "health",
+            message: "\(connection.device.name) took \(days.count) day(s) of "
+                + (measured.isEmpty ? "nothing but zeroes" : measured.joined(separator: ", "))
+        )
     }
 
     // The firmware writes a day's record straight over its own metrics for that
