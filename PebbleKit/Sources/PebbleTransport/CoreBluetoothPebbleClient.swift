@@ -55,10 +55,9 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var connectionTimeoutTask: Task<Void, Never>?
     private var acknowledgementTimeoutTask: Task<Void, Never>?
     private var healthCheckTask: Task<Void, Never>?
-    private var pongTimeoutTask: Task<Void, Never>?
+    private var healthCheckTimeoutTask: Task<Void, Never>?
     private let reconnects = ReconnectPolicy()
-    private var pendingPingCookie: UInt32?
-    private var nextPingCookie: UInt32 = 1
+    private var isAwaitingHealthCheckReply = false
     private var activeTransferSession: PutBytesTransferSession?
     private var completedTransferCookie: UInt32?
     private let firmwareReply = PendingReply<Void>()
@@ -879,11 +878,10 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             return
         }
 
-        // "I do not know that endpoint" is still an answer: recovery firmware
-        // replies this way to a ping, and waiting for a pong that cannot come
-        // would drop a link the watch is holding up perfectly well.
-        if frame.rejectedEndpoint == PingPongCodec.endpoint {
-            clearPendingPing()
+        // "I do not know that endpoint" is still an answer, and a link the watch
+        // is holding up perfectly well should not be dropped for it.
+        if frame.rejectedEndpoint == WatchVersionCodec.endpoint {
+            clearPendingHealthCheck()
             return
         }
 
@@ -1026,6 +1024,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         if frame.endpoint == WatchVersionCodec.endpoint,
            pendingDevice == nil,
            let device = connectedDevice {
+            clearPendingHealthCheck()
             let information = try WatchVersionCodec.decode(frame)
             var updated = device
             updated.firmwareVersion = information.firmwareVersion
@@ -1037,7 +1036,12 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             updated.languageVersion = information.languageVersion
             updated.capabilities = information.capabilities
             connectedDevice = updated
-            eventContinuation?.yield(.deviceUpdated(updated))
+            // The health check asks for this once a minute and the answer is
+            // almost always the same one; announcing it anyway had the app
+            // rewriting its watch library every minute.
+            if updated != device {
+                eventContinuation?.yield(.deviceUpdated(updated))
+            }
             return
         }
 
@@ -1102,19 +1106,15 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     ) throws {
         switch try PingPongCodec.decode(frame) {
         case .ping(let cookie):
+            // The watch pings the phone about once an hour and drops a link it
+            // gets no pong on. Nothing is ever sent the other way: the firmware
+            // answers a ping from the phone by pushing a "Ping" dialog in front
+            // of whatever the reader was doing — `prv_push_window` in
+            // `services/ping/service.c`, unconditionally.
             try sendFrame(PingPongCodec.frame(for: .pong(cookie: cookie)), to: peripheral)
-        case .pong(let cookie):
-            guard pendingPingCookie == cookie else {
-                return
-            }
-            clearPendingPing()
+        case .pong:
+            break
         }
-    }
-
-    private func clearPendingPing() {
-        pendingPingCookie = nil
-        pongTimeoutTask?.cancel()
-        pongTimeoutTask = nil
     }
 
     private func startHealthChecks(on peripheral: CBPeripheral) {
@@ -1130,8 +1130,11 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
     }
 
+    /// Whether the link still carries the protocol, asked in a way the watch
+    /// does not show: a version request is answered by `prv_send_watch_versions`
+    /// and nothing else.
     private func sendHealthCheck(on peripheral: CBPeripheral) {
-        guard pendingPingCookie == nil else {
+        guard !isAwaitingHealthCheckReply else {
             return
         }
         // A transfer can keep the watch busy for longer than the pong deadline,
@@ -1139,36 +1142,37 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         guard activeTransferSession == nil, !isInstallingFirmware else {
             return
         }
-        // Recovery firmware answers no ping at all. Asking can only end in a
-        // dropped link, which is the one thing a watch being recovered cannot
-        // afford.
+        // A watch being recovered cannot afford a dropped link, and its own
+        // timeouts cover the transfer.
         guard connectedDevice?.isRunningRecoveryFirmware != true else {
             return
         }
-        let cookie = nextPingCookie
-        nextPingCookie &+= 1
         do {
-            try sendFrame(PingPongCodec.frame(for: .ping(cookie: cookie)), to: peripheral)
-            pendingPingCookie = cookie
-            pongTimeoutTask?.cancel()
-            pongTimeoutTask = Task { [weak self] in
+            try sendFrame(WatchVersionCodec.requestFrame(), to: peripheral)
+            isAwaitingHealthCheckReply = true
+            healthCheckTimeoutTask?.cancel()
+            healthCheckTimeoutTask = Task { [weak self] in
                 try? await Task.sleep(for: .seconds(15))
-                guard !Task.isCancelled, self?.pendingPingCookie == cookie else {
+                guard !Task.isCancelled, self?.isAwaitingHealthCheckReply == true else {
                     return
                 }
-                self?.cancelLink(peripheral, reason: "no pong within 15s")
+                self?.cancelLink(peripheral, reason: "no answer to the health check within 15s")
             }
         } catch {
-            cancelLink(peripheral, reason: "could not send the health check ping")
+            cancelLink(peripheral, reason: "could not send the health check")
         }
+    }
+
+    private func clearPendingHealthCheck() {
+        isAwaitingHealthCheckReply = false
+        healthCheckTimeoutTask?.cancel()
+        healthCheckTimeoutTask = nil
     }
 
     private func stopHealthChecks() {
         healthCheckTask?.cancel()
         healthCheckTask = nil
-        pongTimeoutTask?.cancel()
-        pongTimeoutTask = nil
-        pendingPingCookie = nil
+        clearPendingHealthCheck()
     }
 
     private func processPutBytesResponse(

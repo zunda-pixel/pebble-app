@@ -3,6 +3,11 @@ public enum PingPongMessage: Equatable, Sendable {
     case pong(cookie: UInt32)
 }
 
+/// The watch pings the phone about once an hour and drops a link it gets no
+/// pong on, so this is answered rather than sent: a ping *to* the watch puts a
+/// "Ping" dialog in front of whatever the reader was doing, every time
+/// (`prv_push_window` in `services/ping/service.c`, with no flag to ask it not
+/// to). Liveness is asked for with a version request instead.
 public enum PingPongCodec {
     public static var endpoint: UInt16 { 2_001 }
 
