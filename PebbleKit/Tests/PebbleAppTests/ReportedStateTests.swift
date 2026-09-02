@@ -144,6 +144,45 @@ struct ReportedStateTests {
         #expect(today.summaryDate == nil)
         #expect(today.newestSample?.steps == 900)
     }
+
+    @Test
+    func aDayTheWatchDidNotCountIsSentTheFiguresApplyHealthHas() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: client,
+            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        )
+        let now = try #require(Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 2, hour: 12)))
+        let yesterday = try #require(Calendar.current.date(byAdding: .day, value: -1, to: now))
+        model.healthSamples = [
+            PebbleHealthSample(
+                date: yesterday,
+                steps: 9_400,
+                sleepMinutes: 430,
+                deepSleepMinutes: 95,
+                activeKilocalories: 512,
+                restingKilocalories: 1_610,
+                distanceMetres: 7_300,
+                activeMinutes: 44,
+                source: .healthKit
+            ),
+        ]
+
+        // The watch counts steps and sleep. Energy, distance and effort come
+        // from the phone or they do not come at all — sent as zero, the watch's
+        // own week reads as a week spent sitting down.
+        let day = try #require(model.healthDays(now: now).first)
+
+        #expect(day.steps == 9_400)
+        #expect(day.activeKilocalories == 512)
+        #expect(day.restingKilocalories == 1_610)
+        #expect(day.distanceMetres == 7_300)
+        #expect(day.activeSeconds == 44 * 60)
+        #expect(day.deepSleepSeconds == 95 * 60)
+    }
 }
 
 /// Music state a test sets by hand.

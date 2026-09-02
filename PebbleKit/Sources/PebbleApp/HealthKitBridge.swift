@@ -73,13 +73,49 @@ final class HealthKitBridge {
         }
     }
 
+    /// What a day cost in effort, alongside the steps and the sleep. The watch
+    /// counts these itself and keeps them to itself — its data-logging sessions
+    /// carry only steps and sleep — so this is where they come from.
+    private enum EffortMeasure: CaseIterable {
+        case activeEnergy
+        case restingEnergy
+        case distance
+        case exerciseTime
+
+        var identifier: HKQuantityTypeIdentifier {
+            switch self {
+            case .activeEnergy: .activeEnergyBurned
+            case .restingEnergy: .basalEnergyBurned
+            case .distance: .distanceWalkingRunning
+            case .exerciseTime: .appleExerciseTime
+            }
+        }
+
+        var unit: HKUnit {
+            switch self {
+            case .activeEnergy, .restingEnergy: .kilocalorie()
+            case .distance: .meter()
+            case .exerciseTime: .minute()
+            }
+        }
+    }
+
     func readRecentSamples(days: Int = 90) async throws -> [PebbleHealthSample] {
         guard HKHealthStore.isHealthDataAvailable(),
               let stepsType = HKQuantityType.quantityType(forIdentifier: .stepCount),
               let sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) else {
             throw HealthKitBridgeError.unavailable
         }
-        try await store.requestAuthorization(toShare: [], read: [stepsType, sleepType])
+        let effortTypes = EffortMeasure.allCases.reduce(into: [EffortMeasure: HKQuantityType]()) { types, measure in
+            types[measure] = HKQuantityType.quantityType(forIdentifier: measure.identifier)
+        }
+        // A phone that will not give one of these still has the others; the
+        // reader is asked for everything at once and told nothing about what
+        // they refused, so a missing measure is simply a zero.
+        try await store.requestAuthorization(
+            toShare: [],
+            read: Set([stepsType, sleepType] as [HKObjectType] + effortTypes.values.map { $0 as HKObjectType })
+        )
         let start = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? .distantPast
         let end = Date()
         async let stepSamples = query(type: stepsType, start: start, end: end)
@@ -107,12 +143,35 @@ final class HealthKitBridge {
             sleepBySource[day, default: [:]][source, default: 0] += Int(sample.endDate.timeIntervalSince(sample.startDate) / 60)
             updatedAtByDay[day] = max(updatedAtByDay[day] ?? .distantPast, sample.endDate)
         }
-        let days = Set(stepsBySource.keys).union(sleepBySource.keys)
+        var effortBySource: [EffortMeasure: [Date: [String: Int]]] = [:]
+        for (measure, type) in effortTypes {
+            for case let sample as HKQuantitySample in try await query(type: type, start: start, end: end) {
+                let day = Calendar.current.startOfDay(for: sample.startDate)
+                let source = sample.sourceRevision.source.bundleIdentifier
+                effortBySource[measure, default: [:]][day, default: [:]][source, default: 0]
+                    += Int(sample.quantity.doubleValue(for: measure.unit))
+                updatedAtByDay[day] = max(updatedAtByDay[day] ?? .distantPast, sample.endDate)
+            }
+        }
+
+        let days = Set(stepsBySource.keys)
+            .union(sleepBySource.keys)
+            .union(effortBySource.values.flatMap(\.keys))
         return days.map { day in
-            PebbleHealthSample(
+            // The busiest source rather than the sum of them: a phone and a
+            // watch both counting the same walk would otherwise report it
+            // twice.
+            func effort(_ measure: EffortMeasure) -> Int {
+                effortBySource[measure]?[day]?.values.max() ?? 0
+            }
+            return PebbleHealthSample(
                 date: day,
                 steps: stepsBySource[day]?.values.max() ?? 0,
                 sleepMinutes: min(24 * 60, sleepBySource[day]?.values.max() ?? 0),
+                activeKilocalories: effort(.activeEnergy),
+                restingKilocalories: effort(.restingEnergy),
+                distanceMetres: effort(.distance),
+                activeMinutes: effort(.exerciseTime),
                 source: .healthKit,
                 updatedAt: updatedAtByDay[day] ?? day
             )

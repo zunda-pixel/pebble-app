@@ -14,12 +14,21 @@ public struct PebbleHealthSample: Codable, Equatable, Identifiable, Sendable {
     /// The night, and any nap, as the watch recorded them. Empty for a day that
     /// came from HealthKit or an older file, which knew only the total.
     public var sleepSessions: [PebbleSleepSession] = []
+    /// What moving cost, over and above staying still.
+    public var activeKilocalories: Int = 0
+    /// What staying alive cost. Apple Health calls it basal energy.
+    public var restingKilocalories: Int = 0
+    public var distanceMetres: Int = 0
+    /// Apple Health's exercise minutes: the part of the day that counted as
+    /// effort, which is what the watch means by active time.
+    public var activeMinutes: Int = 0
     public var timeZoneIdentifier: String = TimeZone.current.identifier
     public var source: PebbleHealthDataSource = .watch
     public var updatedAt: Date = Date()
 
     private enum CodingKeys: String, CodingKey {
         case id, date, steps, sleepMinutes, deepSleepMinutes, sleepSessions
+        case activeKilocalories, restingKilocalories, distanceMetres, activeMinutes
         case timeZoneIdentifier, source, updatedAt
     }
 
@@ -31,6 +40,10 @@ public struct PebbleHealthSample: Codable, Equatable, Identifiable, Sendable {
         sleepMinutes = try container.decode(Int.self, forKey: .sleepMinutes)
         deepSleepMinutes = try container.decodeIfPresent(Int.self, forKey: .deepSleepMinutes) ?? 0
         sleepSessions = try container.decodeIfPresent([PebbleSleepSession].self, forKey: .sleepSessions) ?? []
+        activeKilocalories = try container.decodeIfPresent(Int.self, forKey: .activeKilocalories) ?? 0
+        restingKilocalories = try container.decodeIfPresent(Int.self, forKey: .restingKilocalories) ?? 0
+        distanceMetres = try container.decodeIfPresent(Int.self, forKey: .distanceMetres) ?? 0
+        activeMinutes = try container.decodeIfPresent(Int.self, forKey: .activeMinutes) ?? 0
         timeZoneIdentifier = try container.decodeIfPresent(String.self, forKey: .timeZoneIdentifier)
             ?? TimeZone.current.identifier
         source = try container.decodeIfPresent(PebbleHealthDataSource.self, forKey: .source) ?? .watch
@@ -71,6 +84,13 @@ public actor PebbleHealthLibrary {
             }
             var resolved = normalized.updatedAt >= existing.updatedAt ? normalized : existing
             resolved.steps = max(existing.steps, normalized.steps)
+            // Only Apple Health has these, so a record that has them is the
+            // only one that can say anything: the watch's own record for the
+            // same day carries zeroes and must not wipe them.
+            resolved.activeKilocalories = max(existing.activeKilocalories, normalized.activeKilocalories)
+            resolved.restingKilocalories = max(existing.restingKilocalories, normalized.restingKilocalories)
+            resolved.distanceMetres = max(existing.distanceMetres, normalized.distanceMetres)
+            resolved.activeMinutes = max(existing.activeMinutes, normalized.activeMinutes)
             // The night is taken whole from whichever record is newer: its
             // total, its restful part and the sessions it was made of belong
             // together, and mixing two readings of one night makes a third
@@ -131,6 +151,10 @@ public actor PebbleHealthLibrary {
         value.steps = max(0, sample.steps)
         value.sleepMinutes = min(24 * 60, max(0, sample.sleepMinutes))
         value.deepSleepMinutes = min(value.sleepMinutes, max(0, sample.deepSleepMinutes))
+        value.activeKilocalories = max(0, sample.activeKilocalories)
+        value.restingKilocalories = max(0, sample.restingKilocalories)
+        value.distanceMetres = max(0, sample.distanceMetres)
+        value.activeMinutes = min(24 * 60, max(0, sample.activeMinutes))
         return value
     }
 

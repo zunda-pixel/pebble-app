@@ -307,7 +307,7 @@
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Pebble shows the current song on your watch and lets it control playback.";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Pebble uses Bluetooth to find, connect to, and synchronize with your watch.";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Pebble synchronizes upcoming calendar events to your watch timeline.";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "Pebble reads steps and sleep data to keep your watch health history synchronized.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Pebble reads steps, sleep, energy, distance and exercise minutes so your watch can show the day it has not counted itself.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Pebble saves watch steps and sleep data to your Health data when you choose to synchronize.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Pebble reads your position only to fetch the weather it sends to your watch.";
 				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Pebble synchronizes upcoming reminders to your watch timeline.";
@@ -366,7 +366,7 @@
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Pebble shows the current song on your watch and lets it control playback.";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Pebble uses Bluetooth to find, connect to, and synchronize with your watch.";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Pebble synchronizes upcoming calendar events to your watch timeline.";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "Pebble reads steps and sleep data to keep your watch health history synchronized.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Pebble reads steps, sleep, energy, distance and exercise minutes so your watch can show the day it has not counted itself.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Pebble saves watch steps and sleep data to your Health data when you choose to synchronize.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Pebble reads your position only to fetch the weather it sends to your watch.";
 				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Pebble synchronizes upcoming reminders to your watch timeline.";

@@ -429,6 +429,16 @@
         }
       }
     },
+    "Active Energy" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アクティブエネルギー"
+          }
+        }
+      }
+    },
     "Activity Insights" : {
       "localizations" : {
         "ja" : {
@@ -1539,6 +1549,16 @@
         }
       }
     },
+    "Distance" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "距離"
+          }
+        }
+      }
+    },
     "Double" : {
       "localizations" : {
         "ja" : {
@@ -1765,6 +1785,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このアプリが送っていないものも含めて、ウォッチ上のピンをすべて削除し、そのあとアプリが持っているピンを書き戻します。"
+          }
+        }
+      }
+    },
+    "Exercise" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "エクササイズ"
           }
         }
       }

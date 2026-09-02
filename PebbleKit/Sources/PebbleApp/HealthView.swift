@@ -72,6 +72,23 @@ struct HealthContent: View {
                         Text("\(deep) min")
                     }
                 }
+                // Only Apple Health knows these, so they are shown when it has
+                // been asked and left out when it has not.
+                if let energy = newestSample?.activeKilocalories, energy > 0 {
+                    LabeledContent("Active Energy") {
+                        Text(Measurement(value: Double(energy), unit: UnitEnergy.kilocalories), format: .measurement(width: .abbreviated))
+                    }
+                }
+                if let distance = newestSample?.distanceMetres, distance > 0 {
+                    LabeledContent("Distance") {
+                        Text(Measurement(value: Double(distance), unit: UnitLength.meters), format: .measurement(width: .abbreviated, usage: .road))
+                    }
+                }
+                if let active = newestSample?.activeMinutes, active > 0 {
+                    LabeledContent("Exercise") {
+                        Text("\(active) min")
+                    }
+                }
                 // A night the watch broke into a sleep and a nap, or into two
                 // halves with a wakeful hour between them, is two rows: one
                 // range would say the reader slept through what they did not.

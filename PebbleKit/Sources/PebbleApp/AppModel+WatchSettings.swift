@@ -110,11 +110,14 @@ extension AppModel {
                 weekday: weekday - 1,
                 lastProcessed: day,
                 steps: UInt32(clamping: sample.steps),
-                // Left at zero rather than guessed: the watch shows what it was told.
-                activeKilocalories: 0,
-                restingKilocalories: 0,
-                distanceMetres: 0,
-                activeSeconds: 0,
+                // Measured or nothing. A day Apple Health has no reading for
+                // stays at zero rather than being worked out from the steps:
+                // the watch shows what it was told, and an estimate shown as a
+                // count is a lie the reader cannot see.
+                activeKilocalories: UInt32(clamping: sample.activeKilocalories),
+                restingKilocalories: UInt32(clamping: sample.restingKilocalories),
+                distanceMetres: UInt32(clamping: sample.distanceMetres),
+                activeSeconds: UInt32(clamping: sample.activeMinutes * 60),
                 sleepSeconds: UInt32(clamping: sample.sleepMinutes * 60),
                 deepSleepSeconds: UInt32(clamping: sample.deepSleepMinutes * 60)
             )

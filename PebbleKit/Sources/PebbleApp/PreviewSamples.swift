@@ -169,7 +169,11 @@ enum PreviewSamples {
                 end: bedtime.addingTimeInterval(asleep),
                 asleep: asleep,
                 deep: asleep / 4
-            )]
+            )],
+            activeKilocalories: 320 + day * 37 % 200,
+            restingKilocalories: 1_500,
+            distanceMetres: 4_800 + day * 311 % 3_000,
+            activeMinutes: 28 + day * 7 % 40
         )
     }
 

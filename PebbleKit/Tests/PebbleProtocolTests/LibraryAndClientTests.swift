@@ -547,6 +547,42 @@ struct CompanionStorageTests {
         #expect(merged[0].source == .imported)
     }
 
+    @Test func whatOnlyAppleHealthKnowsSurvivesTheWatchsOwnRecord() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let library = PebbleHealthLibrary(fileURL: directory.appending(path: "health.json"))
+        let phone = PebbleHealthSample(
+            date: Date(timeIntervalSince1970: 100),
+            steps: 7_000,
+            sleepMinutes: 400,
+            activeKilocalories: 420,
+            restingKilocalories: 1_500,
+            distanceMetres: 5_200,
+            activeMinutes: 35,
+            timeZoneIdentifier: "UTC",
+            source: .healthKit,
+            updatedAt: Date(timeIntervalSince1970: 200)
+        )
+        // The watch counts steps and sleep and nothing else, so its record for
+        // the same day carries zeroes where the phone had readings. Taking the
+        // newer record whole would throw them away.
+        let watch = PebbleHealthSample(
+            date: Date(timeIntervalSince1970: 100),
+            steps: 8_000,
+            sleepMinutes: 300,
+            timeZoneIdentifier: "UTC",
+            updatedAt: Date(timeIntervalSince1970: 300)
+        )
+
+        let merged = try await library.merge([phone, watch])
+
+        #expect(merged.count == 1)
+        #expect(merged[0].activeKilocalories == 420)
+        #expect(merged[0].restingKilocalories == 1_500)
+        #expect(merged[0].distanceMetres == 5_200)
+        #expect(merged[0].activeMinutes == 35)
+    }
+
     @Test func healthArchiveRoundTrips() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         let sourceURL = directory.appending(path: "source.json")

@@ -80,12 +80,12 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Pebble reads steps and sleep data to keep your watch health history synchronized."
+            "value" : "Pebble reads steps, sleep, energy, distance and exercise minutes so your watch can show the day it has not counted itself."
           }
         },
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "needs_review",
             "value" : "Pebbleは歩数と睡眠のデータを読み取り、ウォッチのヘルスケア履歴を常に同期します。"
           }
         }
