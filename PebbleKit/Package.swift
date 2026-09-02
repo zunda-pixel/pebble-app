@@ -91,6 +91,7 @@ let package = Package(
     .target(
       name: "PebbleApp",
       dependencies: [
+        .target(name: "PebbleAudio"),
         .target(name: "PebbleProtocol"),
         .target(name: "PebbleTransport"),
         .product(name: "Algorithms", package: "swift-algorithms"),

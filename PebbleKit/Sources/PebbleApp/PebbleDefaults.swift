@@ -30,6 +30,10 @@ extension Defaults.Keys {
 
     static let companionNotificationsEnabled = Key<Bool>("companionNotificationsEnabled", default: true)
 
+    /// Off until the reader asks for it: the recognizer's model is a download,
+    /// and dictation the watch cannot serve is better refused than half-served.
+    static let voiceTranscriptionEnabled = Key<Bool>("voiceTranscriptionEnabled", default: false)
+
     static let hasCompletedOnboarding = Key<Bool>("hasCompletedPebbleOnboarding", default: false)
 
     static let activeWatchfaceID = Key<UUID?>("activeWatchfaceID")

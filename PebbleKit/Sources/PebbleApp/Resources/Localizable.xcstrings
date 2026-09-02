@@ -1439,6 +1439,16 @@
         }
       }
     },
+    "Dictation from the Watch" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチからの音声入力"
+          }
+        }
+      }
+    },
     "Disconnect" : {
       "localizations" : {
         "ja" : {
@@ -1525,6 +1535,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "PebbleOS %@をダウンロード中…"
+          }
+        }
+      }
+    },
+    "Downloading…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ダウンロード中…"
           }
         }
       }
@@ -2669,12 +2689,32 @@
         }
       }
     },
+    "Not Available in This Language" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "この言語では利用できません"
+          }
+        }
+      }
+    },
     "Not connected" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "未接続"
+          }
+        }
+      }
+    },
+    "Not Downloaded" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "未ダウンロード"
           }
         }
       }
@@ -3119,12 +3159,32 @@
         }
       }
     },
+    "Ready" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "利用可能"
+          }
+        }
+      }
+    },
     "Received %lld health update(s) from the watch." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチからヘルスケアの更新%lld件を受信しました。"
+          }
+        }
+      }
+    },
+    "Recognizer" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "認識モデル"
           }
         }
       }
@@ -4421,6 +4481,16 @@
         }
       }
     },
+    "The watch records what you say and this app turns it into words here on the phone, without sending the sound anywhere. Turning this on downloads the recognizer for the language the phone is set to." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチが録音した音声を、このiPhone上で文字に変換します。音声はどこにも送信されません。オンにすると、iPhoneの言語に対応した認識モデルをダウンロードします。"
+          }
+        }
+      }
+    },
     "The watch rejected health synchronization." : {
       "localizations" : {
         "ja" : {
@@ -4987,6 +5057,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "バージョン"
+          }
+        }
+      }
+    },
+    "Voice" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "音声"
           }
         }
       }

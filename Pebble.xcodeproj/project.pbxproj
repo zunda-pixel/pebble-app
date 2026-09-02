@@ -311,6 +311,7 @@
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Pebble saves watch steps and sleep data to your Health data when you choose to synchronize.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Pebble reads your position only to fetch the weather it sends to your watch.";
 				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Pebble synchronizes upcoming reminders to your watch timeline.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Turns what you say to your watch into words. The recording never leaves this phone.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -369,6 +370,7 @@
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Pebble saves watch steps and sleep data to your Health data when you choose to synchronize.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Pebble reads your position only to fetch the weather it sends to your watch.";
 				INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Pebble synchronizes upcoming reminders to your watch timeline.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Turns what you say to your watch into words. The recording never leaves this phone.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;

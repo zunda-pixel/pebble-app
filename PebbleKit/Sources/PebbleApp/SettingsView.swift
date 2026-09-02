@@ -28,6 +28,10 @@ struct SettingsView: View {
             notificationPreferences: model.notificationPreferences,
             applications: model.watchApplications + model.watchfaces,
             diagnosticReportURL: model.diagnosticReportURL,
+            voiceTranscription: model.voiceTranscriptionReadiness,
+            setVoiceTranscriptionEnabled: { enabled in
+                Task { await model.setVoiceTranscriptionEnabled(enabled) }
+            },
             setCompanionNotificationsEnabled: { model.setCompanionNotificationsEnabled($0) },
             setQuietHours: { enabled, start, end in
                 Task { await model.setQuietHours(enabled: enabled, start: start, end: end) }
@@ -40,6 +44,9 @@ struct SettingsView: View {
             weatherDestination: { WeatherView(model: model) },
             notificationAppsDestination: { NotificationAppsView(model: model) }
         )
+        // iOS can take the recognizer's model back, so what is on the phone is
+        // read again each time the screen appears rather than remembered.
+        .task { await model.refreshVoiceTranscriptionReadiness() }
     }
 }
 
@@ -50,6 +57,8 @@ struct SettingsContent<WeatherDestination: View, NotificationAppsDestination: Vi
     var notificationPreferences: NotificationDeliveryPreferences
     var applications: [PebbleApplication]
     var diagnosticReportURL: URL?
+    var voiceTranscription: VoiceTranscriptionReadiness
+    var setVoiceTranscriptionEnabled: (Bool) -> Void
     var setCompanionNotificationsEnabled: (Bool) -> Void
     var setQuietHours: (_ enabled: Bool, _ start: Int?, _ end: Int?) -> Void
     var setNotificationsEnabled: (Bool, UUID) -> Void
@@ -62,6 +71,16 @@ struct SettingsContent<WeatherDestination: View, NotificationAppsDestination: Vi
         ?? PebbleAppCatalog.defaultSourceURL.absoluteString
     @State private var permissions = PhonePermissions()
     @Environment(\.scenePhase) private var scenePhase
+
+    private var voiceTranscriptionSummary: Text {
+        switch voiceTranscription {
+        case .unsupported: Text("Not Available in This Language")
+        case .turnedOff: Text("Off")
+        case .needsInstalling: Text("Not Downloaded")
+        case .installing: Text("Downloading…")
+        case .ready: Text("Ready")
+        }
+    }
 
     private var weatherSummary: Text {
         switch weatherPlaceNames.count {
@@ -149,6 +168,22 @@ struct SettingsContent<WeatherDestination: View, NotificationAppsDestination: Vi
             } footer: {
                 Text("Apps the watch has seen sending notifications, and what it does with each one.")
             }
+            Section {
+                Toggle("Dictation from the Watch", isOn: Binding(
+                    get: { voiceTranscription != .turnedOff && voiceTranscription != .unsupported },
+                    set: { setVoiceTranscriptionEnabled($0) }
+                ))
+                .disabled(voiceTranscription == .unsupported)
+                if voiceTranscription != .turnedOff {
+                    LabeledContent("Recognizer") {
+                        voiceTranscriptionSummary
+                    }
+                }
+            } header: {
+                Text("Voice")
+            } footer: {
+                Text("The watch records what you say and this app turns it into words here on the phone, without sending the sound anywhere. Turning this on downloads the recognizer for the language the phone is set to.")
+            }
             Section("Diagnostics") {
                 Button("Prepare Diagnostic Report", systemImage: "stethoscope", action: prepareDiagnosticReport)
                 if let diagnosticReportURL {
@@ -205,6 +240,8 @@ struct SettingsContent<WeatherDestination: View, NotificationAppsDestination: Vi
             notificationPreferences: NotificationDeliveryPreferences(),
             applications: PreviewSamples.watchApplications + PreviewSamples.watchfaces,
             diagnosticReportURL: nil,
+            voiceTranscription: .ready,
+            setVoiceTranscriptionEnabled: { _ in },
             setCompanionNotificationsEnabled: { _ in },
             setQuietHours: { _, _, _ in },
             setNotificationsEnabled: { _, _ in },
@@ -229,6 +266,8 @@ struct SettingsContent<WeatherDestination: View, NotificationAppsDestination: Vi
             ),
             applications: [],
             diagnosticReportURL: URL(fileURLWithPath: "/tmp/pebble-diagnostics.txt"),
+            voiceTranscription: .needsInstalling,
+            setVoiceTranscriptionEnabled: { _ in },
             setCompanionNotificationsEnabled: { _ in },
             setQuietHours: { _, _, _ in },
             setNotificationsEnabled: { _, _ in },

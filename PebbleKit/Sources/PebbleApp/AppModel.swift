@@ -200,6 +200,8 @@ public final class AppModel {
     let healthKitBridge = HealthKitBridge()
     #endif
     let notificationSourceAppLibrary = NotificationSourceAppLibrary()
+    let speechBridge = SpeechBridge()
+    var voiceTranscriptionReadiness = VoiceTranscriptionReadiness.turnedOff
     @ObservationIgnored lazy var musicCoordinator = MusicCoordinator(
         source: makeSystemMusicSource(),
         send: { [weak self] frame in try await self?.broadcast(frame) }
@@ -375,7 +377,11 @@ public final class AppModel {
             let connectedDevice = try await connectionClient.connect(to: device)
             lastConnectionError = nil
             connectionFailures[device.id] = nil
-            let connection = WatchConnection(client: connectionClient, device: connectedDevice)
+            let connection = WatchConnection(
+                client: connectionClient,
+                device: connectedDevice,
+                voiceProvider: speechBridge
+            )
             connections.append(connection)
             connection.startObserving(
                 onEvent: { [weak self] connection, event in

@@ -138,6 +138,18 @@
           }
         }
       }
+    },
+    "NSSpeechRecognitionUsageDescription" : {
+      "comment" : "Privacy - Speech Recognition Usage Description",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Turns what you say to your watch into words. The recording never leaves this phone."
+          }
+        }
+      }
     }
   },
   "version" : "1.3"

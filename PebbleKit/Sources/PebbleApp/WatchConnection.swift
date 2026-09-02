@@ -72,11 +72,15 @@ public final class WatchConnection: Identifiable {
         return id
     }
 
-    init(client: any PebbleClient, device: PebbleDevice) {
+    init(
+        client: any PebbleClient,
+        device: PebbleDevice,
+        voiceProvider: (any PebbleVoiceTranscriptionProvider)? = nil
+    ) {
         self.client = client
         self.device = device
         self.deviceID = device.id
-        voiceCoordinator = VoiceSessionCoordinator(provider: nil) { [client] frame in
+        voiceCoordinator = VoiceSessionCoordinator(provider: voiceProvider) { [client] frame in
             try await client.send(frame)
         }
     }
