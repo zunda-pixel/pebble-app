@@ -11,6 +11,8 @@ targets iOS 27 and macOS 27; the app target also builds for visionOS.
 | `Pebble/` | App target: `MainApp.swift`, `Info.plist`, entitlements, app-level strings. |
 | `PebbleKit/` | Local Swift package with everything else. Its only product, `PebbleKit`, exports the `PebbleApp` target. |
 | `PebbleKit/Sources/PebbleProtocol` | What the watch says and what the phone says back: frames, PPoG, the endpoint codecs, the package formats (`.pbw`, `.pbz`), the persistence and the catalogues. **Foundation only** — no CoreBluetooth, no SwiftUI, so it holds anywhere and a test of it needs no radio. |
+| `PebbleKit/Sources/CSpeex` | libspeex 1.2.1, vendored. Upstream sources unmodified; `config.h` and `COPYING` are the only additions. |
+| `PebbleKit/Sources/PebbleAudio` | What the watch's microphone sent, turned back into samples: the Swift face of `CSpeex`, and the only place that touches it. |
 | `PebbleKit/Sources/PebbleTransport` | How those bytes reach a watch: the CoreBluetooth client in both roles, the phone-hosted GATT server, the emulator socket, and the mock a test or a preview stands in. |
 | `PebbleKit/Sources/PebbleApp` | The app: `AppModel` (split across `AppModel+*.swift`), the screens, and the phone's own frameworks (HealthKit, EventKit, MediaPlayer, CallKit, WebKit). |
 | `PebbleKit/Tests/PebbleProtocolTests` | Swift Testing suites for the protocol and transport layers, grouped by what they exercise. |
@@ -74,6 +76,15 @@ Two consequences worth knowing before you write an import or a lock:
 - `strictMemorySafety()` rejects the unsafe pointer tricks usually reached for
   when packing integers into bytes. Use `IntegerBytes.swift`
   (`bigEndianBytes`, `littleEndianBytes`, `hexadecimalString`) instead.
+- A type that has to hold a C library's state marks each such expression
+  `unsafe` and carries `@safe` itself, so the unsafety stops at its own
+  boundary instead of spreading to every caller (`SpeexAudioDecoder`). Keep that
+  type small and let nothing else import the C module.
+- **A class initializer that throws after its last property is assigned still
+  runs `deinit`.** Freeing the C state on the way out of such a `guard` frees it
+  twice, and the second one aborts the process — which arrives as a crash in
+  whichever test happened to be running beside it. Assign, then throw, and leave
+  the freeing to `deinit`.
 
 For shared mutable state, use an `actor`, or `Mutex` from `Synchronization` when
 the call site is synchronous (a delegate callback, a `URLProtocol` override).
@@ -232,6 +243,15 @@ stay in order), swift-http-types (typed `HTTPRequest` for every network call),
 swift-retry (`DMRetry`), Defaults (typed keys in `PebbleDefaults.swift`), Valet
 (keychain, in `PebbleTokenStore.swift`), MemberwiseInit, ZIPFoundation.
 
+Vendored C is the last resort, for a format the watch dictates and no Apple
+framework reads: today only Speex. Take it from the same upstream the firmware
+builds, leave every source file exactly as it came, and add nothing but a
+`config.h` and the licence — a local patch is a bug nobody upstream can fix.
+Configure it the way the firmware does, so both ends do the same arithmetic.
+Vendor the encoder alongside the decoder if that is what lets a test produce
+what the watch would have sent; bytes recorded once and trusted forever are not
+a test of a codec.
+
 Work sent to a watch is retried with `retry(with: .watchWork)`
 (`WatchWorkRetry.swift`), not with a hand-written loop. Add a reason to
 `PebbleConnectionError.isWorthAnotherAttempt` rather than a special case at a
@@ -308,6 +328,26 @@ the code that depends on it.
   unanswered. Before using an endpoint as a keepalive, read its receive handler
   and check it draws nothing. `system_version_protocol_msg_callback` (endpoint
   16) is the silent one, and PRF answers it too.
+- **A count and a length byte are on the wire because they are meant to be
+  read.** The audio endpoint says how many frames it carried and prefixes each
+  with its own length (`audio_endpoint_add_frame`). Today it always sends one, so
+  reading the payload as a single blob looks right — and hands a decoder the
+  length byte as sound the moment anything sends two.
+- **A field with a documented range is not a normalised value.** A
+  transcription's confidence is 1 to 100, or 0 for "no value"
+  (`services/voice/transcription.h`). Scaling 0...1 across a byte sends 255,
+  which means nothing. The firmware reads confidence nowhere at all, so the
+  mistake was invisible.
+- **The watch's own validator is part of the contract.**
+  `transcription_validate` throws out an entire transcription over one empty word
+  or one control character in it, and the reader is then told the recognizer
+  misbehaved. Send what passes the validator, and where nothing does, say so
+  outright instead of sending a shell.
+- **A session has a deadline the phone shares.** The voice endpoint allows 8
+  seconds to accept a session and 15 for its result (`services/voice/voice.c`);
+  decoding, recognizing and interpreting all happen inside the second one. Any
+  model that might be downloaded first, or might think for as long as it likes,
+  needs a deadline of its own and something to fall back to.
 - **Some endpoints are Android-only.** `music_endpoint_handle_mobile_app_info_event`
   returns unless the phone reported `RemoteOSAndroid`, so Pebble Protocol music
   control never activates for a phone that truthfully reports iOS or macOS
