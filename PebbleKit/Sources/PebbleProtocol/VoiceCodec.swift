@@ -4,6 +4,9 @@ import MemberwiseInit
 public enum VoiceSessionType: UInt8, Equatable, Sendable {
     case dictation = 0x01
     case command = 0x02
+    /// What the watch's own Reminders app asks for: the phone is expected to
+    /// return a reminder and a time rather than a transcription.
+    case naturalLanguage = 0x03
 }
 
 public enum VoiceSessionResult: UInt8, Equatable, Sendable {
@@ -98,9 +101,24 @@ public enum VoiceControlCodec {
         result: VoiceSessionResult,
         applicationInitiated: Bool
     ) -> PebbleProtocolFrame {
+        sessionSetupResultFrame(
+            sessionTypeValue: sessionType.rawValue,
+            result: result,
+            applicationInitiated: applicationInitiated
+        )
+    }
+
+    /// For answering a request this app could not read: the watch still needs
+    /// the type byte back, and refusing to answer at all is worse than echoing
+    /// one this app has no name for.
+    public static func sessionSetupResultFrame(
+        sessionTypeValue: UInt8,
+        result: VoiceSessionResult,
+        applicationInitiated: Bool
+    ) -> PebbleProtocolFrame {
         var payload: [UInt8] = [0x01]
         payload.append(contentsOf: flags(applicationInitiated: applicationInitiated))
-        payload.append(sessionType.rawValue)
+        payload.append(sessionTypeValue)
         payload.append(result.rawValue)
         return PebbleProtocolFrame(endpoint: endpoint, payload: payload)
     }
@@ -267,6 +285,14 @@ public final class VoiceSessionCoordinator {
 
     public func handleVoiceFrame(_ frame: PebbleProtocolFrame) async {
         guard let request = try? VoiceControlCodec.decodeSessionSetup(frame) else {
+            // Saying nothing leaves the watch waiting out its own timeout, and it
+            // asks twice more before telling the reader that dictation is not
+            // available — three quiet failures where one honest one would do.
+            try? await send(VoiceControlCodec.sessionSetupResultFrame(
+                sessionTypeValue: frame.payload.count > 5 ? frame.payload[5] : 0,
+                result: .invalidMessage,
+                applicationInitiated: false
+            ))
             return
         }
         reset()

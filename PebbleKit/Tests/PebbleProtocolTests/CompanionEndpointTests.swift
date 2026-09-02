@@ -989,6 +989,43 @@ struct VoiceTests {
         #expect(sent[0].payload.last == VoiceSessionResult.disabled.rawValue)
     }
 
+    @Test func theWatchsOwnRemindersAppIsAnsweredRatherThanIgnored() async {
+        // The Reminders app asks for a natural-language session (type 3), which
+        // this app read as a session type it had never heard of and answered with
+        // nothing at all. The watch then waited out its timeout, asked twice more,
+        // and told the reader dictation was not available.
+        var payload = sessionSetupPayload(includeEncoderInfo: true, applicationID: nil)
+        payload[5] = 0x03
+        let collector = FrameCollector()
+        let coordinator = VoiceSessionCoordinator(provider: nil) { frame in
+            await collector.append(frame)
+        }
+
+        await coordinator.handleVoiceFrame(PebbleProtocolFrame(endpoint: 11_000, payload: payload))
+
+        let sent = await collector.frames
+        #expect(sent.count == 1)
+        #expect(sent[0].payload[5] == VoiceSessionType.naturalLanguage.rawValue)
+        #expect(sent[0].payload.last == VoiceSessionResult.disabled.rawValue)
+    }
+
+    @Test func aSetupRequestThisAppCannotReadIsStillAnswered() async {
+        let collector = FrameCollector()
+        let coordinator = VoiceSessionCoordinator(provider: nil) { frame in
+            await collector.append(frame)
+        }
+
+        await coordinator.handleVoiceFrame(PebbleProtocolFrame(
+            endpoint: 11_000,
+            payload: [0x01, 0x00, 0x00, 0x00, 0x00, 0x7F, 0x34, 0x12, 0x00]
+        ))
+
+        let sent = await collector.frames
+        #expect(sent.count == 1)
+        #expect(sent[0].payload[5] == 0x7F)
+        #expect(sent[0].payload.last == VoiceSessionResult.invalidMessage.rawValue)
+    }
+
     @Test func coordinatorRunsFullDictationSession() async throws {
         let collector = FrameCollector()
         let provider = StaticTranscriptionProvider(words: [VoiceTranscriptionWord(text: "Hi", confidence: 1)])
