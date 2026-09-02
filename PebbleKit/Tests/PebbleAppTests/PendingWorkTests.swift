@@ -218,6 +218,93 @@ struct PendingWorkTests {
     }
 
     /// The frame a watch sends to hand over a record of a database of its own.
+    @Test
+    func aReminderTheWatchPostponedReplacesTheOneItSentBefore() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: client,
+            applicationLibrary: PebbleApplicationLibrary(
+                fileURL: directory.appending(path: "applications.json")
+            ),
+            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json")),
+            reminderLibrary: TimelinePinLibrary(fileURL: directory.appending(path: "reminders.json")),
+            clientFactory: { _ in client }
+        )
+        await model.scan()
+        await model.connect(to: try #require(model.discoveredDevices.first))
+        let connection = try #require(model.activeConnections.first)
+        // Whole seconds: the wire carries a `time_t`, so a date with a
+        // fraction in it does not come back the same.
+        let dictated = PebbleTimelinePin(
+            parentApplicationID: UUID(),
+            timestamp: Date(timeIntervalSince1970: (Date().timeIntervalSince1970 + 3600).rounded()),
+            title: "会議",
+            subtitle: nil,
+            body: nil,
+            kind: .reminder,
+            isFromWatch: true
+        )
+        await model.handleWatchDatabaseWrite(
+            offer(dictated, database: TimelineReminderCodec.databaseID),
+            on: connection
+        )
+
+        // Postponed on the watch: the same item, at a later hour, offered
+        // again under the id it already had.
+        var postponed = dictated
+        postponed.timestamp = dictated.timestamp.addingTimeInterval(1800)
+        await model.handleWatchDatabaseWrite(
+            offer(postponed, database: TimelineReminderCodec.databaseID),
+            on: connection
+        )
+
+        #expect(model.reminders.map(\.id) == [dictated.id])
+        #expect(model.reminders.first?.timestamp == postponed.timestamp)
+    }
+
+    @Test
+    func aDictatedReminderDeletedWhileTheWatchWasAwayIsTakenOffIt() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: client,
+            applicationLibrary: PebbleApplicationLibrary(
+                fileURL: directory.appending(path: "applications.json")
+            ),
+            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json")),
+            reminderLibrary: TimelinePinLibrary(fileURL: directory.appending(path: "reminders.json")),
+            clientFactory: { _ in client }
+        )
+        await model.scan()
+        let discovered = try #require(model.discoveredDevices.first)
+        await model.connect(to: discovered)
+        let dictated = PebbleTimelinePin(
+            parentApplicationID: UUID(),
+            timestamp: .now.addingTimeInterval(3600),
+            title: "会議",
+            subtitle: nil,
+            body: nil,
+            kind: .reminder,
+            isFromWatch: true
+        )
+        await model.handleWatchDatabaseWrite(
+            offer(dictated, database: TimelineReminderCodec.databaseID),
+            on: try #require(model.activeConnections.first)
+        )
+        #expect(model.reminders.map(\.id) == [dictated.id])
+
+        await model.disconnect()
+        await model.removeReminders(model.reminders)
+        await model.connect(to: discovered)
+
+        // This app never wrote it — the watch made it — so only a record of
+        // what the watch holds can name it once it is gone from here.
+        #expect(client.deletedTimelineReminderIDs.contains(dictated.id))
+    }
+
     private func offer(
         _ item: PebbleTimelinePin,
         database: UInt8,

@@ -34,6 +34,7 @@ public final class MockPebbleClient: PebbleClient {
     public var bytesToReturn: [UInt8] = []
     public private(set) var writtenNotificationSourceApps: [NotificationSourceApp] = []
     public private(set) var writtenAppGlances: [PebbleAppGlance] = []
+    public private(set) var deletedTimelineReminderIDs: [UUID] = []
     public private(set) var registeredApplications: [PebbleAppMetadata] = []
     public private(set) var unregisteredApplicationIDs: [UUID] = []
     public private(set) var disconnectedDevices: [PebbleDevice] = []
@@ -210,6 +211,9 @@ public final class MockPebbleClient: PebbleClient {
 
     public func deleteTimelineReminder(id: UUID) async throws {
         timelineReminders.removeAll { $0.id == id }
+        // Kept because a reminder the watch made was never written here, so
+        // its absence from `timelineReminders` says nothing on its own.
+        deletedTimelineReminderIDs.append(id)
     }
 
     public func writeWeather(_ report: PebbleWeatherReport) async throws {

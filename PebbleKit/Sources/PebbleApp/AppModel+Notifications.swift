@@ -219,7 +219,7 @@ extension AppModel {
                     // endpoint the watch starts, so the watch already has it,
                     // and writing it back is never the right thing to do.
                     item.isFromWatch = true
-                    await keep(item)
+                    await keep(item, from: connection)
                     succeeded = true
                 }
             default:
