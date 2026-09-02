@@ -293,6 +293,14 @@ public final class AppModel {
         musicCoordinator.start()
         phoneCallCoordinator.start()
         observeWatchesReconnectingThemselves()
+        // A watch that has been set up reconnects on its own, so the radio has
+        // to be open before it does — but only where there is a watch to expect.
+        // Opening it is what raises the system's Bluetooth dialog, and an
+        // install with no watch yet would be asked for permission before it had
+        // asked for anything.
+        if !savedWatches.isEmpty {
+            scannerClient.startBluetooth()
+        }
         if savedWatches.contains(where: \.automaticallyConnects) {
             await scan()
         }
@@ -331,6 +339,8 @@ public final class AppModel {
 
         do {
             await loadSavedWatches()
+            // Asking for a watch is the moment the radio is worth its dialog.
+            scannerClient.startBluetooth()
             var devices = try await scannerClient.scan()
             let connectedIDs = Set(connections.map(\.device.id))
             let missingSavedWatches = savedWatches

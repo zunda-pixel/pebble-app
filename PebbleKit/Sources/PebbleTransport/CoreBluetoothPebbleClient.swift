@@ -85,14 +85,12 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
 
     private let clientTag: String
 
+    private let restoreIdentifier: String
+
     public init(restoreIdentifier: String = "dev.pebble.central") {
+        self.restoreIdentifier = restoreIdentifier
         clientTag = String(restoreIdentifier.split(separator: ".").last ?? "central")
         super.init()
-        centralManager = CBCentralManager(
-            delegate: self,
-            queue: .main,
-            options: [CBCentralManagerOptionRestoreIdentifierKey: restoreIdentifier]
-        )
         appMessages.send = { [weak self] data in
             guard let self, let peripheral = connectedPeripheral, ppogSession != nil else {
                 throw PebbleConnectionError.disconnected
@@ -100,6 +98,22 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             try sendFrame(AppMessageCodec.pushFrame(data), to: peripheral)
         }
         observeSystemTimeChanges()
+    }
+
+    /// Makes the central and publishes the phone's own service.
+    ///
+    /// Not done in `init`: making either manager is what raises the system's
+    /// Bluetooth dialog, and this class is made while the app is starting, which
+    /// on a fresh install means being asked for permission before having asked
+    /// for a watch. Whoever wants the radio calls this, and everything that
+    /// needs it calls it on the way in.
+    public func startBluetooth() {
+        guard centralManager == nil else { return }
+        centralManager = CBCentralManager(
+            delegate: self,
+            queue: .main,
+            options: [CBCentralManagerOptionRestoreIdentifierKey: restoreIdentifier]
+        )
         // Watches inspect the phone's GATT database right after connecting, so
         // the phone-hosted protocol service has to exist before that.
         PebbleGattServer.shared.start()
@@ -657,6 +671,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     }
 
     private func waitForBluetooth() async throws {
+        startBluetooth()
         switch centralManager.state {
         case .poweredOn:
             return

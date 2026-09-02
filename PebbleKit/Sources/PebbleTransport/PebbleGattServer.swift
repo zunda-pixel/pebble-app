@@ -35,7 +35,7 @@ public final class PebbleGattServer: NSObject {
     /// the phone's service without the app having scanned for it.
     public var onUnclaimedWatch: ((_ centralID: String) -> Void)?
 
-    private var peripheralManager: CBPeripheralManager!
+    private var peripheralManager: CBPeripheralManager?
     private var dataCharacteristic: CBMutableCharacteristic?
     private var registrations: [String: Registration] = [:]
     private var subscribedCentrals: [String: CBCentral] = [:]
@@ -46,15 +46,27 @@ public final class PebbleGattServer: NSObject {
 
     private override init() {
         super.init()
-        peripheralManager = CBPeripheralManager(
-            delegate: self,
-            queue: .main,
-            options: [CBPeripheralManagerOptionRestoreIdentifierKey: "dev.pebble.ppog.server"]
-        )
     }
 
+    /// Publishes the service, making the peripheral manager on the way if there
+    /// is not one yet.
+    ///
+    /// The manager is not made in `init` because making one raises the system's
+    /// Bluetooth dialog, and `shared` is touched while the app is starting — to
+    /// hang the reconnect handler on, which needs no radio. The radio is opened
+    /// when a watch is actually wanted.
     public func start() {
-        guard peripheralManager.state == .poweredOn, !isServicePublished else {
+        guard let manager = peripheralManager else {
+            peripheralManager = CBPeripheralManager(
+                delegate: self,
+                queue: .main,
+                options: [CBPeripheralManagerOptionRestoreIdentifierKey: "dev.pebble.ppog.server"]
+            )
+            // Nothing can be published until the radio answers, and it answers
+            // by calling back here.
+            return
+        }
+        guard manager.state == .poweredOn, !isServicePublished else {
             return
         }
         isServicePublished = true
@@ -75,7 +87,7 @@ public final class PebbleGattServer: NSObject {
 
         let service = CBMutableService(type: Self.serviceUUID, primary: true)
         service.characteristics = [meta, data]
-        peripheralManager.add(service)
+        manager.add(service)
 
         let fakeService = CBMutableService(type: Self.fakeServiceUUID, primary: true)
         fakeService.characteristics = [
@@ -86,7 +98,7 @@ public final class PebbleGattServer: NSObject {
                 permissions: .readable
             )
         ]
-        peripheralManager.add(fakeService)
+        manager.add(fakeService)
     }
 
     func register(
@@ -120,7 +132,7 @@ public final class PebbleGattServer: NSObject {
     // Removing and re-adding sends a service-changed indication. A watch that
     // inspected this phone before the service existed caches that result.
     func republish() {
-        guard peripheralManager.state == .poweredOn else {
+        guard let manager = peripheralManager, manager.state == .poweredOn else {
             return
         }
         Task {
@@ -129,7 +141,7 @@ public final class PebbleGattServer: NSObject {
                 message: "Re-publishing the phone's protocol service"
             )
         }
-        peripheralManager.removeAllServices()
+        manager.removeAllServices()
         subscribedCentrals.removeAll()
         pendingNotifications.removeAll()
         dataCharacteristic = nil
@@ -157,7 +169,9 @@ public final class PebbleGattServer: NSObject {
 
     @discardableResult
     func send(_ bytes: [UInt8], to centralID: String) -> Bool {
-        guard let dataCharacteristic, let central = subscribedCentrals[centralID] else {
+        guard let manager = peripheralManager,
+              let dataCharacteristic,
+              let central = subscribedCentrals[centralID] else {
             return false
         }
         guard !isBacklogged else {
@@ -175,7 +189,7 @@ public final class PebbleGattServer: NSObject {
             pendingNotifications.append(value, for: centralID)
             return true
         }
-        guard peripheralManager.updateValue(
+        guard manager.updateValue(
             value,
             for: dataCharacteristic,
             onSubscribedCentrals: [central]
@@ -187,7 +201,7 @@ public final class PebbleGattServer: NSObject {
     }
 
     private func flushPendingNotifications() {
-        guard let dataCharacteristic else {
+        guard let manager = peripheralManager, let dataCharacteristic else {
             return
         }
         while let pending = pendingNotifications.first {
@@ -204,7 +218,7 @@ public final class PebbleGattServer: NSObject {
                 }
                 continue
             }
-            guard peripheralManager.updateValue(
+            guard manager.updateValue(
                 pending.value,
                 for: dataCharacteristic,
                 onSubscribedCentrals: [central]

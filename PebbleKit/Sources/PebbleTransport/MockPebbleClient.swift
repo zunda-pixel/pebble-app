@@ -42,7 +42,13 @@ public final class MockPebbleClient: PebbleClient {
     private var frameContinuation: AsyncStream<PebbleProtocolFrame>.Continuation?
     private var eventContinuation: AsyncStream<PebbleClientEvent>.Continuation?
 
+    public private(set) var startBluetoothCount = 0
+
     public init() {}
+
+    public func startBluetooth() {
+        startBluetoothCount += 1
+    }
 
     public func scan() async throws -> [DiscoveredPebble] {
         try await Task.sleep(for: .milliseconds(400))

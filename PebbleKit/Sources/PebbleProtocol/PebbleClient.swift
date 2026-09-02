@@ -75,6 +75,14 @@ public enum PebbleConnectionError: Error, Equatable, Sendable {
 
 @MainActor
 public protocol PebbleClient: Sendable {
+    /// Opens the radio before anything is asked of it.
+    ///
+    /// Doing this costs the reader the system's permission dialog, so it is not
+    /// done at launch on an install with no watch yet: there the dialog would
+    /// arrive before they had asked for anything. An install that has a watch
+    /// starts here, because a watch that reconnects on its own has to find the
+    /// phone ready.
+    func startBluetooth()
     func scan() async throws -> [DiscoveredPebble]
     /// A bonded Pebble usually does not advertise, so scanning alone can never
     /// rediscover it; it has to be looked up by its stored identifier.
@@ -144,6 +152,9 @@ public protocol PebbleClient: Sendable {
 }
 
 public extension PebbleClient {
+    /// A transport with no radio to open has nothing to do here.
+    func startBluetooth() {}
+
     func retrieveKnownDevices(_ hints: [DiscoveredPebble]) async throws -> [DiscoveredPebble] {
         []
     }
