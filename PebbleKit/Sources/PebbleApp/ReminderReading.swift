@@ -23,10 +23,14 @@ struct SpokenReminder: Equatable, Sendable {
 /// or a separator before a number counts as a time is not something a rule can
 /// fill in without a vocabulary for every language.
 enum ReminderReading {
-    /// How long the model may take before the detector answers instead. The
-    /// watch gives up on a session result after fifteen seconds, and
-    /// transcribing has already spent some of that.
-    static let modelDeadline = Duration.seconds(5)
+    /// How long the model may take before the detector answers instead.
+    ///
+    /// The watch starts a fifteen-second timer when it stops recording
+    /// (`TIMEOUT_SESSION_RESULT` in `voice.c`), and decoding and transcribing
+    /// the session spend under a second of that. Ten leaves the watch four to
+    /// spare, and a model that answered in five and a half seconds — measured
+    /// on 2026-09-02 — was thrown away at the older deadline for nothing.
+    static let modelDeadline = Duration.seconds(10)
 
     private enum ModelAnswer {
         case read(UnderstoodReminder)
@@ -207,6 +211,13 @@ enum ReminderReading {
                 Give the words for the reminder itself, keeping the words they \
                 used and dropping only the ones that ask for a reminder or name \
                 a time. Answer in the language they spoke. \
+                Speaking to a watch, people often say what each field is before \
+                they fill it in — 「スケジュールの名前は」「リマインダーの内容は」\
+                「時間は」, "the name is", "the time is". Those words name the \
+                form and are never part of the reminder: \
+                「スケジュールの名前は会議、時間は明日の午後三時」 is 会議 at \
+                15:00 tomorrow, and "the name is dentist, the time is nine" is \
+                dentist at 09:00. \
                 Give the hour and minute on a 24-hour clock, and how many days \
                 from today they meant, ONLY if they named a time themselves. \
                 Leave the hour and minute empty when they named none. The \
@@ -223,10 +234,15 @@ enum ReminderReading {
             )
             return .read(response.content)
         } catch {
-            await PebbleDiagnostics.shared.record(
-                category: "voice",
-                message: "The model would not read the reminder: \(error)"
-            )
+            // A model still reading when the deadline passes is cancelled here,
+            // and it throws on the way out. That is the deadline's news to
+            // report, not a model that refused.
+            if !Task.isCancelled {
+                await PebbleDiagnostics.shared.record(
+                    category: "voice",
+                    message: "The model would not read the reminder: \(error)"
+                )
+            }
             return .nothing
         }
     }
