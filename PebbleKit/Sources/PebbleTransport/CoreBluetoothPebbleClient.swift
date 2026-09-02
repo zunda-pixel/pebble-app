@@ -248,7 +248,8 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
               ppogSession != nil else {
             throw PebbleConnectionError.disconnected
         }
-        await PebbleDiagnostics.shared.recordFrame(direction: "out", frame: frame)
+        // `sendFrame` records it, and so does every path that reaches the watch
+        // without coming through here.
         try sendFrame(frame, to: peripheral)
     }
 
