@@ -592,6 +592,8 @@ struct CompanionStorageTests {
         #expect(!PebbleConnectionError.bluetoothUnavailable.isWorthAnotherAttempt)
         #expect(!PebbleConnectionError.bluetoothUnsupported.isWorthAnotherAttempt)
         #expect(!PebbleConnectionError.permissionDenied.isWorthAnotherAttempt)
+        // Another attempt is exactly what has been tried.
+        #expect(!PebbleConnectionError.handshakeKeptFailing.isWorthAnotherAttempt)
 
         #expect(PebbleConnectionError.connectionTimedOut.isWorthAnotherAttempt)
         #expect(PebbleConnectionError.connectionFailed.isWorthAnotherAttempt)

@@ -4585,6 +4585,16 @@
         }
       }
     },
+    "This watch connects but does not answer. Restart it, or forget it here and add it again." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このウォッチは接続はできますが応答しません。ウォッチを再起動するか、ここで登録を解除して追加し直してください。"
+          }
+        }
+      }
+    },
     "This watch started its recovery firmware. It works again once PebbleOS is installed." : {
       "localizations" : {
         "ja" : {

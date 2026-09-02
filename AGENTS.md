@@ -184,6 +184,16 @@ finished catalogue because of it.
 
 The bugs worth preventing here have all been the same few shapes.
 
+- **A retry loop needs a way to end, and a reason to show when it does.** Count
+  the failures that mean "this will not work" — a link that comes up and dies in
+  the handshake — rather than trusting a backoff, whose attempt counter says
+  nothing when the attempt itself keeps succeeding. Reset the count when the
+  thing actually works, stop after a handful, and say which watch and why: a
+  loop with no end reads on screen as "Reconnecting…" forever.
+- **One outstanding request means a queue, not a refusal.** BlobDB and app
+  messages each answer by token, so the client may have one in flight — the
+  callers are unrelated features on unrelated timers, and the one that loses the
+  race must wait its turn rather than be told the watch refused it.
 - **Every stored continuation needs a guard and two resume paths.** Guard
   against a second caller before storing one (`guard x == nil else { throw }`),
   and make sure both teardown paths — a connection that failed and a link that

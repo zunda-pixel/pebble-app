@@ -708,6 +708,35 @@ struct AppModelTests {
 
         #expect(model.connectionState == .failed(.connectionTimedOut))
         #expect(model.connectedDevice == nil)
+        // The watch's own screen has the Connect button, so the reason belongs
+        // against that watch and not only in the app-wide state.
+        #expect(model.connectionFailures[discovered.id] == .connectionTimedOut)
+    }
+
+    @Test
+    func aWatchThatKeepsFailingItsHandshakeSaysSoOnItsOwnScreen() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: client,
+            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        )
+        await model.scan()
+        let discovered = try #require(model.discoveredDevices.first)
+        await model.connect(to: discovered)
+
+        // What the transport sends once it has stopped chasing a watch whose
+        // links keep dying before a session.
+        client.emit(.disconnected(.handshakeKeptFailing))
+        try await Task.sleep(for: .milliseconds(20))
+
+        #expect(model.connectionFailures[discovered.id] == .handshakeKeptFailing)
+        #expect(model.connections.isEmpty)
+        // Not "Reconnecting…" forever: the row goes quiet and the screen says
+        // what to do about it.
+        #expect(model.connectionState == .failed(.handshakeKeptFailing))
     }
 
     @Test

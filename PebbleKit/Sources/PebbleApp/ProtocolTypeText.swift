@@ -27,6 +27,8 @@ public extension PebbleConnectionError {
             "The watch does not expose the expected Pebble connection service."
         case .disconnected:
             "The watch disconnected."
+        case .handshakeKeptFailing:
+            "This watch connects but does not answer. Restart it, or forget it here and add it again."
         }
     }
 }

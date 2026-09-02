@@ -55,6 +55,36 @@ struct ReconnectPolicyTests {
     }
 
     @Test
+    func chasingStopsOnceEnoughLinksHaveDiedInTheHandshake() {
+        // The backoff cannot end this on its own: the connect succeeded every
+        // time, so the wait sat at its cap while a watch whose protocol service
+        // was unusable went round the loop for six minutes.
+        let policy = ReconnectPolicy()
+        policy.follow(watch)
+
+        for attempt in 1..<ReconnectPolicy.maximumFailedHandshakes {
+            #expect(policy.noteHandshakeFailed(), "gave up on attempt \(attempt)")
+        }
+
+        #expect(!policy.noteHandshakeFailed())
+        #expect(policy.failedHandshakes == ReconnectPolicy.maximumFailedHandshakes)
+    }
+
+    @Test
+    func aSessionThatOpensForgivesTheFailuresBeforeIt() {
+        // A watch that needed four goes and then worked gets the whole budget
+        // again the next time it drops, rather than one.
+        let policy = ReconnectPolicy()
+        policy.follow(watch)
+        _ = policy.noteHandshakeFailed()
+        _ = policy.noteHandshakeFailed()
+
+        policy.follow(watch)
+
+        #expect(policy.failedHandshakes == 0)
+    }
+
+    @Test
     func nothingIsFollowedUntilAWatchIsConnected() {
         let policy = ReconnectPolicy()
         // With no watch to chase, any disconnect is this one's to act on.

@@ -464,6 +464,8 @@ public final class AppModel {
         case .disconnected(let error):
             connections.removeAll { $0 === connection }
             lastConnectionError = error
+            // On the watch's own screen, where its Connect button is.
+            connectionFailures[connection.device.id] = error
             refreshConnectionState()
             needsApplicationSynchronization = true
             clearBusyOperationState(on: connection)

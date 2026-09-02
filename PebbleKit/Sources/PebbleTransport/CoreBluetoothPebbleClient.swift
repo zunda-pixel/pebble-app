@@ -1335,6 +1335,25 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
     }
 
+    /// Stops chasing a watch whose links keep dying in the handshake, and says
+    /// so: the reader was told "Reconnecting…" for as long as they watched.
+    private func giveUpReconnecting(to device: DiscoveredPebble) {
+        let attempts = reconnects.failedHandshakes
+        reconnects.stop()
+        connectionTimeoutTask?.cancel()
+        connectionTimeoutTask = nil
+        pendingDevice = nil
+        Task { [tag = clientTag, name = device.name] in
+            await PebbleDiagnostics.shared.record(
+                .error,
+                category: "connection",
+                message: "[\(tag)] giving up on \(name):"
+                    + " \(attempts) links came up and none finished the handshake"
+            )
+        }
+        eventContinuation?.yield(.disconnected(.handshakeKeptFailing))
+    }
+
     private func scheduleReconnect(to device: DiscoveredPebble, using peripheral: CBPeripheral) {
         connectionTimeoutTask?.cancel()
         connectionTimeoutTask = nil
@@ -1557,8 +1576,12 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
         if (wasConnected || wasAutomatic), let deviceToReconnect {
             if wasConnected {
                 reconnect(to: deviceToReconnect, using: peripheral)
-            } else {
+            } else if reconnects.noteHandshakeFailed() {
+                // The link came up and died before a session: worth another go,
+                // but not forever.
                 scheduleReconnect(to: deviceToReconnect, using: peripheral)
+            } else {
+                giveUpReconnecting(to: deviceToReconnect)
             }
             return
         }

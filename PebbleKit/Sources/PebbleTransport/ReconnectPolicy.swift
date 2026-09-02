@@ -12,10 +12,16 @@ import Foundation
 /// schedule armed used to undo itself a second later.
 @MainActor
 final class ReconnectPolicy {
+    /// How many links may come up and die in the handshake before the app stops
+    /// chasing. With the backoff below that is about a minute of trying, which
+    /// covers a watch that is merely restarting.
+    static let maximumFailedHandshakes = 5
+
     private(set) var device: DiscoveredPebble?
     /// Whether the attempt in flight is the policy's own rather than a connect
     /// the reader asked for. The handshake takes a different path for each.
     private(set) var isAutomatic = false
+    private(set) var failedHandshakes = 0
 
     private var backoff = PebbleReconnectBackoff()
     private var scheduled: Task<Void, Never>?
@@ -26,6 +32,7 @@ final class ReconnectPolicy {
         self.device = device
         isAutomatic = false
         backoff.reset()
+        failedHandshakes = 0
     }
 
     /// Stops chasing: a disconnect the reader asked for, or a watch forgotten.
@@ -35,6 +42,19 @@ final class ReconnectPolicy {
         device = nil
         isAutomatic = false
         backoff.reset()
+        failedHandshakes = 0
+    }
+
+    /// A link that came up and then dropped without a session. False when that
+    /// has happened often enough to stop.
+    ///
+    /// The backoff cannot decide this: it counts attempts, and the connect
+    /// itself succeeded every time — a watch whose protocol service was unusable
+    /// went round this loop every thirty seconds for six minutes, saying
+    /// "Reconnecting…" and nothing else.
+    func noteHandshakeFailed() -> Bool {
+        failedHandshakes += 1
+        return failedHandshakes < Self.maximumFailedHandshakes
     }
 
     func isFollowing(_ deviceID: String) -> Bool {
