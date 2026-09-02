@@ -16,6 +16,14 @@ import Foundation
 final class PendingReply<Value: Sendable> {
     private var continuation: CheckedContinuation<Value, any Error>?
     private var deadline: Task<Void, Never>?
+    private let sleep: @Sendable (Duration) async -> Void
+
+    /// How the deadline waits. Real time, except in a test, which would rather
+    /// say when the deadline falls due than race it: a machine busy compiling
+    /// can be slower than any margin worth writing down.
+    init(sleep: @escaping @Sendable (Duration) async -> Void = { try? await Task.sleep(for: $0) }) {
+        self.sleep = sleep
+    }
 
     var isWaiting: Bool {
         continuation != nil
@@ -51,8 +59,8 @@ final class PendingReply<Value: Sendable> {
         timedOut: any Error = PebbleConnectionError.connectionTimedOut
     ) {
         deadline?.cancel()
-        deadline = Task { [weak self] in
-            try? await Task.sleep(for: timeout)
+        deadline = Task { [weak self, sleep] in
+            await sleep(timeout)
             guard !Task.isCancelled else { return }
             self?.fail(timedOut)
         }
