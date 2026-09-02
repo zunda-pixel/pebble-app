@@ -82,8 +82,16 @@ public struct HealthDataLoggingProcessor: Sendable {
         }
     }
 
+    /// Sleep as the watch keeps it: one record per stretch, filed under the day
+    /// it ended in.
+    ///
+    /// A restful stretch (types 2 and 4) lies *inside* a sleep or a nap and is
+    /// the same minutes said again — `activity.h` is explicit that its start and
+    /// end are always within the containing session. Adding all four types
+    /// together, which this used to do, made a night with two hours of deep
+    /// sleep ten hours long.
     private func sleepSamples(from bytes: [UInt8], itemSize: Int) throws -> [PebbleHealthSample] {
-        var daily: [Date: (minutes: Int, timeZoneIdentifier: String)] = [:]
+        var daily: [Date: (intervals: [PebbleSleepInterval], timeZoneIdentifier: String)] = [:]
         for itemStart in stride(from: 0, to: bytes.count - (bytes.count % itemSize), by: itemSize) {
             let itemEnd = itemStart + itemSize
             guard itemEnd <= bytes.count, itemSize >= 18 else { continue }
@@ -97,14 +105,25 @@ public struct HealthDataLoggingProcessor: Sendable {
             calendar.timeZone = timeZone
             let endDate = Date(timeIntervalSince1970: TimeInterval(start + duration))
             let day = calendar.startOfDay(for: endDate)
-            var value = daily[day, default: (0, timeZone.identifier)]
-            value.minutes += Int(duration / 60)
+            var value = daily[day, default: ([], timeZone.identifier)]
+            value.intervals.append(PebbleSleepInterval(
+                start: Date(timeIntervalSince1970: TimeInterval(start)),
+                duration: TimeInterval(duration),
+                // Restful sleep, and restful nap.
+                isDeep: type == 2 || type == 4
+            ))
             daily[day] = value
         }
-        return daily.map {
-            PebbleHealthSample(
-                date: $0.key, steps: 0, sleepMinutes: min(24 * 60, $0.value.minutes),
-                timeZoneIdentifier: $0.value.timeZoneIdentifier, source: .watch
+        return daily.map { day, value in
+            let sessions = PebbleSleepSessions.grouped(value.intervals)
+            return PebbleHealthSample(
+                date: day,
+                steps: 0,
+                sleepMinutes: min(24 * 60, sessions.reduce(0) { $0 + $1.asleepMinutes }),
+                deepSleepMinutes: min(24 * 60, sessions.reduce(0) { $0 + $1.deepMinutes }),
+                sleepSessions: sessions,
+                timeZoneIdentifier: value.timeZoneIdentifier,
+                source: .watch
             )
         }
     }

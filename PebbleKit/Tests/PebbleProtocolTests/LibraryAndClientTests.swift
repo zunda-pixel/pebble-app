@@ -320,6 +320,93 @@ struct CompanionStorageTests {
         #expect(result.samples[0].steps == 42)
     }
 
+    @Test func restfulSleepIsPartOfTheNightRatherThanExtraOnTopOfIt() throws {
+        var processor = HealthDataLoggingProcessor()
+        // Session tag 83: the watch's sleep overlays.
+        let openPayload: [UInt8] = [0x01, 3] + Array(repeating: 0, count: 16)
+            + [0, 0, 0, 0] + [83, 0, 0, 0] + [0, 18, 0]
+        #expect(try processor.process(
+            PebbleProtocolFrame(endpoint: 6_778, payload: openPayload)
+        ).response?.payload == [0x85, 3])
+
+        // Seven hours of sleep from 23:00, with two hours of restful sleep
+        // inside it. The firmware records the restful stretch as a session of
+        // its own whose start and end are always within the containing one
+        // (`activity.h`), so the night is seven hours, not nine.
+        let night = sleepItem(type: 1, start: 1_788_303_600, duration: 7 * 3600)
+        let deep = sleepItem(type: 2, start: 1_788_314_400, duration: 2 * 3600)
+        let sendPayload: [UInt8] = [0x02, 3] + Array(repeating: 0, count: 8) + night + deep
+        let result = try processor.process(PebbleProtocolFrame(endpoint: 6_778, payload: sendPayload))
+
+        let sample = try #require(result.samples.first)
+        #expect(sample.sleepMinutes == 7 * 60)
+        #expect(sample.deepSleepMinutes == 2 * 60)
+        #expect(sample.sleepSessions.count == 1)
+    }
+
+    @Test func aNightBrokenByAWakefulHourIsStillOneNight() {
+        let midnight = Date(timeIntervalSince1970: 1_788_303_600)
+        func interval(after hours: Double, lasting minutes: Double, deep: Bool = false) -> PebbleSleepInterval {
+            PebbleSleepInterval(
+                start: midnight.addingTimeInterval(hours * 3600),
+                duration: minutes * 60,
+                isDeep: deep
+            )
+        }
+
+        // Turning over, and then a whole morning: an hour is the line.
+        let sessions = PebbleSleepSessions.grouped([
+            interval(after: 0, lasting: 180),
+            interval(after: 1, lasting: 60, deep: true),
+            interval(after: 3.5, lasting: 120),
+            interval(after: 9, lasting: 45),
+        ])
+
+        #expect(sessions.count == 2)
+        #expect(sessions[0].asleepMinutes == 300)
+        #expect(sessions[0].deepMinutes == 60)
+        #expect(sessions[1].asleepMinutes == 45)
+    }
+
+    @Test func anAverageIsOverTheDaysThatHadSomethingToSay() throws {
+        let calendar = Calendar.current
+        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 9, day: 2, hour: 9)))
+        func day(_ ago: Int, steps: Int, sleep: Int, deep: Int = 0) throws -> PebbleHealthSample {
+            PebbleHealthSample(
+                date: try #require(calendar.date(byAdding: .day, value: -ago, to: calendar.startOfDay(for: now))),
+                steps: steps,
+                sleepMinutes: sleep,
+                deepSleepMinutes: deep
+            )
+        }
+        let samples = [
+            // Today is still happening, so it is left out of every average.
+            try day(0, steps: 12, sleep: 12),
+            try day(1, steps: 6_000, sleep: 400, deep: 100),
+            try day(2, steps: 4_000, sleep: 0),
+            try day(3, steps: 0, sleep: 300, deep: 60),
+        ]
+
+        let averages = samples.averages(over: 7, endingBefore: now)
+
+        // A day the watch was off the wrist is not a day of no steps.
+        #expect(averages.stepDays == 2)
+        #expect(averages.steps == 5_000)
+        #expect(averages.sleepDays == 2)
+        #expect(averages.sleepMinutes == 350)
+        #expect(averages.deepSleepMinutes == 80)
+    }
+
+    /// One sleep overlay as the watch writes it: type, the seconds east of UTC,
+    /// the start and how long it lasted.
+    private func sleepItem(type: UInt16, start: UInt32, duration: UInt32) -> [UInt8] {
+        [0, 0, 0, 0]
+            + type.littleEndianBytes
+            + UInt32(0).littleEndianBytes
+            + start.littleEndianBytes
+            + duration.littleEndianBytes
+    }
+
     @Test func unknownHealthDataLoggingSessionIsRejected() throws {
         var processor = HealthDataLoggingProcessor()
         let payload: [UInt8] = [0x02, 9] + Array(repeating: 0, count: 8)

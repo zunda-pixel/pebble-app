@@ -116,7 +116,7 @@ extension AppModel {
                 distanceMetres: 0,
                 activeSeconds: 0,
                 sleepSeconds: UInt32(clamping: sample.sleepMinutes * 60),
-                deepSleepSeconds: 0
+                deepSleepSeconds: UInt32(clamping: sample.deepSleepMinutes * 60)
             )
         }
     }

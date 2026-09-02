@@ -67,6 +67,24 @@ struct HealthContent: View {
                 LabeledContent("Sleep") {
                     Text("\(newestSample?.sleepMinutes ?? 0) min")
                 }
+                if let deep = newestSample?.deepSleepMinutes, deep > 0 {
+                    LabeledContent("Deep Sleep") {
+                        Text("\(deep) min")
+                    }
+                }
+                // A night the watch broke into a sleep and a nap, or into two
+                // halves with a wakeful hour between them, is two rows: one
+                // range would say the reader slept through what they did not.
+                ForEach(Array((newestSample?.sleepSessions ?? []).enumerated()), id: \.offset) { _, session in
+                    LabeledContent {
+                        Text("\(session.asleepMinutes) min")
+                    } label: {
+                        Text(
+                            session.start..<session.end,
+                            format: .interval.hour().minute()
+                        )
+                    }
+                }
             } header: {
                 if let summaryDate {
                     Text("Last Recorded \(summaryDate, format: .dateTime.weekday(.abbreviated).month().day())")
@@ -79,7 +97,7 @@ struct HealthContent: View {
                     BarMark(x: .value("Date", sample.date), y: .value("Steps", sample.steps))
                 }
                 .frame(minHeight: 180)
-                LabeledContent("Daily Average", value: averageSteps, format: .number)
+                LabeledContent("Daily Average", value: averages.steps, format: .number)
                 LabeledContent("Period Total", value: totalSteps, format: .number)
                 LabeledContent("Best Day", value: bestStepCount, format: .number)
             }
@@ -89,9 +107,14 @@ struct HealthContent: View {
                 }
                 .frame(minHeight: 180)
                 LabeledContent("Daily Average") {
-                    Text("\(averageSleep) min")
+                    Text("\(averages.sleepMinutes) min")
                 }
-                LabeledContent("Tracked Days", value: trackedSleepDays, format: .number)
+                if averages.deepSleepMinutes > 0 {
+                    LabeledContent("Deep Sleep Average") {
+                        Text("\(averages.deepSleepMinutes) min")
+                    }
+                }
+                LabeledContent("Tracked Days", value: averages.sleepDays, format: .number)
             }
             Button("Sync Health Data", systemImage: "arrow.triangle.2.circlepath", action: requestWatchSync)
                 .disabled(!isWatchConnected)
@@ -139,19 +162,14 @@ struct HealthContent: View {
         return samples.filter { $0.date >= start }
     }
 
-    private var averageSteps: Int {
-        filteredSamples.isEmpty ? 0 : filteredSamples.map(\.steps).reduce(0, +) / filteredSamples.count
-    }
+    /// Divided by the days that had something to say rather than by the days in
+    /// the period: a watch that was off the wrist on Sunday should not read as
+    /// a Sunday spent asleep for no minutes.
+    private var averages: PebbleHealthAverages { samples.averages(over: period.days) }
 
     private var totalSteps: Int { filteredSamples.map(\.steps).reduce(0, +) }
 
     private var bestStepCount: Int { filteredSamples.map(\.steps).max() ?? 0 }
-
-    private var averageSleep: Int {
-        filteredSamples.isEmpty ? 0 : filteredSamples.map(\.sleepMinutes).reduce(0, +) / filteredSamples.count
-    }
-
-    private var trackedSleepDays: Int { filteredSamples.count { $0.sleepMinutes > 0 } }
 }
 
 #Preview("Two weeks") {

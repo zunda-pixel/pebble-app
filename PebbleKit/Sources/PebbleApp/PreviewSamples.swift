@@ -156,10 +156,20 @@ enum PreviewSamples {
     ]
 
     static let healthSamples: [PebbleHealthSample] = (0..<14).reversed().map { day in
-        PebbleHealthSample(
-            date: Calendar.current.date(byAdding: .day, value: -day, to: .now) ?? .now,
+        let date = Calendar.current.date(byAdding: .day, value: -day, to: .now) ?? .now
+        let asleep = TimeInterval(360 + day * 17 % 120) * 60
+        let bedtime = Calendar.current.startOfDay(for: date).addingTimeInterval(-3600)
+        return PebbleHealthSample(
+            date: date,
             steps: 6_000 + day * 431 % 5_000,
-            sleepMinutes: 360 + day * 17 % 120
+            sleepMinutes: Int(asleep / 60),
+            deepSleepMinutes: Int(asleep / 60 / 4),
+            sleepSessions: [PebbleSleepSession(
+                start: bedtime,
+                end: bedtime.addingTimeInterval(asleep),
+                asleep: asleep,
+                deep: asleep / 4
+            )]
         )
     }
 

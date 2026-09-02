@@ -1439,6 +1439,26 @@
         }
       }
     },
+    "Deep Sleep" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "深い睡眠"
+          }
+        }
+      }
+    },
+    "Deep Sleep Average" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "深い睡眠の平均"
+          }
+        }
+      }
+    },
     "Delete all local health data?" : {
       "localizations" : {
         "ja" : {
