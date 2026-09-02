@@ -1973,10 +1973,16 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
         guard characteristic.uuid == Self.ppogNotifyCharacteristic,
               error == nil,
               characteristic.isNotifying else {
-            abortLink(
-                peripheral,
-                error: .protocolNegotiationFailed,
-                step: "subscribing to the watch's protocol characteristic: \(error?.localizedDescription ?? "it did not turn on")"
+            // A characteristic that will not turn on is the same problem as one
+            // that was never there: iOS is holding handles from the database the
+            // watch had last time, and a recovery firmware's database is not
+            // that one — hence "The handle is invalid". The watch has meanwhile
+            // subscribed to the phone's service, so hosting the transport is a
+            // way through rather than a reason to drop a watch that is talking.
+            startForwardTransport(
+                on: peripheral,
+                because: "the watch's own characteristic would not subscribe"
+                    + " (\(error?.localizedDescription ?? "it did not turn on"))"
             )
             return
         }
