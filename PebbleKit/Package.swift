@@ -39,11 +39,10 @@ let package = Package(
     .package(url: "https://github.com/gohanlon/swift-memberwise-init-macro.git", from: "0.6.0"),
     .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.20"),
     // Speex, which no Apple framework decodes and the watch gives no
-    // alternative to. A fork of sbooth/CSpeex, whose libspeex is the 1.2.1
-    // release: see the note on `PebbleAudio` below.
+    // alternative to. See the note on `PebbleAudio` below.
     .package(
-      url: "https://github.com/zunda-pixel/CSpeex.git",
-      branch: "sync-libspeex-with-upstream"
+      url: "https://github.com/zunda-pixel/speex.git",
+      branch: "swiftpm"
     ),
   ],
   targets: [
@@ -66,18 +65,17 @@ let package = Package(
     ),
     // What the watch's microphone sent, turned back into samples.
     //
-    // libspeex comes from a fork of sbooth/CSpeex whose sources are synced
-    // with upstream master — the same commit the watch's own encoder is built
-    // from. The 1.2.1 release that fork started from was cut from a release
-    // branch and predates four fixes, two of them on the path every frame
-    // takes: a division by zero in the wideband decoder and undefined
-    // behaviour in the bit reader. Issue #41 has the details, and the reason
-    // this is a branch rather than a version.
+    // libspeex comes from xiph's own repository, at the commit the watch's
+    // encoder is built from, with a manifest added and nothing else changed.
+    // Packagings of the 1.2.1 release are missing four upstream fixes, two of
+    // them on the path every frame takes — a division by zero in the wideband
+    // decoder and undefined behaviour in the bit reader. Issue #41 has the
+    // details, and the reason this is a branch rather than a version.
     .target(
       name: "PebbleAudio",
       dependencies: [
         .target(name: "PebbleProtocol"),
-        .product(name: "speex", package: "CSpeex"),
+        .product(name: "libspeex", package: "speex"),
       ],
       swiftSettings: swiftSettings
     ),
@@ -115,7 +113,7 @@ let package = Package(
         "PebbleTransport",
         .product(name: "HTTPTypes", package: "swift-http-types"),
         // The encoder, so a test can make the frames a watch would have sent.
-        .product(name: "speex", package: "CSpeex"),
+        .product(name: "libspeex", package: "speex"),
       ],
       swiftSettings: swiftSettings
     ),

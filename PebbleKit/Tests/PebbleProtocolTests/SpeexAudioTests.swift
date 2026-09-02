@@ -2,7 +2,7 @@ import Foundation
 import Testing
 import PebbleAudio
 import PebbleProtocol
-import speex
+import libspeex
 
 @Suite struct SpeexAudioTests {
     /// What the watch says about its own encoder: `voice_speex.c` fills this in
