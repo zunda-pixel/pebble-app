@@ -49,6 +49,14 @@ ships, so a green SwiftPM run says little about the app.
 - One build at a time. The project is a shared resource: two `BuildProject` or
   `RunAllTests` calls at once collide, so parallel workers must edit only and
   leave building to whoever coordinates them.
+- **Adding or removing a stored property on a `public` type in the package
+  needs the build products thrown away.** The incremental build leaves a test
+  bundle linked against the old memory layout, and the run then dies in
+  `libmalloc` or `os_unfair_lock` — thirty-odd tests "failing" with heap
+  corruption in code that has nothing to do with the change, each one passing
+  when run on its own. `rm -rf DerivedData/Pebble/Build/Products
+  DerivedData/Pebble/Build/Intermediates.noindex` and build again. A
+  memory-safety failure that a clean build makes go away was never in the code.
 - `XcodeRefreshCodeIssuesInFile` is the fast way to check one file before paying
   for a full build.
 

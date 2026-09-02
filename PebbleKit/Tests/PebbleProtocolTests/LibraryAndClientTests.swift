@@ -128,12 +128,13 @@ struct LibraryAndClientTests {
     @Test
     func diagnosticsKeepsBoundedHistoryAndExportsReport() async throws {
         let diagnostics = PebbleDiagnostics(maximumEntryCount: 2)
+        // Frames go to the log's own packet channel and nowhere near the report
+        // a reader shares: fifty a second of them would be the whole of it.
         await diagnostics.recordFrame(
             direction: "out",
             frame: PebbleProtocolFrame(endpoint: 48, payload: Array("private-token".utf8))
         )
-        let packetEntry = try #require(await diagnostics.snapshot().last)
-        #expect(!packetEntry.message.contains("private-token"))
+        #expect(await diagnostics.snapshot().isEmpty)
         await diagnostics.record(category: "test", message: "first")
         await diagnostics.record(.warning, category: "test", message: "second")
         await diagnostics.record(.error, category: "test", message: "third")

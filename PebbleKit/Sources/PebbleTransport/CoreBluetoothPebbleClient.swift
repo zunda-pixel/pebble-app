@@ -1054,21 +1054,11 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
 
         guard frame.endpoint == WatchVersionCodec.endpoint,
               pendingDevice != nil else {
-            // Audio arrives fifty frames a second and the app answers all of
-            // them, so recording each one filled the whole five-hundred-entry
-            // report with a single dictation and left nothing to diagnose with.
-            // The session says what it heard in one line instead.
+            // The audio endpoint sends fifty of these a second and the app
+            // answers all of them; the session says what it heard in one line.
             guard frame.endpoint != AudioStreamCodec.endpoint else { return }
-            Task { [tag = clientTag, endpoint = frame.endpoint, payload = frame.payload] in
-                await PebbleDiagnostics.shared.record(
-                    category: "packet",
-                    // Every frame is handed to the app as well, so this is only
-                    // ever about the transport: reading it as "the app ignored
-                    // this" sends a search for a missing feature to the wrong
-                    // layer.
-                    message: "[\(tag)] the transport has no answer for endpoint \(endpoint): "
-                        + payload.hexadecimalString
-                )
+            Task { [frame, tag = clientTag] in
+                await PebbleDiagnostics.shared.recordUnansweredFrame(frame, tag: tag)
             }
             return
         }

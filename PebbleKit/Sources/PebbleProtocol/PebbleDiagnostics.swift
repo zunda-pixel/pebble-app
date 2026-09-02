@@ -32,6 +32,15 @@ public actor PebbleDiagnostics {
     private var entries: [PebbleDiagnosticEntry] = []
     private var maximumEntryCount: Int
     private var logger = Logger(subsystem: "dev.pebble.app", category: "diagnostics")
+    /// Every frame that crosses the link, on its own channel.
+    ///
+    /// The endpoint, the direction and the size are enough to follow a whole
+    /// conversation without decoding anything, which is what most of the
+    /// diagnosing in this app has come down to — and they are of no use to
+    /// anyone reading a report, which is the other thing this type is for.
+    /// So they are logged where a person will not meet them by accident: their
+    /// own category, at `debug`, and never in the report below.
+    private let packetLogger = Logger(subsystem: "dev.pebble.app", category: "packet")
 
     public init(maximumEntryCount: Int = 500) {
         self.maximumEntryCount = max(1, maximumEntryCount)
@@ -55,10 +64,19 @@ public actor PebbleDiagnostics {
     }
 
     public func recordFrame(direction: String, frame: PebbleProtocolFrame) {
-        record(
-            category: "packet",
-            message: "\(direction) endpoint=\(frame.endpoint) bytes=\(frame.payload.count)"
-        )
+        let line = "\(direction) endpoint=\(frame.endpoint) bytes=\(frame.payload.count)"
+        packetLogger.debug("\(line, privacy: .public)")
+    }
+
+    /// A frame the transport itself had no answer for, with its bytes.
+    ///
+    /// The app is handed every frame as well, so this is not "nobody wanted
+    /// it" — and reading it that way sends the search for a missing feature to
+    /// the wrong layer. It goes on the packet channel with the rest.
+    public func recordUnansweredFrame(_ frame: PebbleProtocolFrame, tag: String) {
+        let line = "[\(tag)] the transport has no answer for endpoint \(frame.endpoint): "
+            + frame.payload.hexadecimalString
+        packetLogger.debug("\(line, privacy: .public)")
     }
 
     public func exportReport(
