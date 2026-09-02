@@ -1,5 +1,6 @@
 public import PebbleProtocol
 public import Foundation
+import Retry
 import SwiftUI
 
 extension AppModel {
@@ -30,6 +31,13 @@ extension AppModel {
         for connection in activeConnections {
             do {
                 try await connection.client.upsertTimelineReminder(reminder)
+                // Written down before it can be deleted: a reminder added,
+                // then deleted while the watch is away, is one only this record
+                // can name when the watch comes back.
+                let deviceID = connection.device.id
+                var written = (try? await reminderLibrary.writtenPinIDs(deviceID: deviceID)) ?? []
+                written.insert(reminder.id)
+                try? await reminderLibrary.setWrittenPinIDs(written, deviceID: deviceID)
             } catch {
                 reminderStatusMessage =
                     "\(connection.device.name) did not accept the reminder. \(Text(refusalReason(for: error)))"
@@ -49,11 +57,46 @@ extension AppModel {
         let identifiers = Set(removed.map(\.id))
         reminders.removeAll { identifiers.contains($0.id) }
         try? await reminderLibrary.save(reminders)
-        for reminder in removed {
-            for connection in activeConnections {
-                try? await connection.client.deleteTimelineReminder(id: reminder.id)
+        for connection in activeConnections {
+            // Named here as well as swept, because one the watch made was never
+            // written by this app and so is in nobody's record of what it holds.
+            await removeRemindersTheWatchStillHas(on: connection, alsoRemoving: identifiers)
+        }
+    }
+
+    /// Deletes the reminders this watch was given and the app no longer has.
+    ///
+    /// A reminder let go of while the watch was away used to be let go of here
+    /// too: the delete went to every connected watch and, when there were none,
+    /// to nobody. Nothing said it again, and the watch went on buzzing for a
+    /// reminder the reader had thrown away. BlobDB cannot be listed, so what
+    /// this app wrote is the only record of what to take back.
+    func removeRemindersTheWatchStillHas(
+        on connection: WatchConnection,
+        alsoRemoving extra: Set<UUID> = []
+    ) async {
+        let deviceID = connection.device.id
+        let written = (try? await reminderLibrary.writtenPinIDs(deviceID: deviceID)) ?? []
+        let forgotten = written.union(extra).subtracting(reminders.map(\.id))
+        guard !forgotten.isEmpty else { return }
+        var removed: Set<UUID> = []
+        let client = connection.client
+        for id in forgotten {
+            do {
+                try await retry(with: .watchWork) { try await client.deleteTimelineReminder(id: id) }
+                removed.insert(id)
+            } catch {
+                // Kept in the record, so the next connection asks again.
+                await PebbleDiagnostics.shared.record(
+                    .error,
+                    category: "timeline",
+                    message: "\(connection.device.name) kept a reminder that is gone here: "
+                        + String(reflecting: error)
+                )
+                break
             }
         }
+        try? await reminderLibrary.setWrittenPinIDs(written.subtracting(removed), deviceID: deviceID)
     }
 
     // One in the past has already been shown, or missed, and sending it would
@@ -61,17 +104,24 @@ extension AppModel {
     func synchronizeReminders(on connection: WatchConnection) async {
         guard connection.isConnected else { return }
         await loadReminders()
+        await removeRemindersTheWatchStillHas(on: connection)
+        let deviceID = connection.device.id
+        var written = (try? await reminderLibrary.writtenPinIDs(deviceID: deviceID)) ?? []
         for reminder in reminders where reminder.timestamp > .now && !reminder.isFromWatch {
             do {
                 try await connection.client.upsertTimelineReminder(reminder)
+                written.insert(reminder.id)
             } catch {
                 await PebbleDiagnostics.shared.record(
                     .error,
                     category: "timeline",
                     message: "\(connection.device.name) rejected a reminder: \(String(reflecting: error))"
                 )
-                return
+                break
             }
         }
+        // Whatever got through, so that a reminder deleted before the next
+        // connection can still be named.
+        try? await reminderLibrary.setWrittenPinIDs(written, deviceID: deviceID)
     }
 }

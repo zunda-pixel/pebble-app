@@ -641,12 +641,9 @@ struct AppModelTests {
         let model = AppModel(
             client: client,
             applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json")),
+            reminderLibrary: TimelinePinLibrary(fileURL: directory.appending(path: "reminders.json"))
         )
-        // The reminder library is the app's own file rather than something a test
-        // can point elsewhere, so this starts by emptying it.
-        await model.loadReminders()
-        await model.removeReminders(model.reminders)
         await model.connect(to: DiscoveredPebble(
             id: "mock-emery",
             name: "My Pebble",
@@ -666,6 +663,42 @@ struct AppModelTests {
         #expect(client.timelineReminders.map(\.title) == ["Later"])
 
         await model.removeReminders(model.reminders)
+    }
+
+    @Test
+    func aReminderDeletedWhileTheWatchWasAwayIsTakenOffItWhenItReturns() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: client,
+            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json")),
+            reminderLibrary: TimelinePinLibrary(fileURL: directory.appending(path: "reminders.json"))
+        )
+        let watch = DiscoveredPebble(
+            id: "mock-emery",
+            name: "My Pebble",
+            model: .pebbleTime2,
+            signalStrength: -50
+        )
+        await model.connect(to: watch)
+        await model.addReminder(title: "Dentist", date: .now.addingTimeInterval(3600))
+        #expect(client.timelineReminders.map(\.title) == ["Dentist"])
+
+        await model.disconnect()
+        await model.removeReminders(model.reminders)
+
+        // The watch was not there to be told, and nothing else was going to
+        // mention it again: it went on buzzing for a reminder that had been
+        // thrown away.
+        #expect(client.timelineReminders.map(\.title) == ["Dentist"])
+
+        await model.connect(to: watch)
+        let connection = try #require(model.connections.first)
+        await model.synchronizeReminders(on: connection)
+
+        #expect(client.timelineReminders.isEmpty)
     }
 
     @Test

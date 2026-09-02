@@ -180,9 +180,7 @@ public final class AppModel {
     let applicationLibrary: PebbleApplicationLibrary
     let watchLibrary: PebbleWatchLibrary
     let timelineLibrary = TimelinePinLibrary()
-    let reminderLibrary = TimelinePinLibrary(
-        fileURL: URL.applicationSupportDirectory.appending(path: "Pebble/reminders.json")
-    )
+    let reminderLibrary: TimelinePinLibrary
     let healthLibrary = PebbleHealthLibrary()
     let appCatalog = PebbleAppCatalog()
     let languagePackCatalog = PebbleLanguagePackCatalog()
@@ -254,6 +252,9 @@ public final class AppModel {
         applicationLibrary: PebbleApplicationLibrary = PebbleApplicationLibrary(),
         watchLibrary: PebbleWatchLibrary = PebbleWatchLibrary(),
         appGlanceLibrary: AppGlanceLibrary = AppGlanceLibrary(),
+        reminderLibrary: TimelinePinLibrary = TimelinePinLibrary(
+            fileURL: URL.applicationSupportDirectory.appending(path: "Pebble/reminders.json")
+        ),
         clientFactory: (@MainActor (String) -> any PebbleClient)? = nil
     ) {
         self.scannerClient = client
@@ -263,6 +264,7 @@ public final class AppModel {
         self.applicationLibrary = applicationLibrary
         self.watchLibrary = watchLibrary
         self.appGlanceLibrary = appGlanceLibrary
+        self.reminderLibrary = reminderLibrary
         companionNotificationsEnabled = Defaults[.companionNotificationsEnabled]
         activeWatchfaceID = Defaults[.activeWatchfaceID]
         favoriteWatchfaceIDs = Set(Defaults[.favoriteWatchfaceIDs])
