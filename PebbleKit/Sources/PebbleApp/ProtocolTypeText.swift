@@ -126,6 +126,25 @@ public extension NotificationAppMuteState {
     }
 }
 
+public extension NotificationVibePattern {
+    var title: LocalizedStringKey {
+        switch self {
+        case .silent: "No Buzz"
+        case .standard: "Standard"
+        case .pulses: "Pulses"
+        case .double: "Double"
+        case .triple: "Triple"
+        case .bloom: "Bloom"
+        case .pips: "Pips"
+        case .ole: "Olé"
+        case .sos: "SOS"
+        case .ohhhOh: "Ohhh, Oh"
+        case .five: "Five"
+        case .two: "Two"
+        }
+    }
+}
+
 public extension PebbleTimelineIcon {
     var title: LocalizedStringKey {
         switch self {

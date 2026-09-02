@@ -180,7 +180,8 @@ extension AppModel {
                 let apps = try? await notificationSourceAppLibrary.merge(app) {
                     notificationSourceApps = apps
                     connection.synchronizedNotificationAppRecords[app.bundleID] = NotificationAppsCodec.value(
-                        for: apps.first { $0.bundleID == app.bundleID } ?? app
+                        for: (apps.first { $0.bundleID == app.bundleID } ?? app)
+                            .asUnderstoodBy(connection.device)
                     )
                     succeeded = true
                     for other in activeConnections where other !== connection {
@@ -207,14 +208,17 @@ extension AppModel {
 
     func synchronizeNotificationSourceApps(on connection: WatchConnection) async {
         for app in notificationSourceApps {
-            let value = NotificationAppsCodec.value(for: app)
+            // Cut down here rather than in the client, so that what is written
+            // down as sent is the record that was sent.
+            let record = app.asUnderstoodBy(connection.device)
+            let value = NotificationAppsCodec.value(for: record)
             guard connection.synchronizedNotificationAppRecords[app.bundleID] != value else {
                 continue
             }
             do {
                 // Recorded as synchronized only once the watch says it took it, so a
                 // refusal is retried on the next pass.
-                try await connection.client.writeNotificationSourceApp(app)
+                try await connection.client.writeNotificationSourceApp(record)
                 connection.synchronizedNotificationAppRecords[app.bundleID] = value
             } catch {
                 await PebbleDiagnostics.shared.record(
@@ -252,6 +256,23 @@ extension AppModel {
         }
         app.backgroundColor = background
         app.foregroundColor = foreground
+        app.stateUpdated = .now
+        if let apps = try? await notificationSourceAppLibrary.update(app) {
+            notificationSourceApps = apps
+        }
+        for connection in activeConnections {
+            await synchronizeNotificationSourceApps(on: connection)
+        }
+    }
+
+    public func setNotificationSourceAppVibePattern(
+        bundleID: String,
+        pattern: NotificationVibePattern?
+    ) async {
+        guard var app = notificationSourceApps.first(where: { $0.bundleID == bundleID }) else {
+            return
+        }
+        app.vibePattern = pattern
         app.stateUpdated = .now
         if let apps = try? await notificationSourceAppLibrary.update(app) {
             notificationSourceApps = apps

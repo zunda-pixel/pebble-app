@@ -87,6 +87,14 @@ public struct PebbleDevice: Identifiable, Hashable, Sendable {
         WatchCapability.weatherApp.isSet(in: capabilities)
     }
 
+    public var supportsCustomVibePatterns: Bool {
+        WatchCapability.customVibePattern.isSet(in: capabilities)
+    }
+
+    public var supportsNotificationFiltering: Bool {
+        WatchCapability.notificationFiltering.isSet(in: capabilities)
+    }
+
     public var firmwareUpdateSlot: Int? {
         switch runningFirmwareSlot {
         case 0: 1

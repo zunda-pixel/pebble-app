@@ -12,6 +12,47 @@ public enum NotificationAppMuteState: UInt8, Codable, Equatable, Sendable, CaseI
     }
 }
 
+/// How the watch buzzes for one app's notifications.
+///
+/// A pattern is a run of durations in milliseconds that alternate, starting
+/// with the motor on: 200 on, 75 off, 200 on. The watch plays them exactly as
+/// given (`vibes_enqueue_custom_pattern` in `applib/ui/vibes.c`), so these are
+/// the same numbers the official app ships — a reader who knows a Pebble knows
+/// these buzzes.
+public enum NotificationVibePattern: String, Codable, Equatable, Sendable, CaseIterable {
+    case silent
+    case standard
+    case pulses
+    case double
+    case triple
+    case bloom
+    case pips
+    case ole
+    case sos
+    case ohhhOh
+    case five
+    case two
+
+    public var durations: [UInt32] {
+        switch self {
+        // Not "no pattern": an empty run would leave the watch to its own
+        // setting. One buzz of no length is how a phone says silence.
+        case .silent: [0]
+        case .standard: [500]
+        case .pulses: [50, 50, 50, 50, 50, 50, 50]
+        case .double: [200, 75, 200]
+        case .triple: [200, 75, 200, 75, 200]
+        case .bloom: [35, 61, 47, 53, 50, 40, 81, 171, 189, 236, 47, 70, 38, 44, 39, 62, 79, 171, 181]
+        case .pips: [40, 960, 40, 960, 40, 960, 40, 960, 40, 960, 500]
+        case .ole: [61, 194, 272, 153, 47, 77, 47, 78, 46, 89, 54, 78, 47, 70, 388]
+        case .sos: [100, 75, 100, 75, 100, 220, 300, 75, 300, 75, 300, 150, 100, 75, 100, 75, 100]
+        case .ohhhOh: [459, 522, 144, 171, 173, 162, 72, 135, 555, 386, 514]
+        case .five: [68, 178, 80, 237, 54, 95, 122, 221, 154, 221, 139, 218, 81, 161, 137, 189, 55, 95, 130, 211, 188, 178, 222]
+        case .two: [135, 269, 847, 394, 40, 159, 48, 170, 31, 144, 64, 136, 64, 162, 36, 163, 122]
+        }
+    }
+}
+
 /// The watch inserts a record for every app it sees sending notifications; the
 /// phone writes back the parts of it that are the reader's to choose.
 @MemberwiseInit(.public)
@@ -25,8 +66,25 @@ public struct NotificationSourceApp: Codable, Equatable, Sendable, Identifiable 
     public var icon: PebbleTimelineIcon? = nil
     public var backgroundColor: PebbleColor? = nil
     public var foregroundColor: PebbleColor? = nil
+    /// Nil leaves the watch its own vibration setting.
+    public var vibePattern: NotificationVibePattern? = nil
 
     public var id: String { bundleID }
+
+    /// The record as this watch can take it.
+    ///
+    /// An attribute a watch never said it supports is not one to send. The
+    /// firmware writes an attribute it does not know into a stack array without
+    /// checking the bounds (#13), so the cost of guessing is not a setting that
+    /// fails to apply.
+    ///
+    /// A watch that reports no capabilities at all has not been asked yet;
+    /// nothing extra goes to it either.
+    public func asUnderstoodBy(_ device: PebbleDevice) -> NotificationSourceApp {
+        var record = self
+        if !device.supportsCustomVibePatterns { record.vibePattern = nil }
+        return record
+    }
 }
 
 public enum NotificationAppsCodec {
@@ -39,6 +97,7 @@ public enum NotificationAppsCodec {
     static let iconAttribute: UInt8 = 48
     static let foregroundColorAttribute: UInt8 = 27
     static let backgroundColorAttribute: UInt8 = 28
+    static let vibrationPatternAttribute: UInt8 = 49
     static let maximumNameLength = 40
 
     public static func key(for app: NotificationSourceApp) -> [UInt8] {
@@ -64,6 +123,9 @@ public enum NotificationAppsCodec {
         }
         if let foreground = app.foregroundColor {
             attributes.append(attribute(id: foregroundColorAttribute, content: [foreground.argb]))
+        }
+        if let pattern = app.vibePattern {
+            attributes.append(attribute(id: vibrationPatternAttribute, content: uint32List(pattern.durations)))
         }
 
         var value: [UInt8] = UInt32(0).littleEndianBytes
@@ -142,6 +204,20 @@ public enum NotificationAppsCodec {
 
     private static func attribute(id: UInt8, content: [UInt8]) -> [UInt8] {
         [id, UInt8(content.count & 0xFF), UInt8(content.count >> 8)] + content
+    }
+
+    /// The firmware's `Uint32List`: a count and then the values.
+    ///
+    /// The count is declared `uint16_t` in front of a `uint32_t` array, so the
+    /// compiler puts two bytes of padding after it and the values start at four
+    /// (`Uint32ListSize` in `attribute.h`). The padding is on the wire whether
+    /// anything is written into it or not.
+    private static func uint32List(_ values: [UInt32]) -> [UInt8] {
+        var content = UInt16(clamping: values.count).littleEndianBytes + [0, 0]
+        for value in values {
+            content.append(contentsOf: value.littleEndianBytes)
+        }
+        return content
     }
 
     private static func trimmedName(_ name: String) -> [UInt8] {
@@ -289,11 +365,12 @@ public actor NotificationSourceAppLibrary {
         if let index = apps.firstIndex(where: { $0.bundleID == app.bundleID }) {
             if app.stateUpdated > apps[index].stateUpdated {
                 var merged = app
-                // The watch's record says nothing about the icon or the colours, which are
-                // the phone's to choose.
+                // The watch's record says nothing about the icon, the colours or
+                // the buzz, which are the phone's to choose.
                 merged.icon = apps[index].icon
                 merged.backgroundColor = apps[index].backgroundColor
                 merged.foregroundColor = apps[index].foregroundColor
+                merged.vibePattern = apps[index].vibePattern
                 apps[index] = merged
             }
         } else {

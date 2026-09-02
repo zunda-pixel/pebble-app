@@ -794,6 +794,48 @@ struct NotificationAppsTests {
         #expect(Array(value.suffix(7)) == [48, 0x04, 0x00, 45, 0x00, 0x00, 0x80])
     }
 
+    @Test func aBuzzIsWrittenAsDurationsTheWatchPlaysInTurn() {
+        var app = NotificationSourceApp(
+            bundleID: "com.example.chat",
+            displayName: "Chat",
+            stateUpdated: Date(timeIntervalSince1970: 0)
+        )
+        app.vibePattern = .double
+
+        let value = NotificationAppsCodec.value(for: app)
+
+        // A count of three, the two bytes of padding the C struct puts after a
+        // uint16 in front of a uint32 array, and then 200 on, 75 off, 200 on.
+        #expect(Array(value.suffix(19)) == [
+            49, 0x10, 0x00,
+            0x03, 0x00, 0x00, 0x00,
+            0xC8, 0x00, 0x00, 0x00,
+            0x4B, 0x00, 0x00, 0x00,
+            0xC8, 0x00, 0x00, 0x00,
+        ])
+    }
+
+    @Test func aBuzzIsNotSentToAWatchThatNeverSaidItCouldPlayOne() {
+        var app = NotificationSourceApp(bundleID: "com.example.chat", displayName: "Chat")
+        app.vibePattern = .sos
+        var watch = PebbleDevice(
+            id: "watch",
+            name: "Pebble",
+            model: .pebbleTime2,
+            firmwareVersion: nil,
+            batteryLevel: nil
+        )
+
+        // An attribute the firmware does not know is written into a stack array
+        // without a bounds check (#13), so an unasked-for one is not a setting
+        // that fails to apply.
+        #expect(watch.capabilities == 0)
+        #expect(app.asUnderstoodBy(watch).vibePattern == nil)
+
+        watch.capabilities = 1 << 15
+        #expect(app.asUnderstoodBy(watch).vibePattern == .sos)
+    }
+
     @Test func decodesWatchWrittenRecord() throws {
         // Value layout captured from a real iOS ANCS write in the reference test suite.
         let value: [UInt8] = [

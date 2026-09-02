@@ -26,7 +26,16 @@ struct NotificationAppView: View {
                         foreground: foreground
                     )
                 }
-            }
+            },
+            setVibePattern: { pattern in
+                Task {
+                    await model.setNotificationSourceAppVibePattern(
+                        bundleID: app.bundleID,
+                        pattern: pattern
+                    )
+                }
+            },
+            supportsVibePatterns: model.connections.contains { $0.device.supportsCustomVibePatterns }
         )
     }
 }
@@ -37,6 +46,9 @@ struct NotificationAppContent: View {
     var setMute: (NotificationAppMuteState) -> Void
     var setIcon: (PebbleTimelineIcon?) -> Void
     var setColours: (_ background: PebbleColor?, _ foreground: PebbleColor?) -> Void
+    var setVibePattern: (NotificationVibePattern?) -> Void
+    /// Older firmware plays its own buzz and cannot be told another.
+    var supportsVibePatterns: Bool = true
 
     private var current: NotificationSourceApp { app }
 
@@ -53,6 +65,27 @@ struct NotificationAppContent: View {
                 }
             } header: {
                 Text("Notifications")
+            }
+
+            Section {
+                Picker("Buzz", selection: Binding(
+                    get: { current.vibePattern },
+                    set: { pattern in setVibePattern(pattern) }
+                )) {
+                    Text("Chosen by the Watch").tag(NotificationVibePattern?.none)
+                    ForEach(NotificationVibePattern.allCases, id: \.self) { pattern in
+                        Text(pattern.title).tag(NotificationVibePattern?.some(pattern))
+                    }
+                }
+                .disabled(!supportsVibePatterns)
+            } header: {
+                Text("Vibration")
+            } footer: {
+                if supportsVibePatterns {
+                    Text("The watch buzzes the way its own settings say unless one is chosen here.")
+                } else {
+                    Text("This watch's firmware plays the buzz its own settings choose and cannot be told another.")
+                }
             }
 
             Section {
@@ -151,7 +184,21 @@ struct ColourGrid: View {
             app: PreviewSamples.notificationApps[1],
             setMute: { _ in },
             setIcon: { _ in },
-            setColours: { _, _ in }
+            setColours: { _, _ in },
+            setVibePattern: { _ in }
+        )
+    }
+}
+
+#Preview("App on older firmware") {
+    NavigationStack {
+        NotificationAppContent(
+            app: PreviewSamples.notificationApps[1],
+            setMute: { _ in },
+            setIcon: { _ in },
+            setColours: { _, _ in },
+            setVibePattern: { _ in },
+            supportsVibePatterns: false
         )
     }
 }
