@@ -53,6 +53,30 @@ public enum NotificationVibePattern: String, Codable, Equatable, Sendable, CaseI
     }
 }
 
+/// Which part of a notification a rule reads.
+public enum NotificationRuleField: UInt8, Codable, Equatable, Sendable, CaseIterable {
+    /// The title and the body. The watch shows the subtitle on the title line,
+    /// so a title rule reads that too (`ancs_filtering.c`).
+    case anywhere = 0
+    case title = 1
+    case body = 2
+}
+
+/// A notification the reader does not want shown, named by something in it.
+///
+/// The watch looks for the pattern inside the field and drops the notification
+/// when it finds it. It compares plainly — the firmware's own comparison, which
+/// folds only ASCII letters when the rule is not case-sensitive. There is a
+/// regular-expression rule type on the wire and the firmware answers `false` to
+/// every one of them, so this app does not offer it.
+@MemberwiseInit(.public)
+public struct NotificationFilterRule: Codable, Equatable, Sendable, Identifiable {
+    public var id: UUID = UUID()
+    public var pattern: String
+    public var field: NotificationRuleField = .anywhere
+    public var caseSensitive: Bool = false
+}
+
 /// The watch inserts a record for every app it sees sending notifications; the
 /// phone writes back the parts of it that are the reader's to choose.
 @MemberwiseInit(.public)
@@ -68,6 +92,8 @@ public struct NotificationSourceApp: Codable, Equatable, Sendable, Identifiable 
     public var foregroundColor: PebbleColor? = nil
     /// Nil leaves the watch its own vibration setting.
     public var vibePattern: NotificationVibePattern? = nil
+    /// Notifications from this app the watch is to drop rather than show.
+    public var filterRules: [NotificationFilterRule] = []
 
     public var id: String { bundleID }
 
@@ -83,6 +109,7 @@ public struct NotificationSourceApp: Codable, Equatable, Sendable, Identifiable 
     public func asUnderstoodBy(_ device: PebbleDevice) -> NotificationSourceApp {
         var record = self
         if !device.supportsCustomVibePatterns { record.vibePattern = nil }
+        if !device.supportsNotificationFiltering { record.filterRules = [] }
         return record
     }
 }
@@ -98,7 +125,13 @@ public enum NotificationAppsCodec {
     static let foregroundColorAttribute: UInt8 = 27
     static let backgroundColorAttribute: UInt8 = 28
     static let vibrationPatternAttribute: UInt8 = 49
+    static let filteringRulesAttribute: UInt8 = 51
     static let maximumNameLength = 40
+    /// What the firmware keeps of a string list; the rest it throws away
+    /// (`MAX_LENGTH_CANNED_RESPONSES` in `attribute.c`). A rule cut in half
+    /// would match something nobody asked for, so whole rules are dropped
+    /// instead.
+    static let maximumRulesLength = 512
 
     public static func key(for app: NotificationSourceApp) -> [UInt8] {
         Array(app.bundleID.utf8)
@@ -126,6 +159,10 @@ public enum NotificationAppsCodec {
         }
         if let pattern = app.vibePattern {
             attributes.append(attribute(id: vibrationPatternAttribute, content: uint32List(pattern.durations)))
+        }
+        let rules = filteringRules(app.filterRules)
+        if !rules.isEmpty {
+            attributes.append(attribute(id: filteringRulesAttribute, content: rules))
         }
 
         var value: [UInt8] = UInt32(0).littleEndianBytes
@@ -204,6 +241,28 @@ public enum NotificationAppsCodec {
 
     private static func attribute(id: UInt8, content: [UInt8]) -> [UInt8] {
         [id, UInt8(content.count & 0xFF), UInt8(content.count >> 8)] + content
+    }
+
+    /// The rules as the watch reads them: a count, and then each rule as three
+    /// bytes and a pattern that ends at a zero.
+    ///
+    /// A pattern of no length matches everything the app sends, and one with a
+    /// zero in it ends where the reader did not mean it to, so neither is sent.
+    /// Rules past what the firmware keeps are dropped whole: half a pattern
+    /// would silence something nobody named.
+    static func filteringRules(_ rules: [NotificationFilterRule]) -> [UInt8] {
+        var bodies: [[UInt8]] = []
+        var length = 1
+        for rule in rules {
+            let pattern = Array(rule.pattern.utf8)
+            guard !pattern.isEmpty, !pattern.contains(0) else { continue }
+            let body = [0x00, rule.field.rawValue, rule.caseSensitive ? 1 : 0] + pattern + [0x00]
+            guard length + body.count <= maximumRulesLength, bodies.count < 255 else { break }
+            length += body.count
+            bodies.append(body)
+        }
+        guard !bodies.isEmpty else { return [] }
+        return [UInt8(bodies.count)] + bodies.flatMap { $0 }
     }
 
     /// The firmware's `Uint32List`: a count and then the values.
@@ -371,6 +430,7 @@ public actor NotificationSourceAppLibrary {
                 merged.backgroundColor = apps[index].backgroundColor
                 merged.foregroundColor = apps[index].foregroundColor
                 merged.vibePattern = apps[index].vibePattern
+                merged.filterRules = apps[index].filterRules
                 apps[index] = merged
             }
         } else {

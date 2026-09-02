@@ -12,17 +12,19 @@ struct NotificationAppsView: View {
             },
             destination: { app in
                 NotificationAppView(model: model, app: app)
-            }
+            },
+            historyDestination: { NotificationHistoryView(model: model) }
         )
     }
 }
 
 /// The list is as long as the reader's phone is busy, so it is searchable
 /// rather than one run of rows.
-struct NotificationAppsContent<Destination: View>: View {
+struct NotificationAppsContent<Destination: View, HistoryDestination: View>: View {
     var apps: [NotificationSourceApp]
     var remove: ([NotificationSourceApp]) -> Void
     @ViewBuilder var destination: (NotificationSourceApp) -> Destination
+    @ViewBuilder var historyDestination: () -> HistoryDestination
 
     @State private var search = ""
 
@@ -37,6 +39,14 @@ struct NotificationAppsContent<Destination: View>: View {
 
     var body: some View {
         List {
+            Section {
+                NavigationLink {
+                    historyDestination()
+                } label: {
+                    Label("Sent Notifications", systemImage: "clock.arrow.circlepath")
+                }
+            }
+
             Section {
                 ForEach(matches) { app in
                     NavigationLink {
@@ -78,7 +88,8 @@ struct NotificationAppsContent<Destination: View>: View {
         NotificationAppsContent(
             apps: PreviewSamples.notificationApps,
             remove: { _ in },
-            destination: { app in Text(verbatim: app.bundleID) }
+            destination: { app in Text(verbatim: app.bundleID) },
+            historyDestination: { EmptyView() }
         )
     }
 }
@@ -88,7 +99,8 @@ struct NotificationAppsContent<Destination: View>: View {
         NotificationAppsContent(
             apps: [],
             remove: { _ in },
-            destination: { _ in EmptyView() }
+            destination: { _ in EmptyView() },
+            historyDestination: { EmptyView() }
         )
     }
 }

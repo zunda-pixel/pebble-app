@@ -34,6 +34,54 @@ private func loadQueue<Work: Codable & Equatable & Sendable>(
     return try PersistentJSON.loadRecovering([PendingDelivery<Work>].self, from: url) ?? []
 }
 
+/// A notification this app sent to a watch, and what became of it.
+///
+/// Only this app's own. A notification from another phone app goes to the watch
+/// over ANCS, which is a conversation between iOS and the watch that no app can
+/// listen in on — the screen says so rather than showing a list that looks
+/// short for no reason.
+@MemberwiseInit(.public)
+public struct SentNotification: Codable, Equatable, Sendable, Identifiable {
+    public var id: UUID = UUID()
+    public var appName: String
+    public var title: String
+    public var body: String
+    public var sentAt: Date = Date()
+    /// Empty when no watch would take it; it is then queued and appears again
+    /// as its own entry when a watch does.
+    public var watchNames: [String] = []
+}
+
+public actor SentNotificationLibrary {
+    /// Long enough to answer "did it go?" about this morning, short enough that
+    /// the file stays small and nothing is kept that nobody will read.
+    static let capacity = 100
+
+    private var fileURL: URL
+
+    public init(fileURL: URL? = nil) {
+        self.fileURL = fileURL ?? applicationSupportURL("sent-notifications.json")
+    }
+
+    public func notifications() throws -> [SentNotification] {
+        try PersistentJSON.loadRecovering([SentNotification].self, from: fileURL) ?? []
+    }
+
+    public func record(_ notification: SentNotification) throws -> [SentNotification] {
+        var kept = try notifications()
+        kept.insert(notification, at: 0)
+        if kept.count > Self.capacity {
+            kept.removeLast(kept.count - Self.capacity)
+        }
+        try PersistentJSON.save(kept, to: fileURL)
+        return kept
+    }
+
+    public func clear() throws {
+        try PersistentJSON.save([SentNotification](), to: fileURL)
+    }
+}
+
 /// Work queued while no watch is connected, kept so a reconnect can finish it.
 public actor PendingNotificationLibrary {
     private var fileURL: URL

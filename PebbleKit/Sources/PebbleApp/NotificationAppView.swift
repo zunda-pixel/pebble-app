@@ -35,13 +35,14 @@ struct NotificationAppView: View {
                     )
                 }
             },
-            supportsVibePatterns: model.connections.contains { $0.device.supportsCustomVibePatterns }
+            supportsVibePatterns: model.connections.contains { $0.device.supportsCustomVibePatterns },
+            rulesDestination: { NotificationRulesView(model: model, app: app) }
         )
     }
 }
 
 /// One phone app's notifications, as the watch shows them.
-struct NotificationAppContent: View {
+struct NotificationAppContent<RulesDestination: View>: View {
     var app: NotificationSourceApp
     var setMute: (NotificationAppMuteState) -> Void
     var setIcon: (PebbleTimelineIcon?) -> Void
@@ -49,6 +50,7 @@ struct NotificationAppContent: View {
     var setVibePattern: (NotificationVibePattern?) -> Void
     /// Older firmware plays its own buzz and cannot be told another.
     var supportsVibePatterns: Bool = true
+    @ViewBuilder var rulesDestination: () -> RulesDestination
 
     private var current: NotificationSourceApp { app }
 
@@ -61,6 +63,13 @@ struct NotificationAppContent: View {
                 )) {
                     ForEach(NotificationAppMuteState.allCases, id: \.self) { state in
                         Text(state.title).tag(state)
+                    }
+                }
+                NavigationLink {
+                    rulesDestination()
+                } label: {
+                    LabeledContent("Rules") {
+                        Text(current.filterRules.count, format: .number)
                     }
                 }
             } header: {
@@ -185,7 +194,8 @@ struct ColourGrid: View {
             setMute: { _ in },
             setIcon: { _ in },
             setColours: { _, _ in },
-            setVibePattern: { _ in }
+            setVibePattern: { _ in },
+            rulesDestination: { EmptyView() }
         )
     }
 }
@@ -198,7 +208,8 @@ struct ColourGrid: View {
             setIcon: { _ in },
             setColours: { _, _ in },
             setVibePattern: { _ in },
-            supportsVibePatterns: false
+            supportsVibePatterns: false,
+            rulesDestination: { EmptyView() }
         )
     }
 }

@@ -58,6 +58,9 @@ public final class AppModel {
     public internal(set) var companionNotificationsEnabled = true
     public internal(set) var notificationStatusMessage: LocalizedStringKey?
     public internal(set) var notificationPreferences = NotificationDeliveryPreferences()
+    /// Newest first. Only the notifications this app sent: another phone app's
+    /// go to the watch over ANCS, where no app can see them.
+    public internal(set) var sentNotifications: [SentNotification] = []
     public internal(set) var savedWatches: [SavedPebbleWatch] = []
     public internal(set) var unknownBondedWatches: [UnknownBondedWatch] = []
     public internal(set) var watchManagementErrorMessage: LocalizedStringKey?
@@ -191,6 +194,7 @@ public final class AppModel {
     }
     let phoneLocationSource = PhoneLocationSource()
     let pendingNotificationLibrary = PendingNotificationLibrary()
+    let sentNotificationLibrary = SentNotificationLibrary()
     let notificationPreferenceLibrary = NotificationPreferenceLibrary()
     let pendingTimelineOperationLibrary = PendingTimelineOperationLibrary()
     let pendingAppMessageLibrary = PendingAppMessageLibrary()
@@ -274,6 +278,7 @@ public final class AppModel {
         loadWeatherPlaces()
         loadWatchSettings()
         notificationSourceApps = (try? await notificationSourceAppLibrary.apps()) ?? []
+        sentNotifications = (try? await sentNotificationLibrary.notifications()) ?? []
         musicCoordinator.start()
         phoneCallCoordinator.start()
         observeWatchesReconnectingThemselves()

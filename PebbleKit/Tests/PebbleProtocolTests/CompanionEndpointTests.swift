@@ -836,6 +836,63 @@ struct NotificationAppsTests {
         #expect(app.asUnderstoodBy(watch).vibePattern == .sos)
     }
 
+    @Test func aRuleIsWrittenAsThreeBytesAndAPatternThatEndsAtAZero() {
+        var app = NotificationSourceApp(
+            bundleID: "com.example.chat",
+            displayName: "Chat",
+            stateUpdated: Date(timeIntervalSince1970: 0)
+        )
+        app.filterRules = [
+            NotificationFilterRule(pattern: "ad", field: .body),
+            NotificationFilterRule(pattern: "Hi", field: .title, caseSensitive: true),
+        ]
+
+        let value = NotificationAppsCodec.value(for: app)
+
+        #expect(Array(value.suffix(16)) == [
+            51, 0x0D, 0x00,
+            0x02,
+            // Plain text, in the body, either case: "ad".
+            0x00, 0x02, 0x00, 0x61, 0x64, 0x00,
+            // Plain text, in the title, as written: "Hi".
+            0x00, 0x01, 0x01, 0x48, 0x69, 0x00,
+        ])
+    }
+
+    @Test func aRuleThatWouldSilenceEverythingIsNotSent() {
+        // The firmware's own comparison answers true for a pattern of no
+        // length, so an empty rule mutes the app outright; a pattern with a
+        // zero in it ends where the reader did not put the end.
+        #expect(NotificationAppsCodec.filteringRules([
+            NotificationFilterRule(pattern: ""),
+            NotificationFilterRule(pattern: "a\u{0}b"),
+        ]).isEmpty)
+
+        // What the firmware keeps of a string list is 512 bytes, and a rule cut
+        // in half would match something nobody asked for.
+        let long = (0..<20).map { NotificationFilterRule(pattern: String(repeating: "x", count: 40) + "\($0)") }
+        let bytes = NotificationAppsCodec.filteringRules(long)
+        #expect(bytes.count <= 512)
+        #expect(bytes[0] == 11)
+    }
+
+    @Test func rulesAreNotSentToAWatchThatDoesNotFilter() {
+        var app = NotificationSourceApp(bundleID: "com.example.chat", displayName: "Chat")
+        app.filterRules = [NotificationFilterRule(pattern: "ad")]
+        var watch = PebbleDevice(
+            id: "watch",
+            name: "Pebble",
+            model: .pebbleTime2,
+            firmwareVersion: nil,
+            batteryLevel: nil
+        )
+
+        #expect(app.asUnderstoodBy(watch).filterRules.isEmpty)
+
+        watch.capabilities = 1 << 9
+        #expect(app.asUnderstoodBy(watch).filterRules.count == 1)
+    }
+
     @Test func decodesWatchWrittenRecord() throws {
         // Value layout captured from a real iOS ANCS write in the reference test suite.
         let value: [UInt8] = [

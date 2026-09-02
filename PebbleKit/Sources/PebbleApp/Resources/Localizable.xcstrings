@@ -279,6 +279,16 @@
         }
       }
     },
+    "A notification the watch is about to show is dropped when one of these is found in it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "これらのいずれかが見つかった通知は、ウォッチに表示されずに破棄されます。"
+          }
+        }
+      }
+    },
     "A PBL pack built for this watch's board. A pack built for another board installs but shows the wrong glyphs." : {
       "localizations" : {
         "ja" : {
@@ -485,6 +495,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "+ボタンで追加するか、カレンダーを同期してください。"
+          }
+        }
+      }
+    },
+    "Add Rule" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ルールを追加"
           }
         }
       }
@@ -849,6 +869,16 @@
         }
       }
     },
+    "Body" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "本文"
+          }
+        }
+      }
+    },
     "Browse" : {
       "localizations" : {
         "ja" : {
@@ -1045,6 +1075,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このウォッチのピンをすべて消去しますか？"
+          }
+        }
+      }
+    },
+    "Clear History" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "履歴を消去"
           }
         }
       }
@@ -1685,6 +1725,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "1時間ごと"
+          }
+        }
+      }
+    },
+    "Every notification from this app reaches the watch." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このアプリの通知はすべてウォッチに届きます。"
           }
         }
       }
@@ -2429,6 +2479,16 @@
         }
       }
     },
+    "Look in" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "探す場所"
+          }
+        }
+      }
+    },
     "Looking for published firmware…" : {
       "localizations" : {
         "ja" : {
@@ -2455,6 +2515,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このウォッチフェイスを適用します"
+          }
+        }
+      }
+    },
+    "Match Upper and Lower Case" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "大文字と小文字を区別"
           }
         }
       }
@@ -2619,6 +2689,16 @@
         }
       }
     },
+    "New Rule" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "新しいルール"
+          }
+        }
+      }
+    },
     "News" : {
       "localizations" : {
         "ja" : {
@@ -2779,6 +2859,16 @@
         }
       }
     },
+    "Nothing Sent Yet" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "まだ何も送信していません"
+          }
+        }
+      }
+    },
     "Nothing was lost. Connect the watch to try again." : {
       "localizations" : {
         "ja" : {
@@ -2875,6 +2965,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチ上"
+          }
+        }
+      }
+    },
+    "Only what this app sent. Notifications from your other apps go from iOS to the watch directly, and no app on the phone is shown what is in them." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このアプリが送信したものだけです。ほかのアプリの通知はiOSからウォッチへ直接届くため、iPhone上のどのアプリもその内容を見ることはできません。"
           }
         }
       }
@@ -3525,6 +3625,16 @@
         }
       }
     },
+    "Rules" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ルール"
+          }
+        }
+      }
+    },
     "Running recovery firmware" : {
       "localizations" : {
         "ja" : {
@@ -3611,6 +3721,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "“%@”をウォッチに送信中…"
+          }
+        }
+      }
+    },
+    "Sent Notifications" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "送信した通知"
           }
         }
       }
@@ -4781,6 +4901,16 @@
         }
       }
     },
+    "The words are looked for anywhere in the text, and the watch compares them letter by letter — it folds case for English letters only." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "語句はテキストのどこにあっても一致します。ウォッチは1文字ずつ比較し、大文字と小文字の同一視は英字にのみ行います。"
+          }
+        }
+      }
+    },
     "There is no room left on the watch." : {
       "localizations" : {
         "ja" : {
@@ -4891,6 +5021,16 @@
         }
       }
     },
+    "This watch's firmware does not filter notifications, so these are kept here until one that does connects." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このウォッチのファームウェアは通知をフィルタできないため、対応したウォッチが接続するまでルールはここに保存されます。"
+          }
+        }
+      }
+    },
     "This watch's firmware plays the buzz its own settings choose and cannot be told another." : {
       "localizations" : {
         "ja" : {
@@ -4977,6 +5117,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "タイトル"
+          }
+        }
+      }
+    },
+    "Title or Body" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "タイトルまたは本文"
           }
         }
       }
@@ -5181,6 +5331,16 @@
         }
       }
     },
+    "Upper and lower case must match" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "大文字と小文字を区別します"
+          }
+        }
+      }
+    },
     "Use Where the Phone Is" : {
       "localizations" : {
         "ja" : {
@@ -5277,6 +5437,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチアプリの通知"
+          }
+        }
+      }
+    },
+    "Watch app notifications and test notifications appear here once one has gone out." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチアプリの通知とテスト通知は、送信されるとここに表示されます。"
           }
         }
       }
@@ -5447,6 +5617,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "手順"
+          }
+        }
+      }
+    },
+    "Words to look for" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "探す語句"
           }
         }
       }

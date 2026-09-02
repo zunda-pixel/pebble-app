@@ -138,6 +138,23 @@ enum PreviewSamples {
         NotificationSourceApp(bundleID: "com.apple.mobilecal", displayName: "カレンダー", muteState: .weekends),
     ]
 
+    static let sentNotifications: [SentNotification] = [
+        SentNotification(
+            appName: "Pebble",
+            title: "Pebble Test",
+            body: "Notifications are reaching your watch.",
+            sentAt: Date(timeIntervalSince1970: 1_788_349_380),
+            watchNames: ["My Pebble"]
+        ),
+        SentNotification(
+            appName: "Weather",
+            title: "Rain in Kyoto",
+            body: "It starts at about four.",
+            sentAt: Date(timeIntervalSince1970: 1_788_345_780),
+            watchNames: ["My Pebble", "Pebble Time 2"]
+        ),
+    ]
+
     static let healthSamples: [PebbleHealthSample] = (0..<14).reversed().map { day in
         PebbleHealthSample(
             date: Calendar.current.date(byAdding: .day, value: -day, to: .now) ?? .now,

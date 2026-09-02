@@ -32,14 +32,16 @@ extension AppModel {
             notificationStatusMessage = "Connect a Pebble before sending a test notification."
             return
         }
+        let notification = PebbleTimelineNotification(
+            parentApplicationID: UUID(),
+            title: "Pebble Test",
+            body: "Notifications are reaching your watch.",
+            appName: "Pebble"
+        )
         do {
-            try await connection.client.sendNotification(PebbleTimelineNotification(
-                parentApplicationID: UUID(),
-                title: "Pebble Test",
-                body: "Notifications are reaching your watch.",
-                appName: "Pebble"
-            ))
+            try await connection.client.sendNotification(notification)
             notificationStatusMessage = "Test notification sent."
+            await record(notification, sentTo: [connection.device.name])
             await PebbleDiagnostics.shared.record(
                 category: "notification",
                 message: "Test notification sent"
@@ -100,6 +102,7 @@ extension AppModel {
             return
         }
         var delivered: Set<String> = []
+        var watchNames: [String] = []
         for connection in activeConnections {
             let client = connection.client
             do {
@@ -107,9 +110,13 @@ extension AppModel {
                     try await client.sendNotification(notification)
                 }
                 delivered.insert(connection.device.id)
+                watchNames.append(connection.device.name)
             } catch {
                 continue
             }
+        }
+        if !watchNames.isEmpty {
+            await record(notification, sentTo: watchNames)
         }
         guard activeConnections.allSatisfy({ delivered.contains($0.device.id) }) else {
             // The only caller is a `try?`-ed task in the companion runtime, which has
@@ -126,6 +133,24 @@ extension AppModel {
             category: "notification",
             message: "Watch app notification sent"
         )
+    }
+
+    func record(_ notification: PebbleTimelineNotification, sentTo watchNames: [String]) async {
+        let sent = SentNotification(
+            appName: notification.appName ?? "",
+            title: notification.title,
+            body: notification.body,
+            sentAt: notification.timestamp,
+            watchNames: watchNames
+        )
+        if let history = try? await sentNotificationLibrary.record(sent) {
+            sentNotifications = history
+        }
+    }
+
+    public func forgetSentNotifications() async {
+        try? await sentNotificationLibrary.clear()
+        sentNotifications = []
     }
 
     private func queue(_ notification: PendingDelivery<PebbleTimelineNotification>, reason: String) async {
@@ -282,6 +307,23 @@ extension AppModel {
         }
     }
 
+    public func setNotificationSourceAppFilterRules(
+        bundleID: String,
+        rules: [NotificationFilterRule]
+    ) async {
+        guard var app = notificationSourceApps.first(where: { $0.bundleID == bundleID }) else {
+            return
+        }
+        app.filterRules = rules
+        app.stateUpdated = .now
+        if let apps = try? await notificationSourceAppLibrary.update(app) {
+            notificationSourceApps = apps
+        }
+        for connection in activeConnections {
+            await synchronizeNotificationSourceApps(on: connection)
+        }
+    }
+
     public func setNotificationSourceAppMute(bundleID: String, muteState: NotificationAppMuteState) async {
         guard var app = notificationSourceApps.first(where: { $0.bundleID == bundleID }) else {
             return
@@ -372,6 +414,7 @@ extension AppModel {
             activeConnections.contains { queued.isOwed(by: $0.device.id) }
         }) {
             var delivered = next.deliveredTo
+            var watchNames: [String] = []
             for connection in activeConnections where next.isOwed(by: connection.device.id) {
                 let client = connection.client
                 do {
@@ -379,9 +422,13 @@ extension AppModel {
                         try await client.sendNotification(next.work)
                     }
                     delivered.insert(connection.device.id)
+                    watchNames.append(connection.device.name)
                 } catch {
                     continue
                 }
+            }
+            if !watchNames.isEmpty {
+                await record(next.work, sentTo: watchNames)
             }
             // Found again by identity: sending suspends, so the queue need not
             // still hold this one where it did.
