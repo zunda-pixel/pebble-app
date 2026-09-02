@@ -208,7 +208,9 @@ extension AppModel {
         } catch { dataSyncStatusMessage = "Calendar access or synchronization failed." }
     }
 
-    func observeCalendarChanges() {
+    /// One store, one notification: EventKit says a calendar or a reminder
+    /// changed without saying which, so both are read again.
+    func observeEventKitChanges() {
         calendarChangesTask?.cancel()
         calendarChangesTask = Task { [weak self] in
             // EventKit reports a change per store write, so editing one event arrives as
@@ -225,6 +227,7 @@ extension AppModel {
             for await _ in ticks.debounce(for: .seconds(2)) {
                 guard !Task.isCancelled else { return }
                 await self?.synchronizeCalendar()
+                await self?.synchronizeRemindersApp()
             }
         }
     }

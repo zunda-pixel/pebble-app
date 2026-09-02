@@ -60,8 +60,17 @@ struct TimelineView: View {
                     }
                 }
                 ToolbarItem(placement: .secondaryAction) {
-                    Button("Sync Calendar", systemImage: "calendar.badge.clock") {
-                        Task { await model.synchronizeCalendar() }
+                    // Each list is filled from its own app on the phone, and
+                    // asking reads that one rather than both.
+                    switch kind {
+                    case .pins:
+                        Button("Sync Calendar", systemImage: "calendar.badge.clock") {
+                            Task { await model.synchronizeCalendar() }
+                        }
+                    case .reminders:
+                        Button("Sync Reminders", systemImage: "checklist") {
+                            Task { await model.synchronizeRemindersApp() }
+                        }
                     }
                 }
             }

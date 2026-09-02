@@ -2,7 +2,6 @@ import PebbleProtocol
 import CryptoKit
 import EventKit
 import Foundation
-import MemberwiseInit
 
 @MainActor
 final class CalendarBridge {
@@ -13,7 +12,10 @@ final class CalendarBridge {
         let start = Date()
         let end = Calendar.current.date(byAdding: .day, value: 30, to: start) ?? start
         let events = store.events(matching: store.predicateForEvents(withStart: start, end: end, calendars: nil))
-        var pins = events.map { event in
+        // Reminders are read too, but as reminders: `RemindersBridge` puts them
+        // in the database the watch buzzes from rather than on the timeline,
+        // where they could only be looked at.
+        let pins = events.map { event in
             PebbleTimelinePin(
                 id: stableID(event.eventIdentifier ?? "\(event.title ?? "")|\(event.startDate.timeIntervalSince1970)"),
                 parentApplicationID: Self.calendarApplicationID,
@@ -25,50 +27,7 @@ final class CalendarBridge {
                 isAllDay: event.isAllDay
             )
         }
-        if try await store.requestFullAccessToReminders() {
-            let reminders = await reminders(from: start, through: end)
-            pins += reminders.compactMap { reminder in
-                guard let dueDateComponents = reminder.dueDateComponents,
-                      let dueDate = Calendar.current.date(from: dueDateComponents) else { return nil }
-                return PebbleTimelinePin(
-                    id: stableID(reminder.identifier),
-                    parentApplicationID: Self.calendarApplicationID,
-                    timestamp: dueDate,
-                    title: reminder.title,
-                    subtitle: reminder.calendarTitle,
-                    body: reminder.notes
-                )
-            }
-        }
         return pins.sorted { $0.timestamp < $1.timestamp }
-    }
-
-    private func reminders(from start: Date, through end: Date) async -> [ReminderValue] {
-        let predicate = store.predicateForIncompleteReminders(
-            withDueDateStarting: start, ending: end, calendars: nil
-        )
-        return await withCheckedContinuation { continuation in
-            store.fetchReminders(matching: predicate) { reminders in
-                continuation.resume(returning: (reminders ?? []).map {
-                    ReminderValue(
-                        identifier: $0.calendarItemIdentifier,
-                        title: $0.title ?? "Reminder",
-                        calendarTitle: $0.calendar.title,
-                        dueDateComponents: $0.dueDateComponents,
-                        notes: $0.notes
-                    )
-                })
-            }
-        }
-    }
-
-    @MemberwiseInit(.fileprivate)
-    fileprivate struct ReminderValue: Sendable {
-        var identifier: String
-        var title: String
-        var calendarTitle: String
-        var dueDateComponents: DateComponents?
-        var notes: String?
     }
 
     private func stableID(_ value: String) -> UUID {

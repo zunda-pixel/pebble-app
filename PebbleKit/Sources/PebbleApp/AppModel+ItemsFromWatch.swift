@@ -17,6 +17,11 @@ extension AppModel {
             reminders.sort { $0.timestamp < $1.timestamp }
             try? await reminderLibrary.save(reminders)
             await noteHeld(item.id, by: connection, in: reminderLibrary)
+            // Written where the reader will look for it: a reminder spoken to
+            // the watch belongs in the app they keep their reminders in, and it
+            // goes there now rather than at the next sweep, because the watch
+            // may be put down before then.
+            if item.timestamp > .now { await mirrorInRemindersApp(item) }
         case .pin, .notification:
             timelinePins.removeAll { $0.id == item.id }
             timelinePins.append(item)

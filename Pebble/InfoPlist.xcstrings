@@ -128,13 +128,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Pebble synchronizes upcoming reminders to your watch timeline."
+            "value" : "Pebble sends your reminders to the watch, and adds the ones you make on the watch back here."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
-            "value" : "Pebbleは今後のリマインダーをウォッチのタイムラインに同期します。"
+            "value" : "Pebbleはリマインダーをウォッチに送り、ウォッチで作成したリマインダーをこのアプリに追加します。"
           }
         }
       }

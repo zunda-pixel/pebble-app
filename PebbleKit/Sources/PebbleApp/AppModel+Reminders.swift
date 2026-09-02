@@ -57,6 +57,10 @@ extension AppModel {
         let identifiers = Set(removed.map(\.id))
         reminders.removeAll { identifiers.contains($0.id) }
         try? await reminderLibrary.save(reminders)
+        // One reminder kept in two places is let go of in both: leaving the
+        // Reminders app's copy behind would only have the next read put the
+        // reminder back.
+        await forgetInRemindersApp(identifiers)
         for connection in activeConnections {
             // Named here as well as swept, because one the watch made was never
             // written by this app and so is in nobody's record of what it holds.

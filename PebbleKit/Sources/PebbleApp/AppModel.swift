@@ -202,6 +202,9 @@ public final class AppModel {
     let firmwareCatalog = PebbleOSFirmwareCatalog()
     var pendingAppMessages: [StoredAppMessage] = []
     let calendarBridge = CalendarBridge()
+    // Held behind its protocol so a test can answer for the Reminders app,
+    // which nothing can write to without a person saying yes to it first.
+    @ObservationIgnored var remindersAppStore: any RemindersAppStore = RemindersBridge()
     @ObservationIgnored var calendarChangesTask: Task<Void, Never>?
     #if os(iOS)
     let healthKitBridge = HealthKitBridge()
@@ -293,7 +296,7 @@ public final class AppModel {
         if savedWatches.contains(where: \.automaticallyConnects) {
             await scan()
         }
-        observeCalendarChanges()
+        observeEventKitChanges()
     }
 
     public func applicationDidBecomeActive() async {

@@ -36,6 +36,8 @@ struct TimelineRemindersContent: View {
                     rows(upcoming)
                 } header: {
                     Text("Coming Up")
+                } footer: {
+                    Text("What the phone's Reminders app has is here as well, and letting go of one here lets go of it there.")
                 }
             }
             if !past.isEmpty {

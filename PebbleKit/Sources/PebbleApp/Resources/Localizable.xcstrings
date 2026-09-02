@@ -4099,6 +4099,16 @@
         }
       }
     },
+    "Sync Reminders" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リマインダーを同期"
+          }
+        }
+      }
+    },
     "Sync with Apple Health" : {
       "localizations" : {
         "ja" : {
@@ -4441,6 +4451,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "現在地を取得できませんでした。"
+          }
+        }
+      }
+    },
+    "The Reminders app could not be read." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リマインダーアプリを読み込めませんでした。"
           }
         }
       }
@@ -5751,6 +5771,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "オンのあいだにウォッチ上のアプリが書き出した内容です。ウォッチは次回の接続時にこの設定を忘れるため、接続のたびに設定し直します。"
+          }
+        }
+      }
+    },
+    "What the phone's Reminders app has is here as well, and letting go of one here lets go of it there." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "iPhoneのリマインダーアプリにあるものもここに表示されます。ここで削除すると、リマインダーアプリからも削除されます。"
           }
         }
       }

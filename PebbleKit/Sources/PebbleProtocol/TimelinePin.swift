@@ -181,6 +181,12 @@ public actor TimelinePinLibrary {
     /// forgotten — and a delete is only queued at the moment a pin is let go of,
     /// which is no help if that moment was missed or the queue was lost.
     private var writtenURL: URL
+    /// Which item in the phone's own app stands for which one here.
+    ///
+    /// The two are one reminder kept in two places, and neither knows the
+    /// other's name: without this an edit becomes a second reminder, and a
+    /// reminder let go of on one side cannot be found on the other.
+    private var mirroredURL: URL
 
     public init(fileURL: URL? = nil, writtenURL: URL? = nil) {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
@@ -193,6 +199,17 @@ public actor TimelinePinLibrary {
         self.writtenURL = writtenURL ?? items
             .deletingLastPathComponent()
             .appending(path: "\(items.deletingPathExtension().lastPathComponent)-written.json")
+        self.mirroredURL = items
+            .deletingLastPathComponent()
+            .appending(path: "\(items.deletingPathExtension().lastPathComponent)-mirrored.json")
+    }
+
+    public func mirroredIdentifiers() throws -> [UUID: String] {
+        try PersistentJSON.loadRecovering([UUID: String].self, from: mirroredURL) ?? [:]
+    }
+
+    public func setMirroredIdentifiers(_ identifiers: [UUID: String]) throws {
+        try PersistentJSON.save(identifiers, to: mirroredURL)
     }
 
     public func writtenPinIDs(deviceID: String) throws -> Set<UUID> {
