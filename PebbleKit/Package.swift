@@ -24,7 +24,7 @@ let package = Package(
   products: [
     .library(
       name: "PebbleKit",
-      targets: ["UI"]
+      targets: ["PebbleApp"]
     ),
   ],
   dependencies: [
@@ -40,21 +40,12 @@ let package = Package(
     .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.20"),
   ],
   targets: [
+    // What the watch says, and what the phone says back: frames, PPoG, the
+    // endpoint codecs, the package formats, and the values they carry. Nothing
+    // here reaches for an Apple framework, so it holds on any platform and a
+    // test of it needs no Bluetooth.
     .target(
-      name: "UI",
-      dependencies: [
-        .target(name: "API"),
-        .product(name: "Algorithms", package: "swift-algorithms"),
-        .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
-        .product(name: "AsyncOperations", package: "swift-async-operations"),
-        .product(name: "Defaults", package: "Defaults"),
-        .product(name: "DMRetry", package: "swift-retry"),
-        .product(name: "Valet", package: "Valet"),
-      ],
-      swiftSettings: swiftSettings
-    ),
-    .target(
-      name: "API",
+      name: "PebbleProtocol",
       dependencies: [
         .product(name: "Algorithms", package: "swift-algorithms"),
         .product(name: "DequeModule", package: "swift-collections"),
@@ -66,19 +57,46 @@ let package = Package(
       ],
       swiftSettings: swiftSettings
     ),
-    .testTarget(
-      name: "APITests",
+    // How those bytes reach a watch: CoreBluetooth in both roles, the emulator's
+    // socket, and the mock a test or a preview stands in.
+    .target(
+      name: "PebbleTransport",
       dependencies: [
-        "API",
+        .target(name: "PebbleProtocol"),
+        .product(name: "DequeModule", package: "swift-collections"),
+      ],
+      swiftSettings: swiftSettings
+    ),
+    // The app: the model, the screens, and the phone's own frameworks.
+    .target(
+      name: "PebbleApp",
+      dependencies: [
+        .target(name: "PebbleProtocol"),
+        .target(name: "PebbleTransport"),
+        .product(name: "Algorithms", package: "swift-algorithms"),
+        .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+        .product(name: "AsyncOperations", package: "swift-async-operations"),
+        .product(name: "Defaults", package: "Defaults"),
+        .product(name: "DMRetry", package: "swift-retry"),
+        .product(name: "Valet", package: "Valet"),
+      ],
+      swiftSettings: swiftSettings
+    ),
+    .testTarget(
+      name: "PebbleProtocolTests",
+      dependencies: [
+        "PebbleProtocol",
+        "PebbleTransport",
         .product(name: "HTTPTypes", package: "swift-http-types"),
       ],
       swiftSettings: swiftSettings
     ),
     .testTarget(
-      name: "UITests",
+      name: "PebbleAppTests",
       dependencies: [
-        "UI",
-        "API",
+        "PebbleApp",
+        "PebbleProtocol",
+        "PebbleTransport",
         .product(name: "ZIPFoundation", package: "ZIPFoundation"),
       ],
       swiftSettings: swiftSettings

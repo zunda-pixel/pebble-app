@@ -1,5 +1,5 @@
 import SwiftUI
-import UI
+import PebbleApp
 
 @main
 struct MainApp: App {

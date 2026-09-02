@@ -13,15 +13,15 @@
     {
       "target": {
         "containerPath": "container:PebbleKit",
-        "identifier": "UITests",
-        "name": "UITests"
+        "identifier": "PebbleAppTests",
+        "name": "PebbleAppTests"
       }
     },
     {
       "target": {
         "containerPath": "container:PebbleKit",
-        "identifier": "APITests",
-        "name": "APITests"
+        "identifier": "PebbleProtocolTests",
+        "name": "PebbleProtocolTests"
       }
     }
   ],

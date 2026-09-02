@@ -9,12 +9,19 @@ targets iOS 27 and macOS 27; the app target also builds for visionOS.
 | --- | --- |
 | `Pebble.xcodeproj` | The app project. One shared scheme, `Pebble`. |
 | `Pebble/` | App target: `MainApp.swift`, `Info.plist`, entitlements, app-level strings. |
-| `PebbleKit/` | Local Swift package with everything else. Its only product, `PebbleKit`, exports the `UI` target. |
-| `PebbleKit/Sources/API` | Protocol and transport layer: BLE client, PPoG, endpoint codecs, package importers, persistence. No SwiftUI. |
-| `PebbleKit/Sources/UI` | `AppModel` (split across `AppModel+*.swift`), the views, and the system bridges (HealthKit, EventKit, MediaPlayer, CallKit, WebKit). |
-| `PebbleKit/Tests/APITests` | Swift Testing suites for the protocol layer, grouped by what they exercise. |
-| `PebbleKit/Tests/UITests` | Swift Testing suites for `AppModel` against `MockPebbleClient`. |
+| `PebbleKit/` | Local Swift package with everything else. Its only product, `PebbleKit`, exports the `PebbleApp` target. |
+| `PebbleKit/Sources/PebbleProtocol` | What the watch says and what the phone says back: frames, PPoG, the endpoint codecs, the package formats (`.pbw`, `.pbz`), the persistence and the catalogues. **Foundation only** — no CoreBluetooth, no SwiftUI, so it holds anywhere and a test of it needs no radio. |
+| `PebbleKit/Sources/PebbleTransport` | How those bytes reach a watch: the CoreBluetooth client in both roles, the phone-hosted GATT server, the emulator socket, and the mock a test or a preview stands in. |
+| `PebbleKit/Sources/PebbleApp` | The app: `AppModel` (split across `AppModel+*.swift`), the screens, and the phone's own frameworks (HealthKit, EventKit, MediaPlayer, CallKit, WebKit). |
+| `PebbleKit/Tests/PebbleProtocolTests` | Swift Testing suites for the protocol and transport layers, grouped by what they exercise. |
+| `PebbleKit/Tests/PebbleAppTests` | Swift Testing suites for `AppModel` and the content views, against `MockPebbleClient`. |
 | `AllTests.xctestplan` | Covers both test targets. |
+
+The three targets are split by what they are allowed to depend on, and the
+compiler is what keeps them honest: a codec cannot reach for CoreBluetooth, and
+neither a codec nor a transport can reach for SwiftUI. A seam between two of them
+uses `package` access rather than `public` — the package is one unit, and the
+library's public surface is only what the app target needs.
 
 One endpoint codec per file, named after the endpoint. One view per file. When a
 file grows past roughly 500 lines, split it along a seam that already exists
@@ -31,8 +38,8 @@ ships, so a green SwiftPM run says little about the app.
   already covers both targets.
 - **Run tests on the `My Mac` destination.** On a device the package test
   targets are skipped ("Tool-hosted testing is unavailable on device
-  destinations"), and on an iOS simulator the whole `APITests` bundle currently
-  crashes in `Runner._applyScopingTraits` even though every case passes
+  destinations"), and on an iOS simulator the whole `PebbleProtocolTests` bundle
+  currently crashes in `Runner._applyScopingTraits` even though every case passes
   individually and on macOS. Build for the iPhone; test on the Mac.
   **Check the destination before every test run.** Xcode reverts it to the
   attached iPhone on its own, and a run on the iPhone reports "No result" rather
@@ -143,7 +150,7 @@ the commit message's job.
 
 ## Localization
 
-All user-facing text goes through `PebbleKit/Sources/UI/Resources/Localizable.xcstrings`
+All user-facing text goes through `PebbleKit/Sources/PebbleApp/Resources/Localizable.xcstrings`
 — note the `Resources/` — and the app target's own catalog. Japanese stays at
 zero untranslated strings.
 
@@ -151,7 +158,7 @@ zero untranslated strings.
   it resolves against the main bundle, finds nothing, and silently returns the
   English key. This shipped once: the watch was sent six English canned replies
   by a build whose Japanese catalog was complete.
-- Before deleting a key, grep `Sources/UI` for it. Two keys have been removed
+- Before deleting a key, grep `Sources/PebbleApp` for it. Two keys have been removed
   while still in use.
 - A build extracts new keys into the catalog; add the `ja` translation after
   building, and clear any `extractionState: stale` entry whose string is really
