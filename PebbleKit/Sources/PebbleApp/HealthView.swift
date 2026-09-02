@@ -114,7 +114,7 @@ struct HealthContent: View {
             )
             if let statusMessage { Text(statusMessage).foregroundStyle(.secondary) }
         }
-        .navigationTitle("Health")
+        .navigationTitle(Text("Health"))
         .fileImporter(isPresented: $isImportingArchive, allowedContentTypes: [.json]) { result in
             guard case .success(let url) = result else { return }
             importArchive(url)

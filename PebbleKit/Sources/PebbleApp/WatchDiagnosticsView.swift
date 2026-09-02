@@ -63,7 +63,7 @@ struct WatchDiagnosticsContent: View {
                         .scaledToFit()
                         .frame(maxWidth: 200)
                         .frame(maxWidth: .infinity)
-                        .accessibilityLabel("The watch's screen")
+                        .accessibilityLabel(Text("The watch's screen"))
                 }
                 if let screenshotURL {
                     ShareLink(item: screenshotURL) { Label("Share Screenshot", systemImage: "square.and.arrow.up") }
@@ -121,7 +121,7 @@ struct WatchDiagnosticsContent: View {
                 }
             }
         }
-        .navigationTitle("Diagnostics")
+        .navigationTitle(Text("Diagnostics"))
     }
 }
 

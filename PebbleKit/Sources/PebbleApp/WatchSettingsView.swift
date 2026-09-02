@@ -177,7 +177,7 @@ struct WatchSettingsContent: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("Watch Settings")
+        .navigationTitle(Text("Watch Settings"))
     }
 
     private func activityBinding(_ keyPath: WritableKeyPath<PebbleActivitySettings, Bool>) -> Binding<Bool> {

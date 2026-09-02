@@ -108,16 +108,16 @@ struct CatalogContent<Destination: View>: View {
             }
         }
         .searchable(text: $query)
-        .navigationTitle("Catalog")
+        .navigationTitle(Text("Catalog"))
         .toolbar {
             Button(role: .close, action: close)
             if let importApplication {
                 if isImportingApplication {
                     ProgressView()
-                        .accessibilityLabel("Importing Pebble application")
+                        .accessibilityLabel(Text("Importing Pebble application"))
                 } else {
                     Button("Import", systemImage: "square.and.arrow.down", action: importApplication)
-                        .accessibilityHint("Choose a PBW package from Files")
+                        .accessibilityHint(Text("Choose a PBW package from Files"))
                         .disabled(isImportDisabled)
                 }
             }
@@ -237,7 +237,7 @@ struct CatalogApplicationDetailContent: View {
                                     ProgressView()
                                 }
                                 .frame(width: 220, height: 220)
-                                .accessibilityLabel("Screenshot of \(application.name)")
+                                .accessibilityLabel(Text("Screenshot of \(application.name)"))
                             }
                         }
                     }

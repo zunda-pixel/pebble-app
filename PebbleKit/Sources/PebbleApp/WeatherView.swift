@@ -166,12 +166,12 @@ struct WeatherContent: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    .accessibilityLabel("Weather data sources")
+                    .accessibilityLabel(Text("Weather data sources"))
                 }
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("Weather")
+        .navigationTitle(Text("Weather"))
     }
 
     private func submitPlace() {

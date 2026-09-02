@@ -82,7 +82,7 @@ struct LanguageContent: View {
                             if pack.locale == installedPackLocale {
                                 Image(systemName: "checkmark")
                                     .foregroundStyle(.tint)
-                                    .accessibilityLabel("Installed")
+                                    .accessibilityLabel(Text("Installed"))
                             }
                         } label: {
                             Text(verbatim: pack.localName)
@@ -113,7 +113,7 @@ struct LanguageContent: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("Language")
+        .navigationTitle(Text("Language"))
         .fileImporter(isPresented: $isChoosingFile, allowedContentTypes: [.pebbleLanguagePack]) { result in
             guard case .success(let url) = result else { return }
             installFile(url)

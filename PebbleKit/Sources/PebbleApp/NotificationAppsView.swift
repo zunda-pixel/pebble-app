@@ -69,7 +69,7 @@ struct NotificationAppsContent<Destination: View>: View {
                 ContentUnavailableView.search(text: search)
             }
         }
-        .navigationTitle("Phone App Notifications")
+        .navigationTitle(Text("Phone App Notifications"))
     }
 }
 

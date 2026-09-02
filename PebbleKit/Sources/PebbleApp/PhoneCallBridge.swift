@@ -132,7 +132,7 @@ final class CallKitCallSource: NSObject, SystemCallSource, CXCallObserverDelegat
             onEvent?(.ringing(
                 cookie: cookie,
                 callerNumber: "",
-                callerName: String(localized: "Incoming Call")
+                callerName: String(localized: "Incoming Call", bundle: .module)
             ))
         }
     }

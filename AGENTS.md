@@ -150,26 +150,35 @@ the commit message's job.
 
 ## Localization
 
-All user-facing text goes through one catalog, `Pebble/Localizable.xcstrings`,
-which belongs to the **app target** rather than the package. Japanese stays at
+All user-facing text goes through `PebbleKit/Sources/PebbleApp/Resources/Localizable.xcstrings`
+— note the `Resources/` — and the app target's own catalog. Japanese stays at
 zero untranslated strings.
 
-- **The catalog has to be in the app bundle.** `Text("…")`, `Section("…")`,
-  `Button("…")` and every other SwiftUI initializer that takes a
-  `LocalizedStringKey` looks the key up in `Bundle.main` — the app — no matter
-  which module the view is compiled into. The catalog lived in the package's
-  `Resources/` for a while, and on a Japanese iPhone the whole app came up in
-  English with 500 finished translations sitting in
-  `PebbleKit_PebbleApp.bundle` that nothing ever read.
-- The price of that is extraction: a build only merges new keys into catalogs
-  belonging to the target it compiled, and the views are in the package. **New
-  keys have to be added to the catalog by hand** (Xcode's `+`, or an entry with
-  `"extractionState" : "manual"`), then translated.
+**Every lookup has to name this module's bundle.** `Text("…")`,
+`Section("…")`, `Button("…")` and every other SwiftUI initializer taking a
+`LocalizedStringKey` searches `Bundle.main` — the app — whatever module the view
+was compiled into, and these screens are in a package whose strings ship in a
+bundle of their own. A Japanese iPhone showed the whole app in English against a
+finished catalogue because of it.
+
+- `ModuleLocalization.swift` declares the same initializers inside this module
+  and fills the bundle in, so `Text("Devices")` in a view needs nothing at the
+  call site. **A SwiftUI API used with a literal and missing from that file
+  silently falls back to the main bundle**, so a screen whose text comes out
+  English is a missing shim, not a missing translation.
+- A *modifier* cannot be shimmed — `navigationTitle`, `accessibilityLabel`,
+  `accessibilityHint` and `confirmationDialog` differ from ours only in return
+  type, which the compiler calls ambiguous. Those take `Text("…")` at the call
+  site instead.
+- A runtime lookup passes `bundle: .module` for the same reason.
+  `String(localized:)` without it returns the English key. This shipped once:
+  the watch was sent six English canned replies by a build whose Japanese
+  catalogue was complete.
 - Before deleting a key, grep `Sources/PebbleApp` for it. Two keys have been removed
   while still in use.
-- Runtime lookups (`String(localized:)`) take the main bundle by default, which
-  is now the right one — do not pass `bundle: .module`, the package has no
-  resource bundle any more.
+- A build extracts new keys into the catalog; add the `ja` translation after
+  building, and clear any `extractionState: stale` entry whose string is really
+  gone.
 
 ## Lifecycle and state
 

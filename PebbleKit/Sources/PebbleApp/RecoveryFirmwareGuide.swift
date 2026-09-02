@@ -52,7 +52,7 @@ struct RecoveryFirmwareGuide<FirmwareDestination: View>: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("Firmware Required")
+        .navigationTitle(Text("Firmware Required"))
     }
 }
 

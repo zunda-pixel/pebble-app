@@ -81,7 +81,7 @@ struct ApplicationsView: View {
                 undoManager?.setActionName("Favorite Watchface")
             }
         )
-        .navigationTitle("Apps")
+        .navigationTitle(Text("Apps"))
         .task { await model.loadApplications() }
         .toolbar {
             ToolbarItem {
@@ -165,7 +165,7 @@ struct ApplicationsContent: View {
                 ApplicationPlaceholderRow()
             }
             .redacted(reason: .placeholder)
-            .accessibilityLabel("Loading applications")
+            .accessibilityLabel(Text("Loading applications"))
         } else if watchApplications.isEmpty && watchfaces.isEmpty {
             ContentUnavailableView(
                 "No Apps",
@@ -249,7 +249,7 @@ struct InstallationProgressSection: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ProgressView()
-                        .accessibilityLabel("Preparing installation")
+                        .accessibilityLabel(Text("Preparing installation"))
                 }
             }
             .padding(.vertical, 8)
@@ -345,7 +345,7 @@ struct ApplicationListRow: View {
             .disabled(isOperationInProgress)
         }
         .confirmationDialog(
-            "Remove \(application.displayName)?",
+            Text("Remove \(application.displayName)?"),
             isPresented: $isConfirmingRemoval,
             titleVisibility: .visible
         ) {
@@ -406,7 +406,7 @@ struct ApplicationRow: View {
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
                     .disabled(isActive)
-                    .accessibilityHint("Makes this the active watchface")
+                    .accessibilityHint(Text("Makes this the active watchface"))
             }
             Text(versionLabel)
                 .font(.caption)
@@ -415,7 +415,7 @@ struct ApplicationRow: View {
                 Button("Configure", systemImage: "gearshape", action: configure)
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
-                    .accessibilityHint("Opens this watch application's settings")
+                    .accessibilityHint(Text("Opens this watch application's settings"))
             }
         }
         .frame(minHeight: 44)

@@ -165,7 +165,7 @@ struct FirmwareContent: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("Firmware")
+        .navigationTitle(Text("Firmware"))
         .fileImporter(isPresented: $isChoosingFile, allowedContentTypes: [.pebbleFirmware]) { result in
             guard case .success(let url) = result else { return }
             installFile(url)

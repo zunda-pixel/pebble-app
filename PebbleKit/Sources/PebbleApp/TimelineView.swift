@@ -65,7 +65,7 @@ struct TimelineView: View {
                     }
                 }
             }
-            .navigationTitle("Timeline")
+            .navigationTitle(Text("Timeline"))
             .sheet(item: $composing) { kind in
                 TimelineItemComposer(kind: kind) { title, date in
                     Task {

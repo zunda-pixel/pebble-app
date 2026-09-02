@@ -150,7 +150,7 @@ struct MacRootView: View {
                 Label(section.title, systemImage: section.systemImage)
                     .tag(section)
             }
-            .navigationTitle("Pebble")
+            .navigationTitle(Text("Pebble"))
         } detail: {
             NavigationStack {
                 VStack(spacing: 0) {
@@ -241,7 +241,7 @@ struct ConnectionStatusBanner: View {
         .padding(.horizontal)
         .padding(.vertical, 8)
         .background(reduceTransparency ? AnyShapeStyle(.background) : AnyShapeStyle(.regularMaterial))
-        .accessibilityLabel("Connection status")
+        .accessibilityLabel(Text("Connection status"))
         .accessibilityValue(title)
     }
 

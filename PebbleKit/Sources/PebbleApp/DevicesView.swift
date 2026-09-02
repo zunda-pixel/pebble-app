@@ -65,7 +65,7 @@ struct DevicesContent<Destination: View>: View {
                     .foregroundStyle(.red)
             }
         }
-        .navigationTitle("Devices")
+        .navigationTitle(Text("Devices"))
         .toolbar {
             ToolbarItem {
                 Button("Add Watch", systemImage: "plus", action: addWatch)
@@ -139,7 +139,7 @@ struct AddWatchContent: View {
                 if let connectionErrorMessage {
                     Label(connectionErrorMessage, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.red)
-                        .accessibilityLabel("Bluetooth error")
+                        .accessibilityLabel(Text("Bluetooth error"))
                 }
                 if let managementErrorMessage {
                     Label(managementErrorMessage, systemImage: "exclamationmark.triangle.fill")
@@ -178,7 +178,7 @@ struct AddWatchContent: View {
                     }
                 }
             }
-            .navigationTitle("Add Watch")
+            .navigationTitle(Text("Add Watch"))
             .toolbar {
                 Button(role: .close, action: close)
             }
@@ -269,7 +269,7 @@ struct DiscoveredDeviceRow: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .accessibilityHint("Connects to this watch")
+        .accessibilityHint(Text("Connects to this watch"))
     }
 }
 

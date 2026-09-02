@@ -164,7 +164,7 @@ struct SettingsContent<WeatherDestination: View, NotificationAppsDestination: Vi
                 }
             }
         }
-        .navigationTitle("Settings")
+        .navigationTitle(Text("Settings"))
         // Any of these can be changed in the system settings while the app is in the
         // background.
         .task { permissions = PhonePermissions.current() }
