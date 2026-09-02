@@ -39,6 +39,31 @@ enum PreviewSamples {
         signalStrength: -62
     )
 
+    static let connectedSummary = WatchSummary(
+        id: watch.id,
+        name: watch.name,
+        model: watch.model,
+        serialNumber: watch.serialNumber,
+        batteryLevel: watch.batteryLevel,
+        firmwareVersion: watch.firmwareVersion,
+        languageLocale: watch.languageLocale,
+        phase: .connected,
+        isSaved: true,
+        automaticallyConnects: true,
+        lastConnectedAt: .now
+    )
+
+    static let savedSummary = WatchSummary(
+        id: "saved-watch",
+        name: "Pebble 2 Duo",
+        model: .pebble2Duo,
+        serialNumber: "Q403P000001B",
+        batteryLevel: 41,
+        firmwareVersion: "v4.36.1",
+        isSaved: true,
+        lastConnectedAt: .now.addingTimeInterval(-86_400)
+    )
+
     static let pins: [PebbleTimelinePin] = {
         let day = Calendar.current.startOfDay(for: .now)
         return [
@@ -165,6 +190,55 @@ enum PreviewSamples {
         WeatherPlace(id: UUID(), name: "Kyoto", latitude: 35.01, longitude: 135.76, followsPhone: false),
     ]
 
+    static let weatherReports: [PebbleWeatherReport] = weatherPlaces.enumerated().map { index, place in
+        PebbleWeatherReport(
+            id: place.id,
+            locationName: place.name,
+            isCurrentLocation: place.followsPhone,
+            currentTemperature: Int16(21 + index * 3),
+            currentType: index == 0 ? .sun : .lightRain,
+            todayHigh: Int16(26 + index),
+            todayLow: Int16(17 + index),
+            tomorrowType: .cloudyDay,
+            tomorrowHigh: Int16(24 + index),
+            tomorrowLow: Int16(16 + index),
+            shortPhrase: index == 0 ? "晴れ" : "Light rain",
+            updated: .now
+        )
+    }
+
+    static let weatherCredit = WeatherCredit(
+        serviceName: "Weather",
+        lightMarkURL: URL(string: "https://example.invalid/light.png")!,
+        darkMarkURL: URL(string: "https://example.invalid/dark.png")!,
+        legalPageURL: URL(string: "https://example.invalid/legal")!
+    )
+
+    static let firmwareRelease = PebbleOSFirmwareRelease(
+        versionTag: "v4.37.0",
+        board: .obelixPVT,
+        downloadURL: URL(string: "https://example.invalid/normal_obelix_pvt_v4.37.0.pbz")!,
+        sizeInBytes: 1_048_576,
+        releaseNotesURL: nil
+    )
+
+    static let downloadedFirmware = DownloadedFirmware(
+        versionTag: firmwareRelease.versionTag,
+        board: .obelixPVT,
+        url: URL(fileURLWithPath: "/tmp/normal_obelix_pvt_v4.37.0.pbz")
+    )
+
+    static func firmwareJournal(phase: FirmwareUpdatePhase) -> FirmwareUpdateJournal {
+        FirmwareUpdateJournal(
+            deviceID: watch.id,
+            hardwareRevision: "obelix_pvt",
+            previousVersion: watch.firmwareVersion,
+            targetVersion: firmwareRelease.versionTag,
+            packageSHA256: String(repeating: "a", count: 64),
+            phase: phase
+        )
+    }
+
     static let logLines: [WatchLogLine] = [
         WatchLogLine(date: .now, level: 100, file: "pebble_app.c", line: 412, message: "app launched"),
         WatchLogLine(date: .now, level: 1, file: "bt_conn_mgr.c", line: 88, message: "link lost, reason=0x08"),
@@ -172,4 +246,19 @@ enum PreviewSamples {
     ]
 
     static let transferProgress = PutBytesTransferProgress(bytesSent: 240_000, totalBytes: 512_000)
+
+    /// A model on a mock transport, for the navigation shells whose whole job is
+    /// the chrome around a screen. What each screen shows previews from its own
+    /// content view instead: a screen that loads from disk in `.task` would
+    /// overwrite anything set here.
+    @MainActor
+    static func appModel() -> AppModel {
+        let model = AppModel(client: MockPebbleClient())
+        model.savedWatches = [savedWatch]
+        model.watchApplications = watchApplications
+        model.watchfaces = watchfaces
+        model.weatherPlaces = weatherPlaces
+        model.notificationSourceApps = notificationApps
+        return model
+    }
 }

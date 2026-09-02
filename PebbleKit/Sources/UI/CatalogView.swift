@@ -33,11 +33,46 @@ struct CatalogView: View {
     var isImportingApplication: Bool = false
     var isImportDisabled: Bool = false
     var importApplication: (() -> Void)?
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        CatalogContent(
+            applications: model.catalogApplications,
+            state: { model.catalogInstallationState(for: $0) },
+            isImportingApplication: isImportingApplication,
+            isImportDisabled: isImportDisabled,
+            isUpdating: model.isUpdatingCatalog,
+            importApplication: importApplication,
+            installUpdates: { Task { await model.installCatalogUpdates() } },
+            refresh: { Task { await model.refreshCatalog() } },
+            close: { dismiss() },
+            destination: { application in
+                CatalogApplicationDetailView(application: application, model: model)
+            }
+        )
+        .task {
+            await model.loadCatalog()
+            if model.catalogApplications.isEmpty { await model.refreshCatalog() }
+        }
+    }
+}
+
+struct CatalogContent<Destination: View>: View {
+    var applications: [PebbleCatalogApplication]
+    var state: (PebbleCatalogApplication) -> CatalogInstallationState
+    var isImportingApplication: Bool
+    var isImportDisabled: Bool
+    var isUpdating: Bool
+    var importApplication: (() -> Void)?
+    var installUpdates: () -> Void
+    var refresh: () -> Void
+    var close: () -> Void
+    @ViewBuilder var destination: (PebbleCatalogApplication) -> Destination
+
     @State private var query = ""
     @State private var category = "All"
     @State private var kind: CatalogKindFilter = .all
     @State private var sort: CatalogSort = .name
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
@@ -65,12 +100,9 @@ struct CatalogView: View {
             Section("Applications") {
                 ForEach(filteredApplications) { application in
                     NavigationLink {
-                        CatalogApplicationDetailView(application: application, model: model)
+                        destination(application)
                     } label: {
-                        CatalogApplicationRow(
-                            application: application,
-                            state: model.catalogInstallationState(for: application)
-                        )
+                        CatalogApplicationRow(application: application, state: state(application))
                     }
                 }
             }
@@ -78,7 +110,7 @@ struct CatalogView: View {
         .searchable(text: $query)
         .navigationTitle("Catalog")
         .toolbar {
-            Button(role: .close) { dismiss() }
+            Button(role: .close, action: close)
             if let importApplication {
                 if isImportingApplication {
                     ProgressView()
@@ -89,27 +121,19 @@ struct CatalogView: View {
                         .disabled(isImportDisabled)
                 }
             }
-            Button("Update All", systemImage: "arrow.down.app") {
-                Task { await model.installCatalogUpdates() }
-            }
-            Button("Refresh", systemImage: "arrow.clockwise") {
-                Task { await model.refreshCatalog() }
-            }
-            .disabled(model.isUpdatingCatalog)
+            Button("Update All", systemImage: "arrow.down.app", action: installUpdates)
+            Button("Refresh", systemImage: "arrow.clockwise", action: refresh)
+                .disabled(isUpdating)
         }
         .overlay {
             if filteredApplications.isEmpty {
                 ContentUnavailableView("No Catalog Apps", systemImage: "bag", description: Text("Catalog sources can be added in Settings."))
             }
         }
-        .task {
-            await model.loadCatalog()
-            if model.catalogApplications.isEmpty { await model.refreshCatalog() }
-        }
     }
 
     private var filteredApplications: [PebbleCatalogApplication] {
-        let filtered = model.catalogApplications.filter { application in
+        let filtered = applications.filter { application in
             let matchesQuery = query.isEmpty
                 || application.name.localizedCaseInsensitiveContains(query)
                 || application.developer.localizedCaseInsensitiveContains(query)
@@ -130,7 +154,7 @@ struct CatalogView: View {
     }
 
     private var categories: [String] {
-        ["All"] + Set(model.catalogApplications.map(\.category)).sorted()
+        ["All"] + Set(applications.map(\.category)).sorted()
     }
 }
 
@@ -177,12 +201,29 @@ struct CatalogApplicationDetailView: View {
     var model: AppModel
 
     var body: some View {
+        CatalogApplicationDetailContent(
+            application: application,
+            state: model.catalogInstallationState(for: application),
+            isInstalling: model.installingCatalogApplicationID == application.id,
+            isAnyInstallRunning: model.installingCatalogApplicationID != nil,
+            statusMessage: model.dataSyncStatusMessage,
+            install: { Task { await model.installCatalogApplication(application) } }
+        )
+    }
+}
+
+struct CatalogApplicationDetailContent: View {
+    var application: PebbleCatalogApplication
+    var state: CatalogInstallationState
+    var isInstalling: Bool
+    var isAnyInstallRunning: Bool
+    var statusMessage: LocalizedStringKey?
+    var install: () -> Void
+
+    var body: some View {
         List {
             Section {
-                CatalogApplicationRow(
-                    application: application,
-                    state: model.catalogInstallationState(for: application)
-                )
+                CatalogApplicationRow(application: application, state: state)
                 if !application.summary.isEmpty { Text(application.summary) }
             }
             if !application.screenshotURLs.isEmpty {
@@ -209,18 +250,15 @@ struct CatalogApplicationDetailView: View {
                 Section("Release Notes") { Text(releaseNotes) }
             }
             Section {
-                Button(installButtonTitle, systemImage: "arrow.down.app") {
-                    Task { await model.installCatalogApplication(application) }
-                }
-                .disabled(!canInstall || model.installingCatalogApplicationID != nil)
-                if model.installingCatalogApplicationID == application.id { ProgressView() }
-                if let message = model.dataSyncStatusMessage { Text(message).foregroundStyle(.secondary) }
+                Button(installButtonTitle, systemImage: "arrow.down.app", action: install)
+                    .disabled(!canInstall || isAnyInstallRunning)
+                if isInstalling { ProgressView() }
+                if let statusMessage { Text(statusMessage).foregroundStyle(.secondary) }
             }
         }
         .navigationTitle(application.name)
     }
 
-    private var state: CatalogInstallationState { model.catalogInstallationState(for: application) }
     private var canInstall: Bool { state == .available || state == .updateAvailable }
     private var installButtonTitle: LocalizedStringKey { state == .updateAvailable ? "Update" : "Install" }
 }
@@ -231,5 +269,48 @@ struct CatalogApplicationDetailView: View {
         CatalogApplicationRow(application: PreviewSamples.catalogApplication, state: .installed)
         CatalogApplicationRow(application: PreviewSamples.catalogApplication, state: .updateAvailable)
         CatalogApplicationRow(application: PreviewSamples.catalogApplication, state: .incompatible)
+    }
+}
+
+#Preview("Catalog") {
+    CatalogContent(
+        applications: [PreviewSamples.catalogApplication],
+        state: { _ in .updateAvailable },
+        isImportingApplication: false,
+        isImportDisabled: false,
+        isUpdating: false,
+        importApplication: {},
+        installUpdates: {},
+        refresh: {},
+        close: {},
+        destination: { application in Text(verbatim: application.name) }
+    )
+}
+
+#Preview("Empty catalog") {
+    CatalogContent(
+        applications: [],
+        state: { _ in .available },
+        isImportingApplication: true,
+        isImportDisabled: true,
+        isUpdating: true,
+        importApplication: {},
+        installUpdates: {},
+        refresh: {},
+        close: {},
+        destination: { _ in EmptyView() }
+    )
+}
+
+#Preview("Catalog app") {
+    NavigationStack {
+        CatalogApplicationDetailContent(
+            application: PreviewSamples.catalogApplication,
+            state: .available,
+            isInstalling: false,
+            isAnyInstallRunning: false,
+            statusMessage: nil,
+            install: {}
+        )
     }
 }

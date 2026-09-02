@@ -299,3 +299,7 @@ struct SectionContent: View {
 #Preview("Onboarding") {
     OnboardingView {}
 }
+
+#Preview("Root") {
+    AppRootView(model: PreviewSamples.appModel())
+}

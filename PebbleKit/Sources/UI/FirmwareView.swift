@@ -4,7 +4,6 @@ import API
 struct FirmwareView: View {
     var model: AppModel
     var watchID: String
-    @State private var isChoosingFile = false
 
     private var connection: WatchConnection? {
         model.connections.first { $0.device.id == watchID }
@@ -14,10 +13,6 @@ struct FirmwareView: View {
         model.savedWatches.first { $0.id == watchID }
     }
 
-    private var isConnected: Bool {
-        connection?.isConnected == true
-    }
-
     private var journal: FirmwareUpdateJournal? {
         guard let journal = model.firmwareUpdateJournal, journal.deviceID == watchID else {
             return nil
@@ -25,17 +20,59 @@ struct FirmwareView: View {
         return journal
     }
 
-    private var installedVersion: String? {
-        connection?.device.firmwareVersion ?? savedWatch?.firmwareVersion
+    var body: some View {
+        FirmwareContent(
+            installedVersion: connection?.device.firmwareVersion ?? savedWatch?.firmwareVersion,
+            board: connection?.device.board ?? savedWatch?.board,
+            runningSlot: connection?.device.runningFirmwareSlot,
+            isConnected: connection?.isConnected == true,
+            isRunningRecoveryFirmware: connection?.device.isRunningRecoveryFirmware == true,
+            availableRelease: model.availableFirmwareRelease,
+            downloadedFirmware: model.downloadedFirmware,
+            journal: journal,
+            progress: journal == nil ? nil : model.firmwareUpdateProgress,
+            statusMessage: model.firmwareUpdateStatusMessage,
+            requiresConfirmation: model.firmwareRequiresConfirmation,
+            checkForUpdates: { Task { await model.checkForFirmwareUpdate(deviceID: watchID) } },
+            download: { Task { await model.downloadAvailableFirmware(deviceID: watchID) } },
+            installDownloaded: { Task { await model.installDownloadedFirmware(deviceID: watchID) } },
+            installFile: { url in Task { await model.installFirmware(from: url, deviceID: watchID) } },
+            confirmRecovery: { Task { await model.confirmRecoveryFirmwareUpdate() } },
+            resume: { Task { await model.resumeFirmwareUpdate(deviceID: watchID) } },
+            cancel: { Task { await model.cancelFirmwareUpdate() } },
+            discard: { Task { await model.discardPendingFirmwareUpdate() } }
+        )
     }
+}
+
+struct FirmwareContent: View {
+    var installedVersion: String?
+    var board: PebbleWatchBoard?
+    var runningSlot: Int?
+    var isConnected: Bool
+    var isRunningRecoveryFirmware: Bool
+    var availableRelease: PebbleOSFirmwareRelease?
+    var downloadedFirmware: DownloadedFirmware?
+    var journal: FirmwareUpdateJournal?
+    var progress: PutBytesTransferProgress?
+    var statusMessage: LocalizedStringKey?
+    var requiresConfirmation: Bool
+    var checkForUpdates: () -> Void
+    var download: () -> Void
+    var installDownloaded: () -> Void
+    var installFile: (URL) -> Void
+    var confirmRecovery: () -> Void
+    var resume: () -> Void
+    var cancel: () -> Void
+    var discard: () -> Void
+
+    @State private var isChoosingFile = false
 
     var body: some View {
         Form {
             Section {
                 FirmwareStatusRow(status: status)
-                if let progress = model.firmwareUpdateProgress,
-                   journal != nil,
-                   progress.totalBytes > 0 {
+                if let progress, progress.totalBytes > 0 {
                     ProgressView(
                         value: Double(progress.bytesSent),
                         total: Double(progress.totalBytes)
@@ -46,8 +83,8 @@ struct FirmwareView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
-                if let message = model.firmwareUpdateStatusMessage {
-                    Text(message)
+                if let statusMessage {
+                    Text(statusMessage)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -55,31 +92,25 @@ struct FirmwareView: View {
 
             Section("On the Watch") {
                 LabeledContent("Version", value: installedVersion ?? "—")
-                if let board = connection?.device.board ?? savedWatch?.board {
+                if let board {
                     LabeledContent("Board", value: board.rawValue)
                 }
-                if let slot = connection?.device.runningFirmwareSlot {
-                    LabeledContent("Running Slot", value: slot, format: .number)
+                if let runningSlot {
+                    LabeledContent("Running Slot", value: runningSlot, format: .number)
                 }
             }
 
             Section {
-                Button("Check for Updates", systemImage: "arrow.clockwise") {
-                    Task { await model.checkForFirmwareUpdate(deviceID: watchID) }
-                }
-                if let release = model.availableFirmwareRelease {
-                    LabeledContent("Published", value: release.versionTag)
-                    if model.downloadedFirmware?.versionTag != release.versionTag {
-                        Button("Download PebbleOS \(release.versionTag)", systemImage: "arrow.down.circle") {
-                            Task { await model.downloadAvailableFirmware(deviceID: watchID) }
-                        }
+                Button("Check for Updates", systemImage: "arrow.clockwise", action: checkForUpdates)
+                if let availableRelease {
+                    LabeledContent("Published", value: availableRelease.versionTag)
+                    if downloadedFirmware?.versionTag != availableRelease.versionTag {
+                        Button("Download PebbleOS \(availableRelease.versionTag)", systemImage: "arrow.down.circle", action: download)
                     }
                 }
-                if let downloaded = model.downloadedFirmware {
-                    LabeledContent("Downloaded", value: downloaded.versionTag)
-                    Button("Install PebbleOS \(downloaded.versionTag)", systemImage: "arrow.down.app") {
-                        Task { await model.installDownloadedFirmware(deviceID: watchID) }
-                    }
+                if let downloadedFirmware {
+                    LabeledContent("Downloaded", value: downloadedFirmware.versionTag)
+                    Button("Install PebbleOS \(downloadedFirmware.versionTag)", systemImage: "arrow.down.app", action: installDownloaded)
                 }
             } header: {
                 Text("PebbleOS")
@@ -105,35 +136,29 @@ struct FirmwareView: View {
                         LabeledContent("Replacing", value: previousVersion)
                     }
                     // Recovery firmware leaves the watch unusable until the transfer finishes.
-                    if model.firmwareRequiresConfirmation {
+                    if requiresConfirmation {
                         ConfirmingButton(
                             title: "Start the Recovery Install",
                             role: .destructive,
                             question: "Install recovery firmware?",
                             explanation: "The watch cannot be used until this finishes. Keep it nearby and connected.",
-                            confirmationTitle: "Install"
-                        ) {
-                            Task { await model.confirmRecoveryFirmwareUpdate() }
-                        }
+                            confirmationTitle: "Install",
+                            action: confirmRecovery
+                        )
                     }
                     if !journal.phase.mayStartUnattended {
-                        Button("Try Again", systemImage: "arrow.clockwise") {
-                            Task { await model.resumeFirmwareUpdate(deviceID: watchID) }
-                        }
-                        .disabled(!isConnected)
+                        Button("Try Again", systemImage: "arrow.clockwise", action: resume)
+                            .disabled(!isConnected)
                     }
-                    Button("Stop", role: .destructive) {
-                        Task { await model.cancelFirmwareUpdate() }
-                    }
+                    Button("Stop", role: .destructive, action: cancel)
                     ConfirmingButton(
                         title: "Forget This Update",
                         role: .destructive,
                         question: "Forget this update?",
                         explanation: "The package is removed, so this update cannot be picked up again. The watch keeps the firmware it is running.",
-                        confirmationTitle: "Forget"
-                    ) {
-                        Task { await model.discardPendingFirmwareUpdate() }
-                    }
+                        confirmationTitle: "Forget",
+                        action: discard
+                    )
                 } header: {
                     Text("This Update")
                 }
@@ -143,13 +168,13 @@ struct FirmwareView: View {
         .navigationTitle("Firmware")
         .fileImporter(isPresented: $isChoosingFile, allowedContentTypes: [.pebbleFirmware]) { result in
             guard case .success(let url) = result else { return }
-            Task { await model.installFirmware(from: url, deviceID: watchID) }
+            installFile(url)
         }
         .dropDestination(for: URL.self) { urls, _ in
             guard let firmwareURL = urls.first(where: { $0.pathExtension.lowercased() == "pbz" }) else {
                 return false
             }
-            Task { await model.installFirmware(from: firmwareURL, deviceID: watchID) }
+            installFile(firmwareURL)
             return true
         }
     }
@@ -183,7 +208,7 @@ struct FirmwareView: View {
                 tint: .orange
             )
         }
-        if connection?.device.isRunningRecoveryFirmware == true {
+        if isRunningRecoveryFirmware {
             return FirmwareStatus(
                 title: "Running recovery firmware",
                 detail: "The watch works again once firmware is installed.",
@@ -191,9 +216,9 @@ struct FirmwareView: View {
                 tint: .orange
             )
         }
-        if let downloaded = model.downloadedFirmware {
+        if let downloadedFirmware {
             return FirmwareStatus(
-                title: "PebbleOS \(downloaded.versionTag) is downloaded",
+                title: "PebbleOS \(downloadedFirmware.versionTag) is downloaded",
                 detail: isConnected
                     ? "Install it whenever you like."
                     : "Connect the watch to install it.",
@@ -201,9 +226,9 @@ struct FirmwareView: View {
                 tint: .accentColor
             )
         }
-        if let release = model.availableFirmwareRelease, release.versionTag != installedVersion {
+        if let availableRelease, availableRelease.versionTag != installedVersion {
             return FirmwareStatus(
-                title: "PebbleOS \(release.versionTag) is published",
+                title: "PebbleOS \(availableRelease.versionTag) is published",
                 detail: "Download it, then install it.",
                 systemImage: "arrow.down.circle",
                 tint: .accentColor
@@ -252,5 +277,109 @@ private struct FirmwareStatusRow: View {
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
+    }
+}
+
+#Preview("Up to date") {
+    NavigationStack {
+        FirmwareContent(
+            installedVersion: "v4.36.2",
+            board: .obelixPVT,
+            runningSlot: 0,
+            isConnected: true,
+            isRunningRecoveryFirmware: false,
+            availableRelease: nil,
+            downloadedFirmware: nil,
+            journal: nil,
+            progress: nil,
+            statusMessage: nil,
+            requiresConfirmation: false,
+            checkForUpdates: {},
+            download: {},
+            installDownloaded: {},
+            installFile: { _ in },
+            confirmRecovery: {},
+            resume: {},
+            cancel: {},
+            discard: {}
+        )
+    }
+}
+
+#Preview("Transferring") {
+    NavigationStack {
+        FirmwareContent(
+            installedVersion: "v4.36.2",
+            board: .obelixPVT,
+            runningSlot: 0,
+            isConnected: true,
+            isRunningRecoveryFirmware: false,
+            availableRelease: PreviewSamples.firmwareRelease,
+            downloadedFirmware: PreviewSamples.downloadedFirmware,
+            journal: PreviewSamples.firmwareJournal(phase: .transferring),
+            progress: PreviewSamples.transferProgress,
+            statusMessage: "Sending PebbleOS v4.37.0 to Pebble 5209.",
+            requiresConfirmation: false,
+            checkForUpdates: {},
+            download: {},
+            installDownloaded: {},
+            installFile: { _ in },
+            confirmRecovery: {},
+            resume: {},
+            cancel: {},
+            discard: {}
+        )
+    }
+}
+
+#Preview("Stopped, watch away") {
+    NavigationStack {
+        FirmwareContent(
+            installedVersion: "v4.36.2",
+            board: .obelixPVT,
+            runningSlot: nil,
+            isConnected: false,
+            isRunningRecoveryFirmware: false,
+            availableRelease: PreviewSamples.firmwareRelease,
+            downloadedFirmware: PreviewSamples.downloadedFirmware,
+            journal: PreviewSamples.firmwareJournal(phase: .failed),
+            progress: nil,
+            statusMessage: "The transfer stopped.",
+            requiresConfirmation: false,
+            checkForUpdates: {},
+            download: {},
+            installDownloaded: {},
+            installFile: { _ in },
+            confirmRecovery: {},
+            resume: {},
+            cancel: {},
+            discard: {}
+        )
+    }
+}
+
+#Preview("Recovery firmware") {
+    NavigationStack {
+        FirmwareContent(
+            installedVersion: "v4.36.2",
+            board: .obelixPVT,
+            runningSlot: nil,
+            isConnected: true,
+            isRunningRecoveryFirmware: true,
+            availableRelease: nil,
+            downloadedFirmware: PreviewSamples.downloadedFirmware,
+            journal: PreviewSamples.firmwareJournal(phase: .validated),
+            progress: nil,
+            statusMessage: nil,
+            requiresConfirmation: true,
+            checkForUpdates: {},
+            download: {},
+            installDownloaded: {},
+            installFile: { _ in },
+            confirmRecovery: {},
+            resume: {},
+            cancel: {},
+            discard: {}
+        )
     }
 }

@@ -1,7 +1,6 @@
 import API
 import SwiftUI
 
-/// The watch's own settings, and what its health tracking is told.
 struct WatchSettingsView: View {
     var model: AppModel
     var watchID: String
@@ -10,17 +9,52 @@ struct WatchSettingsView: View {
         model.connections.first { $0.device.id == watchID }
     }
 
-    private var isConnected: Bool {
-        connection?.isConnected == true
+    var body: some View {
+        WatchSettingsContent(
+            watchSettings: Dictionary(
+                uniqueKeysWithValues: WatchSetting.allCases.map { ($0, model.isWatchSettingOn($0)) }
+            ),
+            activitySettings: model.activitySettings,
+            heartRateSettings: model.heartRateSettings,
+            isReminderAppEnabled: model.isReminderAppEnabled,
+            isConnected: connection?.isConnected == true,
+            statusMessage: model.watchSettingsStatusMessage,
+            setWatchSetting: { setting, isOn in
+                Task { await model.setWatchSetting(setting, isOn: isOn) }
+            },
+            setActivitySettings: { settings in
+                Task { await model.setActivitySettings(settings) }
+            },
+            setHeartRateSettings: { settings in
+                Task { await model.setHeartRateSettings(settings) }
+            },
+            setReminderAppEnabled: { isOn in
+                Task { await model.setReminderAppEnabled(isOn) }
+            }
+        )
     }
+}
+
+/// The watch's own settings, and what its health tracking is told.
+struct WatchSettingsContent: View {
+    var watchSettings: [WatchSetting: Bool]
+    var activitySettings: PebbleActivitySettings
+    var heartRateSettings: PebbleHeartRateSettings
+    var isReminderAppEnabled: Bool
+    var isConnected: Bool
+    var statusMessage: LocalizedStringKey?
+    var setWatchSetting: (WatchSetting, Bool) -> Void
+    var setActivitySettings: (PebbleActivitySettings) -> Void
+    var setHeartRateSettings: (PebbleHeartRateSettings) -> Void
+    var setReminderAppEnabled: (Bool) -> Void
 
     var body: some View {
         Form {
             Section {
                 ForEach(WatchSetting.allCases, id: \.self) { setting in
                     Toggle(setting.title, isOn: Binding(
-                        get: { model.isWatchSettingOn(setting) },
-                        set: { isOn in Task { await model.setWatchSetting(setting, isOn: isOn) } }
+                        get: { watchSettings[setting] ?? setting.defaultValue },
+                        set: { isOn in setWatchSetting(setting, isOn) }
                     ))
                 }
             } header: {
@@ -30,30 +64,9 @@ struct WatchSettingsView: View {
             }
 
             Section {
-                Toggle("Track Activity", isOn: Binding(
-                    get: { model.activitySettings.isTrackingEnabled },
-                    set: { isOn in
-                        var settings = model.activitySettings
-                        settings.isTrackingEnabled = isOn
-                        Task { await model.setActivitySettings(settings) }
-                    }
-                ))
-                Toggle("Activity Insights", isOn: Binding(
-                    get: { model.activitySettings.areActivityInsightsEnabled },
-                    set: { isOn in
-                        var settings = model.activitySettings
-                        settings.areActivityInsightsEnabled = isOn
-                        Task { await model.setActivitySettings(settings) }
-                    }
-                ))
-                Toggle("Sleep Insights", isOn: Binding(
-                    get: { model.activitySettings.areSleepInsightsEnabled },
-                    set: { isOn in
-                        var settings = model.activitySettings
-                        settings.areSleepInsightsEnabled = isOn
-                        Task { await model.setActivitySettings(settings) }
-                    }
-                ))
+                Toggle("Track Activity", isOn: activityBinding(\.isTrackingEnabled))
+                Toggle("Activity Insights", isOn: activityBinding(\.areActivityInsightsEnabled))
+                Toggle("Sleep Insights", isOn: activityBinding(\.areSleepInsightsEnabled))
             } header: {
                 Text("Health")
             }
@@ -62,11 +75,11 @@ struct WatchSettingsView: View {
                 Stepper(
                     "Height: \(heightMeasurement.formatted(.measurement(width: .abbreviated)))",
                     value: Binding(
-                        get: { Int(model.activitySettings.heightMillimetres) },
+                        get: { Int(activitySettings.heightMillimetres) },
                         set: { value in
-                            var settings = model.activitySettings
+                            var settings = activitySettings
                             settings.heightMillimetres = Int16(clamping: value)
-                            Task { await model.setActivitySettings(settings) }
+                            setActivitySettings(settings)
                         }
                     ),
                     in: 1_000...2_300,
@@ -75,24 +88,24 @@ struct WatchSettingsView: View {
                 Stepper(
                     "Weight: \(weightMeasurement.formatted(.measurement(width: .abbreviated)))",
                     value: Binding(
-                        get: { Int(model.activitySettings.weightDecagrams) },
+                        get: { Int(activitySettings.weightDecagrams) },
                         set: { value in
-                            var settings = model.activitySettings
+                            var settings = activitySettings
                             settings.weightDecagrams = Int16(clamping: value)
-                            Task { await model.setActivitySettings(settings) }
+                            setActivitySettings(settings)
                         }
                     ),
                     in: 3_000...20_000,
                     step: 50
                 )
                 Stepper(
-                    "Age: \(model.activitySettings.ageYears, format: .number)",
+                    "Age: \(activitySettings.ageYears, format: .number)",
                     value: Binding(
-                        get: { Int(model.activitySettings.ageYears) },
+                        get: { Int(activitySettings.ageYears) },
                         set: { value in
-                            var settings = model.activitySettings
+                            var settings = activitySettings
                             settings.ageYears = Int8(clamping: value)
-                            Task { await model.setActivitySettings(settings) }
+                            setActivitySettings(settings)
                         }
                     ),
                     in: 5...120
@@ -105,23 +118,23 @@ struct WatchSettingsView: View {
 
             Section {
                 Toggle("Heart Rate", isOn: Binding(
-                    get: { model.heartRateSettings.isEnabled },
+                    get: { heartRateSettings.isEnabled },
                     set: { isOn in
-                        var settings = model.heartRateSettings
+                        var settings = heartRateSettings
                         settings.isEnabled = isOn
-                        Task { await model.setHeartRateSettings(settings) }
+                        setHeartRateSettings(settings)
                     }
                 ))
-                if model.heartRateSettings.isEnabled {
+                if heartRateSettings.isEnabled {
                     // Off is left out of the choices: the watch keeps a separate
                     // flag for that, which is the toggle above, and offering it
                     // twice would let the two disagree.
                     Picker("Reading", selection: Binding(
-                        get: { model.heartRateSettings.interval == .off ? .everyTenMinutes : model.heartRateSettings.interval },
+                        get: { heartRateSettings.interval == .off ? .everyTenMinutes : heartRateSettings.interval },
                         set: { interval in
-                            var settings = model.heartRateSettings
+                            var settings = heartRateSettings
                             settings.interval = interval
-                            Task { await model.setHeartRateSettings(settings) }
+                            setHeartRateSettings(settings)
                         }
                     )) {
                         ForEach(PebbleHeartRateInterval.allCases.filter { $0 != .off }, id: \.self) { interval in
@@ -129,11 +142,11 @@ struct WatchSettingsView: View {
                         }
                     }
                     Toggle("Read During Activity", isOn: Binding(
-                        get: { model.heartRateSettings.isEnabledDuringActivity },
+                        get: { heartRateSettings.isEnabledDuringActivity },
                         set: { isOn in
-                            var settings = model.heartRateSettings
+                            var settings = heartRateSettings
                             settings.isEnabledDuringActivity = isOn
-                            Task { await model.setHeartRateSettings(settings) }
+                            setHeartRateSettings(settings)
                         }
                     ))
                 }
@@ -143,8 +156,8 @@ struct WatchSettingsView: View {
 
             Section {
                 Toggle("Reminders App", isOn: Binding(
-                    get: { model.isReminderAppEnabled },
-                    set: { isOn in Task { await model.setReminderAppEnabled(isOn) } }
+                    get: { isReminderAppEnabled },
+                    set: { isOn in setReminderAppEnabled(isOn) }
                 ))
             } footer: {
                 Text("Turns the watch's own Reminders app on, which is where the reminders added on the Timeline screen appear.")
@@ -156,9 +169,9 @@ struct WatchSettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            if let message = model.watchSettingsStatusMessage {
+            if let statusMessage {
                 Section {
-                    Label(message, systemImage: "exclamationmark.triangle")
+                    Label(statusMessage, systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -167,14 +180,63 @@ struct WatchSettingsView: View {
         .navigationTitle("Watch Settings")
     }
 
+    private func activityBinding(_ keyPath: WritableKeyPath<PebbleActivitySettings, Bool>) -> Binding<Bool> {
+        Binding(
+            get: { activitySettings[keyPath: keyPath] },
+            set: { isOn in
+                var settings = activitySettings
+                settings[keyPath: keyPath] = isOn
+                setActivitySettings(settings)
+            }
+        )
+    }
+
     private var heightMeasurement: Measurement<UnitLength> {
-        Measurement(value: Double(model.activitySettings.heightMillimetres), unit: .millimeters)
+        Measurement(value: Double(activitySettings.heightMillimetres), unit: .millimeters)
             .converted(to: Locale.current.measurementSystem == .us ? .inches : .centimeters)
     }
 
     private var weightMeasurement: Measurement<UnitMass> {
         // The firmware counts weight in decagrams: 7000 is 70 kg.
-        Measurement(value: Double(model.activitySettings.weightDecagrams) / 100, unit: .kilograms)
+        Measurement(value: Double(activitySettings.weightDecagrams) / 100, unit: .kilograms)
             .converted(to: Locale.current.measurementSystem == .us ? .pounds : .kilograms)
+    }
+}
+
+#Preview("Connected") {
+    NavigationStack {
+        WatchSettingsContent(
+            watchSettings: [.clock24Hour: true, .backlight: true],
+            activitySettings: PebbleActivitySettings(),
+            heartRateSettings: PebbleHeartRateSettings(),
+            isReminderAppEnabled: true,
+            isConnected: true,
+            statusMessage: nil,
+            setWatchSetting: { _, _ in },
+            setActivitySettings: { _ in },
+            setHeartRateSettings: { _ in },
+            setReminderAppEnabled: { _ in }
+        )
+    }
+}
+
+#Preview("Heart rate off, watch away") {
+    NavigationStack {
+        WatchSettingsContent(
+            watchSettings: [:],
+            activitySettings: PebbleActivitySettings(),
+            heartRateSettings: PebbleHeartRateSettings(
+                isEnabled: false,
+                interval: .everyThirtyMinutes,
+                isEnabledDuringActivity: false
+            ),
+            isReminderAppEnabled: false,
+            isConnected: false,
+            statusMessage: "Pebble 5209 did not accept the setting.",
+            setWatchSetting: { _, _ in },
+            setActivitySettings: { _ in },
+            setHeartRateSettings: { _ in },
+            setReminderAppEnabled: { _ in }
+        )
     }
 }
