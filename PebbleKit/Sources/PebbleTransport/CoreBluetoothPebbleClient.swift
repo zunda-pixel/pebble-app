@@ -707,7 +707,21 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         appMessages.startNextIfPossible()
     }
 
-    private func abortLink(_ peripheral: CBPeripheral, error: PebbleConnectionError) {
+    /// `step` names what the link was doing. Eleven places report the same
+    /// `protocolNegotiationFailed`, and a log that only carries the error says
+    /// nothing about which of them a watch stopped at.
+    private func abortLink(
+        _ peripheral: CBPeripheral,
+        error: PebbleConnectionError,
+        step: String
+    ) {
+        Task { [tag = clientTag] in
+            await PebbleDiagnostics.shared.record(
+                .error,
+                category: "pairing",
+                message: "[\(tag)] giving up while \(step)"
+            )
+        }
         if connectionContinuation != nil {
             failConnection(error)
             return
@@ -1386,7 +1400,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             try handle(actions, peripheral: peripheral)
             updateAcknowledgementTimeout(for: peripheral)
         } catch {
-            abortLink(peripheral, error: .connectionTimedOut)
+            abortLink(peripheral, error: .connectionTimedOut, step: "resending unacknowledged packets")
         }
     }
 }
@@ -1563,7 +1577,11 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
 
     public func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: (any Error)?) {
         guard error == nil else {
-            abortLink(peripheral, error: .protocolNegotiationFailed)
+            abortLink(
+                peripheral,
+                error: .protocolNegotiationFailed,
+                step: "discovering services: \(error?.localizedDescription ?? "")"
+            )
             return
         }
         let services = peripheral.services ?? []
@@ -1668,7 +1686,13 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
               let characteristics = service.characteristics,
               let notifyCharacteristic = characteristics.first(where: { $0.uuid == Self.ppogNotifyCharacteristic }),
               let writeCharacteristic = characteristics.first(where: { $0.uuid == Self.ppogWriteCharacteristic }) else {
-            abortLink(peripheral, error: .protocolNegotiationFailed)
+            let found = (service.characteristics ?? []).map(\.uuid.uuidString).joined(separator: ",")
+            abortLink(
+                peripheral,
+                error: .protocolNegotiationFailed,
+                step: "reading the watch's protocol service:"
+                    + " \(error?.localizedDescription ?? "it offered [\(found)]")"
+            )
             return
         }
 
@@ -1720,7 +1744,7 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
             },
             onUnsubscribe: { [weak self] in
                 guard let self, self.setup.transport == .forward else { return }
-                self.abortLink(peripheral, error: .disconnected)
+                self.abortLink(peripheral, error: .disconnected, step: "hosting the transport: the watch unsubscribed")
             }
         )
     }
@@ -1790,7 +1814,11 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
         guard let status = PebbleConnectivityStatus(decoding: bytes) else {
             // A watch stuck in a bad state reports a truncated value; it needs
             // a reboot before it can be paired.
-            abortLink(peripheral, error: .protocolNegotiationFailed)
+            abortLink(
+                peripheral,
+                error: .protocolNegotiationFailed,
+                step: "reading the watch's pairing state: it answered \(bytes.count) bytes"
+            )
             return
         }
         Task {
@@ -1838,7 +1866,7 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
             guard !Task.isCancelled else {
                 return
             }
-            self?.abortLink(peripheral, error: .connectionTimedOut)
+            self?.abortLink(peripheral, error: .connectionTimedOut, step: "waiting for the watch to be paired")
         }
     }
 
@@ -1856,14 +1884,18 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
         guard characteristic.uuid == Self.ppogNotifyCharacteristic,
               error == nil,
               characteristic.isNotifying else {
-            abortLink(peripheral, error: .protocolNegotiationFailed)
+            abortLink(
+                peripheral,
+                error: .protocolNegotiationFailed,
+                step: "subscribing to the watch's protocol characteristic: \(error?.localizedDescription ?? "it did not turn on")"
+            )
             return
         }
 
         do {
             try write(.resetRequest(sequence: 0, version: .one), to: peripheral)
         } catch {
-            abortLink(peripheral, error: .protocolNegotiationFailed)
+            abortLink(peripheral, error: .protocolNegotiationFailed, step: "opening the session")
         }
     }
 
@@ -1895,7 +1927,11 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
         guard characteristic.uuid == Self.ppogNotifyCharacteristic,
               error == nil,
               let value = characteristic.value else {
-            abortLink(peripheral, error: .protocolNegotiationFailed)
+            abortLink(
+                peripheral,
+                error: .protocolNegotiationFailed,
+                step: "reading what the watch sent: \(error?.localizedDescription ?? "it was empty")"
+            )
             return
         }
         handleIncomingProtocolBytes([UInt8](value), from: peripheral)
@@ -1977,7 +2013,7 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
                 }
                 return
             }
-            abortLink(peripheral, error: .protocolNegotiationFailed)
+            abortLink(peripheral, error: .protocolNegotiationFailed, step: "handling a packet from the watch")
         }
     }
 
@@ -2001,7 +2037,7 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
     private func handleInSessionReset(on peripheral: CBPeripheral) {
         ppogSession = nil
         frameDecoder = PebbleProtocolFrameDecoder()
-        abortLink(peripheral, error: .disconnected)
+        abortLink(peripheral, error: .disconnected, step: "the watch asked to start the session over")
     }
 
     public func peripheralIsReady(toSendWriteWithoutResponse peripheral: CBPeripheral) {
