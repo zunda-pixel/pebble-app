@@ -96,21 +96,30 @@ extension AppModel {
             appName: application.displayName
         )
         guard !activeConnections.isEmpty else {
-            await queue(notification, reason: "no watch is connected")
+            await queue(PendingDelivery(work: notification), reason: "no watch is connected")
             return
         }
-        do {
-            for connection in activeConnections {
-                let client = connection.client
+        var delivered: Set<String> = []
+        for connection in activeConnections {
+            let client = connection.client
+            do {
                 try await retry(with: .watchWork) {
                     try await client.sendNotification(notification)
                 }
+                delivered.insert(connection.device.id)
+            } catch {
+                continue
             }
-        } catch {
+        }
+        guard activeConnections.allSatisfy({ delivered.contains($0.device.id) }) else {
             // The only caller is a `try?`-ed task in the companion runtime, which has
             // nowhere to put a throw. A watch that would not take it now is in the same
-            // position as one that was not there at all.
-            await queue(notification, reason: "the watch would not take it")
+            // position as one that was not there at all — but the watches that did take
+            // it are written down, so the flush does not show it to them twice.
+            await queue(
+                PendingDelivery(work: notification, deliveredTo: delivered),
+                reason: "a watch would not take it"
+            )
             return
         }
         await PebbleDiagnostics.shared.record(
@@ -119,7 +128,7 @@ extension AppModel {
         )
     }
 
-    private func queue(_ notification: PebbleTimelineNotification, reason: String) async {
+    private func queue(_ notification: PendingDelivery<PebbleTimelineNotification>, reason: String) async {
         pendingNotifications.append(notification)
         if pendingNotifications.count > 20 {
             pendingNotifications.removeFirst(pendingNotifications.count - 20)
@@ -325,20 +334,35 @@ extension AppModel {
     }
 
     private func deliverPendingNotifications() async {
-        while !activeConnections.isEmpty, let notification = pendingNotifications.first {
-            do {
-                for connection in activeConnections {
-                    let client = connection.client
+        while let next = pendingNotifications.first(where: { queued in
+            activeConnections.contains { queued.isOwed(by: $0.device.id) }
+        }) {
+            var delivered = next.deliveredTo
+            for connection in activeConnections where next.isOwed(by: connection.device.id) {
+                let client = connection.client
+                do {
                     try await retry(with: .watchWork) {
-                        try await client.sendNotification(notification)
+                        try await client.sendNotification(next.work)
                     }
+                    delivered.insert(connection.device.id)
+                } catch {
+                    continue
                 }
-            } catch {
+            }
+            // Found again by identity: sending suspends, so the queue need not
+            // still hold this one where it did.
+            guard let index = pendingNotifications.firstIndex(where: { $0.work.id == next.work.id }) else {
+                continue
+            }
+            guard delivered != pendingNotifications[index].deliveredTo else {
+                // Nothing got through. Another pass would ask the same watches
+                // the same question.
                 break
             }
-            // Removed by identity: sending suspends, so the notification at the front
-            // afterwards need not be this one.
-            pendingNotifications.removeAll { $0.id == notification.id }
+            pendingNotifications[index].deliveredTo = delivered
+            if watchesOwed(pendingNotifications[index].deliveredTo).isEmpty {
+                pendingNotifications.remove(at: index)
+            }
         }
         try? await pendingNotificationLibrary.save(pendingNotifications)
         if pendingNotifications.isEmpty {
@@ -347,6 +371,13 @@ extension AppModel {
                 message: "Queued watch app notifications delivered"
             )
         }
+    }
+
+    /// Which watches have still not had a piece of queued work: every watch the
+    /// app knows of, so an entry is finished only once nobody is waiting for it.
+    private func watchesOwed(_ deliveredTo: Set<String>) -> Set<String> {
+        let known = Set(savedWatches.map(\.id)).union(connections.map(\.device.id))
+        return known.subtracting(deliveredTo)
     }
 
     func restorePendingNotifications() async {

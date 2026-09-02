@@ -215,7 +215,7 @@ public final class AppModel {
     @ObservationIgnored var needsApplicationSynchronization = false
     @ObservationIgnored var hasStarted = false
     @ObservationIgnored var recentNotificationFingerprints: [String: Date] = [:]
-    @ObservationIgnored var pendingNotifications: [PebbleTimelineNotification] = []
+    @ObservationIgnored var pendingNotifications: [PendingDelivery<PebbleTimelineNotification>] = []
     // Both the app coming forward and a watch finishing its synchronization ask
     // for a flush; two at once hand the watch everything twice.
     @ObservationIgnored var pendingNotificationFlush: Task<Void, Never>?

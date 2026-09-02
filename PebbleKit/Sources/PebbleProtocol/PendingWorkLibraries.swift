@@ -1,6 +1,39 @@
 public import Foundation
 import MemberwiseInit
 
+/// One piece of queued work and the watches that already have it.
+///
+/// The queue used to be a list of the work alone, and a flush sent each item to
+/// every connected watch and kept it if *any* of them refused. With two watches
+/// that means the one which took it gets it again on the next flush: shown twice,
+/// buzzed twice. Which watch has what belongs to the item.
+@MemberwiseInit(.public)
+public struct PendingDelivery<Work: Codable & Equatable & Sendable>: Codable, Equatable, Sendable {
+    public var work: Work
+    public var deliveredTo: Set<String> = []
+
+    public func isOwed(by watchID: String) -> Bool {
+        !deliveredTo.contains(watchID)
+    }
+}
+
+/// Reads a queue, accepting one written before the watches were tracked per
+/// item — nobody has had those yet, which is what an empty set says. Tried in
+/// this order because `loadRecovering` moves a file it cannot decode out of the
+/// way, which would take the older shape with it.
+private func loadQueue<Work: Codable & Equatable & Sendable>(
+    _ work: Work.Type,
+    from url: URL
+) throws -> [PendingDelivery<Work>] {
+    if let stored = try? PersistentJSON.load([PendingDelivery<Work>].self, from: url) {
+        return stored
+    }
+    if let queued = try? PersistentJSON.load([Work].self, from: url) {
+        return queued.map { PendingDelivery(work: $0) }
+    }
+    return try PersistentJSON.loadRecovering([PendingDelivery<Work>].self, from: url) ?? []
+}
+
 /// Work queued while no watch is connected, kept so a reconnect can finish it.
 public actor PendingNotificationLibrary {
     private var fileURL: URL
@@ -9,11 +42,11 @@ public actor PendingNotificationLibrary {
         self.fileURL = fileURL ?? applicationSupportURL("pending-notifications.json")
     }
 
-    public func notifications() throws -> [PebbleTimelineNotification] {
-        try PersistentJSON.loadRecovering([PebbleTimelineNotification].self, from: fileURL) ?? []
+    public func notifications() throws -> [PendingDelivery<PebbleTimelineNotification>] {
+        try loadQueue(PebbleTimelineNotification.self, from: fileURL)
     }
 
-    public func save(_ notifications: [PebbleTimelineNotification]) throws {
+    public func save(_ notifications: [PendingDelivery<PebbleTimelineNotification>]) throws {
         try PersistentJSON.save(notifications, to: fileURL)
     }
 }
@@ -80,9 +113,20 @@ public struct StoredAppMessage: Codable, Equatable, Identifiable, Sendable {
 
 public actor PendingAppMessageLibrary {
     private var fileURL: URL
-    public init(fileURL: URL? = nil) { self.fileURL = fileURL ?? applicationSupportURL("pending-appmessages.json") }
-    public func messages() throws -> [StoredAppMessage] { try PersistentJSON.loadRecovering([StoredAppMessage].self, from: fileURL) ?? [] }
-    public func save(_ messages: [StoredAppMessage]) throws { try PersistentJSON.save(messages, to: fileURL) }
+
+    public init(fileURL: URL? = nil) {
+        self.fileURL = fileURL ?? applicationSupportURL("pending-appmessages.json")
+    }
+
+    /// A plain list: an app message is addressed to an application and sent to
+    /// one watch, so there is no per-watch delivery to remember.
+    public func messages() throws -> [StoredAppMessage] {
+        try PersistentJSON.loadRecovering([StoredAppMessage].self, from: fileURL) ?? []
+    }
+
+    public func save(_ messages: [StoredAppMessage]) throws {
+        try PersistentJSON.save(messages, to: fileURL)
+    }
 }
 
 public actor PendingFirmwareUpdateLibrary {

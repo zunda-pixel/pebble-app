@@ -2,6 +2,7 @@ import Foundation
 import Testing
 import ZIPFoundation
 @testable import PebbleProtocol
+@testable import PebbleTransport
 @testable import PebbleApp
 
 /// Work the phone holds on a watch's behalf: notifications and messages queued
@@ -40,7 +41,7 @@ struct PendingWorkTests {
                 appName: "Chat"
             )
         }
-        model.pendingNotifications = queued
+        model.pendingNotifications = queued.map { PendingDelivery(work: $0) }
 
         // Both callers ask at once, which is what happens when the app comes
         // forward while a watch is finishing its reconnection.
@@ -51,6 +52,52 @@ struct PendingWorkTests {
         // Each flush working from its own snapshot made the watch buzz twice
         // for every queued notification.
         #expect(client.sentNotifications.map(\.id) == queued.map(\.id))
+        #expect(model.pendingNotifications.isEmpty)
+    }
+
+    @Test
+    func aNotificationTheSecondWatchRefusesIsNotShownTwiceOnTheFirst() async throws {
+        var clients: [String: SuspendingPebbleClient] = [:]
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: MockPebbleClient(),
+            applicationLibrary: PebbleApplicationLibrary(
+                fileURL: directory.appending(path: "applications.json")
+            ),
+            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json")),
+            clientFactory: { deviceID in
+                let client = SuspendingPebbleClient()
+                clients[deviceID] = client
+                return client
+            }
+        )
+        try await model.pendingNotificationLibrary.save([])
+        await model.scan()
+        let devices = model.discoveredDevices
+        let first = try #require(devices.first)
+        let second = try #require(devices.dropFirst().first)
+        await model.connect(to: first)
+        await model.connect(to: second)
+        let refusing = try #require(clients[second.id])
+        refusing.notificationFailure = PebbleConnectionError.disconnected
+
+        let notification = PebbleTimelineNotification(
+            parentApplicationID: UUID(),
+            title: "Queued",
+            body: "One watch took it",
+            appName: "Chat"
+        )
+        model.pendingNotifications = [PendingDelivery(work: notification)]
+        await model.flushPendingNotifications()
+        // The second watch comes back, and the first is asked for nothing.
+        refusing.notificationFailure = nil
+        await model.flushPendingNotifications()
+
+        // The watch that took it first used to be shown it again every time the
+        // other one refused: two notifications, two buzzes, one message.
+        #expect(clients[first.id]?.sentNotifications.map(\PebbleTimelineNotification.id) == [notification.id])
+        #expect(refusing.sentNotifications.map(\.id) == [notification.id])
         #expect(model.pendingNotifications.isEmpty)
     }
 
