@@ -694,9 +694,16 @@ struct AppModelTests {
         // thrown away.
         #expect(client.timelineReminders.map(\.title) == ["Dentist"])
 
-        await model.connect(to: watch)
-        let connection = try #require(model.connections.first)
-        await model.synchronizeReminders(on: connection)
+        // A phone put down for the night: the app is gone from memory before
+        // the watch is next in range, so what the watch was given has to be on
+        // disk to be taken back.
+        let afterRelaunch = AppModel(
+            client: client,
+            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json")),
+            reminderLibrary: TimelinePinLibrary(fileURL: directory.appending(path: "reminders.json"))
+        )
+        await afterRelaunch.connect(to: watch)
 
         #expect(client.timelineReminders.isEmpty)
     }
