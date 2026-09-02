@@ -57,6 +57,26 @@ let package = Package(
       ],
       swiftSettings: swiftSettings
     ),
+    // Speex, as vendored from libspeex 1.2.1 — the same sources and the same
+    // fixed-point arithmetic the watch encodes with. No Apple framework decodes
+    // Speex, and the watch does not offer a second format.
+    .target(
+      name: "CSpeex",
+      exclude: ["COPYING"],
+      cSettings: [
+        .headerSearchPath("."),
+        .define("HAVE_CONFIG_H"),
+      ]
+    ),
+    // What the watch's microphone sent, turned back into samples.
+    .target(
+      name: "PebbleAudio",
+      dependencies: [
+        .target(name: "CSpeex"),
+        .target(name: "PebbleProtocol"),
+      ],
+      swiftSettings: swiftSettings
+    ),
     // How those bytes reach a watch: CoreBluetooth in both roles, the emulator's
     // socket, and the mock a test or a preview stands in.
     .target(
@@ -85,6 +105,8 @@ let package = Package(
     .testTarget(
       name: "PebbleProtocolTests",
       dependencies: [
+        "CSpeex",
+        "PebbleAudio",
         "PebbleProtocol",
         "PebbleTransport",
         .product(name: "HTTPTypes", package: "swift-http-types"),
