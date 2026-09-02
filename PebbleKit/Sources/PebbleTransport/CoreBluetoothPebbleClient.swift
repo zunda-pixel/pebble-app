@@ -1610,8 +1610,10 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
             }
         }
 
+        // The transport is not handed back here: a service can be listed and still
+        // be unusable, and dropping the phone's one first would leave the link
+        // with neither.
         if let service = services.first(where: { $0.uuid == Self.ppogService }) {
-            endForwardTransport(on: peripheral)
             peripheral.discoverCharacteristics(
                 [Self.ppogNotifyCharacteristic, Self.ppogWriteCharacteristic],
                 for: service
@@ -1620,7 +1622,7 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
             // The watch expects the phone to host the service and connects to it as a
             // GATT client. It inspects the phone right after connecting and does not come
             // back for a second look.
-            startForwardTransport(on: peripheral)
+            startForwardTransport(on: peripheral, because: "the watch hosts none")
         }
 
         if let batteryService = services.first(where: { $0.uuid == Self.batteryService }) {
@@ -1686,16 +1688,22 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
               let characteristics = service.characteristics,
               let notifyCharacteristic = characteristics.first(where: { $0.uuid == Self.ppogNotifyCharacteristic }),
               let writeCharacteristic = characteristics.first(where: { $0.uuid == Self.ppogWriteCharacteristic }) else {
+            // iOS keeps its own copy of the watch's database, and a factory reset
+            // leaves that copy holding the protocol service with nothing inside it.
+            // The watch subscribes to the phone's service while this is going on, so
+            // an unusable service is a reason to host the transport rather than to
+            // give up on a watch that is talking.
             let found = (service.characteristics ?? []).map(\.uuid.uuidString).joined(separator: ",")
-            abortLink(
-                peripheral,
-                error: .protocolNegotiationFailed,
-                step: "reading the watch's protocol service:"
-                    + " \(error?.localizedDescription ?? "it offered [\(found)]")"
+            startForwardTransport(
+                on: peripheral,
+                because: "the watch's own service is unusable"
+                    + " (\(error?.localizedDescription ?? "it offered [\(found)]"))"
             )
+            startProtocolIfReady(on: peripheral)
             return
         }
 
+        endForwardTransport(on: peripheral)
         activeWriteCharacteristic = writeCharacteristic
         ppogNotifyCharacteristicToSubscribe = notifyCharacteristic
         startProtocolIfReady(on: peripheral)
@@ -1723,14 +1731,14 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
         }
     }
 
-    private func startForwardTransport(on peripheral: CBPeripheral) {
+    private func startForwardTransport(on peripheral: CBPeripheral, because reason: String) {
         guard setup.hostTransportOnPhone() else {
             return
         }
         Task { [tag = clientTag] in
             await PebbleDiagnostics.shared.record(
                 category: "pairing",
-                message: "[\(tag)] Watch hosts no protocol service; serving it from the phone"
+                message: "[\(tag)] serving the protocol from the phone: \(reason)"
             )
         }
         PebbleGattServer.shared.start()

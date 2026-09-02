@@ -32,6 +32,10 @@ public final class AppModel {
     public internal(set) var connectionState: PebbleConnectionState = .idle
     public internal(set) var connections: [WatchConnection] = []
     public internal(set) var connectingDeviceIDs: Set<String> = []
+    /// Why the last attempt at each watch ended. A watch has its own screen with
+    /// its own Connect button, and a failure that only reached the log left that
+    /// button looking like it had done nothing.
+    public internal(set) var connectionFailures: [String: PebbleConnectionError] = [:]
     public internal(set) var isScanning = false
     public internal(set) var discoveredDevices: [DiscoveredPebble] = []
     public internal(set) var watchApplications: [PebbleApplication] = []
@@ -353,6 +357,7 @@ public final class AppModel {
             return
         }
         connectingDeviceIDs.insert(device.id)
+        connectionFailures[device.id] = nil
         refreshConnectionState()
         Task { [id = device.id] in
             await PebbleDiagnostics.shared.record(
@@ -369,6 +374,7 @@ public final class AppModel {
         do {
             let connectedDevice = try await connectionClient.connect(to: device)
             lastConnectionError = nil
+            connectionFailures[device.id] = nil
             let connection = WatchConnection(client: connectionClient, device: connectedDevice)
             connections.append(connection)
             connection.startObserving(
@@ -391,12 +397,14 @@ public final class AppModel {
             await synchronizeEverything(on: connection)
         } catch let error as PebbleConnectionError {
             lastConnectionError = error
+            connectionFailures[device.id] = error
             if !connections.isEmpty {
                 watchManagementErrorMessage = error.message
             }
             await PebbleDiagnostics.shared.record(.error, category: "connection", message: error.logDescription)
         } catch {
             lastConnectionError = .protocolNegotiationFailed
+            connectionFailures[device.id] = .protocolNegotiationFailed
         }
     }
 

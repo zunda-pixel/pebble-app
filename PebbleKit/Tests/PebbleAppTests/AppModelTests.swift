@@ -570,6 +570,32 @@ struct AppModelTests {
     }
 
     @Test
+    func aConnectThatFailsIsRememberedAgainstThatWatch() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: client,
+            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        )
+        let watch = DiscoveredPebble(id: "mock-emery", name: "My Pebble", model: .pebbleTime2, signalStrength: -50)
+        client.connectionFailure = .protocolNegotiationFailed
+
+        await model.connect(to: watch)
+
+        // The watch's own screen has the Connect button; a failure that only
+        // reached the log left that button looking like it had done nothing.
+        #expect(model.connectionFailures[watch.id] == .protocolNegotiationFailed)
+        #expect(model.connections.isEmpty)
+
+        client.connectionFailure = nil
+        await model.connect(to: watch)
+
+        #expect(model.connectionFailures[watch.id] == nil)
+    }
+
+    @Test
     func appModelRejectsAppMessageForUnknownApplication() async throws {
         let client = MockPebbleClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)

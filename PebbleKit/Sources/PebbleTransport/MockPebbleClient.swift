@@ -72,9 +72,15 @@ public final class MockPebbleClient: PebbleClient {
 
     /// Makes the next connection report a watch running recovery firmware.
     public var connectsAsRecoveryFirmware = false
+    /// Makes connecting fail the way a watch out of range or with an unusable
+    /// protocol service does.
+    public var connectionFailure: PebbleConnectionError?
 
     public func connect(to device: DiscoveredPebble) async throws -> PebbleDevice {
         try await Task.sleep(for: .milliseconds(500))
+        if let connectionFailure {
+            throw connectionFailure
+        }
 
         return PebbleDevice(
             id: device.id,

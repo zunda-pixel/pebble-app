@@ -30,6 +30,7 @@ struct WatchDetailView: View {
             languageName: languageName,
             notificationStatusMessage: model.notificationStatusMessage,
             resetStatusMessage: model.watchResetStatusMessage,
+            connectionErrorMessage: model.connectionFailures[watchID]?.message,
             connect: {
                 guard let saved = model.savedWatches.first(where: { $0.id == watchID }) else { return }
                 Task { await model.connect(to: saved) }
@@ -66,6 +67,7 @@ struct WatchDetailContent<
     var languageName: String?
     var notificationStatusMessage: LocalizedStringKey?
     var resetStatusMessage: LocalizedStringKey?
+    var connectionErrorMessage: LocalizedStringKey?
     var connect: () -> Void
     var setAutomaticallyConnects: (Bool) -> Void
     var disconnect: () -> Void
@@ -164,6 +166,10 @@ struct WatchDetailContent<
                 }
                 if watch.phase != nil {
                     Button("Disconnect", role: .destructive, action: disconnect)
+                }
+                if let connectionErrorMessage {
+                    Label(connectionErrorMessage, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
                 }
             }
             Section("Notifications") {
@@ -270,6 +276,7 @@ struct WatchDetailContent<
             languageName: "日本語",
             notificationStatusMessage: nil,
             resetStatusMessage: nil,
+            connectionErrorMessage: nil,
             connect: {},
             setAutomaticallyConnects: { _ in },
             disconnect: {},
@@ -293,6 +300,7 @@ struct WatchDetailContent<
             languageName: nil,
             notificationStatusMessage: "Queued for the next connection.",
             resetStatusMessage: nil,
+            connectionErrorMessage: "The watch does not expose the expected Pebble connection service.",
             connect: {},
             setAutomaticallyConnects: { _ in },
             disconnect: {},
@@ -316,6 +324,7 @@ struct WatchDetailContent<
             languageName: nil,
             notificationStatusMessage: nil,
             resetStatusMessage: "The watch is erasing itself. It has forgotten this device, so it cannot reconnect until it is forgotten here too.",
+            connectionErrorMessage: nil,
             connect: {},
             setAutomaticallyConnects: { _ in },
             disconnect: {},

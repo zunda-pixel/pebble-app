@@ -89,6 +89,7 @@ extension AppModel {
         do {
             savedWatches = try await watchLibrary.remove(watchID: id)
             installedApplicationIDsByWatch[id] = nil
+            connectionFailures[id] = nil
             watchManagementErrorMessage = nil
         } catch {
             watchManagementErrorMessage = "The watch could not be forgotten."
