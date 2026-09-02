@@ -624,6 +624,12 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         nextBlobDBToken &+= 1
         pendingBlobDBToken = token
         acceptedBlobDBStatuses = acceptedStatuses
+        // A frame that cannot even be built fails the caller from inside `wait`,
+        // which leaves the token behind for the next answer to match.
+        defer {
+            pendingBlobDBToken = nil
+            acceptedBlobDBStatuses.removeAll()
+        }
         try await blobDBReply.wait(timeout: .seconds(20)) {
             try sendFrame(try frame(token), to: peripheral)
         }
@@ -1181,6 +1187,16 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             let response = try BlobDBCodec.decodeResponse(frame)
             guard response.token == pendingBlobDBToken else { return }
             guard acceptedBlobDBStatuses.contains(response.status) else {
+                // The status is the watch's whole explanation, and a refusal that
+                // only reached the caller as an error value left the log showing a
+                // request answered in milliseconds and nothing else.
+                Task { [tag = clientTag, status = response.status] in
+                    await PebbleDiagnostics.shared.record(
+                        .warning,
+                        category: "blobdb",
+                        message: "[\(tag)] the watch refused the write: \(status)"
+                    )
+                }
                 failBlobDBOperation(BlobDBClientError.rejected(response.status))
                 return
             }

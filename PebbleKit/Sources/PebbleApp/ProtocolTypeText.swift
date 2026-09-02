@@ -31,6 +31,49 @@ public extension PebbleConnectionError {
     }
 }
 
+public extension BlobDBClientError {
+    /// `localizedDescription` on a Swift error enum reads "The operation couldn't
+    /// be completed. (PebbleTransport.BlobDBClientError error 1.)", which told a
+    /// reader whose reminder had been refused nothing at all.
+    var message: LocalizedStringKey {
+        switch self {
+        case .operationAlreadyInProgress:
+            "The watch is still busy with the last change."
+        case .rejected(let status):
+            status.message
+        }
+    }
+}
+
+public extension BlobDBStatus {
+    var message: LocalizedStringKey {
+        switch self {
+        case .success:
+            "The watch accepted it."
+        case .generalFailure:
+            "The watch could not store it."
+        case .invalidOperation:
+            "The watch does not allow that change."
+        case .invalidDatabaseID:
+            "This firmware has nowhere to keep it."
+        case .invalidData:
+            "The watch could not read what was sent."
+        case .keyDoesNotExist:
+            "The watch no longer has it."
+        case .databaseFull:
+            "There is no room left on the watch."
+        case .dataStale:
+            "The watch already has a newer copy."
+        case .notSupported:
+            "This firmware does not support it."
+        case .locked:
+            "The watch is using it right now."
+        case .tryLater:
+            "The watch is busy. Try again in a moment."
+        }
+    }
+}
+
 public extension HealthAnalysisPeriod {
     var title: LocalizedStringKey {
         switch self {

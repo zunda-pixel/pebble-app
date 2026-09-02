@@ -3689,6 +3689,16 @@
         }
       }
     },
+    "That time has passed, so the reminder is kept here rather than sent to the watch." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "その時刻は過ぎているため、リマインダーはここに保存し、ウォッチには送りません。"
+          }
+        }
+      }
+    },
     "The app catalog cache could not be loaded." : {
       "localizations" : {
         "ja" : {
@@ -4015,12 +4025,32 @@
         }
       }
     },
+    "The watch accepted it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチが受け付けました。"
+          }
+        }
+      }
+    },
     "The watch adds an app here the first time it sees a notification from it." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチがそのアプリからの通知を初めて検出したときに、アプリがここに追加されます。"
+          }
+        }
+      }
+    },
+    "The watch already has a newer copy." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチにはすでに新しい内容があります。"
           }
         }
       }
@@ -4065,6 +4095,36 @@
         }
       }
     },
+    "The watch could not read what was sent." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "送った内容をウォッチが読み取れませんでした。"
+          }
+        }
+      }
+    },
+    "The watch could not store it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチに保存できませんでした。"
+          }
+        }
+      }
+    },
+    "The watch did not accept it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチが受け付けませんでした。"
+          }
+        }
+      }
+    },
     "The watch did not respond in time." : {
       "localizations" : {
         "ja" : {
@@ -4091,6 +4151,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "再起動中は、ウォッチの接続が解除されます。"
+          }
+        }
+      }
+    },
+    "The watch does not allow that change." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "その変更はウォッチでは許可されていません。"
           }
         }
       }
@@ -4185,6 +4255,16 @@
         }
       }
     },
+    "The watch is busy. Try again in a moment." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチが処理中です。少し待ってからもう一度お試しください。"
+          }
+        }
+      }
+    },
     "The watch is erasing itself. It has forgotten this device, so it cannot reconnect until it is forgotten here too." : {
       "localizations" : {
         "ja" : {
@@ -4215,6 +4295,26 @@
         }
       }
     },
+    "The watch is still busy with the last change." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチが前の変更をまだ処理しています。"
+          }
+        }
+      }
+    },
+    "The watch is using it right now." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチが今それを使用中です。"
+          }
+        }
+      }
+    },
     "The watch keeps a log of each run in flash. Gathering reads them back until it says it has no more." : {
       "localizations" : {
         "ja" : {
@@ -4231,6 +4331,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ウォッチは渡された数値をそのまま保持するため、この単位で送信します。"
+          }
+        }
+      }
+    },
+    "The watch no longer has it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチにはもうありません。"
           }
         }
       }
@@ -4385,6 +4495,16 @@
         }
       }
     },
+    "There is no room left on the watch." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチに空き容量がありません。"
+          }
+        }
+      }
+    },
     "These are the watch's own settings. They are written again whenever it connects, so this is the copy that wins." : {
       "localizations" : {
         "ja" : {
@@ -4401,6 +4521,26 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このアプリケーションは接続中のPebbleのモデルに対応していません。"
+          }
+        }
+      }
+    },
+    "This firmware does not support it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このファームウェアでは対応していません。"
+          }
+        }
+      }
+    },
+    "This firmware has nowhere to keep it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このファームウェアには保存先がありません。"
           }
         }
       }

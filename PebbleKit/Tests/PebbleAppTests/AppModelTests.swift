@@ -570,6 +570,41 @@ struct AppModelTests {
     }
 
     @Test
+    func aReminderWhoseTimeHasPassedIsKeptRatherThanSent() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: client,
+            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        )
+        // The reminder library is the app's own file rather than something a test
+        // can point elsewhere, so this starts by emptying it.
+        await model.loadReminders()
+        await model.removeReminders(model.reminders)
+        await model.connect(to: DiscoveredPebble(
+            id: "mock-emery",
+            name: "My Pebble",
+            model: .pebbleTime2,
+            signalStrength: -50
+        ))
+
+        await model.addReminder(title: "Past", date: .now.addingTimeInterval(-3600))
+
+        // `MAX_REMINDER_AGE` is fifteen minutes: the watch refuses an older one
+        // with a status the reader cannot act on, so it is never sent.
+        #expect(client.timelineReminders.isEmpty)
+        #expect(model.reminders.contains { $0.title == "Past" })
+
+        await model.addReminder(title: "Later", date: .now.addingTimeInterval(3600))
+
+        #expect(client.timelineReminders.map(\.title) == ["Later"])
+
+        await model.removeReminders(model.reminders)
+    }
+
+    @Test
     func aConnectThatFailsIsRememberedAgainstThatWatch() async throws {
         let client = MockPebbleClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)

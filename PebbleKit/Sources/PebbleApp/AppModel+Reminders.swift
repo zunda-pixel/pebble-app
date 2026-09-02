@@ -19,13 +19,39 @@ extension AppModel {
         reminders.append(reminder)
         reminders.sort { $0.timestamp < $1.timestamp }
         try? await reminderLibrary.save(reminders)
+        // The watch keeps a fifteen-minute window — `MAX_REMINDER_AGE` in
+        // `reminder_db.c` — and refuses anything older outright, which the list
+        // already says about the ones that have passed.
+        guard reminder.timestamp > .now else {
+            reminderStatusMessage = "That time has passed, so the reminder is kept here rather than sent to the watch."
+            return
+        }
+        reminderStatusMessage = nil
         for connection in activeConnections {
             do {
                 try await connection.client.upsertTimelineReminder(reminder)
             } catch {
-                reminderStatusMessage = "\(connection.device.name) did not accept the reminder. \(error.localizedDescription)"
+                reminderStatusMessage =
+                    "\(connection.device.name) did not accept the reminder. \(Text(reason(for: error)))"
+                await PebbleDiagnostics.shared.record(
+                    .error,
+                    category: "timeline",
+                    message: "\(connection.device.name) refused a reminder: \(String(reflecting: error))"
+                )
             }
         }
+    }
+
+    /// What to tell the reader about a watch that turned something down. The
+    /// watch answers with a status, and only this layer has sentences.
+    func reason(for error: any Error) -> LocalizedStringKey {
+        if let error = error as? BlobDBClientError {
+            return error.message
+        }
+        if let error = error as? PebbleConnectionError {
+            return error.message
+        }
+        return "The watch did not accept it."
     }
 
     // Named rather than numbered: the list they were picked from is sorted and
