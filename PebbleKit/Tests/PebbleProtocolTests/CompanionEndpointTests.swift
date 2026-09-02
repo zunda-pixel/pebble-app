@@ -537,6 +537,24 @@ struct WatchDiagnosticsTests {
         #expect(PebbleColor.all.allSatisfy { PebbleColor(argb: $0.argb) == $0 })
     }
 
+    @Test func aColourPickedOnThePhoneBecomesTheNearestTheWatchHas() {
+        // Halfway between two levels rounds up, and either end stays put.
+        #expect(PebbleColor(nearestTo: 0.5, green: 0, blue: 1)
+            == PebbleColor(red: 2, green: 0, blue: 3))
+        // A channel just short of a level still reads as that level.
+        #expect(PebbleColor(nearestTo: 0.32, green: 0.34, blue: 0.99)
+            == PebbleColor(red: 1, green: 1, blue: 3))
+        // Extended sRGB reaches outside zero to one, and there is nothing
+        // outside the screen's range to show it with.
+        #expect(PebbleColor(nearestTo: 1.4, green: -0.2, blue: .nan)
+            == PebbleColor(red: 3, green: 0, blue: 0))
+        // Every colour the watch has survives the trip out and back.
+        #expect(PebbleColor.all.allSatisfy { colour in
+            let (red, green, blue) = colour.components
+            return PebbleColor(nearestTo: red, green: green, blue: blue) == colour
+        })
+    }
+
     @Test func anAppsColoursRideOnItsRecord() {
         var app = NotificationSourceApp(
             bundleID: "com.example.chat",

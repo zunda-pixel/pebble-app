@@ -1159,6 +1159,16 @@
         }
       }
     },
+    "Colours" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "色"
+          }
+        }
+      }
+    },
     "Coming Up" : {
       "localizations" : {
         "ja" : {
@@ -3539,22 +3549,6 @@
         }
       }
     },
-    "Red %u, green %u, blue %u" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Red %1$u, green %2$u, blue %3$u"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "赤%1$u、緑%2$u、青%3$u"
-          }
-        }
-      }
-    },
     "Refresh" : {
       "localizations" : {
         "ja" : {
@@ -5001,12 +4995,12 @@
         }
       }
     },
-    "The watch's screen has four levels of each colour, and these are all of them. Choosing none leaves the colour the watch already uses for this app." : {
+    "The watch's screen has four levels of each colour, so a colour picked here becomes the nearest one it can show. Until one is picked, the watch uses the colours it already has for this app." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
-            "value" : "ウォッチの画面は各色に4段階あり、ここにあるのが表示できる色のすべてです。色を選ばなければ、このアプリにウォッチがすでに使っている色のままになります。"
+            "value" : "ウォッチの画面は各色に4段階しかないため、ここで選んだ色は表示できるいちばん近い色になります。選ぶまでは、このアプリにウォッチがすでに使っている色のままです。"
           }
         }
       }

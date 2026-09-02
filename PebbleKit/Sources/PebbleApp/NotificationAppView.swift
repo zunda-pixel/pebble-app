@@ -114,23 +114,23 @@ struct NotificationAppContent<RulesDestination: View>: View {
             }
 
             Section {
-                ColourGrid(
+                WatchColorPicker(
+                    label: Text("Background"),
                     selection: current.backgroundColor,
                     onChoose: { colour in setColours(colour, current.foregroundColor) }
                 )
-            } header: {
-                Text("Background")
-            } footer: {
-                Text("The watch's screen has four levels of each colour, and these are all of them. Choosing none leaves the colour the watch already uses for this app.")
-            }
-
-            Section {
-                ColourGrid(
+                WatchColorPicker(
+                    label: Text("Text"),
                     selection: current.foregroundColor,
                     onChoose: { colour in setColours(current.backgroundColor, colour) }
                 )
+                if current.backgroundColor != nil || current.foregroundColor != nil {
+                    Button("Chosen by the Watch") { setColours(nil, nil) }
+                }
             } header: {
-                Text("Text")
+                Text("Colours")
+            } footer: {
+                Text("The watch's screen has four levels of each colour, so a colour picked here becomes the nearest one it can show. Until one is picked, the watch uses the colours it already has for this app.")
             }
         }
         .formStyle(.grouped)
@@ -138,52 +138,37 @@ struct NotificationAppContent<RulesDestination: View>: View {
     }
 }
 
-
-/// Every colour the watch has, as swatches. There are sixty-four of them and no
-/// names worth giving them, so they are shown rather than listed.
-struct ColourGrid: View {
+/// A colour for the watch, picked the way any other colour is picked on the
+/// phone.
+///
+/// The phone offers millions and the watch has sixty-four, so what comes back
+/// from the picker is rounded to the nearest the screen can show — and the
+/// picker is shown that rounded colour, not the one picked, so the swatch is
+/// the colour the watch will use.
+struct WatchColorPicker: View {
+    var label: Text
     var selection: PebbleColor?
-    var onChoose: (PebbleColor?) -> Void
+    var onChoose: (PebbleColor) -> Void
 
-    private let columns = Array(repeating: GridItem(.adaptive(minimum: 28), spacing: 6), count: 1)
+    @Environment(\.self) private var environment
 
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 6) {
-            swatch(for: nil)
-            ForEach(PebbleColor.all, id: \.self) { colour in
-                swatch(for: colour)
-            }
-        }
-        .padding(.vertical, 4)
-    }
-
-    private func swatch(for colour: PebbleColor?) -> some View {
-        Button {
-            onChoose(colour)
-        } label: {
-            RoundedRectangle(cornerRadius: 6)
-                .fill(fill(for: colour))
-                .frame(height: 28)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(.tint, lineWidth: selection == colour ? 3 : 0)
+        ColorPicker(
+            selection: Binding(
+                get: { Color(selection ?? .white) },
+                set: { colour in
+                    // The picker reports every step of a drag, and sixty-four
+                    // colours means most of those steps round to the one
+                    // already chosen. Only a change is worth writing down.
+                    let rounded = PebbleColor(nearest: colour, in: environment)
+                    guard rounded != selection else { return }
+                    onChoose(rounded)
                 }
-                .overlay {
-                    if colour == nil {
-                        Image(systemName: "slash.circle").foregroundStyle(.secondary)
-                    }
-                }
+            ),
+            supportsOpacity: false
+        ) {
+            label
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(colour.map { colour in
-            Text("Red \(colour.red), green \(colour.green), blue \(colour.blue)")
-        } ?? Text("Chosen by the Watch"))
-    }
-
-    private func fill(for colour: PebbleColor?) -> Color {
-        guard let colour else { return Color(white: 0.5, opacity: 0.15) }
-        let (red, green, blue) = colour.components
-        return Color(red: red, green: green, blue: blue)
     }
 }
 
@@ -216,7 +201,11 @@ struct ColourGrid: View {
 
 #Preview("Colours") {
     Form {
-        ColourGrid(selection: PebbleColor(red: 3, green: 0, blue: 0)) { _ in }
+        WatchColorPicker(
+            label: Text("Background"),
+            selection: PebbleColor(red: 3, green: 0, blue: 0),
+            onChoose: { _ in }
+        )
     }
     .formStyle(.grouped)
 }

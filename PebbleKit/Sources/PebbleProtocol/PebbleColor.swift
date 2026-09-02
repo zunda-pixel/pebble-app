@@ -21,6 +21,23 @@ public struct PebbleColor: Codable, Equatable, Hashable, Sendable {
         0b1100_0000 | (red << 4) | (green << 2) | blue
     }
 
+    /// The nearest colour the screen can show to one given as sRGB channels of
+    /// zero to one.
+    ///
+    /// The four levels of a channel are evenly spaced, so rounding each channel
+    /// on its own also lands on the nearest of the sixty-four.
+    public init(nearestTo red: Double, green: Double, blue: Double) {
+        self.init(red: Self.level(red), green: Self.level(green), blue: Self.level(blue))
+    }
+
+    private static func level(_ value: Double) -> UInt8 {
+        // Written as two exits rather than a clamp so that a value which is not
+        // a number lands on zero instead of trapping the conversion.
+        guard value > 0 else { return 0 }
+        guard value < 1 else { return 3 }
+        return UInt8((value * 3).rounded())
+    }
+
     /// Each channel spread back over the whole range: 0, 85, 170, 255.
     public var components: (red: Double, green: Double, blue: Double) {
         (Double(red) / 3, Double(green) / 3, Double(blue) / 3)
