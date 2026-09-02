@@ -20,6 +20,12 @@ public struct PebbleTimelinePin: Codable, Equatable, Identifiable, Sendable {
     public var body: String?
     public var isAllDay: Bool = false
     public var kind: PebbleTimelineItemType = .pin
+    /// Whether the watch made this one rather than the app.
+    ///
+    /// Such an item has actions and an icon the watch chose and this app does
+    /// not model, so sending it back would replace what the watch has with a
+    /// poorer copy of it. It is kept, shown and deletable; it is not written.
+    public var isFromWatch: Bool = false
 
     public func encoded() throws -> [UInt8] {
         // `MAX_ATTRIBUTE_LENGTHS`. The firmware cuts anything longer itself, and cuts
@@ -48,6 +54,77 @@ public struct PebbleTimelinePin: Codable, Equatable, Identifiable, Sendable {
     private func textAttribute(id: UInt8, value: String, limit: Int) -> [UInt8] {
         let content = value.utf8BytesEndingOnACharacter(maximumByteCount: limit)
         return [id] + UInt16(content.count).littleEndianBytes + content
+    }
+
+    /// Reads an item the watch serialized (`SerializedTimelineItemHeader` in
+    /// `services/timeline/item.h`, then the attributes, then the actions).
+    ///
+    /// The icon, the colour and the actions are read past rather than kept:
+    /// what this app has a place for is the text and the time. `isFromWatch`
+    /// records that there is more to the item than what was kept, so that
+    /// nothing here writes it back.
+    public init(decoding bytes: [UInt8]) throws {
+        guard bytes.count >= Self.headerLength else {
+            throw TimelinePinError.malformedItem
+        }
+        guard let kind = PebbleTimelineItemType(rawValue: bytes[38]) else {
+            throw TimelinePinError.malformedItem
+        }
+        id = try Self.uuid(bytes[0..<16])
+        parentApplicationID = try Self.uuid(bytes[16..<32])
+        let seconds = UInt32(bytes[32])
+            | UInt32(bytes[33]) << 8
+            | UInt32(bytes[34]) << 16
+            | UInt32(bytes[35]) << 24
+        timestamp = Date(timeIntervalSince1970: TimeInterval(seconds))
+        durationMinutes = UInt16(bytes[36]) | UInt16(bytes[37]) << 8
+        self.kind = kind
+        let flags = bytes[39]
+        isAllDay = flags & (1 << 2) != 0
+        isFromWatch = flags & (1 << 3) != 0
+
+        var spokenTitle: String?
+        var offset = Self.headerLength
+        for _ in 0..<Int(bytes[44]) {
+            guard bytes.count >= offset + 3 else {
+                throw TimelinePinError.malformedItem
+            }
+            let attribute = bytes[offset]
+            let length = Int(bytes[offset + 1]) | Int(bytes[offset + 2]) << 8
+            offset += 3
+            guard bytes.count >= offset + length else {
+                throw TimelinePinError.malformedItem
+            }
+            let text = String(decoding: bytes[offset..<offset + length], as: UTF8.self)
+            offset += length
+            switch attribute {
+            case 0x01: spokenTitle = text
+            case 0x02: subtitle = text
+            case 0x03: body = text
+            default: continue
+            }
+        }
+        // An item with nothing to read is not one this app can show, and the
+        // watch always titles what it makes.
+        guard let spokenTitle, !spokenTitle.isEmpty else {
+            throw TimelinePinError.malformedItem
+        }
+        title = spokenTitle
+    }
+
+    /// `CommonTimelineItemHeader` plus the payload length and the two counts.
+    private static var headerLength: Int { 46 }
+
+    private static func uuid(_ bytes: ArraySlice<UInt8>) throws -> UUID {
+        let dashed = [8, 4, 4, 4, 12].reduce(into: (rest: Substring(bytes.hexadecimalString), parts: [Substring]())) {
+            state, count in
+            state.parts.append(state.rest.prefix(count))
+            state.rest = state.rest.dropFirst(count)
+        }.parts.joined(separator: "-")
+        guard let uuid = UUID(uuidString: dashed) else {
+            throw TimelinePinError.malformedItem
+        }
+        return uuid
     }
 }
 
@@ -152,6 +229,8 @@ public actor TimelinePinLibrary {
 public enum TimelinePinError: Error, Equatable, Sendable {
     case invalidTimestamp
     case payloadTooLarge
+    /// An item the watch sent that this app could not read as one.
+    case malformedItem
 }
 
 extension String {

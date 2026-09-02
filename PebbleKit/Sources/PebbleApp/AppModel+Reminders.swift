@@ -61,7 +61,7 @@ extension AppModel {
     func synchronizeReminders(on connection: WatchConnection) async {
         guard connection.isConnected else { return }
         await loadReminders()
-        for reminder in reminders where reminder.timestamp > .now {
+        for reminder in reminders where reminder.timestamp > .now && !reminder.isFromWatch {
             do {
                 try await connection.client.upsertTimelineReminder(reminder)
             } catch {

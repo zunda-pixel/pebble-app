@@ -171,6 +171,67 @@ struct PendingWorkTests {
     }
 
     @Test
+    func aPinTheWatchMadeIsKeptAndNotSentBackToIt() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: client,
+            applicationLibrary: PebbleApplicationLibrary(
+                fileURL: directory.appending(path: "applications.json")
+            ),
+            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json")),
+            clientFactory: { _ in client }
+        )
+        await model.scan()
+        let discovered = try #require(model.discoveredDevices.first)
+        await model.connect(to: discovered)
+
+        // What the watch hands over after someone dictates a reminder to it: a
+        // record of its own pin database, on the endpoint it starts itself.
+        let dictated = PebbleTimelinePin(
+            parentApplicationID: UUID(),
+            timestamp: .now.addingTimeInterval(3600),
+            title: "牛乳を買う",
+            subtitle: nil,
+            body: nil,
+            isFromWatch: true
+        )
+        let connection = try #require(model.activeConnections.first)
+        await model.handleWatchDatabaseWrite(
+            offer(dictated, database: TimelinePinCodec.databaseID),
+            on: connection
+        )
+
+        #expect(model.timelinePins.map(\.id) == [dictated.id])
+        #expect(model.timelinePins.first?.isFromWatch == true)
+        // Every offer is answered, and this one was taken.
+        #expect(client.sentFrames.last?.payload == [0x88, 0x0C, 0x00, 0x01])
+
+        await model.synchronizeTimeline()
+
+        // The watch's own copy has actions and an icon this app does not model,
+        // so writing this back would replace it with less than it already has.
+        #expect(client.timelinePins.isEmpty)
+
+        try await model.timelineLibrary.forgetWrittenPinIDs(deviceID: discovered.id)
+    }
+
+    /// The frame a watch sends to hand over a record of a database of its own.
+    private func offer(
+        _ item: PebbleTimelinePin,
+        database: UInt8,
+        token: [UInt8] = [0x0C, 0x00]
+    ) -> PebbleProtocolFrame {
+        let value = (try? item.encoded()) ?? []
+        var payload: [UInt8] = [0x08] + token + [database, 0x00, 0x00, 0x00, 0x00, 16]
+        payload += Array(repeating: 0, count: 16)
+        payload += [UInt8(value.count & 0xFF), UInt8(value.count >> 8)]
+        payload += value
+        return PebbleProtocolFrame(endpoint: BlobDB2Codec.endpoint, payload: payload)
+    }
+
+    @Test
     func clearingTheWatchsTimelineWritesBackWhatTheAppHas() async throws {
         let client = MockPebbleClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)

@@ -54,7 +54,11 @@ extension AppModel {
             if case .upsert(let pin) = operation { return pin.id }
             return nil
         })
-        operations += timelinePins.filter { !queuedUpserts.contains($0.id) }.map(PendingTimelineOperation.upsert)
+        // A pin the watch made is already on the watch, with actions and an icon
+        // this app does not model: writing it back would replace it with less.
+        operations += timelinePins
+            .filter { !queuedUpserts.contains($0.id) && !$0.isFromWatch }
+            .map(PendingTimelineOperation.upsert)
         // A watch that stopped part-way keeps the rest of the queue for its next
         // connection, and so does every other watch: whatever the least
         // finished one did not get is what is kept.

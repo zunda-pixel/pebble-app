@@ -170,21 +170,34 @@ extension AppModel {
         switch message {
         case .write(let write), .writeBack(let write):
             var succeeded = false
-            if write.databaseID == NotificationAppsCodec.databaseID,
-               let app = try? NotificationAppsCodec.decodeRecord(
-                   key: write.key,
-                   value: write.value,
-                   timestamp: write.timestamp
-               ),
-               let apps = try? await notificationSourceAppLibrary.merge(app) {
-                notificationSourceApps = apps
-                connection.synchronizedNotificationAppRecords[app.bundleID] = NotificationAppsCodec.value(
-                    for: apps.first { $0.bundleID == app.bundleID } ?? app
-                )
-                succeeded = true
-                for other in activeConnections where other !== connection {
-                    await synchronizeNotificationSourceApps(on: other)
+            switch write.databaseID {
+            case NotificationAppsCodec.databaseID:
+                if let app = try? NotificationAppsCodec.decodeRecord(
+                    key: write.key,
+                    value: write.value,
+                    timestamp: write.timestamp
+                ),
+                let apps = try? await notificationSourceAppLibrary.merge(app) {
+                    notificationSourceApps = apps
+                    connection.synchronizedNotificationAppRecords[app.bundleID] = NotificationAppsCodec.value(
+                        for: apps.first { $0.bundleID == app.bundleID } ?? app
+                    )
+                    succeeded = true
+                    for other in activeConnections where other !== connection {
+                        await synchronizeNotificationSourceApps(on: other)
+                    }
                 }
+            case TimelinePinCodec.databaseID, TimelineReminderCodec.databaseID:
+                if var item = try? PebbleTimelinePin(decoding: write.value) {
+                    // Whatever the item's own flag says. It arrived on the
+                    // endpoint the watch starts, so the watch already has it,
+                    // and writing it back is never the right thing to do.
+                    item.isFromWatch = true
+                    await keep(item)
+                    succeeded = true
+                }
+            default:
+                break
             }
             try? await connection.client.send(BlobDB2Codec.responseFrame(to: message, succeeded: succeeded))
         case .syncDone:
