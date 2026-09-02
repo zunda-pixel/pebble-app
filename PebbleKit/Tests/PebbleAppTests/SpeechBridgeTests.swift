@@ -140,8 +140,32 @@ import PebbleProtocol
         // said. Numbers reach this in digits or in words.
         #expect(ReminderReading.numbersNamed(in: "call mum at 7") == [7])
         #expect(ReminderReading.numbersNamed(in: "wake me at five") == [5])
+        // Twenty, and not the two and the nought it is written with.
         #expect(ReminderReading.numbersNamed(in: "in 20 minutes") == [20])
         #expect(ReminderReading.numbersNamed(in: "buy some milk").isEmpty)
+    }
+
+    @Test func aNumberInASentenceWithNoSpacesIsStillANumberThatWasSaid() {
+        // Splitting on spaces finds nothing in a Japanese sentence, and the
+        // hour the model gives would then always be one nobody said.
+        #expect(ReminderReading.numbersNamed(in: "名前は会議、時間は明日の午後三時").contains(3))
+        #expect(ReminderReading.numbersNamed(in: "9時に薬を飲む").contains(9))
+        // 「十五」 read as fifteen, and as the ten and the five it is written
+        // with: any of the three is a reading of what was said.
+        #expect(ReminderReading.numbersNamed(in: "十五時に出る").isSuperset(of: [10, 5]))
+    }
+
+    @Test func theAfternoonHourOfASentenceThatNamesItsFieldsIsTaken() throws {
+        // 「名前は会議、時間は明日の午後三時」: the detector reads the time and
+        // leaves 「名前は会議、時間」 as the words, which is what the model is
+        // for. Three in the afternoon is fifteen, and three is in the sentence.
+        let spoken = "名前は会議、時間は明日の午後三時"
+        let time = ReminderReading.time(
+            from: UnderstoodReminder(title: "会議", hour: 15, daysFromToday: 1),
+            in: spoken,
+            now: try Self.evening()
+        )
+        #expect(Self.clock(try #require(time)) == DateComponents(month: 9, day: 3, hour: 15, minute: 0))
     }
 
     @Test func aTimeThatHasAlreadyGoneMeansTheNextOneComing() throws {

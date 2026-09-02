@@ -125,20 +125,45 @@ enum ReminderReading {
         return nextTime(matching: time, after: now)
     }
 
-    /// The numbers the sentence says out loud, in digits or in words.
+    /// The numbers the sentence says out loud, however it says them.
     ///
-    /// `NumberFormatter` reads the words, so this needs no vocabulary of its
-    /// own in any language it knows.
+    /// Three ways, none of which needs a vocabulary here. A word on its own is
+    /// read by `NumberFormatter` — "five", 「十五」. A run of characters that
+    /// are numbers is read the same way and then character by character, which
+    /// is what finds 「三」 in 「午後三時」: Unicode knows its value, and a
+    /// sentence with no spaces in it never offered a word to read.
     static func numbersNamed(in spoken: String) -> Set<Int> {
         let spelled = NumberFormatter()
         spelled.numberStyle = .spellOut
         var numbers: Set<Int> = []
-        for token in spoken.split(whereSeparator: { !$0.isLetter && !$0.isNumber }) {
-            if let digits = Int(token) {
+
+        func read(_ run: some StringProtocol) {
+            if let digits = Int(run) {
                 numbers.insert(digits)
-            } else if let word = spelled.number(from: String(token).lowercased()) {
+            } else if let word = spelled.number(from: String(run).lowercased()) {
                 numbers.insert(word.intValue)
             }
+        }
+
+        for token in spoken.split(whereSeparator: { !$0.isLetter && !$0.isNumber }) {
+            read(token)
+        }
+        var run = ""
+        for character in spoken + " " {
+            guard let value = character.wholeNumberValue else {
+                // However short: 「9時に薬を飲む」 offers the 9 to nothing else,
+                // there being no space anywhere in it to split on.
+                if !run.isEmpty { read(run) }
+                run = ""
+                continue
+            }
+            // 「三」 is three wherever it stands; the 2 of "20" is not two. Only
+            // a numeral that does not take its value from its position counts
+            // on its own.
+            if character.unicodeScalars.first?.properties.numericType == .numeric {
+                numbers.insert(value)
+            }
+            run.append(character)
         }
         return numbers
     }
