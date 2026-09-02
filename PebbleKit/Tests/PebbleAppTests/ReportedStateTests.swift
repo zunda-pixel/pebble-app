@@ -183,6 +183,45 @@ struct ReportedStateTests {
         #expect(day.activeSeconds == 44 * 60)
         #expect(day.deepSleepSeconds == 95 * 60)
     }
+
+    @Test
+    func aDayTheWatchSyncedLastStillCarriesWhatOnlyThePhoneKnows() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: client,
+            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        )
+        let now = try #require(Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 2, hour: 12)))
+        let yesterday = try #require(Calendar.current.date(byAdding: .day, value: -1, to: now))
+        // What the merge leaves after the watch synced later than Apple Health
+        // was read: one record marked `watch`, carrying figures the watch has
+        // no way of counting.
+        model.healthSamples = [
+            PebbleHealthSample(
+                date: yesterday,
+                steps: 9_400,
+                sleepMinutes: 430,
+                distanceMetres: 7_300,
+                source: .watch
+            ),
+            // A day the watch counted and nothing else touched stays with the
+            // watch, which already has it.
+            PebbleHealthSample(
+                date: try #require(Calendar.current.date(byAdding: .day, value: -2, to: now)),
+                steps: 8_000,
+                sleepMinutes: 400,
+                source: .watch
+            ),
+        ]
+
+        let days = model.healthDays(now: now)
+
+        #expect(days.count == 1)
+        #expect(days.first?.distanceMetres == 7_300)
+    }
 }
 
 /// Music state a test sets by hand.

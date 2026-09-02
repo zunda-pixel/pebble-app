@@ -108,8 +108,8 @@ extension AppModel {
     }
 
     // The firmware writes a day's record straight over its own metrics for that
-    // day, so today is never sent and a day the phone knows nothing about is
-    // left alone.
+    // day, so today is never sent — it is still being counted — and a day the
+    // phone knows nothing about is left alone.
     func healthDays(now: Date = .now) -> [PebbleHealthDay] {
         let calendar = Calendar.current
         let startOfToday = calendar.startOfDay(for: now)
@@ -118,7 +118,16 @@ extension AppModel {
         }
         return healthSamples.compactMap { sample in
             let day = calendar.startOfDay(for: sample.date)
-            guard sample.source != .watch, day >= oldest, day < startOfToday else { return nil }
+            guard day >= oldest, day < startOfToday else { return nil }
+            // A day is worth writing if the phone knows something the watch
+            // does not. `source` alone cannot say so any more: a day the watch
+            // synced after Apple Health was read is one record marked `watch`
+            // that carries the energy and distance the watch never counted, and
+            // skipping it left those four fields at zero on a watch that could
+            // have had them.
+            let phoneOnly = sample.activeKilocalories + sample.restingKilocalories
+                + sample.distanceMetres + sample.activeMinutes
+            guard sample.source != .watch || phoneOnly > 0 else { return nil }
             guard let weekday = calendar.dateComponents([.weekday], from: day).weekday else {
                 return nil
             }
