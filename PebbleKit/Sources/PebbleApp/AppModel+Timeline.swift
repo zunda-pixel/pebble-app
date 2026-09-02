@@ -55,24 +55,99 @@ extension AppModel {
             return nil
         })
         operations += timelinePins.filter { !queuedUpserts.contains($0.id) }.map(PendingTimelineOperation.upsert)
-        var remaining: [PendingTimelineOperation] = []
+        // A watch that stopped part-way keeps the rest of the queue for its next
+        // connection, and so does every other watch: whatever the least
+        // finished one did not get is what is kept.
+        var firstUnfinished = operations.count
+        for connection in activeConnections {
+            await removePinsTheAppHasForgotten(on: connection)
+            firstUnfinished = min(firstUnfinished, await send(operations, to: connection))
+        }
+        try? await pendingTimelineOperationLibrary.save(Array(operations[firstUnfinished...]))
+    }
+
+    /// Sends the operations to one watch and answers the index it stopped at.
+    private func send(
+        _ operations: [PendingTimelineOperation],
+        to connection: WatchConnection
+    ) async -> Int {
+        let client = connection.client
         for (index, operation) in operations.indexed() {
             do {
-                for connection in activeConnections {
-                    let client = connection.client
-                    switch operation {
-                    case .upsert(let pin):
-                        try await retry(with: .watchWork) { try await client.upsertTimelinePin(pin) }
-                    case .delete(let id):
-                        try await retry(with: .watchWork) { try await client.deleteTimelinePin(id: id) }
-                    }
+                switch operation {
+                case .upsert(let pin):
+                    try await retry(with: .watchWork) { try await client.upsertTimelinePin(pin) }
+                case .delete(let id):
+                    try await retry(with: .watchWork) { try await client.deleteTimelinePin(id: id) }
                 }
             } catch {
-                remaining.append(contentsOf: operations[index...])
+                return index
+            }
+        }
+        // This watch now holds exactly what the app holds, which is what makes
+        // the reconciliation above possible next time.
+        try? await timelineLibrary.setWrittenPinIDs(
+            Set(timelinePins.map(\.id)),
+            deviceID: connection.device.id
+        )
+        return operations.count
+    }
+
+    /// Deletes the pins this watch was given and the app no longer has.
+    ///
+    /// BlobDB has no listing, so a pin can only be named from the app's own
+    /// record of what it wrote. Without this, a pin whose delete was never
+    /// queued — the queue was full, the app was reinstalled, the moment was
+    /// missed — stays on the watch's timeline and is never mentioned again.
+    private func removePinsTheAppHasForgotten(on connection: WatchConnection) async {
+        let deviceID = connection.device.id
+        let written = (try? await timelineLibrary.writtenPinIDs(deviceID: deviceID)) ?? []
+        let forgotten = written.subtracting(timelinePins.map(\.id))
+        guard !forgotten.isEmpty else { return }
+        var removed: Set<UUID> = []
+        let client = connection.client
+        for id in forgotten {
+            do {
+                try await retry(with: .watchWork) { try await client.deleteTimelinePin(id: id) }
+                removed.insert(id)
+            } catch {
                 break
             }
         }
-        try? await pendingTimelineOperationLibrary.save(remaining)
+        try? await timelineLibrary.setWrittenPinIDs(written.subtracting(removed), deviceID: deviceID)
+        await PebbleDiagnostics.shared.record(
+            category: "timeline",
+            message: "\(connection.device.name): removed \(removed.count)"
+                + " of \(forgotten.count) pin(s) the app no longer has"
+        )
+    }
+
+    /// Empties the watch's own pin database and writes back what the app holds.
+    ///
+    /// The reconciliation above can only name pins the app remembers writing.
+    /// After a reinstall it remembers nothing, and this is the only way to reach
+    /// what is left — at the cost of removing pins from any other source too,
+    /// which is why it is asked for rather than done.
+    public func clearWatchTimeline(deviceID: String? = nil) async {
+        guard let connection = connection(for: deviceID), connection.isConnected else {
+            dataSyncStatusMessage = "Connect the watch before clearing its timeline."
+            return
+        }
+        do {
+            try await connection.client.clearTimelinePins()
+        } catch {
+            dataSyncStatusMessage =
+                "\(connection.device.name) did not clear its timeline. \(Text(refusalReason(for: error)))"
+            return
+        }
+        try? await timelineLibrary.forgetWrittenPinIDs(deviceID: connection.device.id)
+        await PebbleDiagnostics.shared.record(
+            .warning,
+            category: "timeline",
+            message: "\(connection.device.name): cleared the pin database"
+        )
+        dataSyncStatusMessage = "The watch's timeline was cleared. Sending what the app has…"
+        await synchronizeTimeline()
     }
 
     func queueTimelineOperation(_ operation: PendingTimelineOperation) async throws {

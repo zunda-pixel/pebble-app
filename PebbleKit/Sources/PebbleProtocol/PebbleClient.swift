@@ -92,6 +92,10 @@ public protocol PebbleClient: Sendable {
     func sendNotification(_ notification: PebbleTimelineNotification) async throws
     func upsertTimelinePin(_ pin: PebbleTimelinePin) async throws
     func deleteTimelinePin(id: UUID) async throws
+    /// Empties the watch's pin database, including pins this app never sent.
+    /// BlobDB cannot be listed, so this is the only way to reach a pin the app
+    /// has no record of.
+    func clearTimelinePins() async throws
     func upsertTimelineReminder(_ reminder: PebbleTimelinePin) async throws
     func deleteTimelineReminder(id: UUID) async throws
     func launchApplication(id: UUID) async throws

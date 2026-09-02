@@ -111,6 +111,16 @@ public enum BlobDBCodec {
         return PebbleProtocolFrame(endpoint: endpoint, payload: payload)
     }
 
+    /// Empties one database. `0x05 <token> <databaseID>` — the firmware
+    /// documents it in `services/blob_db/endpoint.c`, and it takes no key: this
+    /// removes what other sources put there too.
+    public static func clearFrame(databaseID: UInt8, token: UInt16) -> PebbleProtocolFrame {
+        PebbleProtocolFrame(
+            endpoint: endpoint,
+            payload: commonHeader(command: 0x05, token: token, databaseID: databaseID)
+        )
+    }
+
     public static func decodeResponse(_ frame: PebbleProtocolFrame) throws -> BlobDBResponse {
         guard frame.endpoint == endpoint else {
             throw BlobDBCodecError.unexpectedEndpoint

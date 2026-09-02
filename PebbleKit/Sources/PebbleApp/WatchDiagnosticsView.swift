@@ -26,7 +26,8 @@ struct WatchDiagnosticsView: View {
             takeScreenshot: { Task { await model.takeScreenshot(deviceID: watchID) } },
             gatherWatchLogs: { Task { await model.gatherWatchLogs(deviceID: watchID) } },
             setApplicationLogging: { isOn in Task { await model.setApplicationLoggingEnabled(isOn) } },
-            collectCoredump: { Task { await model.collectCoredump(deviceID: watchID) } }
+            collectCoredump: { Task { await model.collectCoredump(deviceID: watchID) } },
+            clearTimeline: { Task { await model.clearWatchTimeline(deviceID: watchID) } }
         )
     }
 }
@@ -49,6 +50,7 @@ struct WatchDiagnosticsContent: View {
     var gatherWatchLogs: () -> Void
     var setApplicationLogging: (Bool) -> Void
     var collectCoredump: () -> Void
+    var clearTimeline: () -> Void
 
     var body: some View {
         List {
@@ -115,6 +117,23 @@ struct WatchDiagnosticsContent: View {
                 Text("The dump the watch saved the last time it restarted unexpectedly. It is marked as read once collected, so a second attempt finds nothing.")
             }
 
+            Section {
+                ConfirmingButton(
+                    title: "Clear the Watch's Timeline",
+                    systemImage: "trash",
+                    role: .destructive,
+                    question: "Clear every pin from this watch?",
+                    explanation: "Every pin on the watch is removed, including any this app did not send, and then the app writes back what it has.",
+                    confirmationTitle: "Clear Timeline",
+                    action: clearTimeline
+                )
+                .disabled(!isConnected)
+            } header: {
+                Text("Timeline")
+            } footer: {
+                Text("A pin the app no longer has is removed on the next synchronization. This is for the ones it has no record of — after a reinstall, or when its queue was lost.")
+            }
+
             if let statusMessage {
                 Section {
                     Label(statusMessage, systemImage: "info.circle").foregroundStyle(.secondary)
@@ -153,7 +172,8 @@ struct WatchScreenshotImage {
             takeScreenshot: {},
             gatherWatchLogs: {},
             setApplicationLogging: { _ in },
-            collectCoredump: {}
+            collectCoredump: {},
+            clearTimeline: {}
         )
     }
 }
@@ -176,7 +196,8 @@ struct WatchScreenshotImage {
             takeScreenshot: {},
             gatherWatchLogs: {},
             setApplicationLogging: { _ in },
-            collectCoredump: {}
+            collectCoredump: {},
+            clearTimeline: {}
         )
     }
 }

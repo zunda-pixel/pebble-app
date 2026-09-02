@@ -8,7 +8,7 @@ import ZIPFoundation
 /// Work the phone holds on a watch's behalf: notifications and messages queued
 /// while it was away, timeline changes waiting to be written, and an import
 /// whose transfer the watch refused.
-@Suite
+@Suite(.serialized)
 @MainActor
 struct PendingWorkTests {
     private func makeModel(client: any PebbleClient, directory: URL) -> AppModel {
@@ -127,6 +127,84 @@ struct PendingWorkTests {
         // without ever sending it, and then saved the empty queue.
         #expect(client.sentAppMessages.map { $0.applicationID } == queued.map(\.applicationID))
         #expect(model.pendingAppMessages.isEmpty)
+    }
+
+    @Test
+    func aPinTheAppNoLongerHasIsTakenOffTheWatch() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: client,
+            applicationLibrary: PebbleApplicationLibrary(
+                fileURL: directory.appending(path: "applications.json")
+            ),
+            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json")),
+            clientFactory: { _ in client }
+        )
+        let pin = PebbleTimelinePin(
+            parentApplicationID: UUID(),
+            timestamp: .now.addingTimeInterval(3600),
+            title: "Dentist",
+            subtitle: nil,
+            body: nil
+        )
+        try await model.timelineLibrary.save([pin])
+        await model.scan()
+        let discovered = try #require(model.discoveredDevices.first)
+        await model.connect(to: discovered)
+        await model.synchronizeTimeline()
+        #expect(client.timelinePins.map(\.id) == [pin.id])
+
+        // The pin goes from under the app: a queue that was lost, or an app that
+        // was reinstalled and never knew about it.
+        try await model.timelineLibrary.save([])
+        try await model.pendingTimelineOperationLibrary.save([])
+        await model.synchronizeTimeline()
+
+        // Nothing else can name it: BlobDB has no listing, and no delete was
+        // ever queued for it.
+        #expect(client.timelinePins.isEmpty)
+        #expect(try await model.timelineLibrary.writtenPinIDs(deviceID: discovered.id).isEmpty)
+
+        try await model.timelineLibrary.forgetWrittenPinIDs(deviceID: discovered.id)
+    }
+
+    @Test
+    func clearingTheWatchsTimelineWritesBackWhatTheAppHas() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: client,
+            applicationLibrary: PebbleApplicationLibrary(
+                fileURL: directory.appending(path: "applications.json")
+            ),
+            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json")),
+            clientFactory: { _ in client }
+        )
+        let pin = PebbleTimelinePin(
+            parentApplicationID: UUID(),
+            timestamp: .now.addingTimeInterval(3600),
+            title: "Kept",
+            subtitle: nil,
+            body: nil
+        )
+        try await model.timelineLibrary.save([pin])
+        try await model.pendingTimelineOperationLibrary.save([])
+        await model.scan()
+        let discovered = try #require(model.discoveredDevices.first)
+        await model.connect(to: discovered)
+
+        await model.clearWatchTimeline(deviceID: discovered.id)
+
+        // The reader asked for this because the watch held pins nothing could
+        // name; their own are not collateral.
+        #expect(client.clearedTimelineCount == 1)
+        #expect(client.timelinePins.map(\.id) == [pin.id])
+
+        try await model.timelineLibrary.save([])
+        try await model.timelineLibrary.forgetWrittenPinIDs(deviceID: discovered.id)
     }
 
     @Test

@@ -101,6 +101,22 @@
         }
       }
     },
+    "%@ did not clear its timeline. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ did not clear its timeline. %2$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%1$@ はタイムラインを消去しませんでした。%2$@"
+          }
+        }
+      }
+    },
     "%@ has no weather app, so nothing is sent to it." : {
       "localizations" : {
         "ja" : {
@@ -279,6 +295,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このウォッチのボード向けにビルドされたPBZパッケージです。"
+          }
+        }
+      }
+    },
+    "A pin the app no longer has is removed on the next synchronization. This is for the ones it has no record of — after a reinstall, or when its queue was lost." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリが持たなくなったピンは、次回の同期で削除されます。これは記録が残っていないピン（再インストール後や、キューが失われた場合）のための操作です。"
           }
         }
       }
@@ -993,6 +1019,36 @@
         }
       }
     },
+    "Clear every pin from this watch?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このウォッチのピンをすべて消去しますか？"
+          }
+        }
+      }
+    },
+    "Clear the Watch's Timeline" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチのタイムラインを消去"
+          }
+        }
+      }
+    },
+    "Clear Timeline" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "タイムラインを消去"
+          }
+        }
+      }
+    },
     "Collect Crash Report" : {
       "localizations" : {
         "ja" : {
@@ -1089,6 +1145,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "対象のPebbleを一度接続してボードを確認してから、ファームウェアを選択してください。"
+          }
+        }
+      }
+    },
+    "Connect the watch before clearing its timeline." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "タイムラインを消去する前にウォッチを接続してください。"
           }
         }
       }
@@ -1569,6 +1635,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "1時間ごと"
+          }
+        }
+      }
+    },
+    "Every pin on the watch is removed, including any this app did not send, and then the app writes back what it has." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このアプリが送っていないものも含めて、ウォッチ上のピンをすべて削除し、そのあとアプリが持っているピンを書き戻します。"
           }
         }
       }
@@ -4481,6 +4557,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチの画面は各色に4段階あり、ここにあるのが表示できる色のすべてです。色を選ばなければ、このアプリにウォッチがすでに使っている色のままになります。"
+          }
+        }
+      }
+    },
+    "The watch's timeline was cleared. Sending what the app has…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチのタイムラインを消去しました。アプリが持っているピンを送信しています…"
           }
         }
       }

@@ -25,6 +25,7 @@ final class SuspendingPebbleClient: PebbleClient {
     private(set) var appFetchResponses: [AppFetchResponseStatus] = []
     private(set) var upsertedPins: [PebbleTimelinePin] = []
     private(set) var deletedPinIDs: [UUID] = []
+    private(set) var clearedTimelineCount = 0
     private(set) var sentFrames: [PebbleProtocolFrame] = []
     private(set) var disconnectedDevices: [PebbleDevice] = []
     private var frameContinuation: AsyncStream<PebbleProtocolFrame>.Continuation?
@@ -109,6 +110,12 @@ final class SuspendingPebbleClient: PebbleClient {
     func deleteTimelinePin(id: UUID) async throws {
         upsertedPins.removeAll { $0.id == id }
         deletedPinIDs.append(id)
+    }
+
+    func clearTimelinePins() async throws {
+        await answer()
+        upsertedPins.removeAll()
+        clearedTimelineCount += 1
     }
 
     // Everything below is not what these tests are about: the watch takes it

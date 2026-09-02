@@ -10,6 +10,7 @@ public final class MockPebbleClient: PebbleClient {
     public private(set) var reorderedApplicationIDs: [[UUID]] = []
     public private(set) var sentNotifications: [PebbleTimelineNotification] = []
     public private(set) var timelinePins: [PebbleTimelinePin] = []
+    public private(set) var clearedTimelineCount = 0
     public private(set) var installedObjects: [(bytes: [UInt8], objectType: PutBytesObjectType, appBankID: UInt32)] = []
     public private(set) var installedFirmwarePackages: [PBZFirmwarePackage] = []
     public private(set) var installedFiles: [(bytes: [UInt8], filename: String)] = []
@@ -148,6 +149,11 @@ public final class MockPebbleClient: PebbleClient {
 
     public func deleteTimelinePin(id: UUID) async throws {
         timelinePins.removeAll { $0.id == id }
+    }
+
+    public func clearTimelinePins() async throws {
+        clearedTimelineCount += 1
+        timelinePins.removeAll()
     }
 
     public func launchApplication(id: UUID) async throws {

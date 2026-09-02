@@ -67,6 +67,10 @@ public enum TimelinePinCodec {
     public static func deleteFrame(id: UUID, token: UInt16) -> PebbleProtocolFrame {
         BlobDBCodec.deleteFrame(databaseID: databaseID, key: BlobDBCodec.uuidBytes(id), token: token)
     }
+
+    public static func clearFrame(token: UInt16) -> PebbleProtocolFrame {
+        BlobDBCodec.clearFrame(databaseID: databaseID, token: token)
+    }
 }
 
 /// The watch keeps a window of reminders around the present and shows each one
@@ -95,11 +99,43 @@ public enum TimelineReminderCodec {
 
 public actor TimelinePinLibrary {
     private var fileURL: URL
+    /// Which pin the app last gave which watch. BlobDB cannot be listed, so
+    /// without this there is no way to name a pin the watch has and the app has
+    /// forgotten — and a delete is only queued at the moment a pin is let go of,
+    /// which is no help if that moment was missed or the queue was lost.
+    private var writtenURL: URL
 
-    public init(fileURL: URL? = nil) {
+    public init(fileURL: URL? = nil, writtenURL: URL? = nil) {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
-        self.fileURL = fileURL ?? base.appending(path: "Pebble/timeline.json")
+        let items = fileURL ?? base.appending(path: "Pebble/timeline.json")
+        self.fileURL = items
+        // Named after the items it accounts for: pins and reminders are two of
+        // these libraries, and one shared file would have each claiming to have
+        // written the other's.
+        self.writtenURL = writtenURL ?? items
+            .deletingLastPathComponent()
+            .appending(path: "\(items.deletingPathExtension().lastPathComponent)-written.json")
+    }
+
+    public func writtenPinIDs(deviceID: String) throws -> Set<UUID> {
+        Set(try writtenStates()[deviceID] ?? [])
+    }
+
+    public func setWrittenPinIDs(_ pinIDs: Set<UUID>, deviceID: String) throws {
+        var states = try writtenStates()
+        states[deviceID] = Array(pinIDs)
+        try PersistentJSON.save(states, to: writtenURL)
+    }
+
+    public func forgetWrittenPinIDs(deviceID: String) throws {
+        var states = try writtenStates()
+        states[deviceID] = nil
+        try PersistentJSON.save(states, to: writtenURL)
+    }
+
+    private func writtenStates() throws -> [String: [UUID]] {
+        try PersistentJSON.loadRecovering([String: [UUID]].self, from: writtenURL) ?? [:]
     }
 
     public func pins() throws -> [PebbleTimelinePin] {
