@@ -140,7 +140,8 @@ extension AppModel {
         do {
             try await connection.client.writeWeatherLocationOrder(weatherReports.map(\.id))
         } catch {
-            weatherStatusMessage = "\(connection.device.name) did not accept the list of places. \(error.localizedDescription)"
+            weatherStatusMessage =
+                "\(connection.device.name) did not accept the list of places. \(Text(refusalReason(for: error)))"
             await PebbleDiagnostics.shared.record(
                 .error,
                 category: "weather",
@@ -154,7 +155,8 @@ extension AppModel {
                 // between "sent" and "shown".
                 try await connection.client.writeWeather(report)
             } catch {
-                weatherStatusMessage = "\(connection.device.name) did not accept the forecast. \(error.localizedDescription)"
+                weatherStatusMessage =
+                    "\(connection.device.name) did not accept the forecast. \(Text(refusalReason(for: error)))"
                 await PebbleDiagnostics.shared.record(
                     .error,
                     category: "weather",

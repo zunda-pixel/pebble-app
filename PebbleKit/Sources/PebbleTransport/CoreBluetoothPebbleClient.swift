@@ -70,6 +70,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var pendingBlobDBToken: UInt16?
     private var acceptedBlobDBStatuses: [BlobDBStatus] = []
     private let blobDBReply = PendingReply<Void>()
+    private let blobDBQueue = BlobDBQueue()
     private let appReorderReply = PendingReply<Void>()
     private let appMessages = AppMessageQueue()
     private var healthDataLoggingProcessor = HealthDataLoggingProcessor()
@@ -612,12 +613,14 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         acceptedStatuses: [BlobDBStatus],
         frame: (UInt16) throws -> PebbleProtocolFrame
     ) async throws {
+        // Callers take turns rather than being turned away: they are unrelated
+        // features on unrelated timers, and the one that lost the race used to
+        // report that the watch had refused it.
+        try await blobDBQueue.begin()
+        defer { blobDBQueue.finish() }
         guard let peripheral = connectedPeripheral,
               ppogSession != nil else {
             throw PebbleConnectionError.disconnected
-        }
-        guard !blobDBReply.isWaiting else {
-            throw BlobDBClientError.operationAlreadyInProgress
         }
 
         let token = nextBlobDBToken
@@ -767,6 +770,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         stopHealthChecks()
         failTransfer(error)
         failBlobDBOperation(error)
+        blobDBQueue.failAll(error)
         failPulls(error)
         failAppReorder(error)
         appMessages.failAll(error)
@@ -1296,6 +1300,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         stopHealthChecks()
         failTransfer(PebbleConnectionError.disconnected)
         failBlobDBOperation(PebbleConnectionError.disconnected)
+        blobDBQueue.failAll(PebbleConnectionError.disconnected)
         failPulls(PebbleConnectionError.disconnected)
         failAppReorder(PebbleConnectionError.disconnected)
         // A firmware control exchange is waiting on a reply that the watch can

@@ -74,6 +74,19 @@ public extension BlobDBStatus {
     }
 }
 
+/// What to tell the reader when a watch turns something down. Errors from the
+/// protocol layer are named for the logs; the screens need a sentence, and the
+/// one Foundation writes for a Swift error names the type and a number.
+func refusalReason(for error: any Error) -> LocalizedStringKey {
+    if let error = error as? BlobDBClientError {
+        return error.message
+    }
+    if let error = error as? PebbleConnectionError {
+        return error.message
+    }
+    return "The watch did not accept it."
+}
+
 public extension HealthAnalysisPeriod {
     var title: LocalizedStringKey {
         switch self {

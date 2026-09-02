@@ -32,7 +32,7 @@ extension AppModel {
                 try await connection.client.upsertTimelineReminder(reminder)
             } catch {
                 reminderStatusMessage =
-                    "\(connection.device.name) did not accept the reminder. \(Text(reason(for: error)))"
+                    "\(connection.device.name) did not accept the reminder. \(Text(refusalReason(for: error)))"
                 await PebbleDiagnostics.shared.record(
                     .error,
                     category: "timeline",
@@ -40,18 +40,6 @@ extension AppModel {
                 )
             }
         }
-    }
-
-    /// What to tell the reader about a watch that turned something down. The
-    /// watch answers with a status, and only this layer has sentences.
-    func reason(for error: any Error) -> LocalizedStringKey {
-        if let error = error as? BlobDBClientError {
-            return error.message
-        }
-        if let error = error as? PebbleConnectionError {
-            return error.message
-        }
-        return "The watch did not accept it."
     }
 
     // Named rather than numbered: the list they were picked from is sorted and
