@@ -10,17 +10,58 @@ struct SpokenReminder: Equatable, Sendable {
 
 /// Turns a spoken sentence into a reminder the watch can keep.
 ///
-/// The time is found by `NSDataDetector` rather than asked of the language
-/// model: a date is the part that has to be exactly right, and the detector
-/// gives the same answer every time for a fraction of the fifteen seconds the
-/// watch allows. The model is asked only to say the reminder in fewer words,
-/// which is the part it is better at than any rule.
+/// The language model reads the sentence and says what was meant — the words
+/// for the reminder, and the hour on a clock. Arithmetic is none of its
+/// business: `Calendar` turns the hour into a date, and a time already past
+/// becomes the next one coming.
+///
+/// `NSDataDetector` answers when there is no model, or when it is too slow.
+/// It is exact on what it recognizes and blind on the rest — measured against
+/// English on 2026-09-02, it reads "5pm", "5:00", "five o'clock" and "noon",
+/// finds nothing at all in "wake me at five", "meeting at 3" or "in 20
+/// minutes", and reads "tomorrow at five" as tomorrow at noon. Needing a unit
+/// or a separator before a number counts as a time is not something a rule can
+/// fill in without a vocabulary for every language.
 enum ReminderReading {
-    /// How long the model may take before the detector's own wording is sent
-    /// instead. The watch gives up on a session result after fifteen seconds,
-    /// and transcribing has already spent some of that.
+    /// How long the model may take before the detector answers instead. The
+    /// watch gives up on a session result after fifteen seconds, and
+    /// transcribing has already spent some of that.
     static let modelDeadline = Duration.seconds(5)
 
+    static func readWithModel(_ spoken: String, now: Date = Date()) async -> SpokenReminder {
+        let detected = read(spoken, now: now)
+        guard SystemLanguageModel.default.isAvailable else { return detected }
+        let understood = await withTaskGroup(of: UnderstoodReminder??.self) { group in
+            group.addTask { await understand(spoken, now: now) }
+            group.addTask {
+                try? await Task.sleep(for: modelDeadline)
+                return .some(nil)
+            }
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first ?? nil
+        }
+        guard let understood else { return detected }
+        let title = understood.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        // A model that hands the sentence back whole has read nothing out of
+        // it, and the detector has at least cut the time it found: 「五時に起こ
+        // して」 came back untouched where the detector had 「起こして」.
+        let shortened = !title.isEmpty && title != spoken.trimmingCharacters(in: .whitespacesAndNewlines)
+        return SpokenReminder(
+            // Cutting the time out leaves the same loose word behind whoever
+            // did the cutting: the model answered "meeting at".
+            text: shortened ? tidied(title, fallingBackTo: title) : detected.text,
+            // What the detector recognizes it reads exactly, and it reads the
+            // clock as well: a bare hour becomes the next time the clock shows
+            // it, which is how people use one. The model is asked to fill the
+            // silences, not to overrule that — measured on 2026-09-02 it read
+            // 「五時に起こして」 as five in the afternoon where the detector had
+            // it right.
+            time: detected.time ?? time(from: understood, in: spoken, now: now)
+        )
+    }
+
+    /// What `NSDataDetector` makes of the sentence, and nothing else.
     static func read(_ spoken: String, now: Date = Date()) -> SpokenReminder {
         let sentence = spoken.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let detector = try? NSDataDetector(
@@ -40,50 +81,96 @@ enum ReminderReading {
             text: tidied(withoutTheTime, fallingBackTo: sentence),
             // A time with no date in it lands on the day the detector was given,
             // which is today: one already past means tomorrow was meant.
-            time: date > now ? date : tomorrow(date, after: now)
+            time: date > now ? date : nextTime(matching: date, after: now)
         )
     }
 
-    /// The same reminder with the language model's shorter wording, when there
-    /// is a model and it answers in time.
-    static func readWithModel(_ spoken: String, now: Date = Date()) async -> SpokenReminder {
-        let detected = read(spoken, now: now)
-        guard SystemLanguageModel.default.isAvailable else { return detected }
-        let shorter = await withTaskGroup(of: String?.self) { group in
-            group.addTask { await shortened(spoken) }
-            group.addTask {
-                try? await Task.sleep(for: modelDeadline)
-                return nil
-            }
-            let first = await group.next() ?? nil
-            group.cancelAll()
-            return first
-        }
-        guard let shorter, !shorter.isEmpty else { return detected }
-        return SpokenReminder(text: shorter, time: detected.time)
+    /// The clock reading the model gave, as a date — if the speaker named that
+    /// hour themselves.
+    ///
+    /// Every number is a suggestion to be checked. An hour outside a day, or a
+    /// day count beyond a month, is a model that has lost its place. And an
+    /// hour that appears nowhere in what was said is one it invented: measured
+    /// on 2026-09-02, "wake me at five" came back as midnight and "in 20
+    /// minutes" as eleven o'clock. Five and twenty are in those sentences;
+    /// midnight and eleven are not.
+    static func time(
+        from understood: UnderstoodReminder,
+        in spoken: String,
+        now: Date = Date()
+    ) -> Date? {
+        guard let hour = understood.hour, (0...23).contains(hour) else { return nil }
+        let named = numbersNamed(in: spoken)
+        // A twenty-four hour reading of an hour spoken as one of twelve: seven
+        // in the evening is nineteen, and midnight is twelve.
+        guard named.contains(hour) || named.contains(hour % 12)
+            || (hour % 12 == 0 && named.contains(12)) else { return nil }
+        let minute = understood.minute ?? 0
+        guard (0...59).contains(minute) else { return nil }
+        let days = understood.daysFromToday ?? 0
+        guard (0...31).contains(days) else { return nil }
+
+        let calendar = Calendar.current
+        guard let day = calendar.date(byAdding: .day, value: days, to: now),
+              let time = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day)
+        else { return nil }
+        // The clock the model was told the time by, handed back as the answer.
+        // Asked for a reminder with no time in it — "buy some milk" — it gave
+        // the minute it was called, and nobody asks to be reminded of
+        // something now.
+        guard abs(time.timeIntervalSince(now)) > 120 else { return nil }
+        // Said of today, and today's has gone: the next one is what was meant.
+        // A day the model counted out stands as it is, even if it has passed.
+        guard days == 0, time <= now else { return time }
+        return nextTime(matching: time, after: now)
     }
 
-    private static func shortened(_ spoken: String) async -> String? {
+    /// The numbers the sentence says out loud, in digits or in words.
+    ///
+    /// `NumberFormatter` reads the words, so this needs no vocabulary of its
+    /// own in any language it knows.
+    static func numbersNamed(in spoken: String) -> Set<Int> {
+        let spelled = NumberFormatter()
+        spelled.numberStyle = .spellOut
+        var numbers: Set<Int> = []
+        for token in spoken.split(whereSeparator: { !$0.isLetter && !$0.isNumber }) {
+            if let digits = Int(token) {
+                numbers.insert(digits)
+            } else if let word = spelled.number(from: String(token).lowercased()) {
+                numbers.insert(word.intValue)
+            }
+        }
+        return numbers
+    }
+
+    private static func understand(_ spoken: String, now: Date) async -> UnderstoodReminder?? {
         let session = LanguageModelSession(
             instructions: """
-                You turn what someone said out loud into the title of a reminder. \
-                Keep the words they used. Drop anything that only asks for the \
-                reminder to be made, and drop the time or date. \
-                Answer in the language they spoke.
+                You read what someone said out loud into a reminder. \
+                Give the words for the reminder itself, keeping the words they \
+                used and dropping only the ones that ask for a reminder or name \
+                a time. Answer in the language they spoke. \
+                Give the hour and minute on a 24-hour clock, and how many days \
+                from today they meant, ONLY if they named a time themselves. \
+                Leave the hour and minute empty when they named none. The \
+                current time is told to you so that you can work out what \
+                "tomorrow" or "this evening" means, and MUST NOT be answered \
+                with as if they had asked for it.
                 """
         )
+        let clock = now.formatted(.dateTime.weekday(.wide).hour().minute())
         do {
             let response = try await session.respond(
-                to: "They said: \(spoken)",
-                generating: SpokenReminderTitle.self
+                to: "It is \(clock). They said: \(spoken)",
+                generating: UnderstoodReminder.self
             )
-            return response.content.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            return .some(response.content)
         } catch {
             await PebbleDiagnostics.shared.record(
                 category: "voice",
-                message: "The model would not shorten the reminder: \(error)"
+                message: "The model would not read the reminder: \(error)"
             )
-            return nil
+            return .some(nil)
         }
     }
 
@@ -110,7 +197,7 @@ enum ReminderReading {
         return tidied.isEmpty ? whole : tidied
     }
 
-    private static func tomorrow(_ date: Date, after now: Date) -> Date {
+    private static func nextTime(matching date: Date, after now: Date) -> Date {
         let calendar = Calendar.current
         let time = calendar.dateComponents([.hour, .minute, .second], from: date)
         return calendar.nextDate(
@@ -121,8 +208,14 @@ enum ReminderReading {
     }
 }
 
-@Generable(description: "The title of a reminder someone asked for out loud")
-private struct SpokenReminderTitle {
-    @Guide(description: "What to be reminded of, in as few words as they used, with no time or date")
+@Generable(description: "A reminder someone asked for out loud")
+struct UnderstoodReminder {
+    @Guide(description: "What to be reminded of, in the words they used, with no time or date")
     var title: String
+    @Guide(description: "The hour they meant, on a 24-hour clock, or nothing if they named no time")
+    var hour: Int?
+    @Guide(description: "The minutes past that hour, or nothing")
+    var minute: Int?
+    @Guide(description: "0 if they meant today, 1 for tomorrow, and so on")
+    var daysFromToday: Int?
 }
