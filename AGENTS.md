@@ -150,19 +150,26 @@ the commit message's job.
 
 ## Localization
 
-All user-facing text goes through `PebbleKit/Sources/PebbleApp/Resources/Localizable.xcstrings`
-— note the `Resources/` — and the app target's own catalog. Japanese stays at
+All user-facing text goes through one catalog, `Pebble/Localizable.xcstrings`,
+which belongs to the **app target** rather than the package. Japanese stays at
 zero untranslated strings.
 
-- A runtime lookup **must** pass `bundle: .module`. `String(localized:)` without
-  it resolves against the main bundle, finds nothing, and silently returns the
-  English key. This shipped once: the watch was sent six English canned replies
-  by a build whose Japanese catalog was complete.
+- **The catalog has to be in the app bundle.** `Text("…")`, `Section("…")`,
+  `Button("…")` and every other SwiftUI initializer that takes a
+  `LocalizedStringKey` looks the key up in `Bundle.main` — the app — no matter
+  which module the view is compiled into. The catalog lived in the package's
+  `Resources/` for a while, and on a Japanese iPhone the whole app came up in
+  English with 500 finished translations sitting in
+  `PebbleKit_PebbleApp.bundle` that nothing ever read.
+- The price of that is extraction: a build only merges new keys into catalogs
+  belonging to the target it compiled, and the views are in the package. **New
+  keys have to be added to the catalog by hand** (Xcode's `+`, or an entry with
+  `"extractionState" : "manual"`), then translated.
 - Before deleting a key, grep `Sources/PebbleApp` for it. Two keys have been removed
   while still in use.
-- A build extracts new keys into the catalog; add the `ja` translation after
-  building, and clear any `extractionState: stale` entry whose string is really
-  gone.
+- Runtime lookups (`String(localized:)`) take the main bundle by default, which
+  is now the right one — do not pass `bundle: .module`, the package has no
+  resource bundle any more.
 
 ## Lifecycle and state
 

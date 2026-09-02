@@ -15,7 +15,7 @@ extension AppModel {
         }
         do {
             let location = try await phoneLocationSource.currentLocation()
-            let name = await placeName(for: location) ?? String(localized: "Current Location", bundle: .module)
+            let name = await placeName(for: location) ?? String(localized: "Current Location")
             weatherPlaces.insert(
                 WeatherPlace(
                     id: UUID(),
