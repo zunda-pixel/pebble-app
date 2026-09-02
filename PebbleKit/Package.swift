@@ -39,8 +39,12 @@ let package = Package(
     .package(url: "https://github.com/gohanlon/swift-memberwise-init-macro.git", from: "0.6.0"),
     .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.20"),
     // Speex, which no Apple framework decodes and the watch gives no
-    // alternative to. See the note on `PebbleAudio` below.
-    .package(url: "https://github.com/sbooth/CSpeex.git", from: "1.2.1"),
+    // alternative to. A fork of sbooth/CSpeex, whose libspeex is the 1.2.1
+    // release: see the note on `PebbleAudio` below.
+    .package(
+      url: "https://github.com/zunda-pixel/CSpeex.git",
+      branch: "sync-libspeex-with-upstream"
+    ),
   ],
   targets: [
     // What the watch says, and what the phone says back: frames, PPoG, the
@@ -62,11 +66,13 @@ let package = Package(
     ),
     // What the watch's microphone sent, turned back into samples.
     //
-    // libspeex comes from sbooth/CSpeex, which packages the 1.2.1 release.
-    // That release predates four upstream fixes, and two of them are on paths
-    // every session here takes: a division by zero in the wideband decoder the
-    // watch records with, and undefined behaviour in the bit reader. See issue
-    // #41 before raising the lower bound or reading a crash report.
+    // libspeex comes from a fork of sbooth/CSpeex whose sources are synced
+    // with upstream master — the same commit the watch's own encoder is built
+    // from. The 1.2.1 release that fork started from was cut from a release
+    // branch and predates four fixes, two of them on the path every frame
+    // takes: a division by zero in the wideband decoder and undefined
+    // behaviour in the bit reader. Issue #41 has the details, and the reason
+    // this is a branch rather than a version.
     .target(
       name: "PebbleAudio",
       dependencies: [

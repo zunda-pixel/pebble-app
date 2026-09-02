@@ -1,13 +1,13 @@
 {
-  "originHash" : "719bc82a2e3d8d4c67ead82483a795bad54c45a110be62183dae8688a8b8d392",
+  "originHash" : "7c17e503c2502266bda0d49abdcb23ebd4de7eaed641fe297ad5b64e35a79310",
   "pins" : [
     {
       "identity" : "cspeex",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/sbooth/CSpeex.git",
+      "location" : "https://github.com/zunda-pixel/CSpeex.git",
       "state" : {
-        "revision" : "ba33fd93d54d8e7fc93b8a1d27991e756bac7345",
-        "version" : "1.2.1"
+        "branch" : "sync-libspeex-with-upstream",
+        "revision" : "d94077349e9967064474a0577a6fdafa0a39b3bc"
       }
     },
     {
