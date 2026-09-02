@@ -180,6 +180,47 @@ struct FirmwareLifecycleTests {
         #expect(FileManager.default.fileExists(atPath: onDisk.path(percentEncoded: false)))
     }
 
+    @Test
+    func aWatchBackFromItsUpdateIsNoLongerWaitingForARestart() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: client,
+            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        )
+        let device = PebbleDevice(
+            id: "watch-1",
+            name: "My Pebble",
+            model: .pebbleTime2,
+            firmwareVersion: "v4.9.142",
+            batteryLevel: nil,
+            board: .obelixPVT
+        )
+        let package = makeFirmwarePackage(versionTag: "v4.36.2")
+        try await model.pendingFirmwareUpdateLibrary.save(package, journal: FirmwareUpdateJournal(
+            deviceID: device.id,
+            hardwareRevision: PebbleWatchBoard.obelixPVT.rawValue,
+            previousVersion: "v4.9.142",
+            targetVersion: "v4.36.2",
+            packageSHA256: package.sha256
+        ))
+
+        try await model.performFirmwareUpdate(package, on: WatchConnection(client: client, device: device))
+        #expect(model.firmwareUpdateJournal?.phase == .awaitingRestart)
+
+        await model.recordConnectedWatch(device)
+
+        // The journal is already gone from disk, so nothing but the watch
+        // itself can end this: left alone the firmware screen kept offering
+        // Stop and Try Again for an update that had finished, and the watch's
+        // own row went on saying an update was waiting.
+        #expect(model.firmwareUpdateJournal == nil)
+        #expect(model.firmwareUpdateStatusMessage == nil)
+    }
+
     private func makeFirmwarePackage(versionTag: String? = nil) -> PBZFirmwarePackage {
         let firmware = Data([4, 3, 2, 1])
         return PBZFirmwarePackage(

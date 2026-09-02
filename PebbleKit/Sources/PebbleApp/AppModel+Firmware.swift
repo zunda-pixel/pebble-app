@@ -218,6 +218,20 @@ extension AppModel {
         discardDownloadedFirmware(matching: package)
     }
 
+    /// The watch that took the firmware is back, so the restart it was waiting
+    /// for has happened.
+    ///
+    /// Nothing else says so. The journal is cleared from disk the moment the
+    /// transfer finishes, and the copy held here is what the screens read: left
+    /// at `awaitingRestart` it offers Stop and Try Again for an update that is
+    /// over, and the watch's own row goes on saying an update is waiting.
+    func noteFirmwareUpdateFinished(on device: PebbleDevice) {
+        guard firmwareUpdateJournal?.deviceID == device.id,
+              firmwareUpdateJournal?.phase == .awaitingRestart else { return }
+        firmwareUpdateJournal = nil
+        firmwareUpdateStatusMessage = nil
+    }
+
     /// The package on disk has done its job. Left there it keeps telling the
     /// reader that firmware is downloaded and waiting, on a watch that is at that
     /// moment restarting into it.

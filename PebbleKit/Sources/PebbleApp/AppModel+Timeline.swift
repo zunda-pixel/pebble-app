@@ -152,6 +152,7 @@ extension AppModel {
         )
         dataSyncStatusMessage = "The watch's timeline was cleared. Sending what the app has…"
         await synchronizeTimeline()
+        dataSyncStatusMessage = "The watch's timeline was cleared and written again from the app."
     }
 
     func queueTimelineOperation(_ operation: PendingTimelineOperation) async throws {

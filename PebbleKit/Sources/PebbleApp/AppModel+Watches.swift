@@ -166,6 +166,7 @@ extension AppModel {
         // A watch that is talking again has finished restarting, whoever opened
         // the link. Every way back in passes through here.
         watchResetStatusMessages[device.id] = nil
+        noteFirmwareUpdateFinished(on: device)
         do {
             savedWatches = try await watchLibrary.record(device)
             watchManagementErrorMessage = nil

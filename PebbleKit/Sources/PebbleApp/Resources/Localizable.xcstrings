@@ -4631,6 +4631,16 @@
         }
       }
     },
+    "The watch's timeline was cleared and written again from the app." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチのタイムラインを消去し、アプリが持っているピンを書き込み直しました。"
+          }
+        }
+      }
+    },
     "The watch's timeline was cleared. Sending what the app has…" : {
       "localizations" : {
         "ja" : {
