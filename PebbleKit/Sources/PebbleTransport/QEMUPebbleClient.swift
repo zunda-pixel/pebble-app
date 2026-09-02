@@ -8,6 +8,10 @@ public final class QEMUPebbleClient: PebbleClient {
     private var host: NWEndpoint.Host
     private var port: NWEndpoint.Port
     private var connection: NWConnection?
+    /// Which connection a callback belongs to. `NWConnection` goes on calling
+    /// its handlers after `cancel()`, and the `.cancelled` of the link that just
+    /// dropped would otherwise resolve the handshake of the one replacing it.
+    private var connectionGeneration = 0
     private var receiveBuffer: [UInt8] = []
     private var frameDecoder = PebbleProtocolFrameDecoder()
     private var frameContinuation: AsyncStream<PebbleProtocolFrame>.Continuation?
@@ -62,14 +66,16 @@ public final class QEMUPebbleClient: PebbleClient {
         healthDataLoggingProcessor = HealthDataLoggingProcessor()
         let connection = NWConnection(host: host, port: port, using: .tcp)
         self.connection = connection
+        connectionGeneration += 1
+        let generation = connectionGeneration
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
             openContinuation = continuation
             connection.stateUpdateHandler = { [weak self] state in
-                Task { @MainActor in self?.handleConnectionState(state) }
+                Task { @MainActor in self?.handleConnectionState(state, from: generation) }
             }
             connection.start(queue: .global(qos: .userInitiated))
         }
-        receiveNextMessage()
+        receiveNextMessage(from: generation)
         let information = try await withCheckedThrowingContinuation { continuation in
             versionContinuation = continuation
             Task {
@@ -102,8 +108,7 @@ public final class QEMUPebbleClient: PebbleClient {
         isManualDisconnect = true
         reconnectTask?.cancel()
         reconnectTask = nil
-        connection?.cancel()
-        connection = nil
+        discardConnection()
         connectedDevice = nil
         reconnectDevice = nil
         failOperation(PebbleConnectionError.disconnected)
@@ -185,6 +190,10 @@ public final class QEMUPebbleClient: PebbleClient {
         try await performBlobOperation(acceptedStatuses: [.success, .keyDoesNotExist]) { token in
             TimelinePinCodec.deleteFrame(id: id, token: token)
         }
+    }
+
+    public func clearTimelinePins() async throws {
+        try await performBlobOperation { token in TimelinePinCodec.clearFrame(token: token) }
     }
 
     public func launchApplication(id: UUID) async throws {
@@ -343,6 +352,12 @@ public final class QEMUPebbleClient: PebbleClient {
         frame: PebbleProtocolFrame,
         timeout: Duration = .seconds(20)
     ) async throws {
+        // Every caller guards this too, in the error its own API documents. The
+        // guard belongs here as well: overwriting the continuation would leave
+        // the first caller waiting on a reply that goes to the second.
+        guard operationContinuation == nil else {
+            throw QEMUTransportError.operationAlreadyInProgress
+        }
         try await withCheckedThrowingContinuation { continuation in
             operationContinuation = continuation
             Task {
@@ -356,7 +371,10 @@ public final class QEMUPebbleClient: PebbleClient {
         }
     }
 
-    private func handleConnectionState(_ state: NWConnection.State) {
+    private func handleConnectionState(_ state: NWConnection.State, from generation: Int) {
+        guard generation == connectionGeneration else {
+            return
+        }
         switch state {
         case .ready:
             openContinuation?.resume()
@@ -367,7 +385,7 @@ public final class QEMUPebbleClient: PebbleClient {
             openContinuation = nil
             finishVersion(throwing: error)
             failOperation(error)
-            connection = nil
+            discardConnection()
             connectedDevice = nil
             if shouldReconnect {
                 scheduleReconnect()
@@ -380,6 +398,14 @@ public final class QEMUPebbleClient: PebbleClient {
         default:
             break
         }
+    }
+
+    /// Cancels the link and retires its stamp, so nothing it says afterwards is
+    /// taken for the next one's.
+    private func discardConnection() {
+        connection?.cancel()
+        connection = nil
+        connectionGeneration += 1
     }
 
     private func scheduleReconnect() {
@@ -396,8 +422,7 @@ public final class QEMUPebbleClient: PebbleClient {
                     self.eventContinuation?.yield(.deviceUpdated(device))
                     return
                 } catch {
-                    self.connection?.cancel()
-                    self.connection = nil
+                    self.discardConnection()
                 }
             }
             self.reconnectTask = nil
@@ -405,17 +430,17 @@ public final class QEMUPebbleClient: PebbleClient {
         }
     }
 
-    private func receiveNextMessage() {
+    private func receiveNextMessage(from generation: Int) {
         connection?.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { [weak self] data, _, complete, error in
             Task { @MainActor in
-                guard let self else { return }
+                guard let self, generation == self.connectionGeneration else { return }
                 if let data { self.consume([UInt8](data)) }
                 if let error {
-                    self.handleConnectionState(.failed(error))
+                    self.handleConnectionState(.failed(error), from: generation)
                 } else if complete {
-                    self.handleConnectionState(.failed(NWError.posix(.ECONNRESET)))
+                    self.handleConnectionState(.failed(NWError.posix(.ECONNRESET)), from: generation)
                 } else {
-                    self.receiveNextMessage()
+                    self.receiveNextMessage(from: generation)
                 }
             }
         }
@@ -586,5 +611,6 @@ public final class QEMUPebbleClient: PebbleClient {
 
 public enum QEMUTransportError: Error, Equatable, Sendable {
     case messageTooLarge
+    case operationAlreadyInProgress
 }
 #endif
