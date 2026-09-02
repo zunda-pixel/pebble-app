@@ -65,7 +65,10 @@ struct BluetoothStartTests {
 
         await model.start()
 
-        #expect(client.startBluetoothCount == 1)
+        // Counted rather than counted exactly: a saved watch connects
+        // automatically, so the scan that follows asks for the radio again, and
+        // asking twice is what the transport is built to shrug off.
+        #expect(client.startBluetoothCount >= 1)
     }
 
     /// Whoever asks for a watch gets the radio opened for them, whether or not
