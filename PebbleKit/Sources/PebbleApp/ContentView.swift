@@ -177,7 +177,10 @@ struct IOSRootView: View {
     var body: some View {
         TabView {
             ForEach(AppSection.allCases) { section in
-                Tab(section.title, systemImage: section.systemImage) {
+                // The label as a view rather than a key: `Tab`'s own
+                // title initializer and a shimmed one cannot be told apart,
+                // and this way the label is built by `Label` above.
+                Tab {
                     NavigationStack {
                         SectionContent(section: section, model: model)
                         .toolbar {
@@ -188,6 +191,8 @@ struct IOSRootView: View {
                             }
                         }
                     }
+                } label: {
+                    Label(section.title, systemImage: section.systemImage)
                 }
             }
         }

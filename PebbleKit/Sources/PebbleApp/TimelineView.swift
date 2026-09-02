@@ -120,7 +120,7 @@ struct TimelineItemComposer: View {
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle(kind.newTitle)
+            .navigationTitle(Text(kind.newTitle))
             .toolbar {
                 Button(role: .cancel) { dismiss() }
                 Button("Add", role: .confirm) {
