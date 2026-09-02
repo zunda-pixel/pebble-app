@@ -1,4 +1,5 @@
 import Foundation
+import Speech
 import Testing
 @testable import PebbleApp
 import PebbleProtocol
@@ -12,8 +13,31 @@ import PebbleProtocol
     @Test func aLanguageWrittenWithoutSpacesArrivesAsOneWord() {
         // The watch puts a space between every word it is sent, so a Japanese
         // sentence handed over word by word would come back with gaps in it.
-        let words = SpeechBridge.words(in: AttributedString("牛乳を買う"))
+        // The recognizer hands it over exactly that way: asking for confidence
+        // puts every segment in its own run, and the watch wrote 「は い 。」.
+        let spoken = Self.asHeard(["牛乳", "を", "買う"])
+        #expect(spoken.runs.count == 3)
+
+        let words = SpeechBridge.words(in: spoken)
+
         #expect(words.map(\.text) == ["牛乳を買う"])
+    }
+
+    @Test func wordsTheRecognizerSeparatedStaySeparate() {
+        let words = SpeechBridge.words(in: Self.asHeard(["buy ", "some ", "milk"]))
+        #expect(words.map(\.text) == ["buy", "some", "milk"])
+    }
+
+    /// A transcript in the shape the recognizer returns one: a run for every
+    /// word it recognized, each with its own confidence.
+    private static func asHeard(_ segments: [String]) -> AttributedString {
+        var spoken = AttributedString()
+        for (index, segment) in segments.enumerated() {
+            var run = AttributedString(segment)
+            run.transcriptionConfidence = 0.5 + Double(index) / 10
+            spoken += run
+        }
+        return spoken
     }
 
     @Test func aRecognizerWithNoConfidenceToGiveSaysSoRatherThanGuessing() {

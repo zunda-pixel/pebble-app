@@ -206,19 +206,47 @@ actor SpeechBridge: PebbleVoiceTranscriptionProvider {
 
     /// The transcript cut where the watch expects cuts.
     ///
-    /// The watch puts a space between the words it is sent, so a language that
-    /// writes without spaces has to arrive as one word — which is what falls out
-    /// of splitting on whitespace.
+    /// The watch puts a space between the words it is sent, so what arrives as
+    /// two words is read as two words. Only whitespace in the transcript may cut
+    /// it: asking for confidence attributes puts every recognized word in its
+    /// own run, and cutting there sent Japanese one segment at a time — the
+    /// watch then wrote 「は い 。」 and no date detector could find a time in
+    /// what was left.
     static func words(in spoken: AttributedString) -> [VoiceTranscriptionWord] {
-        spoken.runs.flatMap { run in
-            String(spoken[run.range].characters)
-                .split(whereSeparator: \.isWhitespace)
-                .map { text in
-                    VoiceTranscriptionWord(
-                        text: String(text),
-                        confidence: run.transcriptionConfidence ?? 0
-                    )
+        var words: [VoiceTranscriptionWord] = []
+        var text = ""
+        var start: AttributedString.Index?
+        for index in spoken.characters.indices {
+            let character = spoken.characters[index]
+            if character.isWhitespace {
+                if let start, !text.isEmpty {
+                    words.append(word(text, confidenceAt: start, in: spoken))
                 }
+                text = ""
+                start = nil
+            } else {
+                if text.isEmpty {
+                    start = index
+                }
+                text.append(character)
+            }
         }
+        if let start, !text.isEmpty {
+            words.append(word(text, confidenceAt: start, in: spoken))
+        }
+        return words
+    }
+
+    /// A word spanning more than one run is scored by where it started; the
+    /// watch reads the field nowhere, and a word is one word either way.
+    private static func word(
+        _ text: String,
+        confidenceAt index: AttributedString.Index,
+        in spoken: AttributedString
+    ) -> VoiceTranscriptionWord {
+        VoiceTranscriptionWord(
+            text: text,
+            confidence: spoken[index...].runs.first?.transcriptionConfidence ?? 0
+        )
     }
 }
