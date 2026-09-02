@@ -94,7 +94,93 @@ struct FirmwareLifecycleTests {
         await model.discardPendingFirmwareUpdate()
     }
 
-    private func makeFirmwarePackage() -> PBZFirmwarePackage {
+    @Test
+    func aFinishedInstallTakesTheDownloadedPackageWithIt() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: client,
+            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        )
+        let device = PebbleDevice(
+            id: "watch-1",
+            name: "My Pebble",
+            model: .pebbleTime2,
+            firmwareVersion: "v4.9.142",
+            batteryLevel: nil,
+            board: .obelixPVT
+        )
+        let package = makeFirmwarePackage(versionTag: "v4.36.2")
+        try await model.pendingFirmwareUpdateLibrary.save(package, journal: FirmwareUpdateJournal(
+            deviceID: device.id,
+            hardwareRevision: PebbleWatchBoard.obelixPVT.rawValue,
+            previousVersion: "v4.9.142",
+            targetVersion: "v4.36.2",
+            packageSHA256: package.sha256
+        ))
+        let onDisk = directory.appending(path: "pebbleos-obelix_pvt-v4.36.2.pbz")
+        try Data([1]).write(to: onDisk)
+        model.downloadedFirmware = DownloadedFirmware(
+            versionTag: "v4.36.2",
+            board: .obelixPVT,
+            url: onDisk
+        )
+
+        try await model.performFirmwareUpdate(package, on: WatchConnection(client: client, device: device))
+
+        // Otherwise the firmware screen goes on offering an install of what the
+        // watch is at that moment restarting into.
+        #expect(model.downloadedFirmware == nil)
+        #expect(!FileManager.default.fileExists(atPath: onDisk.path(percentEncoded: false)))
+    }
+
+    @Test
+    func aDownloadForAnotherVersionSurvivesAnInstall() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: client,
+            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        )
+        let device = PebbleDevice(
+            id: "watch-1",
+            name: "My Pebble",
+            model: .pebbleTime2,
+            firmwareVersion: "v4.9.142",
+            batteryLevel: nil,
+            board: .obelixPVT
+        )
+        let package = makeFirmwarePackage(versionTag: "v4.36.2")
+        try await model.pendingFirmwareUpdateLibrary.save(package, journal: FirmwareUpdateJournal(
+            deviceID: device.id,
+            hardwareRevision: PebbleWatchBoard.obelixPVT.rawValue,
+            previousVersion: nil,
+            targetVersion: "v4.36.2",
+            packageSHA256: package.sha256
+        ))
+        let onDisk = directory.appending(path: "pebbleos-obelix_pvt-v4.37.0.pbz")
+        try Data([1]).write(to: onDisk)
+        // A watch installing firmware from a file is no reason to throw away a
+        // download meant for another watch, or for the next release.
+        model.downloadedFirmware = DownloadedFirmware(
+            versionTag: "v4.37.0",
+            board: .obelixPVT,
+            url: onDisk
+        )
+
+        try await model.performFirmwareUpdate(package, on: WatchConnection(client: client, device: device))
+
+        #expect(model.downloadedFirmware?.versionTag == "v4.37.0")
+        #expect(FileManager.default.fileExists(atPath: onDisk.path(percentEncoded: false)))
+    }
+
+    private func makeFirmwarePackage(versionTag: String? = nil) -> PBZFirmwarePackage {
         let firmware = Data([4, 3, 2, 1])
         return PBZFirmwarePackage(
             manifest: PBZFirmwareManifest(
@@ -105,7 +191,7 @@ struct FirmwareLifecycleTests {
                     hardwareRevision: PebbleWatchBoard.obelixPVT.rawValue,
                     size: firmware.count,
                     crc: PebbleCRC32.calculate([UInt8](firmware)),
-                    versionTag: nil,
+                    versionTag: versionTag,
                     slot: nil
                 ),
                 resources: nil

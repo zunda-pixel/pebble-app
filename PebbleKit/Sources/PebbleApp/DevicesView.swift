@@ -203,32 +203,45 @@ struct WatchListRow: View {
                     Text(lastConnectedAt, format: .relative(presentation: .named))
                 }
 
-                switch watch.phase {
-                case .connected:
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                        Text("Connected")
-                    }
-                    .foregroundStyle(.green)
-                case .reconnecting:
-                    HStack {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                        Text("Reconnecting…")
-                    }
-                    .foregroundStyle(.orange)
-                case .disconnected, nil:
-                    HStack {
-                        Image(systemName: "applewatch.slash")
-                        Text("Not connected")
-                    }
-                    .foregroundStyle(.secondary)
-                }
+                status
             }
         } label: {
             Text(watch.name)
             if let displayName = watch.model?.displayName {
                 Text(displayName)
             }
+        }
+    }
+
+    // A watch in recovery firmware is connected and yet does nothing the rest of
+    // the app offers, so saying only "Connected" leaves the reader waiting.
+    @ViewBuilder
+    private var status: some View {
+        switch watch.phase {
+        case .connected where watch.isRunningRecoveryFirmware:
+            HStack {
+                Image(systemName: "exclamationmark.triangle.fill")
+                Text("Firmware Required")
+            }
+            .foregroundStyle(.orange)
+        case .connected:
+            HStack {
+                Image(systemName: "checkmark.circle.fill")
+                Text("Connected")
+            }
+            .foregroundStyle(.green)
+        case .reconnecting:
+            HStack {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                Text("Reconnecting…")
+            }
+            .foregroundStyle(.orange)
+        case .disconnected, nil:
+            HStack {
+                Image(systemName: "applewatch.slash")
+                Text("Not connected")
+            }
+            .foregroundStyle(.secondary)
         }
     }
 }
@@ -265,6 +278,7 @@ struct DiscoveredDeviceRow: View {
         DevicesContent(
             watches: [
                 PreviewSamples.connectedSummary,
+                PreviewSamples.recoverySummary,
                 PreviewSamples.savedSummary,
             ],
             errorMessage: nil,

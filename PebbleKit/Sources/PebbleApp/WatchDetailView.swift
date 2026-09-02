@@ -107,10 +107,26 @@ struct WatchDetailContent<
         Form {
             if watch.isRunningRecoveryFirmware {
                 Section {
-                    Label(
-                        "This watch started its recovery firmware. Install firmware to finish setting it up.",
-                        systemImage: "exclamationmark.triangle"
-                    )
+                    NavigationLink {
+                        RecoveryFirmwareGuide(
+                            watchName: watch.name,
+                            isConnected: watch.isConnected,
+                            firmwareDestination: firmwareDestination
+                        )
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Firmware Required")
+                                    .font(.headline)
+                                Text("This watch started its recovery firmware. It works again once PebbleOS is installed.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                        }
+                    }
                 }
             }
 
@@ -232,6 +248,12 @@ struct WatchDetailContent<
                     confirmationTitle: "Forget Watch",
                     action: forget
                 )
+            } footer: {
+                #if os(macOS)
+                Text("A watch that has been factory reset no longer knows this Mac, and cannot be added again while the old pairing is around. Forget it here, then open System Settings › Bluetooth and forget it there too.")
+                #else
+                Text("A watch that has been factory reset no longer knows this iPhone, and cannot be added again while the old pairing is around. Forget it here, then open Settings › Bluetooth, tap the ⓘ beside it and choose Forget This Device.")
+                #endif
             }
         }
         .formStyle(.grouped)
@@ -288,16 +310,12 @@ struct WatchDetailContent<
 #Preview("Recovery firmware") {
     NavigationStack {
         WatchDetailContent(
-            watch: {
-                var watch = PreviewSamples.connectedSummary
-                watch.isRunningRecoveryFirmware = true
-                return watch
-            }(),
+            watch: PreviewSamples.recoverySummary,
             firmwareJournalPhase: nil,
             downloadedFirmwareVersion: nil,
             languageName: nil,
             notificationStatusMessage: nil,
-            resetStatusMessage: "Pebble 5209 is restarting.",
+            resetStatusMessage: "The watch is erasing itself. It has forgotten this device, so it cannot reconnect until it is forgotten here too.",
             connect: {},
             setAutomaticallyConnects: { _ in },
             disconnect: {},

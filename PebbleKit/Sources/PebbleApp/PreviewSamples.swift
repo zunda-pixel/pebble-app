@@ -54,6 +54,19 @@ enum PreviewSamples {
         lastConnectedAt: .now
     )
 
+    static let recoverySummary = WatchSummary(
+        id: "recovery-watch",
+        name: "Pebble 33EE",
+        model: .pebble2Duo,
+        batteryLevel: 63,
+        firmwareVersion: "v4.9.142",
+        isRunningRecoveryFirmware: true,
+        phase: .connected,
+        isSaved: true,
+        automaticallyConnects: true,
+        lastConnectedAt: .now
+    )
+
     static let savedSummary = WatchSummary(
         id: "saved-watch",
         name: "Pebble 2 Duo",

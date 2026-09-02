@@ -215,6 +215,21 @@ extension AppModel {
             message: "the watch took the firmware and is restarting"
         )
         await pendingFirmwareUpdateLibrary.clear()
+        discardDownloadedFirmware(matching: package)
+    }
+
+    /// The package on disk has done its job. Left there it keeps telling the
+    /// reader that firmware is downloaded and waiting, on a watch that is at that
+    /// moment restarting into it.
+    func discardDownloadedFirmware(matching package: PBZFirmwarePackage) {
+        guard let firmware = downloadedFirmware,
+              firmware.versionTag == package.manifest.firmware.versionTag,
+              firmware.board.rawValue == package.manifest.firmware.hardwareRevision else {
+            return
+        }
+        try? FileManager.default.removeItem(at: firmware.url)
+        downloadedFirmware = nil
+        Defaults[.downloadedFirmware] = nil
     }
 
     // The only case that runs unasked, which is the whole point of staging one.

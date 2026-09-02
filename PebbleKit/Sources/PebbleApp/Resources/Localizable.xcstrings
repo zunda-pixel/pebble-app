@@ -151,6 +151,16 @@
         }
       }
     },
+    "%@ needs firmware" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%@にはファームウェアが必要です"
+          }
+        }
+      }
+    },
     "%@ of %@ bytes" : {
       "localizations" : {
         "en" : {
@@ -303,12 +313,42 @@
         }
       }
     },
+    "A watch in recovery firmware disconnects often. The install picks itself up again on the next connection, so a drop part-way through is not a lost update." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リカバリファームウェアのウォッチは頻繁に切断されます。インストールは次の接続で再開されるので、途中で切断されてもアップデートは失われません。"
+          }
+        }
+      }
+    },
     "A watch scan is already in progress." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチのスキャンはすでに実行中です。"
+          }
+        }
+      }
+    },
+    "A watch that has been factory reset no longer knows this iPhone, and cannot be added again while the old pairing is around. Forget it here, then open Settings › Bluetooth, tap the ⓘ beside it and choose Forget This Device." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "工場出荷時の状態にリセットしたウォッチは、このiPhoneを認識しなくなります。古いペアリングが残っていると追加し直せないので、ここで登録を解除してから、「設定」＞「Bluetooth」でウォッチの横のⓘをタップし、「このデバイスの登録を解除」を選んでください。"
+          }
+        }
+      }
+    },
+    "A watch that has been factory reset no longer knows this Mac, and cannot be added again while the old pairing is around. Forget it here, then open System Settings › Bluetooth and forget it there too." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "工場出荷時の状態にリセットしたウォッチは、このMacを認識しなくなります。古いペアリングが残っていると追加し直せないので、ここで登録を解除してから、「システム設定」＞「Bluetooth」でも登録を解除してください。"
           }
         }
       }
@@ -1373,6 +1413,16 @@
         }
       }
     },
+    "Download the published PebbleOS, then install it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "公開されているPebbleOSをダウンロードして、インストールします。"
+          }
+        }
+      }
+    },
     "Downloaded" : {
       "localizations" : {
         "ja" : {
@@ -1609,6 +1659,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ファームウェアの準備ができました。ウォッチが接続され次第インストールされます。"
+          }
+        }
+      }
+    },
+    "Firmware Required" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ファームウェアが必要"
           }
         }
       }
@@ -1963,6 +2023,16 @@
         }
       }
     },
+    "Install Firmware" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ファームウェアをインストール"
+          }
+        }
+      }
+    },
     "Install from a File…" : {
       "localizations" : {
         "ja" : {
@@ -2113,6 +2183,16 @@
         }
       }
     },
+    "It started its recovery firmware, which can do one thing: take a new copy of PebbleOS. Apps, watchfaces, and notifications come back once that is installed." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リカバリファームウェアで起動しており、この状態でできるのはPebbleOSを新しく受け取ることだけです。インストールすれば、アプリ、ウォッチフェイス、通知はまた使えるようになります。"
+          }
+        }
+      }
+    },
     "Keep the watch nearby until this finishes." : {
       "localizations" : {
         "ja" : {
@@ -2149,6 +2229,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最終記録 %@"
+          }
+        }
+      }
+    },
+    "Leave both alone until the watch restarts by itself." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチが自動的に再起動するまで、どちらも操作せずに待ちます。"
           }
         }
       }
@@ -2603,6 +2693,16 @@
         }
       }
     },
+    "Open Firmware below and check for updates." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "下の「ファームウェア」を開いて、アップデートを確認します。"
+          }
+        }
+      }
+    },
     "Open Privacy Settings" : {
       "localizations" : {
         "ja" : {
@@ -2879,6 +2979,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "現在、公開されているファームウェアを確認できません。"
+          }
+        }
+      }
+    },
+    "Put the watch on its charger and keep it next to this device." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチを充電器に載せ、この端末のそばに置きます。"
           }
         }
       }
@@ -3709,6 +3819,16 @@
         }
       }
     },
+    "The download only needs the network. It installs as soon as this watch connects." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ダウンロードにはネットワークだけが必要です。このウォッチが接続され次第、インストールが始まります。"
+          }
+        }
+      }
+    },
     "The dump the watch saved the last time it restarted unexpectedly. It is marked as read once collected, so a second attempt finds nothing." : {
       "localizations" : {
         "ja" : {
@@ -4065,12 +4185,12 @@
         }
       }
     },
-    "The watch is performing a factory reset." : {
+    "The watch is erasing itself. It has forgotten this device, so it cannot reconnect until it is forgotten here too." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
-            "value" : "ウォッチを工場出荷時の状態にリセットしています。"
+            "value" : "ウォッチを消去しています。ウォッチはこの端末を忘れたため、こちらでも登録を解除するまで再接続できません。"
           }
         }
       }
@@ -4325,12 +4445,12 @@
         }
       }
     },
-    "This watch started its recovery firmware. Install firmware to finish setting it up." : {
+    "This watch started its recovery firmware. It works again once PebbleOS is installed." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
-            "value" : "このウォッチはリカバリファームウェアで起動しています。セットアップを完了するには、ファームウェアをインストールしてください。"
+            "value" : "このウォッチはリカバリファームウェアで起動しています。PebbleOSをインストールすると、また使えるようになります。"
           }
         }
       }
@@ -4831,6 +4951,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このアプリが読み取りを許可されている項目です。“ヘルスケア”は、ヘルスケアデータへの書き込みが許可されているかどうかを示します。iOSには、読み取りが許可されたかどうかを確認する手段がないためです。"
+          }
+        }
+      }
+    },
+    "What to Do" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "手順"
           }
         }
       }

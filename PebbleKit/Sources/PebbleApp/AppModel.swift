@@ -522,7 +522,7 @@ public final class AppModel {
     func synchronizeEverything(on connection: WatchConnection) async {
         if connection.device.isRunningRecoveryFirmware {
             watchManagementErrorMessage =
-                "This watch started its recovery firmware. Install firmware to finish setting it up."
+                "This watch started its recovery firmware. It works again once PebbleOS is installed."
             await PebbleDiagnostics.shared.record(
                 .error,
                 category: "connection",

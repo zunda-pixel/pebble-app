@@ -151,7 +151,8 @@ extension AppModel {
             watchResetStatusMessage = switch kind {
             case .restart: "The watch is restarting."
             case .recoveryFirmware: "The watch is restarting into recovery firmware."
-            case .factoryReset: "The watch is performing a factory reset."
+            case .factoryReset:
+                "The watch is erasing itself. It has forgotten this device, so it cannot reconnect until it is forgotten here too."
             }
         } catch {
             watchResetStatusMessage = nil
