@@ -102,6 +102,15 @@ actor SpeechBridge: PebbleVoiceTranscriptionProvider {
         do {
             let spoken = try await transcribe(samples, sampleRate: Double(encoderInfo.sampleRate), in: locale)
             let words = Self.words(in: spoken)
+            // What was said is nobody's business but the reader's, and the
+            // report is made to be shared: how much was heard, and how much
+            // came back, is all that helps.
+            await PebbleDiagnostics.shared.record(
+                category: "voice",
+                message: "heard \(audioFrames.count) frames"
+                    + ", \(samples.count / max(1, Int(encoderInfo.sampleRate))) s"
+                    + ", \(words.count) words back"
+            )
             guard !words.isEmpty else { return .failed(.recognizerError) }
             return .transcribed(words)
         } catch {

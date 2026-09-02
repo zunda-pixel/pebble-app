@@ -1053,6 +1053,11 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
 
         guard frame.endpoint == WatchVersionCodec.endpoint,
               pendingDevice != nil else {
+            // Audio arrives fifty frames a second and the app answers all of
+            // them, so recording each one filled the whole five-hundred-entry
+            // report with a single dictation and left nothing to diagnose with.
+            // The session says what it heard in one line instead.
+            guard frame.endpoint != AudioStreamCodec.endpoint else { return }
             Task { [tag = clientTag, endpoint = frame.endpoint, payload = frame.payload] in
                 await PebbleDiagnostics.shared.record(
                     category: "packet",
