@@ -177,6 +177,12 @@ extension AppModel {
         }
         firmwareUpdateStatusMessage = "Transferring verified firmware…"
         connection.beginTransfer(.firmware)
+        await PebbleDiagnostics.shared.record(
+            category: "firmware",
+            message: "sending \(package.manifest.firmware.versionTag ?? "firmware")"
+                + " to \(connection.device.name)"
+                + (connection.device.isRunningRecoveryFirmware ? " (recovery firmware)" : "")
+        )
         let client = connection.client
         let task = Task { try await client.installFirmware(package) }
         firmwareUpdateTask = task
@@ -187,6 +193,11 @@ extension AppModel {
         do {
             try await task.value
         } catch {
+            await PebbleDiagnostics.shared.record(
+                .warning,
+                category: "firmware",
+                message: "the transfer stopped: \(error.localizedDescription)"
+            )
             // So the next connection offers the update again instead of silently
             // starting the whole transfer over.
             let stopped = try? await pendingFirmwareUpdateLibrary.journal()
@@ -199,6 +210,10 @@ extension AppModel {
         try await pendingFirmwareUpdateLibrary.updatePhase(.awaitingRestart)
         firmwareUpdateJournal = try await pendingFirmwareUpdateLibrary.journal()
         firmwareUpdateStatusMessage = "Firmware installed. Waiting for the watch to restart."
+        await PebbleDiagnostics.shared.record(
+            category: "firmware",
+            message: "the watch took the firmware and is restarting"
+        )
         await pendingFirmwareUpdateLibrary.clear()
     }
 

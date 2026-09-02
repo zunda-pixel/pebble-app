@@ -141,9 +141,33 @@ public final class PebbleGattServer: NSObject {
         subscribedCentrals[centralID]?.maximumUpdateValueLength ?? 20
     }
 
+    /// How many packets may wait for iOS to say it is ready again.
+    ///
+    /// A backlog is normal — iOS refuses a notification when its transmit queue
+    /// is full and calls back when it drains — but a backlog that only grows
+    /// means the watch is no longer reading. Reporting success into that void is
+    /// what turned a dead session into thirty seconds of protocol
+    /// retransmissions and then a bare timeout: the protocol's own window is at
+    /// most 25 packets, so anything past that is not flow control.
+    static let maximumBacklog = 32
+
+    var isBacklogged: Bool {
+        pendingNotifications.count >= Self.maximumBacklog
+    }
+
     @discardableResult
     func send(_ bytes: [UInt8], to centralID: String) -> Bool {
         guard let dataCharacteristic, let central = subscribedCentrals[centralID] else {
+            return false
+        }
+        guard !isBacklogged else {
+            Task {
+                await PebbleDiagnostics.shared.record(
+                    .warning,
+                    category: "pairing",
+                    message: "The phone's protocol service has \(Self.maximumBacklog) packets waiting; the watch is not reading"
+                )
+            }
             return false
         }
         let value = Data(bytes)
@@ -168,7 +192,16 @@ public final class PebbleGattServer: NSObject {
         }
         while let pending = pendingNotifications.first {
             guard let central = subscribedCentrals[pending.centralID] else {
+                // Dropping a protocol packet silently leaves the session
+                // retransmitting into a watch that is no longer there.
                 pendingNotifications.removeFirst()
+                Task { [centralID = pending.centralID] in
+                    await PebbleDiagnostics.shared.record(
+                        .warning,
+                        category: "pairing",
+                        message: "Dropped a packet for a watch that unsubscribed (\(centralID))"
+                    )
+                }
                 continue
             }
             guard peripheralManager.updateValue(

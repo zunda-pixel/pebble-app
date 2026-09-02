@@ -40,6 +40,8 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private var ppogNotifyCharacteristicToSubscribe: CBCharacteristic?
     private var setup = LinkSetup()
     private var pairingTimeoutTask: Task<Void, Never>?
+    private var subscriptionWatchdog: Task<Void, Never>?
+    private var hasRepublishedForThisLink = false
     private var connectedPeripheral: CBPeripheral?
     private var connectedDevice: PebbleDevice?
     private var latestBatteryLevel: Int?
@@ -1238,6 +1240,9 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         activePairingTriggerCharacteristic = nil
         ppogNotifyCharacteristicToSubscribe = nil
         setup.reset()
+        subscriptionWatchdog?.cancel()
+        subscriptionWatchdog = nil
+        hasRepublishedForThisLink = false
         pairingTimeoutTask?.cancel()
         pairingTimeoutTask = nil
         connectedPeripheral = nil
@@ -1687,6 +1692,7 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
             peripheral.setNotifyValue(true, for: notifyCharacteristic)
         case .forward:
             guard PebbleGattServer.shared.isSubscribed(centralID: peripheral.identifier.uuidString) else {
+                waitForTheWatchToSubscribe(on: peripheral)
                 return
             }
             handleForwardTransportReady(on: peripheral)
@@ -1732,6 +1738,37 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
                 category: "pairing",
                 message: "[\(tag)] the watch published its own protocol service; using that instead"
             )
+        }
+    }
+
+    /// A bonded watch that never subscribes to the phone's service.
+    ///
+    /// It has to read the phone's GATT database to find the characteristic, and
+    /// it caches what it read. Re-adding the service is what makes iOS send a
+    /// service-changed indication, which is the only thing that tells a watch
+    /// holding a stale cache to look again. Without this the link sits until the
+    /// connect deadline and the next attempt does exactly the same, for ever.
+    private func waitForTheWatchToSubscribe(on peripheral: CBPeripheral) {
+        guard !hasRepublishedForThisLink, subscriptionWatchdog == nil else {
+            return
+        }
+        subscriptionWatchdog = Task { [weak self, tag = clientTag] in
+            try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled, let self else { return }
+            self.subscriptionWatchdog = nil
+            let centralID = peripheral.identifier.uuidString
+            guard self.setup.transport == .forward,
+                  self.ppogSession == nil,
+                  !PebbleGattServer.shared.isSubscribed(centralID: centralID) else {
+                return
+            }
+            self.hasRepublishedForThisLink = true
+            await PebbleDiagnostics.shared.record(
+                .warning,
+                category: "pairing",
+                message: "[\(tag)] the watch has not subscribed to the phone's service; publishing it again"
+            )
+            PebbleGattServer.shared.republish()
         }
     }
 

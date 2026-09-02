@@ -10,6 +10,10 @@ struct PendingNotificationQueue: Equatable, Sendable {
         packets.isEmpty
     }
 
+    var count: Int {
+        packets.count
+    }
+
     var first: (centralID: String, value: Data)? {
         packets.first
     }
