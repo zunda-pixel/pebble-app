@@ -39,8 +39,17 @@ public struct VoiceSessionSetupRequest: Equatable, Sendable {
 @MemberwiseInit(.public)
 public struct VoiceTranscriptionWord: Equatable, Sendable {
     public var text: String
-    /// 0...1, scaled to a single byte on the wire.
+    /// 0...1, sent as the watch's 1-100 percentage. Zero reaches the watch as
+    /// its "no confidence value" marker, which is what a recognizer that does
+    /// not score words means.
     public var confidence: Double = 0.9
+}
+
+/// What a natural-language session asks for: the words are not wanted, a
+/// reminder and the time it is for are.
+public enum VoiceReminderOutcome: Equatable, Sendable {
+    case understood(reminder: String, time: Date?)
+    case failed(VoiceSessionResult)
 }
 
 public enum VoiceControlCodec {
@@ -49,6 +58,8 @@ public enum VoiceControlCodec {
     static let speexEncoderInfoAttribute: UInt8 = 0x01
     static let transcriptionAttribute: UInt8 = 0x02
     static let applicationIDAttribute: UInt8 = 0x03
+    static let reminderAttribute: UInt8 = 0x04
+    static let timestampAttribute: UInt8 = 0x05
 
     public static func decodeSessionSetup(_ frame: PebbleProtocolFrame) throws -> VoiceSessionSetupRequest {
         guard frame.endpoint == endpoint else {
@@ -129,24 +140,76 @@ public enum VoiceControlCodec {
         words: [VoiceTranscriptionWord]?,
         applicationID: UUID?
     ) -> PebbleProtocolFrame {
-        var payload: [UInt8] = [0x02]
-        payload.append(contentsOf: flags(applicationInitiated: applicationID != nil))
-        payload.append(UInt8(sessionID & 0xFF))
-        payload.append(UInt8(sessionID >> 8))
-        payload.append(result.rawValue)
-
+        let sentence = words.map(sendableWords) ?? []
         var attributes: [[UInt8]] = []
-        if let words {
-            attributes.append(attribute(id: transcriptionAttribute, content: transcription(words)))
+        if !sentence.isEmpty {
+            attributes.append(attribute(id: transcriptionAttribute, content: transcription(sentence)))
         }
         if let applicationID {
             attributes.append(attribute(id: applicationIDAttribute, content: BlobDBCodec.uuidBytes(applicationID)))
         }
+        // A success with no words is one the watch throws out for being
+        // malformed, and it then tells the reader the recognizer misbehaved.
+        // Saying that outright is the same news, one step sooner.
+        let honestResult = words != nil && sentence.isEmpty ? .recognizerError : result
+        return resultFrame(
+            messageID: 0x02,
+            sessionID: sessionID,
+            result: honestResult,
+            applicationInitiated: applicationID != nil,
+            attributes: attributes
+        )
+    }
+
+    /// The answer to a natural-language session: what to remind the reader of,
+    /// and when. The watch ignores an application ID here, and a session it
+    /// started itself is never application-initiated.
+    public static func nlpResultFrame(
+        sessionID: UInt16,
+        result: VoiceSessionResult,
+        reminder: String?,
+        time: Date?
+    ) -> PebbleProtocolFrame {
+        let text = reminder.map(wireBytes) ?? []
+        var attributes: [[UInt8]] = []
+        if !text.isEmpty {
+            attributes.append(attribute(id: reminderAttribute, content: text))
+            if let time, let seconds = watchSeconds(time) {
+                attributes.append(attribute(id: timestampAttribute, content: seconds.littleEndianBytes))
+            }
+        }
+        return resultFrame(
+            messageID: 0x03,
+            sessionID: sessionID,
+            result: text.isEmpty && result == .success ? .recognizerError : result,
+            applicationInitiated: false,
+            attributes: attributes
+        )
+    }
+
+    private static func resultFrame(
+        messageID: UInt8,
+        sessionID: UInt16,
+        result: VoiceSessionResult,
+        applicationInitiated: Bool,
+        attributes: [[UInt8]]
+    ) -> PebbleProtocolFrame {
+        var payload: [UInt8] = [messageID]
+        payload.append(contentsOf: flags(applicationInitiated: applicationInitiated))
+        payload.append(UInt8(sessionID & 0xFF))
+        payload.append(UInt8(sessionID >> 8))
+        payload.append(result.rawValue)
         payload.append(UInt8(attributes.count))
         for attribute in attributes {
             payload.append(contentsOf: attribute)
         }
         return PebbleProtocolFrame(endpoint: endpoint, payload: payload)
+    }
+
+    private static func watchSeconds(_ time: Date) -> UInt32? {
+        let seconds = time.timeIntervalSince1970.rounded()
+        guard seconds >= 0, seconds <= Double(UInt32.max) else { return nil }
+        return UInt32(seconds)
     }
 
     private static func flags(applicationInitiated: Bool) -> [UInt8] {
@@ -157,19 +220,48 @@ public enum VoiceControlCodec {
         [id, UInt8(content.count & 0xFF), UInt8(content.count >> 8)] + content
     }
 
-    private static func transcription(_ words: [VoiceTranscriptionWord]) -> [UInt8] {
+    /// The words the watch will accept, in the order they were said. A word of
+    /// no length fails the watch's check on the whole transcription, so an empty
+    /// one is dropped rather than sent.
+    private static func sendableWords(
+        _ words: [VoiceTranscriptionWord]
+    ) -> [(bytes: [UInt8], confidence: UInt8)] {
+        words.compactMap { word in
+            let bytes = wireBytes(word.text)
+            guard !bytes.isEmpty else { return nil }
+            return (bytes, UInt8((max(0, min(1, word.confidence)) * 100).rounded()))
+        }
+    }
+
+    private static func transcription(_ words: [(bytes: [UInt8], confidence: UInt8)]) -> [UInt8] {
         // Transcription type 0x01: a single sentence containing every word.
         var content: [UInt8] = [0x01, 0x01]
         content.append(UInt8(words.count & 0xFF))
         content.append(UInt8(words.count >> 8))
         for word in words {
-            let bytes = Array(word.text.utf8.prefix(Int(UInt16.max)))
-            content.append(UInt8((max(0, min(1, word.confidence)) * 255).rounded()))
-            content.append(UInt8(bytes.count & 0xFF))
-            content.append(UInt8(bytes.count >> 8))
-            content.append(contentsOf: bytes)
+            content.append(word.confidence)
+            content.append(UInt8(word.bytes.count & 0xFF))
+            content.append(UInt8(word.bytes.count >> 8))
+            content.append(contentsOf: word.bytes)
         }
         return content
+    }
+
+    /// UTF-8 the watch will take: one control character anywhere in a
+    /// transcription makes it throw the lot away, and a recognizer that hands
+    /// back a line break has not earned that.
+    private static func wireBytes(_ text: String) -> [UInt8] {
+        var bytes: [UInt8] = []
+        for scalar in text.unicodeScalars {
+            let encoded = Array(String(scalar).utf8)
+            guard bytes.count + encoded.count <= Int(UInt16.max) else { break }
+            if encoded.count == 1, encoded[0] < 0x20, encoded[0] != 0x08 {
+                bytes.append(0x20)
+            } else {
+                bytes.append(contentsOf: encoded)
+            }
+        }
+        return bytes
     }
 
     private static func decodeSpeexEncoderInfo(_ content: [UInt8]) throws -> SpeexEncoderInfo {
@@ -203,9 +295,9 @@ public enum VoiceControlCodec {
 }
 
 public enum AudioStreamMessage: Equatable, Sendable {
-    /// Every encoded frame carries a 1-byte quality header and the watch
-    /// concatenates them after the frame count byte.
-    case data(sessionID: UInt16, bytes: [UInt8])
+    /// The encoded frames a message carried, each one already cut to the length
+    /// the watch gave it. A decoder is handed whole frames or nothing.
+    case data(sessionID: UInt16, frames: [[UInt8]])
     case stop(sessionID: UInt16)
 }
 
@@ -225,7 +317,23 @@ public enum AudioStreamCodec {
             guard frame.payload.count >= 4 else {
                 throw VoiceCodecError.invalidPayload
             }
-            return .data(sessionID: sessionID, bytes: Array(frame.payload.dropFirst(4)))
+            // The watch sends one frame per message today, but the count byte is
+            // on the wire and a run of them is a legal message.
+            var frames: [[UInt8]] = []
+            var offset = 4
+            for _ in 0..<Int(frame.payload[3]) {
+                guard offset < frame.payload.count else {
+                    throw VoiceCodecError.invalidPayload
+                }
+                let length = Int(frame.payload[offset])
+                offset += 1
+                guard offset + length <= frame.payload.count else {
+                    throw VoiceCodecError.invalidPayload
+                }
+                frames.append(Array(frame.payload[offset..<offset + length]))
+                offset += length
+            }
+            return .data(sessionID: sessionID, frames: frames)
         case 0x03:
             return .stop(sessionID: sessionID)
         default:
@@ -253,8 +361,17 @@ public enum VoiceTranscriptionOutcome: Equatable, Sendable {
 }
 
 public protocol PebbleVoiceTranscriptionProvider: Sendable {
-    func canServeSession() async -> Bool
+    /// Whether this kind of session can be served at all. A phone that can turn
+    /// speech into words may still have no way to read a reminder out of them.
+    func canServeSession(_ sessionType: VoiceSessionType) async -> Bool
     func transcribe(encoderInfo: SpeexEncoderInfo, audioFrames: [[UInt8]]) async -> VoiceTranscriptionOutcome
+    func interpretReminder(_ words: [VoiceTranscriptionWord]) async -> VoiceReminderOutcome
+}
+
+extension PebbleVoiceTranscriptionProvider {
+    public func interpretReminder(_ words: [VoiceTranscriptionWord]) async -> VoiceReminderOutcome {
+        .failed(.serviceUnavailable)
+    }
 }
 
 @MainActor
@@ -302,7 +419,7 @@ public final class VoiceSessionCoordinator {
             await respondToSetup(request, result: .invalidMessage, applicationInitiated: applicationInitiated)
             return
         }
-        guard let provider, await provider.canServeSession() else {
+        guard let provider, await provider.canServeSession(request.sessionType) else {
             await respondToSetup(request, result: .disabled, applicationInitiated: applicationInitiated)
             return
         }
@@ -316,9 +433,9 @@ public final class VoiceSessionCoordinator {
             return
         }
         switch message {
-        case .data(let sessionID, let bytes):
+        case .data(let sessionID, let frames):
             guard sessionID == session.request.sessionID else { return }
-            session.audioFrames.append(bytes)
+            session.audioFrames.append(contentsOf: frames)
             activeSession = session
         case .stop(let sessionID):
             guard sessionID == session.request.sessionID else { return }
@@ -331,30 +448,70 @@ public final class VoiceSessionCoordinator {
         guard let provider, let encoderInfo = session.request.encoderInfo else {
             return
         }
+        let request = session.request
         transcriptionTask = Task { [send] in
             let outcome = await provider.transcribe(
                 encoderInfo: encoderInfo,
                 audioFrames: session.audioFrames
             )
             guard !Task.isCancelled else { return }
-            let frame: PebbleProtocolFrame
-            switch outcome {
-            case .transcribed(let words):
-                frame = VoiceControlCodec.dictationResultFrame(
-                    sessionID: session.request.sessionID,
-                    result: .success,
-                    words: words,
-                    applicationID: session.request.applicationID
-                )
-            case .failed(let result):
-                frame = VoiceControlCodec.dictationResultFrame(
-                    sessionID: session.request.sessionID,
-                    result: result,
-                    words: nil,
-                    applicationID: session.request.applicationID
-                )
+            let frame = switch request.sessionType {
+            case .naturalLanguage:
+                await Self.reminderFrame(for: outcome, request: request, provider: provider)
+            case .dictation, .command:
+                Self.dictationFrame(for: outcome, request: request)
             }
+            guard !Task.isCancelled else { return }
             try? await send(frame)
+        }
+    }
+
+    private static func dictationFrame(
+        for outcome: VoiceTranscriptionOutcome,
+        request: VoiceSessionSetupRequest
+    ) -> PebbleProtocolFrame {
+        switch outcome {
+        case .transcribed(let words):
+            VoiceControlCodec.dictationResultFrame(
+                sessionID: request.sessionID,
+                result: .success,
+                words: words,
+                applicationID: request.applicationID
+            )
+        case .failed(let result):
+            VoiceControlCodec.dictationResultFrame(
+                sessionID: request.sessionID,
+                result: result,
+                words: nil,
+                applicationID: request.applicationID
+            )
+        }
+    }
+
+    private static func reminderFrame(
+        for outcome: VoiceTranscriptionOutcome,
+        request: VoiceSessionSetupRequest,
+        provider: any PebbleVoiceTranscriptionProvider
+    ) async -> PebbleProtocolFrame {
+        let interpretation: VoiceReminderOutcome = switch outcome {
+        case .transcribed(let words): await provider.interpretReminder(words)
+        case .failed(let result): .failed(result)
+        }
+        switch interpretation {
+        case .understood(let reminder, let time):
+            return VoiceControlCodec.nlpResultFrame(
+                sessionID: request.sessionID,
+                result: .success,
+                reminder: reminder,
+                time: time
+            )
+        case .failed(let result):
+            return VoiceControlCodec.nlpResultFrame(
+                sessionID: request.sessionID,
+                result: result,
+                reminder: nil,
+                time: nil
+            )
         }
     }
 

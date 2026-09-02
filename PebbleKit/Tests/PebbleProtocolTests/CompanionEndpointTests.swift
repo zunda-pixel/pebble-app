@@ -955,23 +955,108 @@ struct VoiceTests {
             0x02, 0x14, 0x00,
             0x01, 0x01,
             0x02, 0x00,
-            0xFF, 0x05, 0x00, 0x48, 0x65, 0x6C, 0x6C, 0x6F,
-            0x80, 0x05, 0x00, 0x57, 0x6F, 0x72, 0x6C, 0x64,
+            100, 0x05, 0x00, 0x48, 0x65, 0x6C, 0x6C, 0x6F,
+            50, 0x05, 0x00, 0x57, 0x6F, 0x72, 0x6C, 0x64,
         ])
     }
 
-    @Test func audioStreamDecodesDataAndStop() throws {
+    @Test func aWordTheWatchWouldThrowOutIsNotSent() {
+        let frame = VoiceControlCodec.dictationResultFrame(
+            sessionID: 0x1234,
+            result: .success,
+            words: [
+                VoiceTranscriptionWord(text: "", confidence: 1),
+                VoiceTranscriptionWord(text: "two\nlines", confidence: 0),
+            ],
+            applicationID: nil
+        )
+        #expect(frame.payload == [
+            0x02,
+            0x00, 0x00, 0x00, 0x00,
+            0x34, 0x12,
+            0x00,
+            0x01,
+            0x02, 0x10, 0x00,
+            0x01, 0x01,
+            0x01, 0x00,
+            0, 0x09, 0x00, 0x74, 0x77, 0x6F, 0x20, 0x6C, 0x69, 0x6E, 0x65, 0x73,
+        ])
+    }
+
+    @Test func aTranscriptionWithNothingLeftInItSaysSoInsteadOfSendingItsShell() {
+        let frame = VoiceControlCodec.dictationResultFrame(
+            sessionID: 0x1234,
+            result: .success,
+            words: [VoiceTranscriptionWord(text: "", confidence: 1)],
+            applicationID: nil
+        )
+        #expect(frame.payload == [
+            0x02,
+            0x00, 0x00, 0x00, 0x00,
+            0x34, 0x12,
+            VoiceSessionResult.recognizerError.rawValue,
+            0x00,
+        ])
+    }
+
+    @Test func nlpResultCarriesTheReminderAndItsTime() {
+        let frame = VoiceControlCodec.nlpResultFrame(
+            sessionID: 0x1234,
+            result: .success,
+            reminder: "Milk",
+            time: Date(timeIntervalSince1970: 0x5FA0_1020)
+        )
+        #expect(frame.payload == [
+            0x03,
+            0x00, 0x00, 0x00, 0x00,
+            0x34, 0x12,
+            0x00,
+            0x02,
+            0x04, 0x04, 0x00, 0x4D, 0x69, 0x6C, 0x6B,
+            0x05, 0x04, 0x00, 0x20, 0x10, 0xA0, 0x5F,
+        ])
+    }
+
+    @Test func nlpResultWithoutATimeSendsOnlyTheReminder() {
+        let frame = VoiceControlCodec.nlpResultFrame(
+            sessionID: 0x0001,
+            result: .success,
+            reminder: "Milk",
+            time: nil
+        )
+        #expect(frame.payload == [
+            0x03,
+            0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00,
+            0x00,
+            0x01,
+            0x04, 0x04, 0x00, 0x4D, 0x69, 0x6C, 0x6B,
+        ])
+    }
+
+    @Test func audioStreamCutsEachFrameToTheLengthTheWatchGaveIt() throws {
+        // Read as one blob, a session's frames arrive at the decoder with their
+        // length bytes still in them and every frame after the first misplaced.
         let data = try AudioStreamCodec.decode(PebbleProtocolFrame(
             endpoint: 10_000,
-            payload: [0x02, 0x34, 0x12, 0x03, 0xAA, 0xBB, 0xCC]
+            payload: [0x02, 0x34, 0x12, 0x02, 0x02, 0xAA, 0xBB, 0x01, 0xCC]
         ))
-        #expect(data == .data(sessionID: 0x1234, bytes: [0xAA, 0xBB, 0xCC]))
+        #expect(data == .data(sessionID: 0x1234, frames: [[0xAA, 0xBB], [0xCC]]))
         let stop = try AudioStreamCodec.decode(PebbleProtocolFrame(
             endpoint: 10_000,
             payload: [0x03, 0x34, 0x12]
         ))
         #expect(stop == .stop(sessionID: 0x1234))
         #expect(AudioStreamCodec.stopFrame(sessionID: 0x1234).payload == [0x03, 0x34, 0x12])
+    }
+
+    @Test func anAudioMessageCutShortIsRefusedRatherThanGuessedAt() {
+        #expect(throws: VoiceCodecError.invalidPayload) {
+            try AudioStreamCodec.decode(PebbleProtocolFrame(
+                endpoint: 10_000,
+                payload: [0x02, 0x34, 0x12, 0x01, 0x04, 0xAA, 0xBB]
+            ))
+        }
     }
 
     @Test func coordinatorRejectsSessionsWithoutProvider() async {
@@ -1042,7 +1127,7 @@ struct VoiceTests {
 
         await coordinator.handleAudioFrame(PebbleProtocolFrame(
             endpoint: 10_000,
-            payload: [0x02, 0x34, 0x12, 0x01, 0x00, 0xAB]
+            payload: [0x02, 0x34, 0x12, 0x01, 0x02, 0x00, 0xAB]
         ))
         await coordinator.handleAudioFrame(PebbleProtocolFrame(
             endpoint: 10_000,
@@ -1058,6 +1143,63 @@ struct VoiceTests {
         #expect(sent[1].payload[7] == VoiceSessionResult.success.rawValue)
         let received = await provider.receivedFrames
         #expect(received == [[0x00, 0xAB]])
+    }
+
+    @Test func aRemindersSessionIsAnsweredWithAReminderRatherThanWords() async throws {
+        let collector = FrameCollector()
+        let provider = StaticTranscriptionProvider(
+            words: [VoiceTranscriptionWord(text: "Milk", confidence: 1)],
+            reminder: .understood(reminder: "Milk", time: Date(timeIntervalSince1970: 0x5FA0_1020))
+        )
+        let coordinator = VoiceSessionCoordinator(provider: provider) { frame in
+            await collector.append(frame)
+        }
+        var payload = sessionSetupPayload(includeEncoderInfo: true, applicationID: nil)
+        payload[5] = VoiceSessionType.naturalLanguage.rawValue
+
+        await coordinator.handleVoiceFrame(PebbleProtocolFrame(endpoint: 11_000, payload: payload))
+        await coordinator.handleAudioFrame(PebbleProtocolFrame(
+            endpoint: 10_000,
+            payload: [0x02, 0x34, 0x12, 0x01, 0x02, 0x00, 0xAB]
+        ))
+        await coordinator.handleAudioFrame(PebbleProtocolFrame(
+            endpoint: 10_000,
+            payload: [0x03, 0x34, 0x12]
+        ))
+
+        var sent: [PebbleProtocolFrame] = []
+        for _ in 0..<200 {
+            sent = await collector.frames
+            if sent.count == 2 { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(sent.count == 2)
+        #expect(sent[1].payload == [
+            0x03,
+            0x00, 0x00, 0x00, 0x00,
+            0x34, 0x12,
+            0x00,
+            0x02,
+            0x04, 0x04, 0x00, 0x4D, 0x69, 0x6C, 0x6B,
+            0x05, 0x04, 0x00, 0x20, 0x10, 0xA0, 0x5F,
+        ])
+    }
+
+    @Test func aProviderThatOnlyTranscribesRefusesARemindersSession() async {
+        let collector = FrameCollector()
+        let coordinator = VoiceSessionCoordinator(
+            provider: StaticTranscriptionProvider(words: [], servesReminders: false)
+        ) { frame in
+            await collector.append(frame)
+        }
+        var payload = sessionSetupPayload(includeEncoderInfo: true, applicationID: nil)
+        payload[5] = VoiceSessionType.naturalLanguage.rawValue
+
+        await coordinator.handleVoiceFrame(PebbleProtocolFrame(endpoint: 11_000, payload: payload))
+
+        let sent = await collector.frames
+        #expect(sent.count == 1)
+        #expect(sent[0].payload.last == VoiceSessionResult.disabled.rawValue)
     }
 
     @Test func coordinatorReportsInvalidSetupWithoutEncoderInfo() async {
@@ -1085,18 +1227,30 @@ private actor FrameCollector {
 
 private actor StaticTranscriptionProvider: PebbleVoiceTranscriptionProvider {
     private let words: [VoiceTranscriptionWord]
+    private let reminder: VoiceReminderOutcome
+    private let servesReminders: Bool
     private(set) var receivedFrames: [[UInt8]] = []
 
-    init(words: [VoiceTranscriptionWord]) {
+    init(
+        words: [VoiceTranscriptionWord],
+        reminder: VoiceReminderOutcome = .failed(.serviceUnavailable),
+        servesReminders: Bool = true
+    ) {
         self.words = words
+        self.reminder = reminder
+        self.servesReminders = servesReminders
     }
 
-    func canServeSession() async -> Bool {
-        true
+    func canServeSession(_ sessionType: VoiceSessionType) async -> Bool {
+        sessionType != .naturalLanguage || servesReminders
     }
 
     func transcribe(encoderInfo: SpeexEncoderInfo, audioFrames: [[UInt8]]) async -> VoiceTranscriptionOutcome {
         receivedFrames = audioFrames
         return .transcribed(words)
+    }
+
+    func interpretReminder(_ words: [VoiceTranscriptionWord]) async -> VoiceReminderOutcome {
+        reminder
     }
 }
