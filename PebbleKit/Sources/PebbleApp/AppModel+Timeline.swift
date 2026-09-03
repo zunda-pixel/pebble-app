@@ -134,13 +134,13 @@ extension AppModel {
     /// which is why it is asked for rather than done.
     public func clearWatchTimeline(deviceID: String? = nil) async {
         guard let connection = connection(for: deviceID), connection.isConnected else {
-            dataSyncStatusMessage = "Connect the watch before clearing its timeline."
+            watchDiagnosticsStatusMessages[.timeline] = "Connect the watch before clearing its timeline."
             return
         }
         do {
             try await connection.client.clearTimelinePins()
         } catch {
-            dataSyncStatusMessage =
+            watchDiagnosticsStatusMessages[.timeline] =
                 "\(connection.device.name) did not clear its timeline. \(Text(refusalReason(for: error)))"
             return
         }
@@ -150,9 +150,9 @@ extension AppModel {
             category: "timeline",
             message: "\(connection.device.name): cleared the pin database"
         )
-        dataSyncStatusMessage = "The watch's timeline was cleared. Sending what the app has…"
+        watchDiagnosticsStatusMessages[.timeline] = "The watch's timeline was cleared. Sending what the app has…"
         await synchronizeTimeline()
-        dataSyncStatusMessage = "The watch's timeline was cleared and written again from the app."
+        watchDiagnosticsStatusMessages[.timeline] = "The watch's timeline was cleared and written again from the app."
     }
 
     func queueTimelineOperation(_ operation: PendingTimelineOperation) async throws {

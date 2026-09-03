@@ -22,7 +22,7 @@ struct WatchDiagnosticsView: View {
             applicationLogLines: model.applicationLogLines,
             coredumpURL: model.coredumpURL,
             isCollectingCoredump: model.isCollectingCoredump,
-            statusMessage: model.watchDiagnosticsStatusMessage,
+            statusMessages: model.watchDiagnosticsStatusMessages,
             takeScreenshot: { Task { await model.takeScreenshot(deviceID: watchID) } },
             gatherWatchLogs: { Task { await model.gatherWatchLogs(deviceID: watchID) } },
             setApplicationLogging: { isOn in Task { await model.setApplicationLoggingEnabled(isOn) } },
@@ -45,7 +45,7 @@ struct WatchDiagnosticsContent: View {
     var applicationLogLines: [WatchLogLine]
     var coredumpURL: URL?
     var isCollectingCoredump: Bool
-    var statusMessage: LocalizedStringKey?
+    var statusMessages: [WatchDiagnostic: LocalizedStringKey]
     var takeScreenshot: () -> Void
     var gatherWatchLogs: () -> Void
     var setApplicationLogging: (Bool) -> Void
@@ -70,6 +70,7 @@ struct WatchDiagnosticsContent: View {
                 if let screenshotURL {
                     ShareLink(item: screenshotURL) { Label("Share Screenshot", systemImage: "square.and.arrow.up") }
                 }
+                DiagnosticResult(statusMessages[.screenshot])
             } header: {
                 Text("Screen")
             }
@@ -83,6 +84,7 @@ struct WatchDiagnosticsContent: View {
                 if let watchLogsURL {
                     ShareLink(item: watchLogsURL) { Label("Share Logs", systemImage: "square.and.arrow.up") }
                 }
+                DiagnosticResult(statusMessages[.watchLogs])
             } header: {
                 Text("Watch Logs")
             } footer: {
@@ -111,6 +113,7 @@ struct WatchDiagnosticsContent: View {
                 if let coredumpURL {
                     ShareLink(item: coredumpURL) { Label("Share Crash Report", systemImage: "square.and.arrow.up") }
                 }
+                DiagnosticResult(statusMessages[.coredump])
             } header: {
                 Text("Crash Report")
             } footer: {
@@ -128,19 +131,31 @@ struct WatchDiagnosticsContent: View {
                     action: clearTimeline
                 )
                 .disabled(!isConnected)
+                DiagnosticResult(statusMessages[.timeline])
             } header: {
                 Text("Timeline")
             } footer: {
                 Text("A pin the app no longer has is removed on the next synchronization. This is for the ones it has no record of — after a reinstall, or when its queue was lost.")
             }
-
-            if let statusMessage {
-                Section {
-                    Label(statusMessage, systemImage: "info.circle").foregroundStyle(.secondary)
-                }
-            }
         }
         .navigationTitle(Text("Diagnostics"))
+    }
+}
+
+/// How the last attempt went, in the section that asked. The screen's buttons
+/// are sections apart and the app logs section can be fifty lines long, so a
+/// result gathered anywhere else is off the screen from whatever caused it.
+private struct DiagnosticResult: View {
+    var message: LocalizedStringKey?
+
+    init(_ message: LocalizedStringKey?) {
+        self.message = message
+    }
+
+    var body: some View {
+        if let message {
+            Label(message, systemImage: "info.circle").foregroundStyle(.secondary)
+        }
     }
 }
 
@@ -168,7 +183,7 @@ struct WatchScreenshotImage {
             applicationLogLines: PreviewSamples.logLines,
             coredumpURL: nil,
             isCollectingCoredump: false,
-            statusMessage: "3 log line(s) collected.",
+            statusMessages: [.watchLogs: "3 log line(s) collected."],
             takeScreenshot: {},
             gatherWatchLogs: {},
             setApplicationLogging: { _ in },
@@ -192,7 +207,7 @@ struct WatchScreenshotImage {
             applicationLogLines: [],
             coredumpURL: nil,
             isCollectingCoredump: false,
-            statusMessage: nil,
+            statusMessages: [:],
             takeScreenshot: {},
             gatherWatchLogs: {},
             setApplicationLogging: { _ in },

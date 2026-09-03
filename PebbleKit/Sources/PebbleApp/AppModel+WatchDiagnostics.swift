@@ -5,7 +5,7 @@ import SwiftUI
 extension AppModel {
     public func takeScreenshot(deviceID: String? = nil) async {
         guard let connection = connection(for: deviceID), connection.isConnected else {
-            watchDiagnosticsStatusMessage = "Connect the watch before taking a screenshot."
+            watchDiagnosticsStatusMessages[.screenshot] = "Connect the watch before taking a screenshot."
             return
         }
         isTakingScreenshot = true
@@ -14,9 +14,9 @@ extension AppModel {
             let screenshot = try await connection.client.takeScreenshot()
             latestScreenshot = screenshot
             screenshotURL = try writeScreenshot(screenshot, name: connection.device.name)
-            watchDiagnosticsStatusMessage = nil
+            watchDiagnosticsStatusMessages[.screenshot] = nil
         } catch {
-            watchDiagnosticsStatusMessage = "The watch would not send a screenshot."
+            watchDiagnosticsStatusMessages[.screenshot] = "The watch would not send a screenshot."
             await PebbleDiagnostics.shared.record(
                 .error,
                 category: "screenshot",
@@ -29,7 +29,7 @@ extension AppModel {
     /// and so on until the watch says it has no more.
     public func gatherWatchLogs(deviceID: String? = nil) async {
         guard let connection = connection(for: deviceID), connection.isConnected else {
-            watchDiagnosticsStatusMessage = "Connect the watch before gathering its logs."
+            watchDiagnosticsStatusMessages[.watchLogs] = "Connect the watch before gathering its logs."
             return
         }
         isGatheringWatchLogs = true
@@ -43,11 +43,11 @@ extension AppModel {
                 watchLogLines += lines
             }
             watchLogsURL = try writeWatchLogs(name: connection.device.name)
-            watchDiagnosticsStatusMessage = nil
+            watchDiagnosticsStatusMessages[.watchLogs] = nil
         } catch {
             // A log that stops halfway is more use than none.
             watchLogsURL = try? writeWatchLogs(name: connection.device.name)
-            watchDiagnosticsStatusMessage = "The watch stopped part way through its logs."
+            watchDiagnosticsStatusMessages[.watchLogs] = "The watch stopped part way through its logs."
             await PebbleDiagnostics.shared.record(
                 .error,
                 category: "watchlog",
@@ -88,7 +88,7 @@ extension AppModel {
     // alone.
     public func collectCoredump(deviceID: String? = nil) async {
         guard let connection = connection(for: deviceID), connection.isConnected else {
-            watchDiagnosticsStatusMessage = "Connect the watch before collecting a crash report."
+            watchDiagnosticsStatusMessages[.coredump] = "Connect the watch before collecting a crash report."
             return
         }
         isCollectingCoredump = true
@@ -96,15 +96,15 @@ extension AppModel {
         do {
             let bytes = try await connection.client.getBytes(.unreadCoredump)
             guard !bytes.isEmpty else {
-                watchDiagnosticsStatusMessage = "The watch has no crash report that has not been read."
+                watchDiagnosticsStatusMessages[.coredump] = "The watch has no crash report that has not been read."
                 return
             }
             coredumpURL = try write(bytes, name: "\(connection.device.name)-coredump.bin")
-            watchDiagnosticsStatusMessage = nil
+            watchDiagnosticsStatusMessages[.coredump] = nil
         } catch GetBytesError.refused(3) {
-            watchDiagnosticsStatusMessage = "The watch has no crash report."
+            watchDiagnosticsStatusMessages[.coredump] = "The watch has no crash report."
         } catch {
-            watchDiagnosticsStatusMessage = "The crash report could not be read."
+            watchDiagnosticsStatusMessages[.coredump] = "The crash report could not be read."
             await PebbleDiagnostics.shared.record(
                 .error,
                 category: "coredump",

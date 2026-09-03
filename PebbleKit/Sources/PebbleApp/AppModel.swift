@@ -86,7 +86,7 @@ public final class AppModel {
     public internal(set) var isTakingScreenshot = false
     public internal(set) var isGatheringWatchLogs = false
     public internal(set) var isCollectingCoredump = false
-    public internal(set) var watchDiagnosticsStatusMessage: LocalizedStringKey?
+    public internal(set) var watchDiagnosticsStatusMessages: [WatchDiagnostic: LocalizedStringKey] = [:]
     public internal(set) var healthSamples: [PebbleHealthSample] = []
     public internal(set) var catalogApplications: [PebbleCatalogApplication] = []
     public internal(set) var catalogLastUpdated: Date?
