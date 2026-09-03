@@ -16,7 +16,7 @@
       "location" : "https://github.com/zunda-pixel/speex.git",
       "state" : {
         "branch" : "swiftpm",
-        "revision" : "12f0998b273f2064c66433471c3169c4248f9bd3"
+        "revision" : "aab3c00364bd84ea3a9ec29b21a27a7c6d944953"
       }
     },
     {
