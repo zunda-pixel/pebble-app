@@ -867,9 +867,9 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     ) throws {
         Task { await PebbleDiagnostics.shared.recordFrame(direction: "in", frame: frame) }
         if try answer(frame, peripheral: peripheral) { return }
-        // The audio endpoint sends fifty of these a second and the app answers
-        // all of them; the session says what it heard in one line.
-        guard frame.endpoint != AudioStreamCodec.endpoint else { return }
+        // A frame the app takes off `frames()` is answered, just not here, and
+        // the audio endpoint alone sends fifty a second.
+        guard CompanionFrame(endpoint: frame.endpoint) == nil else { return }
         Task { [frame, tag = clientTag] in
             await PebbleDiagnostics.shared.recordUnansweredFrame(frame, tag: tag)
         }

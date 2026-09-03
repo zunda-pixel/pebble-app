@@ -169,18 +169,18 @@ extension AppModel {
         _ frame: PebbleProtocolFrame,
         from connection: WatchConnection
     ) async {
-        switch frame.endpoint {
-        case MusicControlCodec.endpoint:
+        switch CompanionFrame(endpoint: frame.endpoint) {
+        case .musicControl:
             musicCoordinator.handleFrame(frame)
-        case PhoneControlCodec.endpoint:
+        case .phoneControl:
             phoneCallCoordinator.handleFrame(frame)
-        case VoiceControlCodec.endpoint:
+        case .voiceControl:
             await connection.voiceCoordinator.handleVoiceFrame(frame)
-        case AudioStreamCodec.endpoint:
+        case .audioStream:
             await connection.voiceCoordinator.handleAudioFrame(frame)
-        case BlobDB2Codec.endpoint:
+        case .watchDatabaseWrite:
             await handleWatchDatabaseWrite(frame, on: connection)
-        default:
+        case nil:
             return
         }
     }
