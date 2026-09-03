@@ -858,128 +858,143 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         peripheral: CBPeripheral
     ) throws {
         Task { await PebbleDiagnostics.shared.recordFrame(direction: "in", frame: frame) }
-        if frame.endpoint == PingPongCodec.endpoint {
-            try processPingPong(frame, peripheral: peripheral)
-            return
+        if try answer(frame, peripheral: peripheral) { return }
+        // The audio endpoint sends fifty of these a second and the app answers
+        // all of them; the session says what it heard in one line.
+        guard frame.endpoint != AudioStreamCodec.endpoint else { return }
+        Task { [frame, tag = clientTag] in
+            await PebbleDiagnostics.shared.recordUnansweredFrame(frame, tag: tag)
         }
+    }
 
-        // "I do not know that endpoint" is still an answer, and a link the watch
-        // is holding up perfectly well should not be dropped for it.
-        if frame.rejectedEndpoint == WatchVersionCodec.endpoint {
+    /// Whether anything in the app was waiting for this frame.
+    ///
+    /// One case an endpoint, so that what a new one does cannot depend on where
+    /// in a list it was written: the two endpoints that answer more than one
+    /// thing choose between them themselves. An answer with nobody waiting is
+    /// not an error — a reply to a request already given up on, or an endpoint
+    /// this app does not implement, is worth a line in the log and no more.
+    private func answer(
+        _ frame: PebbleProtocolFrame,
+        peripheral: CBPeripheral
+    ) throws -> Bool {
+        switch frame.endpoint {
+        case PebbleProtocolFrame.metaEndpoint:
+            // "I do not know that endpoint" is still an answer, and a link the
+            // watch is holding up perfectly well should not be dropped for it.
+            guard frame.rejectedEndpoint == WatchVersionCodec.endpoint else { return false }
             clearPendingHealthCheck()
-            return
-        }
 
-        if PhoneVersionCodec.isRequest(frame) {
+        case PingPongCodec.endpoint:
+            try processPingPong(frame, peripheral: peripheral)
+
+        case PhoneVersionCodec.endpoint:
+            guard PhoneVersionCodec.isRequest(frame) else { return false }
             #if os(macOS)
             let operatingSystem = PhoneOperatingSystem.macOS
             #else
             let operatingSystem = PhoneOperatingSystem.iOS
             #endif
-            try sendFrame(PhoneVersionCodec.responseFrame(operatingSystem: operatingSystem), to: peripheral)
-            return
-        }
+            try sendFrame(
+                PhoneVersionCodec.responseFrame(operatingSystem: operatingSystem),
+                to: peripheral
+            )
 
-        if frame.endpoint == AppFetchCodec.endpoint {
+        case WatchVersionCodec.endpoint:
+            return try answerWatchVersion(frame, peripheral: peripheral)
+
+        case AppFetchCodec.endpoint:
             eventContinuation?.yield(.appFetchRequested(try AppFetchCodec.decodeRequest(frame)))
-            return
-        }
 
-        if frame.endpoint == HealthSyncCodec.endpoint {
+        case HealthSyncCodec.endpoint:
             eventContinuation?.yield(.healthSyncCompleted(try HealthSyncResponseCodec.decode(frame)))
-            return
-        }
 
-        if frame.endpoint == HealthDataLoggingCodec.endpoint {
+        case HealthDataLoggingCodec.endpoint:
             let result = try healthDataLoggingProcessor.process(frame)
             if let response = result.response { try sendFrame(response, to: peripheral) }
             if !result.samples.isEmpty { eventContinuation?.yield(.healthSamplesReceived(result.samples)) }
-            return
-        }
 
-        if frame.endpoint == TimelineActionCodec.endpoint {
+        case TimelineActionCodec.endpoint:
             let invocation = try TimelineActionCodec.decode(frame)
             eventContinuation?.yield(.timelineActionInvoked(invocation))
             try sendFrame(
                 TimelineActionCodec.responseFrame(itemID: invocation.itemID, succeeded: true),
                 to: peripheral
             )
-            return
-        }
 
-        if frame.endpoint == AppRunStateCodec.endpoint {
+        case AppRunStateCodec.endpoint:
             eventContinuation?.yield(.appRunStateChanged(try AppRunStateCodec.decode(frame)))
-            return
-        }
 
-        if frame.endpoint == ScreenshotCodec.endpoint, screenshot.take(frame) {
-            return
-        }
+        case ScreenshotCodec.endpoint:
+            return screenshot.take(frame)
 
-        if frame.endpoint == LogDumpCodec.endpoint, logDump.take(frame) {
-            return
-        }
+        case LogDumpCodec.endpoint:
+            return logDump.take(frame)
 
-        if frame.endpoint == AppLogCodec.endpoint {
+        case GetBytesCodec.endpoint:
+            return fileBytes.take(frame)
+
+        case AppLogCodec.endpoint:
             let (applicationID, line) = try AppLogCodec.decode(frame)
             eventContinuation?.yield(.applicationLogReceived(applicationID: applicationID, line: line))
-            return
-        }
 
-        if frame.endpoint == GetBytesCodec.endpoint, fileBytes.take(frame) {
-            return
-        }
-
-        if frame.endpoint == ImagingCodec.endpoint {
+        case ImagingCodec.endpoint:
             eventContinuation?.yield(.imageRequested(try ImagingCodec.decode(frame)))
-            return
-        }
 
-        if frame.endpoint == AppMessageCodec.endpoint {
+        case AppMessageCodec.endpoint:
             processAppMessage(frame)
-            return
-        }
 
-        if frame.endpoint == AppReorderCodec.endpoint, appReorderReply.isWaiting {
+        case AppReorderCodec.endpoint:
+            guard appReorderReply.isWaiting else { return false }
             processAppReorderResponse(frame)
-            return
-        }
 
-        if frame.endpoint == PutBytesCodec.endpoint, activeTransferSession != nil {
-            try processPutBytesResponse(frame, peripheral: peripheral)
-            return
-        }
+        case PutBytesCodec.endpoint:
+            return try answerPutBytes(frame, peripheral: peripheral)
 
-        if frame.endpoint == PutBytesCodec.endpoint, pendingInstallCookie != nil {
-            // The install cookie comes back as zero: the firmware answers from
-            // `prv_cleanup_and_send_response`, whose transfer state the
-            // preceding commit already cleared.
-            let response = try PutBytesCodec.decodeResponse(frame)
-            pendingInstallCookie = nil
-            response.result == .acknowledgement
-                ? finishFirmwareControl()
-                : finishFirmwareControl(throwing: PutBytesTransferError.negativeAcknowledgement)
-            return
-        }
-
-        if frame.endpoint == SystemMessageCodec.endpoint, waitingForFirmwareStart {
+        case SystemMessageCodec.endpoint:
+            guard waitingForFirmwareStart else { return false }
             waitingForFirmwareStart = false
             try SystemMessageCodec.decodeFirmwareUpdateStartResponse(frame)
                 ? finishFirmwareControl()
                 : finishFirmwareControl(throwing: SystemMessageCodecError.updateRejected)
-            return
-        }
 
-        if frame.endpoint == BlobDBCodec.endpoint, pendingBlobDBToken != nil {
+        case BlobDBCodec.endpoint:
+            guard pendingBlobDBToken != nil else { return false }
             processBlobDBResponse(frame)
-            return
-        }
 
-        // The watch changes what it reports when a language pack is installed, which
-        // is how the app finds out.
-        if frame.endpoint == WatchVersionCodec.endpoint,
-           pendingDevice == nil,
-           let device = connectedDevice {
+        default:
+            return false
+        }
+        return true
+    }
+
+    private func answerPutBytes(
+        _ frame: PebbleProtocolFrame,
+        peripheral: CBPeripheral
+    ) throws -> Bool {
+        if activeTransferSession != nil {
+            try processPutBytesResponse(frame, peripheral: peripheral)
+            return true
+        }
+        guard pendingInstallCookie != nil else { return false }
+        // The install cookie comes back as zero: the firmware answers from
+        // `prv_cleanup_and_send_response`, whose transfer state the preceding
+        // commit already cleared.
+        let response = try PutBytesCodec.decodeResponse(frame)
+        pendingInstallCookie = nil
+        response.result == .acknowledgement
+            ? finishFirmwareControl()
+            : finishFirmwareControl(throwing: PutBytesTransferError.negativeAcknowledgement)
+        return true
+    }
+
+    private func answerWatchVersion(
+        _ frame: PebbleProtocolFrame,
+        peripheral: CBPeripheral
+    ) throws -> Bool {
+        // The watch changes what it reports when a language pack is installed,
+        // which is how the app finds out.
+        if pendingDevice == nil, let device = connectedDevice {
             clearPendingHealthCheck()
             let information = try WatchVersionCodec.decode(frame)
             var updated = device
@@ -998,19 +1013,10 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             if updated != device {
                 eventContinuation?.yield(.deviceUpdated(updated))
             }
-            return
+            return true
         }
 
-        guard frame.endpoint == WatchVersionCodec.endpoint,
-              pendingDevice != nil else {
-            // The audio endpoint sends fifty of these a second and the app
-            // answers all of them; the session says what it heard in one line.
-            guard frame.endpoint != AudioStreamCodec.endpoint else { return }
-            Task { [frame, tag = clientTag] in
-                await PebbleDiagnostics.shared.recordUnansweredFrame(frame, tag: tag)
-            }
-            return
-        }
+        guard pendingDevice != nil else { return false }
         let information = try WatchVersionCodec.decode(frame)
         Task { [
             tag = clientTag,
@@ -1027,6 +1033,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
         try sendFrame(TimeSynchronizationCodec.frame(), to: peripheral)
         finishConnection(peripheral: peripheral, information: information)
+        return true
     }
 
     private func finishFirmwareControl(throwing error: (any Error)? = nil) {

@@ -5,11 +5,17 @@ public struct PebbleProtocolFrame: Equatable, Sendable {
     public var endpoint: UInt16
     public var payload: [UInt8]
 
-    /// The firmware's meta endpoint replies on endpoint 0 with a reason and the
-    /// endpoint it is refusing, which is how a watch in recovery firmware answers
-    /// anything it does not implement.
+    /// Where the firmware answers for an endpoint rather than from it: a reason
+    /// and the endpoint it is refusing. A watch in recovery firmware answers
+    /// nearly everything here.
+    public static var metaEndpoint: UInt16 { 0 }
+
+    /// The endpoint a refusal on ``metaEndpoint`` was refusing, which is how a
+    /// watch says it does not implement what it was asked for.
     public var rejectedEndpoint: UInt16? {
-        guard endpoint == 0, payload.count >= 3, payload[0] == 0xDC || payload[0] == 0xDD else {
+        guard endpoint == Self.metaEndpoint,
+              payload.count >= 3,
+              payload[0] == 0xDC || payload[0] == 0xDD else {
             return nil
         }
         return UInt16(payload[1]) << 8 | UInt16(payload[2])
