@@ -238,7 +238,7 @@ final class MediaPlayerMusicSource: SystemMusicSource {
 }
 #endif
 
-// macOS and visionOS have no system now-playing API.
+/// For a platform with neither a now-playing API nor a player to ask.
 @MainActor
 final class UnsupportedMusicSource: SystemMusicSource {
     var onChange: (() -> Void)?
@@ -252,6 +252,8 @@ final class UnsupportedMusicSource: SystemMusicSource {
 func makeSystemMusicSource() -> any SystemMusicSource {
     #if os(iOS)
     MediaPlayerMusicSource()
+    #elseif os(macOS)
+    ScriptedMusicSource(runner: AppleScriptRunner())
     #else
     UnsupportedMusicSource()
     #endif

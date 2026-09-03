@@ -19,6 +19,24 @@
         }
       }
     },
+    "NSAppleEventsUsageDescription" : {
+      "comment" : "Privacy - AppleEvents Sending Usage Description",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Pebble asks the Music app what is playing so your watch can show it and control it."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Pebbleは“ミュージック”に現在再生中の曲を問い合わせ、ウォッチに表示し、ウォッチから再生をコントロールできるようにします。"
+          }
+        }
+      }
+    },
     "NSAppleMusicUsageDescription" : {
       "comment" : "Privacy - Media Library Usage Description",
       "extractionState" : "extracted_with_value",
