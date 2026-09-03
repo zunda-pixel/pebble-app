@@ -73,14 +73,10 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     private let appReorderReply = PendingReply<Void>()
     private let appMessages = AppMessageQueue()
     private var healthDataLoggingProcessor = HealthDataLoggingProcessor()
-    private var screenshotCollector: ScreenshotCollector?
-    private let screenshotReply = PendingReply<PebbleScreenshot>()
-    private var logDumpCookie: UInt32?
+    private let screenshot = WatchPull<ScreenshotCollector>(timeout: .seconds(30))
+    private let logDump = WatchPull<LogDumpCollector>(timeout: .seconds(30))
     private var nextLogDumpCookie: UInt32 = 1
-    private var logDumpLines: [WatchLogLine] = []
-    private let logDumpReply = PendingReply<[WatchLogLine]?>()
-    private var getBytesCollector: GetBytesCollector?
-    private let getBytesReply = PendingReply<[UInt8]>()
+    private let fileBytes = WatchPull<GetBytesCollector>(timeout: .seconds(60))
     private var nextGetBytesTransactionID: UInt8 = 1
 
     private let clientTag: String
@@ -92,10 +88,8 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         clientTag = String(restoreIdentifier.split(separator: ".").last ?? "central")
         super.init()
         appMessages.send = { [weak self] data in
-            guard let self, let peripheral = connectedPeripheral, ppogSession != nil else {
-                throw PebbleConnectionError.disconnected
-            }
-            try sendFrame(AppMessageCodec.pushFrame(data), to: peripheral)
+            guard let self else { throw PebbleConnectionError.disconnected }
+            try sendFrame(AppMessageCodec.pushFrame(data), to: try linkedPeripheral())
         }
         observeSystemTimeChanges()
     }
@@ -117,6 +111,17 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         // Watches inspect the phone's GATT database right after connecting, so
         // the phone-hosted protocol service has to exist before that.
         PebbleGattServer.shared.start()
+    }
+
+    /// The watch to write to, once there is a session to write into. A connected
+    /// peripheral is not enough: the transport is not open until the PPoG
+    /// handshake finishes, and anything sent before that is lost rather than
+    /// queued.
+    private func linkedPeripheral() throws -> CBPeripheral {
+        guard let peripheral = connectedPeripheral, ppogSession != nil else {
+            throw PebbleConnectionError.disconnected
+        }
+        return peripheral
     }
 
     /// A locally cancelled link arrives back as a disconnect with no error,
@@ -258,10 +263,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     }
 
     public func send(_ frame: PebbleProtocolFrame) async throws {
-        guard let peripheral = connectedPeripheral,
-              ppogSession != nil else {
-            throw PebbleConnectionError.disconnected
-        }
+        let peripheral = try linkedPeripheral()
         // `sendFrame` records it, and so does every path that reaches the watch
         // without coming through here.
         try sendFrame(frame, to: peripheral)
@@ -282,18 +284,12 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     }
 
     public func synchronizeTime() async throws {
-        guard let peripheral = connectedPeripheral,
-              ppogSession != nil else {
-            throw PebbleConnectionError.disconnected
-        }
+        let peripheral = try linkedPeripheral()
         try sendFrame(TimeSynchronizationCodec.frame(), to: peripheral)
     }
 
     public func reorderApplications(_ applicationIDs: [UUID]) async throws {
-        guard let peripheral = connectedPeripheral,
-              ppogSession != nil else {
-            throw PebbleConnectionError.disconnected
-        }
+        let peripheral = try linkedPeripheral()
         guard !appReorderReply.isWaiting else {
             throw AppReorderClientError.operationAlreadyInProgress
         }
@@ -303,24 +299,17 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     }
 
     public func respondToAppFetch(with status: AppFetchResponseStatus) async throws {
-        guard let peripheral = connectedPeripheral,
-              ppogSession != nil else {
-            throw PebbleConnectionError.disconnected
-        }
+        let peripheral = try linkedPeripheral()
         try sendFrame(AppFetchCodec.responseFrame(status: status), to: peripheral)
     }
 
     public func sendAppMessage(applicationID: UUID, tuples: [AppMessageTuple]) async throws {
-        guard connectedPeripheral != nil, ppogSession != nil else {
-            throw PebbleConnectionError.disconnected
-        }
+        _ = try linkedPeripheral()
         try await appMessages.enqueue(applicationID: applicationID, tuples: tuples)
     }
 
     public func respondToAppMessage(transactionID: UInt8, acknowledged: Bool) async throws {
-        guard let peripheral = connectedPeripheral, ppogSession != nil else {
-            throw PebbleConnectionError.disconnected
-        }
+        let peripheral = try linkedPeripheral()
         try sendFrame(
             AppMessageCodec.resultFrame(transactionID: transactionID, acknowledged: acknowledged),
             to: peripheral
@@ -391,10 +380,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         filename: String?
     ) async throws {
         completedTransferCookie = nil
-        guard let peripheral = connectedPeripheral,
-              ppogSession != nil else {
-            throw PebbleConnectionError.disconnected
-        }
+        let peripheral = try linkedPeripheral()
         guard activeTransferSession == nil else {
             throw PutBytesClientError.transferAlreadyInProgress
         }
@@ -551,34 +537,25 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     }
 
     public func takeScreenshot() async throws -> PebbleScreenshot {
-        guard let peripheral = connectedPeripheral, ppogSession != nil else {
-            throw PebbleConnectionError.disconnected
-        }
-        guard !screenshotReply.isWaiting else {
-            throw WatchPullError.operationAlreadyInProgress
-        }
-        screenshotCollector = ScreenshotCollector()
-        return try await screenshotReply.wait(timeout: .seconds(30)) {
+        let peripheral = try linkedPeripheral()
+        return try await screenshot.run(collecting: ScreenshotCollector()) {
             try sendFrame(ScreenshotCodec.requestFrame(), to: peripheral)
         }
     }
 
     public func readLogGeneration(_ generation: UInt8) async throws -> [WatchLogLine]? {
-        guard let peripheral = connectedPeripheral, ppogSession != nil else {
-            throw PebbleConnectionError.disconnected
-        }
-        guard !logDumpReply.isWaiting else {
-            throw WatchPullError.operationAlreadyInProgress
-        }
+        let peripheral = try linkedPeripheral()
         let cookie = nextLogDumpCookie
         nextLogDumpCookie &+= 1
-        logDumpCookie = cookie
-        logDumpLines = []
-        return try await logDumpReply.wait(timeout: .seconds(30)) {
+        let dump = try await logDump.run(collecting: LogDumpCollector(cookie: cookie)) {
             try sendFrame(
                 LogDumpCodec.requestFrame(generation: generation, cookie: cookie),
                 to: peripheral
             )
+        }
+        switch dump {
+        case .lines(let lines): return lines
+        case .noLogs: return nil
         }
     }
 
@@ -587,19 +564,12 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     }
 
     public func getBytes(_ request: GetBytesRequest) async throws -> [UInt8] {
-        guard let peripheral = connectedPeripheral, ppogSession != nil else {
-            throw PebbleConnectionError.disconnected
-        }
-        guard !getBytesReply.isWaiting else {
-            throw WatchPullError.operationAlreadyInProgress
-        }
+        let peripheral = try linkedPeripheral()
         let transactionID = nextGetBytesTransactionID
         nextGetBytesTransactionID &+= 1
-        getBytesCollector = GetBytesCollector(transactionID: transactionID)
-        // A coredump is a hundred kilobytes over a link that manages a few of
-        // them a second, so this waits for the watch to go quiet rather than for
-        // the whole thing.
-        return try await getBytesReply.wait(timeout: .seconds(60)) {
+        return try await fileBytes.run(
+            collecting: GetBytesCollector(transactionID: transactionID)
+        ) {
             try sendFrame(
                 GetBytesCodec.requestFrame(request, transactionID: transactionID),
                 to: peripheral
@@ -608,25 +578,9 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     }
 
     private func failPulls(_ error: any Error) {
-        finishScreenshot(.failure(error))
-        finishLogDump(.failure(error))
-        finishGetBytes(.failure(error))
-    }
-
-    private func finishScreenshot(_ result: Result<PebbleScreenshot, any Error>) {
-        screenshotCollector = nil
-        screenshotReply.resume(with: result)
-    }
-
-    private func finishLogDump(_ result: Result<[WatchLogLine]?, any Error>) {
-        logDumpCookie = nil
-        logDumpLines = []
-        logDumpReply.resume(with: result)
-    }
-
-    private func finishGetBytes(_ result: Result<[UInt8], any Error>) {
-        getBytesCollector = nil
-        getBytesReply.resume(with: result)
+        screenshot.finish(.failure(error))
+        logDump.finish(.failure(error))
+        fileBytes.finish(.failure(error))
     }
 
     public func writeWeatherLocationOrder(_ orderedIDs: [UUID]) async throws {
@@ -650,10 +604,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         // report that the watch had refused it.
         try await blobDBQueue.begin()
         defer { blobDBQueue.finish() }
-        guard let peripheral = connectedPeripheral,
-              ppogSession != nil else {
-            throw PebbleConnectionError.disconnected
-        }
+        let peripheral = try linkedPeripheral()
 
         let token = nextBlobDBToken
         nextBlobDBToken &+= 1
@@ -961,31 +912,11 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             return
         }
 
-        if frame.endpoint == ScreenshotCodec.endpoint, screenshotCollector != nil {
-            do {
-                if let screenshot = try screenshotCollector?.accept(frame) {
-                    finishScreenshot(.success(screenshot))
-                } else {
-                    screenshotReply.extendDeadline(.seconds(30))
-                }
-            } catch {
-                finishScreenshot(.failure(error))
-            }
+        if frame.endpoint == ScreenshotCodec.endpoint, screenshot.take(frame) {
             return
         }
 
-        if frame.endpoint == LogDumpCodec.endpoint, let cookie = logDumpCookie {
-            switch try LogDumpCodec.decode(frame, cookie: cookie) {
-            case .line(let line):
-                logDumpLines.append(line)
-                logDumpReply.extendDeadline(.seconds(30))
-            case .done:
-                finishLogDump(.success(logDumpLines))
-            case .noLogs:
-                finishLogDump(.success(nil))
-            case nil:
-                break
-            }
+        if frame.endpoint == LogDumpCodec.endpoint, logDump.take(frame) {
             return
         }
 
@@ -995,16 +926,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             return
         }
 
-        if frame.endpoint == GetBytesCodec.endpoint, getBytesCollector != nil {
-            do {
-                if let bytes = try getBytesCollector?.accept(frame) {
-                    finishGetBytes(.success(bytes))
-                } else {
-                    getBytesReply.extendDeadline(.seconds(60))
-                }
-            } catch {
-                finishGetBytes(.failure(error))
-            }
+        if frame.endpoint == GetBytesCodec.endpoint, fileBytes.take(frame) {
             return
         }
 

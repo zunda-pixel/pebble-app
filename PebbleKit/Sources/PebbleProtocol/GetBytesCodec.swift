@@ -36,7 +36,7 @@ public enum GetBytesCodec {
     }
 }
 
-public struct GetBytesCollector: Sendable {
+public struct GetBytesCollector: WatchPullCollector {
     private let transactionID: UInt8
     private var expectedByteCount: Int?
     private var bytes: [UInt8] = []

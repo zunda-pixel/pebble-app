@@ -93,6 +93,36 @@ public enum LogDumpCodec {
     }
 }
 
+/// What a generation held. A watch with nothing to send says so rather than
+/// sending an empty dump, and the difference is worth keeping.
+public enum LogDump: Equatable, Sendable {
+    case lines([WatchLogLine])
+    case noLogs
+}
+
+public struct LogDumpCollector: WatchPullCollector {
+    private let cookie: UInt32
+    private var lines: [WatchLogLine] = []
+
+    public init(cookie: UInt32) {
+        self.cookie = cookie
+    }
+
+    public mutating func accept(_ frame: PebbleProtocolFrame) throws -> LogDump? {
+        switch try LogDumpCodec.decode(frame, cookie: cookie) {
+        case .line(let line):
+            lines.append(line)
+            return nil
+        case .done:
+            return .lines(lines)
+        case .noLogs:
+            return .noLogs
+        case nil:
+            return nil
+        }
+    }
+}
+
 public enum AppLogCodec {
     public static var endpoint: UInt16 { 2_006 }
 

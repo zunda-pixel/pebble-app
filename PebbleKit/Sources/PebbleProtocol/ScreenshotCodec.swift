@@ -18,7 +18,7 @@ public enum ScreenshotCodec {
 
 /// There is no marker on the last packet, so the pixels are counted against
 /// the size in the header.
-public struct ScreenshotCollector: Sendable {
+public struct ScreenshotCollector: WatchPullCollector {
     /// One bit a pixel on a black and white screen, one byte on a colour one.
     enum Depth: UInt32 {
         case blackAndWhite = 1
