@@ -82,7 +82,14 @@ struct AddWatchSheet: View {
     // everything the app then sends it has been sent.
     @State private var watchBeingAdded: String?
 
+    /// Asked of the watch that was tapped rather than of `connectionState`: this
+    /// sheet scans in a loop the whole time it is open, and a scan in progress
+    /// outranks a failure there — which is how a refused connect came to leave
+    /// the screen exactly as it was.
     private var connectionErrorMessage: LocalizedStringKey? {
+        if let watchBeingAdded, let failure = model.connectionFailures[watchBeingAdded] {
+            return failure.message
+        }
         guard case .failed(let error) = model.connectionState else { return nil }
         return error.message
     }

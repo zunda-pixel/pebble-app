@@ -83,6 +83,21 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
         didFailToConnect peripheral: CBPeripheral,
         error: (any Error)?
     ) {
+        let reason = Self.connectionError(from: error)
+        Task { [tag = clientTag, described = error.map { String(describing: $0) } ?? "none"] in
+            await PebbleDiagnostics.shared.record(
+                .warning,
+                category: "pairing",
+                message: "[\(tag)] the connect attempt was refused: \(described)"
+            )
+        }
+        // A bond only the phone still has is not something another attempt, or
+        // dropping the notification requirement, can get past.
+        guard reason != .pairingRemovedByWatch else {
+            reconnects.stop()
+            failConnection(reason)
+            return
+        }
         if retryWithoutNotificationAccess(peripheral) {
             return
         }
@@ -91,7 +106,20 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
             scheduleReconnect(to: device, using: peripheral)
             return
         }
-        failConnection(.connectionFailed)
+        failConnection(reason)
+    }
+
+    /// What CoreBluetooth refused a connect for, where it says something the
+    /// reader can act on.
+    private static func connectionError(from error: (any Error)?) -> PebbleConnectionError {
+        guard let error = error as? NSError, error.domain == CBErrorDomain else {
+            return .connectionFailed
+        }
+        return switch CBError.Code(rawValue: error.code) {
+        case .peerRemovedPairingInformation: .pairingRemovedByWatch
+        case .connectionTimeout: .connectionTimedOut
+        default: .connectionFailed
+        }
     }
 
     public func centralManager(

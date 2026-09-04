@@ -58,13 +58,16 @@ public enum PebbleConnectionError: Error, Equatable, Sendable {
     /// The link kept coming up and the handshake kept dying, so the app stopped
     /// chasing the watch. Only a person can do anything about this one.
     case handshakeKeptFailing
+    /// The phone is holding a bond the watch has thrown away, so every connect
+    /// fails at encryption. Nothing here can clear the phone's side of it.
+    case pairingRemovedByWatch
 
     /// A link that is gone, or a radio that is off, will not come back
     /// within the few hundred milliseconds a retry waits.
     public var isWorthAnotherAttempt: Bool {
         switch self {
         case .bluetoothUnavailable, .bluetoothUnsupported, .permissionDenied, .disconnected,
-             .handshakeKeptFailing:
+             .handshakeKeptFailing, .pairingRemovedByWatch:
             false
         case .scanAlreadyInProgress, .deviceNotFound, .connectionAlreadyInProgress,
              .connectionFailed, .connectionTimedOut, .protocolNegotiationFailed:

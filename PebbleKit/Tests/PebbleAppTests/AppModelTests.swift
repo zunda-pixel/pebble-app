@@ -735,6 +735,29 @@ struct AppModelTests {
     }
 
     @Test
+    func aFailureIsKeptAgainstTheWatchWhileAScanIsStillRunning() async throws {
+        let client = MockPebbleClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: client,
+            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        )
+        let watch = DiscoveredPebble(id: "mock-emery", name: "My Pebble", model: .pebbleTime2, signalStrength: -50)
+        client.connectionFailure = .pairingRemovedByWatch
+        model.isScanning = true
+
+        await model.connect(to: watch)
+
+        // The Add Watch sheet scans the whole time it is open, and a scan in
+        // progress is the state it reports; the failure has to be readable
+        // beside it or the screen says nothing about a refused connect.
+        #expect(model.connectionState == .scanning)
+        #expect(model.connectionFailures[watch.id] == .pairingRemovedByWatch)
+    }
+
+    @Test
     func appModelRejectsAppMessageForUnknownApplication() async throws {
         let client = MockPebbleClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
