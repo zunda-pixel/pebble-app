@@ -4861,6 +4861,16 @@
         }
       }
     },
+    "The watch ended the connection. A Pebble talks to one phone or computer at a time, and gives itself to whichever asked last, so another device connecting takes it from this one. Connect again here to take it back." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチが接続を終了しました。Pebbleは一度に1台のiPhoneまたはコンピュータとしか通信せず、最後に接続してきた側に切り替わるため、ほかのデバイスが接続するとこのデバイスからは切断されます。こちらに戻すには、もう一度接続してください。"
+          }
+        }
+      }
+    },
     "The watch has a logo of its own for the apps it knows. Choosing one here is for the ones it does not." : {
       "localizations" : {
         "ja" : {

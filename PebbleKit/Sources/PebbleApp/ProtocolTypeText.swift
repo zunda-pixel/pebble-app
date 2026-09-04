@@ -29,6 +29,8 @@ public extension PebbleConnectionError {
             "The watch disconnected."
         case .handshakeKeptFailing:
             "This watch connects but does not answer. Restart it, or forget it here and add it again."
+        case .sessionClosedByWatch:
+            "The watch ended the connection. A Pebble talks to one phone or computer at a time, and gives itself to whichever asked last, so another device connecting takes it from this one. Connect again here to take it back."
         case .pairingRemovedByWatch:
             "The connection failed: the watch has forgotten this phone, and the phone still holds the old pairing. Forget the watch in the system Bluetooth settings, then add it again here."
         }
