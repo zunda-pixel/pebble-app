@@ -44,6 +44,12 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
         if setup.pairing == .unknown {
             if let pairingService = services.first(where: { $0.uuid == Self.pairingService }) {
                 setup.noteCheckingPairing()
+                Task { [tag = clientTag] in
+                    await PebbleDiagnostics.shared.record(
+                        category: "pairing",
+                        message: "[\(tag)] asking the pairing service what it has"
+                    )
+                }
                 peripheral.discoverCharacteristics(
                     [
                         Self.connectivityCharacteristic,
@@ -53,6 +59,12 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
                     for: pairingService
                 )
             } else {
+                Task { [tag = clientTag] in
+                    await PebbleDiagnostics.shared.record(
+                        category: "pairing",
+                        message: "[\(tag)] no pairing service; taking the link as bonded"
+                    )
+                }
                 setup.noteNoPairingService()
             }
         }
@@ -103,9 +115,26 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
         }
 
         if service.uuid == Self.pairingService {
+            Task { [
+                tag = clientTag,
+                uuids = (service.characteristics ?? []).map(\.uuid.uuidString),
+                described = error.map { String(describing: $0) } ?? "none"
+            ] in
+                await PebbleDiagnostics.shared.record(
+                    category: "pairing",
+                    message: "[\(tag)] the pairing service has [\(uuids.joined(separator: ","))] error=\(described)"
+                )
+            }
             guard error == nil,
                   let characteristics = service.characteristics,
                   let connectivity = characteristics.first(where: { $0.uuid == Self.connectivityCharacteristic }) else {
+                Task { [tag = clientTag] in
+                    await PebbleDiagnostics.shared.record(
+                        .warning,
+                        category: "pairing",
+                        message: "[\(tag)] no connectivity characteristic; taking the link as bonded"
+                    )
+                }
                 setup.noteNoPairingService()
                 startProtocolIfReady(on: peripheral)
                 return
@@ -126,6 +155,15 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
             }
             if connectivity.properties.contains(.notify) || connectivity.properties.contains(.indicate) {
                 peripheral.setNotifyValue(true, for: connectivity)
+            }
+            // Reading this is what asks for the bond, and the answer arrives at
+            // `handleConnectivity`. Nothing between the two is the watch not
+            // answering, or the system not asking.
+            Task { [tag = clientTag] in
+                await PebbleDiagnostics.shared.record(
+                    category: "pairing",
+                    message: "[\(tag)] reading the watch's pairing state"
+                )
             }
             peripheral.readValue(for: connectivity)
             return
@@ -382,6 +420,15 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
 
         if characteristic.uuid == Self.connectivityCharacteristic {
             guard error == nil, let value = characteristic.value else {
+                // Reading this needs the link encrypted, so a refusal here is
+                // the bond being refused rather than a characteristic problem.
+                Task { [tag = clientTag, described = error.map { String(describing: $0) } ?? "it was empty"] in
+                    await PebbleDiagnostics.shared.record(
+                        .warning,
+                        category: "pairing",
+                        message: "[\(tag)] the watch's pairing state could not be read: \(described)"
+                    )
+                }
                 return
             }
             handleConnectivity([UInt8](value), on: peripheral)
