@@ -165,6 +165,8 @@ struct ApplicationsContent: View {
     var activateWatchface: (PebbleApplication) -> Void
     var toggleFavoriteWatchface: (PebbleApplication) -> Void
 
+    @State private var applicationToRemove: PebbleApplication?
+
     var body: some View {
         if isLoading && watchApplications.isEmpty && watchfaces.isEmpty {
             List(0..<3, id: \.self) { _ in
@@ -192,46 +194,74 @@ struct ApplicationsContent: View {
                     errorMessage: errorMessage
                 )
                 List {
-                    if !watchApplications.isEmpty {
+                    // Each section carries the kind it is for as its identity.
+                    // Written as two `if`s, removing the last watch app left the
+                    // watchfaces standing where the watch apps had been, and
+                    // SwiftUI told UIKit a row had gone from a section that
+                    // still had one — which UIKit threw over. A section that can
+                    // be told apart moves instead of being rewritten.
+                    ForEach(groups) { group in
                         ApplicationSection(
-                            title: "Watch Apps",
-                            applications: watchApplications,
+                            title: group.title,
+                            applications: group.applications,
                             activeWatchfaceID: activeWatchfaceID,
                             favoriteWatchfaceIDs: favoriteWatchfaceIDs,
                             installedApplicationIDs: installedApplicationIDs,
                             isOperationInProgress: isOperationInProgress,
-                            removeApplication: removeApplication,
+                            requestRemoval: { applicationToRemove = $0 },
                             configureApplication: configureApplication,
                             editGlance: editGlance,
                             activateWatchface: activateWatchface,
                             toggleFavoriteWatchface: toggleFavoriteWatchface,
                             moveApplications: { offsets, destination in
-                                reorderApplications(.watchapp, offsets, destination)
-                            }
-                        )
-                    }
-                    if !watchfaces.isEmpty {
-                        ApplicationSection(
-                            title: "Watchfaces",
-                            applications: watchfaces,
-                            activeWatchfaceID: activeWatchfaceID,
-                            favoriteWatchfaceIDs: favoriteWatchfaceIDs,
-                            installedApplicationIDs: installedApplicationIDs,
-                            isOperationInProgress: isOperationInProgress,
-                            removeApplication: removeApplication,
-                            configureApplication: configureApplication,
-                            editGlance: editGlance,
-                            activateWatchface: activateWatchface,
-                            toggleFavoriteWatchface: toggleFavoriteWatchface,
-                            moveApplications: { offsets, destination in
-                                reorderApplications(.watchface, offsets, destination)
+                                reorderApplications(group.kind, offsets, destination)
                             }
                         )
                     }
                 }
+                // An alert, and one for the whole list rather than one per row.
+                // A confirmation dialog is anchored, and a swiped row is already
+                // gone by the time it would be asked about, so there is nothing
+                // left to anchor to; a dialog per row also meant the second row
+                // swiped was refused its own ("already presenting").
+                .alert(
+                    Text("Remove \(applicationToRemove?.displayName ?? "")?"),
+                    isPresented: Binding(
+                        get: { applicationToRemove != nil },
+                        set: { presented in
+                            if !presented { applicationToRemove = nil }
+                        }
+                    ),
+                    presenting: applicationToRemove
+                ) { application in
+                    Button("Remove Application", role: .destructive) {
+                        removeApplication(application.id)
+                    }
+                    Button(role: .cancel) {}
+                } message: { _ in
+                    Text("The application and its settings will be removed. A Pebble that is not connected is told the next time it is.")
+                }
             }
         }
     }
+
+    private var groups: [ApplicationGroup] {
+        [
+            ApplicationGroup(kind: .watchapp, title: "Watch Apps", applications: watchApplications),
+            ApplicationGroup(kind: .watchface, title: "Watchfaces", applications: watchfaces),
+        ]
+        .filter { !$0.applications.isEmpty }
+    }
+}
+
+/// One of the list's sections, as something the list can tell apart from the
+/// other by what it holds rather than by where it sits.
+private struct ApplicationGroup: Identifiable {
+    var kind: PebbleApplicationKind
+    var title: LocalizedStringKey
+    var applications: [PebbleApplication]
+
+    var id: PebbleApplicationKind { kind }
 }
 
 /// What the library is in the middle of, and what went wrong doing it.
@@ -306,7 +336,7 @@ struct ApplicationSection: View {
     var favoriteWatchfaceIDs: Set<UUID>
     var installedApplicationIDs: Set<UUID>?
     var isOperationInProgress: Bool
-    var removeApplication: (UUID) -> Void
+    var requestRemoval: (PebbleApplication) -> Void
     var configureApplication: (PebbleApplication) -> Void
     var editGlance: (PebbleApplication) -> Void
     var activateWatchface: (PebbleApplication) -> Void
@@ -322,7 +352,7 @@ struct ApplicationSection: View {
                     isFavorite: favoriteWatchfaceIDs.contains(application.id),
                     isInstalled: installedApplicationIDs.map { $0.contains(application.id) },
                     isOperationInProgress: isOperationInProgress,
-                    removeApplication: { removeApplication(application.id) },
+                    requestRemoval: { requestRemoval(application) },
                     configureApplication: { configureApplication(application) },
                     editGlance: { editGlance(application) },
                     activateWatchface: { activateWatchface(application) },
@@ -341,13 +371,11 @@ struct ApplicationListRow: View {
     var isFavorite: Bool
     var isInstalled: Bool?
     var isOperationInProgress: Bool
-    var removeApplication: () -> Void
+    var requestRemoval: () -> Void
     var configureApplication: () -> Void
     var editGlance: () -> Void
     var activateWatchface: () -> Void
     var toggleFavoriteWatchface: () -> Void
-
-    @State private var isConfirmingRemoval = false
 
     var body: some View {
         ApplicationRow(
@@ -363,11 +391,14 @@ struct ApplicationListRow: View {
             activate: activateWatchface,
             toggleFavorite: toggleFavoriteWatchface
         )
+        // Red, but not `role: .destructive`: that role takes the row out of the
+        // list by itself, and the library still had the application until the
+        // alert was answered — a row deleted from under a count that had not
+        // changed is exactly what UIKit threw over.
         .swipeActions {
-            Button("Remove", role: .destructive) {
-                isConfirmingRemoval = true
-            }
-            .disabled(isOperationInProgress)
+            Button("Remove", action: requestRemoval)
+                .tint(.red)
+                .disabled(isOperationInProgress)
         }
         .contextMenu {
             if application.isConfigurable {
@@ -386,20 +417,8 @@ struct ApplicationListRow: View {
                 )
             }
             Divider()
-            Button("Remove", systemImage: "trash", role: .destructive) {
-                isConfirmingRemoval = true
-            }
-            .disabled(isOperationInProgress)
-        }
-        .confirmationDialog(
-            Text("Remove \(application.displayName)?"),
-            isPresented: $isConfirmingRemoval,
-            titleVisibility: .visible
-        ) {
-            Button("Remove Application", role: .destructive, action: removeApplication)
-            Button(role: .cancel) {}
-        } message: {
-            Text("The application and its settings will be removed. A Pebble that is not connected is told the next time it is.")
+            Button("Remove", systemImage: "trash", role: .destructive, action: requestRemoval)
+                .disabled(isOperationInProgress)
         }
     }
 }
