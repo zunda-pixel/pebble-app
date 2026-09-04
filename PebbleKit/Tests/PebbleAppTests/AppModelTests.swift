@@ -94,7 +94,7 @@ struct AppModelTests {
         // The keys were string literals repeated across the files that read
         // them, which is how the same preference came to be read two ways.
         #expect(Defaults.Keys.companionNotificationsEnabled.defaultValue)
-        #expect(!Defaults.Keys.hasCompletedOnboarding.defaultValue)
+        #expect(!Defaults.Keys.hasCompletedWatchSetup.defaultValue)
         #expect(Defaults.Keys.favoriteWatchfaceIDs.defaultValue.isEmpty)
         #expect(Defaults.Keys.activeWatchfaceID.defaultValue == nil)
         #expect(Defaults.Keys.catalogSource.defaultValue == nil)

@@ -219,16 +219,6 @@ struct SettingsContent<WeatherDestination: View, NotificationAppsDestination: Vi
             Text(name)
         }
     }
-
-    private func openPrivacySettings() {
-#if os(macOS)
-        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy") else { return }
-        NSWorkspace.shared.open(url)
-#elseif os(iOS)
-        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
-        UIApplication.shared.open(url)
-#endif
-    }
 }
 
 #Preview("Settings") {

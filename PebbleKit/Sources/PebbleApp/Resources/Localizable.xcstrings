@@ -147,6 +147,16 @@
         }
       }
     },
+    "%@ is connected" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%@が接続されました"
+          }
+        }
+      }
+    },
     "%@ is installed. The watch switches to it now." : {
       "localizations" : {
         "ja" : {
@@ -275,6 +285,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "24時間表示"
+          }
+        }
+      }
+    },
+    "A few things are needed before it can show your day, your reminders, and the weather. Each one is asked for on its own screen, and any of them can wait." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "予定、リマインダー、天気をウォッチに表示するには、いくつかの許可が必要です。1画面につき1つずつ確認しますが、どれもあとにできます。"
           }
         }
       }
@@ -599,7 +619,18 @@
         }
       }
     },
+    "Allow" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "許可"
+          }
+        }
+      }
+    },
     "Allow Bluetooth access when requested." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -675,6 +706,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "別のウォッチへの接続がすでに進行中です。"
+          }
+        }
+      }
+    },
+    "Anything left unanswered can be granted later in Settings, which also shows what this app has been allowed to read." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "答えなかった項目は、あとから“設定”で許可できます。“設定”には、このアプリが読み取りを許可されている項目も表示されます。"
           }
         }
       }
@@ -1090,6 +1131,7 @@
       }
     },
     "Choose Devices, then Scan to connect." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -1360,6 +1402,7 @@
       }
     },
     "Connect your Pebble, install watch apps, and keep timeline and health data synchronized." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -1445,6 +1488,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このウォッチに接続します"
+          }
+        }
+      }
+    },
+    "Continue" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "続ける"
           }
         }
       }
@@ -1779,6 +1832,16 @@
         }
       }
     },
+    "Events become timeline pins on the watch, so the day ahead is on your wrist." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "カレンダーの予定がウォッチのタイムラインピンになり、この先の予定を手元で確認できます。"
+          }
+        }
+      }
+    },
     "Every 10 Minutes" : {
       "localizations" : {
         "ja" : {
@@ -2070,6 +2133,7 @@
       }
     },
     "Get Started" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -2479,6 +2543,16 @@
         }
       }
     },
+    "It started its recovery firmware, which can do one thing: take a new copy of PebbleOS. Everything else comes back once that is installed." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リカバリファームウェアで起動しています。この状態でできることは、PebbleOSの新しいコピーを受け取ることだけです。インストールが終われば、ほかの機能も元に戻ります。"
+          }
+        }
+      }
+    },
     "Keep the watch nearby until this finishes." : {
       "localizations" : {
         "ja" : {
@@ -2515,6 +2589,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最終記録 %@"
+          }
+        }
+      }
+    },
+    "Later" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "あとで"
           }
         }
       }
@@ -3609,6 +3693,16 @@
         }
       }
     },
+    "Reminders are sent to the watch's own reminder app, which buzzes when one is due." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リマインダーはウォッチのリマインダーアプリに送信され、時間になると振動でお知らせします。"
+          }
+        }
+      }
+    },
     "Remove" : {
       "localizations" : {
         "ja" : {
@@ -3849,6 +3943,16 @@
         }
       }
     },
+    "Set Up %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%@を設定"
+          }
+        }
+      }
+    },
     "Setting up connection…" : {
       "localizations" : {
         "ja" : {
@@ -3875,6 +3979,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "設定を利用できません"
+          }
+        }
+      }
+    },
+    "Setup Complete" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "設定が完了しました"
           }
         }
       }
@@ -4045,6 +4159,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "歩数"
+          }
+        }
+      }
+    },
+    "Steps and sleep the watch recorded are written to Health, and what the phone recorded is shown next to them." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチが記録した歩数と睡眠を“ヘルスケア”に書き込み、iPhoneが記録したデータと並べて表示します。"
           }
         }
       }
@@ -5376,6 +5500,7 @@
       }
     },
     "Turn on your Pebble and keep it nearby." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -5715,6 +5840,16 @@
         }
       }
     },
+    "Weather for where the phone is, rather than a place typed in by hand." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "手入力した地点ではなく、iPhoneがある場所の天気を表示します。"
+          }
+        }
+      }
+    },
     "Week" : {
       "localizations" : {
         "ja" : {
@@ -5756,6 +5891,7 @@
       }
     },
     "Welcome to Pebble" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {

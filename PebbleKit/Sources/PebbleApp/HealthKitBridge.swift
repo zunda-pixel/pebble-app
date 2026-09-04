@@ -19,6 +19,23 @@ final class HealthKitBridge {
         case onlyWhatIsAlreadyGranted
     }
 
+    /// Asks for everything the app ever uses, for the setup flow: HealthKit puts
+    /// one sheet up per request, and the reader should see it once.
+    func requestAuthorization() async throws {
+        guard HKHealthStore.isHealthDataAvailable(),
+              let stepsType = HKQuantityType.quantityType(forIdentifier: .stepCount),
+              let sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) else {
+            throw HealthKitBridgeError.unavailable
+        }
+        let effortTypes = EffortMeasure.allCases.compactMap {
+            HKQuantityType.quantityType(forIdentifier: $0.identifier) as HKObjectType?
+        }
+        try await store.requestAuthorization(
+            toShare: [stepsType, sleepType],
+            read: Set([stepsType, sleepType] as [HKObjectType] + effortTypes)
+        )
+    }
+
     func synchronize(
         _ samples: [PebbleHealthSample],
         authorization: Authorization = .mayAsk

@@ -24,6 +24,13 @@ protocol RemindersAppStore {
     func add(_ reminder: PebbleTimelinePin) async throws -> String
     func update(_ reminder: PebbleTimelinePin, identifier: String) async throws
     func remove(identifier: String) async throws
+    /// Asks without reading anything, for the setup flow.
+    func requestAccess() async throws
+}
+
+extension RemindersAppStore {
+    // A store that needs nobody's permission is already usable.
+    func requestAccess() async throws {}
 }
 
 @MainActor
@@ -34,6 +41,12 @@ final class RemindersBridge: RemindersAppStore {
     /// the watch keeps a window around the present and refuses what is outside
     /// it, so a reminder for next year is one to read again nearer the time.
     private static var window: TimeInterval { 30 * 24 * 60 * 60 }
+
+    func requestAccess() async throws {
+        guard try await store.requestFullAccessToReminders() else {
+            throw RemindersBridgeError.accessDenied
+        }
+    }
 
     func reminders() async throws -> [RemindersAppItem] {
         guard try await store.requestFullAccessToReminders() else {

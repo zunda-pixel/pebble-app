@@ -118,7 +118,8 @@ public enum AppSection: String, CaseIterable, Identifiable {
 
 struct AppRootView: View {
     var model: AppModel
-    @Default(.hasCompletedOnboarding) private var hasCompletedOnboarding
+    @Default(.hasCompletedWatchSetup) private var hasCompletedWatchSetup
+    @State private var setup: WatchSetupContext?
 
     var body: some View {
         Group {
@@ -128,12 +129,19 @@ struct AppRootView: View {
             IOSRootView(model: model)
 #endif
         }
-        .sheet(isPresented: Binding(
-            get: { !hasCompletedOnboarding },
-            set: { if !$0 { hasCompletedOnboarding = true } }
-        )) {
-            OnboardingView {
-                hasCompletedOnboarding = true
+        // The permissions are read here rather than in the sheet, so that the
+        // steps cannot be decided before the answers are known.
+        .onChange(of: model.connections.filter(\.isConnected).map(\.device.id)) { _, connectedIDs in
+            guard !hasCompletedWatchSetup, setup == nil, let watchID = connectedIDs.first else {
+                return
+            }
+            setup = WatchSetupContext(watchID: watchID, permissions: .current())
+        }
+        // Asked once, however it was left: Settings is where the rest of the
+        // answers live.
+        .sheet(item: $setup, onDismiss: { hasCompletedWatchSetup = true }) { context in
+            WatchSetupSheet(model: model, context: context) {
+                setup = nil
             }
         }
     }
@@ -199,34 +207,6 @@ struct IOSRootView: View {
     }
 }
 #endif
-
-struct OnboardingView: View {
-    var complete: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Label("Welcome to Pebble", systemImage: "applewatch")
-                .font(.largeTitle)
-                .accessibilityAddTraits(.isHeader)
-            Text("Connect your Pebble, install watch apps, and keep timeline and health data synchronized.")
-                .font(.body)
-            VStack(alignment: .leading, spacing: 12) {
-                Label("Turn on your Pebble and keep it nearby.", systemImage: "1.circle")
-                Label("Allow Bluetooth access when requested.", systemImage: "2.circle")
-                Label("Choose Devices, then Scan to connect.", systemImage: "3.circle")
-            }
-            .accessibilityElement(children: .contain)
-            HStack {
-                Spacer()
-                Button("Get Started", action: complete)
-                    .buttonStyle(.borderedProminent)
-                    .keyboardShortcut(.defaultAction)
-            }
-        }
-        .padding(24)
-        .frame(minWidth: 420, idealWidth: 520)
-    }
-}
 
 struct ConnectionStatusBanner: View {
     var state: PebbleConnectionState
@@ -300,10 +280,6 @@ struct SectionContent: View {
 
 #Preview("Connected") {
     ConnectionStatusBanner(state: .connected(PreviewSamples.watch))
-}
-
-#Preview("Onboarding") {
-    OnboardingView {}
 }
 
 #Preview("Root") {

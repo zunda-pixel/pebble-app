@@ -36,6 +36,65 @@ public enum PhonePermissionState: Equatable, Sendable {
     var isSettled: Bool { self == .allowed }
 }
 
+/// One thing this app has to be allowed to read, as something the setup flow can
+/// hold and ask for.
+///
+/// Bluetooth is not among them: a watch cannot have connected without it.
+public enum PhonePermissionKind: String, CaseIterable, Identifiable, Sendable {
+    case calendar
+    case reminders
+    case location
+    case health
+
+    public var id: Self { self }
+
+    /// In the order setup asks for them, leaving out what this platform has no
+    /// answer for.
+    public static var asked: [Self] {
+        #if os(iOS)
+        [.calendar, .reminders, .location, .health]
+        #else
+        [.calendar, .reminders, .location]
+        #endif
+    }
+
+    var title: LocalizedStringKey {
+        switch self {
+        case .calendar: "Calendar"
+        case .reminders: "Reminders"
+        case .location: "Location"
+        case .health: "Health"
+        }
+    }
+
+    var explanation: LocalizedStringKey {
+        switch self {
+        case .calendar: "Events become timeline pins on the watch, so the day ahead is on your wrist."
+        case .reminders: "Reminders are sent to the watch's own reminder app, which buzzes when one is due."
+        case .location: "Weather for where the phone is, rather than a place typed in by hand."
+        case .health: "Steps and sleep the watch recorded are written to Health, and what the phone recorded is shown next to them."
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .calendar: "calendar"
+        case .reminders: "checklist"
+        case .location: "location"
+        case .health: "heart"
+        }
+    }
+
+    func state(in permissions: PhonePermissions) -> PhonePermissionState {
+        switch self {
+        case .calendar: permissions.calendar
+        case .reminders: permissions.reminders
+        case .location: permissions.location
+        case .health: permissions.health
+        }
+    }
+}
+
 @MemberwiseInit(.public)
 public struct PhonePermissions: Equatable, Sendable {
     public var bluetooth: PhonePermissionState = .notDetermined
@@ -110,4 +169,17 @@ public struct PhonePermissions: Equatable, Sendable {
         return .unavailable
         #endif
     }
+}
+
+/// The system's own privacy settings, which is the only place a refusal can be
+/// taken back: asking again after one does nothing at all.
+@MainActor
+func openPrivacySettings() {
+#if os(macOS)
+    guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy") else { return }
+    NSWorkspace.shared.open(url)
+#elseif os(iOS)
+    guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+    UIApplication.shared.open(url)
+#endif
 }

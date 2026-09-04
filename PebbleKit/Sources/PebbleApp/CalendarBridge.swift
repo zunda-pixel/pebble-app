@@ -7,6 +7,12 @@ import Foundation
 final class CalendarBridge {
     private var store = EKEventStore()
 
+    /// Asks without reading anything, for the setup flow: everywhere else the
+    /// question comes with work to do the moment it is answered.
+    func requestAccess() async throws {
+        guard try await store.requestFullAccessToEvents() else { throw CalendarBridgeError.accessDenied }
+    }
+
     func timelinePins() async throws -> [PebbleTimelinePin] {
         guard try await store.requestFullAccessToEvents() else { throw CalendarBridgeError.accessDenied }
         let start = Date()

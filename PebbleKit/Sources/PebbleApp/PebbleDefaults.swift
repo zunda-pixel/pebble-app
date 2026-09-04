@@ -34,7 +34,9 @@ extension Defaults.Keys {
     /// and dictation the watch cannot serve is better refused than half-served.
     static let voiceTranscriptionEnabled = Key<Bool>("voiceTranscriptionEnabled", default: false)
 
-    static let hasCompletedOnboarding = Key<Bool>("hasCompletedPebbleOnboarding", default: false)
+    /// A new key rather than the launch-time welcome's: an install that saw that
+    /// one has still never been asked for anything.
+    static let hasCompletedWatchSetup = Key<Bool>("hasCompletedPebbleWatchSetup", default: false)
 
     static let activeWatchfaceID = Key<UUID?>("activeWatchfaceID")
 
