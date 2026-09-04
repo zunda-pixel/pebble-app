@@ -83,6 +83,9 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
         didFailToConnect peripheral: CBPeripheral,
         error: (any Error)?
     ) {
+        if retryWithoutNotificationAccess(peripheral) {
+            return
+        }
         if reconnects.isAutomatic, let device = reconnects.device {
             pendingDevice = nil
             scheduleReconnect(to: device, using: peripheral)
@@ -136,6 +139,23 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
             eventContinuation?.yield(.disconnected(.disconnected))
         }
     }
+
+#if os(iOS)
+    /// The answer to iOS's notification-sharing question, which arrives here and
+    /// nowhere else. Without this method CoreBluetooth has nowhere to deliver it
+    /// and says so: "could not find a central ... delegateImplemented 0".
+    public func centralManager(
+        _ central: CBCentralManager,
+        didUpdateANCSAuthorizationFor peripheral: CBPeripheral
+    ) {
+        Task { [tag = clientTag, allowed = peripheral.ancsAuthorized] in
+            await PebbleDiagnostics.shared.record(
+                category: "pairing",
+                message: "[\(tag)] notification sharing \(allowed ? "allowed" : "refused")"
+            )
+        }
+    }
+#endif
 
     public func centralManager(
         _ central: CBCentralManager,

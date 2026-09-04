@@ -47,6 +47,12 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     var activePairingTriggerCharacteristic: CBCharacteristic?
     var ppogNotifyCharacteristicToSubscribe: CBCharacteristic?
     var setup = LinkSetup()
+    /// Watches whose link was asked for with the notification requirement and
+    /// did not come up. See `connectOptions(for:)`.
+    var refusedNotificationAccess: Set<UUID> = []
+    /// Whether the attempt in flight carried that requirement, so a failure can
+    /// be told apart from one that had nothing to do with it.
+    var requiredNotificationAccess = false
     var pairingTimeoutTask: Task<Void, Never>?
     var subscriptionWatchdog: Task<Void, Never>?
     var hasRepublishedForThisLink = false
@@ -235,7 +241,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             connectionContinuation = continuation
-            centralManager.connect(peripheral)
+            centralManager.connect(peripheral, options: connectOptions(for: peripheral))
 
             // A reconnect in flight has its own deadline armed here, and it
             // tears the link down when it expires. Left running it would
@@ -1282,6 +1288,51 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         appMessages.failAll(PebbleConnectionError.disconnected)
     }
 
+    /// Asks iOS for the notification-sharing decision as part of connecting.
+    ///
+    /// Without this the question is only raised when the watch itself gets round
+    /// to asking for ANCS, which is whenever iOS chooses — in practice long
+    /// after the reader has left the app, which is where the alert was turning
+    /// up. Requiring it here puts the alert on the connect the reader started.
+    ///
+    /// It is dropped for a watch that has already failed to connect with it,
+    /// because with this set a refusal is a failed link: a watch that connects
+    /// without notifications is worth more than one that will not connect.
+    func connectOptions(for peripheral: CBPeripheral) -> [String: Any]? {
+        #if os(iOS)
+        guard !refusedNotificationAccess.contains(peripheral.identifier) else {
+            requiredNotificationAccess = false
+            return nil
+        }
+        requiredNotificationAccess = true
+        return [CBConnectPeripheralOptionRequiresANCS: true]
+        #else
+        requiredNotificationAccess = false
+        return nil
+        #endif
+    }
+
+    /// Retries without the notification requirement, once per watch.
+    ///
+    /// Returns whether this attempt is the one being retried, in which case the
+    /// caller has nothing left to report: the link is being asked for again.
+    func retryWithoutNotificationAccess(_ peripheral: CBPeripheral) -> Bool {
+        guard requiredNotificationAccess,
+              !refusedNotificationAccess.contains(peripheral.identifier) else {
+            return false
+        }
+        refusedNotificationAccess.insert(peripheral.identifier)
+        Task { [tag = clientTag] in
+            await PebbleDiagnostics.shared.record(
+                .warning,
+                category: "pairing",
+                message: "[\(tag)] the link was refused with notification sharing required; asking again without it"
+            )
+        }
+        centralManager.connect(peripheral, options: connectOptions(for: peripheral))
+        return true
+    }
+
     func reconnect(to device: DiscoveredPebble, using peripheral: CBPeripheral) {
         reconnects.cancelSchedule()
         guard centralManager.state == .poweredOn else {
@@ -1293,7 +1344,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         reconnects.beginAutomaticAttempt()
         peripheral.delegate = self
         eventContinuation?.yield(.reconnecting(deviceID: device.id))
-        centralManager.connect(peripheral)
+        centralManager.connect(peripheral, options: connectOptions(for: peripheral))
 
         connectionTimeoutTask?.cancel()
         connectionTimeoutTask = Task { [weak self] in
