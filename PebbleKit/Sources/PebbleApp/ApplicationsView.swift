@@ -179,16 +179,82 @@ struct ApplicationsContent: View {
                 description: Text("Imported watch apps and watchfaces will appear here.")
             )
         } else {
-            List {
-                if let operationStatusMessage {
-                    Section {
-                        Label(operationStatusMessage, systemImage: "arrow.triangle.2.circlepath")
-                            .foregroundStyle(.secondary)
+            // Above the list rather than in it. These arrive with the very
+            // operation that removes an application, so a swipe used to insert
+            // a section at the top of the list in the same update that deleted
+            // a row from it — which UIKit would not reconcile: it threw an
+            // invalid-update exception rather than drawing.
+            VStack(spacing: 0) {
+                ApplicationOperationBanner(
+                    statusMessage: operationStatusMessage,
+                    installingApplicationName: installingApplicationName,
+                    installationProgress: installationProgress,
+                    errorMessage: errorMessage
+                )
+                List {
+                    if !watchApplications.isEmpty {
+                        ApplicationSection(
+                            title: "Watch Apps",
+                            applications: watchApplications,
+                            activeWatchfaceID: activeWatchfaceID,
+                            favoriteWatchfaceIDs: favoriteWatchfaceIDs,
+                            installedApplicationIDs: installedApplicationIDs,
+                            isOperationInProgress: isOperationInProgress,
+                            removeApplication: removeApplication,
+                            configureApplication: configureApplication,
+                            editGlance: editGlance,
+                            activateWatchface: activateWatchface,
+                            toggleFavoriteWatchface: toggleFavoriteWatchface,
+                            moveApplications: { offsets, destination in
+                                reorderApplications(.watchapp, offsets, destination)
+                            }
+                        )
+                    }
+                    if !watchfaces.isEmpty {
+                        ApplicationSection(
+                            title: "Watchfaces",
+                            applications: watchfaces,
+                            activeWatchfaceID: activeWatchfaceID,
+                            favoriteWatchfaceIDs: favoriteWatchfaceIDs,
+                            installedApplicationIDs: installedApplicationIDs,
+                            isOperationInProgress: isOperationInProgress,
+                            removeApplication: removeApplication,
+                            configureApplication: configureApplication,
+                            editGlance: editGlance,
+                            activateWatchface: activateWatchface,
+                            toggleFavoriteWatchface: toggleFavoriteWatchface,
+                            moveApplications: { offsets, destination in
+                                reorderApplications(.watchface, offsets, destination)
+                            }
+                        )
                     }
                 }
-                if let installingApplicationName,
-                   let installationProgress {
-                    InstallationProgressSection(
+            }
+        }
+    }
+}
+
+/// What the library is in the middle of, and what went wrong doing it.
+struct ApplicationOperationBanner: View {
+    var statusMessage: LocalizedStringKey?
+    var installingApplicationName: String?
+    var installationProgress: PutBytesTransferProgress?
+    var errorMessage: LocalizedStringKey?
+
+    private var isEmpty: Bool {
+        statusMessage == nil && errorMessage == nil
+            && (installingApplicationName == nil || installationProgress == nil)
+    }
+
+    var body: some View {
+        if !isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                if let statusMessage {
+                    Label(statusMessage, systemImage: "arrow.triangle.2.circlepath")
+                        .foregroundStyle(.secondary)
+                }
+                if let installingApplicationName, let installationProgress {
+                    InstallationProgressRow(
                         applicationName: installingApplicationName,
                         progress: installationProgress
                     )
@@ -197,72 +263,39 @@ struct ApplicationsContent: View {
                     Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.red)
                 }
-                if !watchApplications.isEmpty {
-                    ApplicationSection(
-                        title: "Watch Apps",
-                        applications: watchApplications,
-                        activeWatchfaceID: activeWatchfaceID,
-                        favoriteWatchfaceIDs: favoriteWatchfaceIDs,
-                        installedApplicationIDs: installedApplicationIDs,
-                        isOperationInProgress: isOperationInProgress,
-                        removeApplication: removeApplication,
-                        configureApplication: configureApplication,
-                        editGlance: editGlance,
-                        activateWatchface: activateWatchface,
-                        toggleFavoriteWatchface: toggleFavoriteWatchface,
-                        moveApplications: { offsets, destination in
-                            reorderApplications(.watchapp, offsets, destination)
-                        }
-                    )
-                }
-                if !watchfaces.isEmpty {
-                    ApplicationSection(
-                        title: "Watchfaces",
-                        applications: watchfaces,
-                        activeWatchfaceID: activeWatchfaceID,
-                        favoriteWatchfaceIDs: favoriteWatchfaceIDs,
-                        installedApplicationIDs: installedApplicationIDs,
-                        isOperationInProgress: isOperationInProgress,
-                        removeApplication: removeApplication,
-                        configureApplication: configureApplication,
-                        editGlance: editGlance,
-                        activateWatchface: activateWatchface,
-                        toggleFavoriteWatchface: toggleFavoriteWatchface,
-                        moveApplications: { offsets, destination in
-                            reorderApplications(.watchface, offsets, destination)
-                        }
-                    )
-                }
             }
+            .font(.callout)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal)
+            .padding(.vertical, 12)
+            .background(.bar)
         }
     }
 }
 
-struct InstallationProgressSection: View {
+struct InstallationProgressRow: View {
     var applicationName: String
     var progress: PutBytesTransferProgress
 
     var body: some View {
-        Section("Installing") {
-            VStack(alignment: .leading, spacing: 8) {
-                Label(applicationName, systemImage: "arrow.down.app")
-                    .font(.headline)
-                if progress.totalBytes > 0 {
-                    ProgressView(
-                        value: Double(progress.bytesSent),
-                        total: Double(progress.totalBytes)
-                    )
-                    Text("\(progress.bytesSent, format: .number) of \(progress.totalBytes, format: .number) bytes")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    ProgressView()
-                        .accessibilityLabel(Text("Preparing installation"))
-                }
+        VStack(alignment: .leading, spacing: 8) {
+            Label(applicationName, systemImage: "arrow.down.app")
+                .font(.headline)
+            if progress.totalBytes > 0 {
+                ProgressView(
+                    value: Double(progress.bytesSent),
+                    total: Double(progress.totalBytes)
+                )
+                Text("\(progress.bytesSent, format: .number) of \(progress.totalBytes, format: .number) bytes")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ProgressView()
+                    .accessibilityLabel(Text("Preparing installation"))
             }
-            .padding(.vertical, 8)
-            .accessibilityElement(children: .combine)
         }
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .combine)
     }
 }
 
