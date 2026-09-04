@@ -1,50 +1,54 @@
 import Testing
 @testable import PebbleApp
 
-/// Which screens a watch's first connection puts in front of the reader.
+/// Which screens a watch's first connection puts in front of the reader, and
+/// which permissions get a switch on the one that asks for them.
 @Suite
 struct WatchSetupTests {
     @Test
-    func aWatchWithFirmwareIsWelcomedAndThenAsksForEverything() {
+    func aWatchWithFirmwareIsWelcomedAndThenAsksForPermissions() {
         let steps = WatchSetupStep.steps(
             isRunningRecoveryFirmware: false,
             permissions: PhonePermissions()
         )
 
-        #expect(steps.first == .welcome)
-        #expect(steps.last == .finished)
-        #expect(!steps.contains(.firmware))
-        // One screen per permission, in the order they are asked.
-        #expect(steps.dropFirst().dropLast() == PhonePermissionKind.asked.map { .permission($0) })
+        #expect(steps == [.welcome, .permissions, .finished])
     }
 
     @Test
-    func firmwareComesBeforeAnyPermission() throws {
+    func firmwareComesBeforeThePermissions() throws {
         let steps = WatchSetupStep.steps(
             isRunningRecoveryFirmware: true,
             permissions: PhonePermissions()
         )
 
         // Nothing a permission unlocks reaches a watch in its recovery firmware.
-        let firmware = try #require(steps.firstIndex(of: .firmware))
-        let firstPermission = try #require(steps.firstIndex(of: .permission(PhonePermissionKind.asked[0])))
-        #expect(firmware < firstPermission)
-        #expect(steps[1] == .firmware)
+        #expect(steps == [.welcome, .firmware, .permissions, .finished])
     }
 
     @Test
-    func whatIsAlreadyAllowedIsNotAskedForAgain() {
+    func thePermissionScreenIsSkippedWhenThereIsNothingLeftToAsk() {
         let steps = WatchSetupStep.steps(
             isRunningRecoveryFirmware: false,
             permissions: PhonePermissions(
                 calendar: .allowed,
-                reminders: .notDetermined,
+                reminders: .allowed,
                 location: .allowed,
                 health: .allowed
             )
         )
 
-        #expect(steps == [.welcome, .permission(.reminders), .finished])
+        #expect(steps == [.welcome, .finished])
+    }
+
+    @Test
+    func everySwitchThisPhoneCanAnswerIsShownEvenWhenItIsAlreadyOn() {
+        // One screen, so what is granted is shown beside what is not rather
+        // than left out: the row is the answer as much as the question.
+        let permissions = PhonePermissions(calendar: .allowed, reminders: .notDetermined)
+
+        #expect(PhonePermissionKind.calendar.isListed(in: permissions))
+        #expect(PhonePermissionKind.reminders.isListed(in: permissions))
     }
 
     @Test
@@ -55,11 +59,12 @@ struct WatchSetupTests {
     }
 
     @Test
-    func nothingIsAskedWhenNoAnswerCouldChangeIt() {
-        #expect(!PhonePermissionKind.health.isWorthAsking(in: PhonePermissions(health: .unavailable)))
-        #expect(!PhonePermissionKind.location.isWorthAsking(in: PhonePermissions(location: .restricted)))
-        // A refusal is still shown: that screen offers the privacy settings,
-        // which is the only place it can be taken back.
+    func nothingIsShownWhenNoAnswerCouldChangeIt() {
+        #expect(!PhonePermissionKind.health.isListed(in: PhonePermissions(health: .unavailable)))
+        #expect(!PhonePermissionKind.location.isListed(in: PhonePermissions(location: .restricted)))
+        // A refusal keeps its row: that row offers the privacy settings, which
+        // is the only place it can be taken back.
+        #expect(PhonePermissionKind.calendar.isListed(in: PhonePermissions(calendar: .denied)))
         #expect(PhonePermissionKind.calendar.isWorthAsking(in: PhonePermissions(calendar: .denied)))
     }
 

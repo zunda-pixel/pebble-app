@@ -290,11 +290,22 @@
       }
     },
     "A few things are needed before it can show your day, your reminders, and the weather. Each one is asked for on its own screen, and any of them can wait." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "予定、リマインダー、天気をウォッチに表示するには、いくつかの許可が必要です。1画面につき1つずつ確認しますが、どれもあとにできます。"
+          }
+        }
+      }
+    },
+    "A few things are needed before it can show your day, your reminders, and the weather. They are all on the next screen, and any of them can wait." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "予定、リマインダー、天気をウォッチに表示するには、いくつかの許可が必要です。次の画面にまとめてあり、どれもあとにできます。"
           }
         }
       }
@@ -620,6 +631,7 @@
       }
     },
     "Allow" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -5510,6 +5522,16 @@
         }
       }
     },
+    "Turning one on asks the system for it. Anything left off can be turned on later in Settings." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "オンにすると、システムに許可を求めます。オフのままにしたものは、あとから“設定”でオンにできます。"
+          }
+        }
+      }
+    },
     "Turns the watch's own Reminders app on, which is where the reminders added on the Timeline screen appear." : {
       "localizations" : {
         "ja" : {
@@ -5917,6 +5939,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "iPhoneのリマインダーアプリにあるものもここに表示されます。ここで削除すると、リマインダーアプリからも削除されます。"
+          }
+        }
+      }
+    },
+    "What the watch may use" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチが使えるもの"
           }
         }
       }
