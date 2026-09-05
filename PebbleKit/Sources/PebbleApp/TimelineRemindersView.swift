@@ -7,7 +7,7 @@ struct TimelineRemindersView: View {
     var body: some View {
         TimelineRemindersContent(
             reminders: model.reminders,
-            statusMessage: model.reminderStatusMessage
+            feedback: model.reminderFeedback
         ) { removed in
             Task { await model.removeReminders(removed) }
         }
@@ -18,7 +18,7 @@ struct TimelineRemindersView: View {
 /// the watch is told about that half only.
 struct TimelineRemindersContent: View {
     var reminders: [TimelinePin]
-    var statusMessage: LocalizedStringKey?
+    var feedback: FeatureFeedback?
     var remove: ([TimelinePin]) -> Void
 
     private var upcoming: [TimelinePin] {
@@ -49,10 +49,8 @@ struct TimelineRemindersContent: View {
                     Text("A reminder whose time has gone is not sent to the watch.")
                 }
             }
-            if let statusMessage {
-                Section {
-                    Text(statusMessage).foregroundStyle(.secondary)
-                }
+            if feedback != nil {
+                Section { FeedbackBanner(feedback: feedback) }
             }
         }
         .overlay {
@@ -83,13 +81,13 @@ struct TimelineRemindersContent: View {
     NavigationStack {
         TimelineRemindersContent(
             reminders: PreviewSamples.reminders,
-            statusMessage: nil
+            feedback: nil
         ) { _ in }
     }
 }
 
 #Preview("No reminders") {
     NavigationStack {
-        TimelineRemindersContent(reminders: [], statusMessage: nil) { _ in }
+        TimelineRemindersContent(reminders: [], feedback: nil) { _ in }
     }
 }

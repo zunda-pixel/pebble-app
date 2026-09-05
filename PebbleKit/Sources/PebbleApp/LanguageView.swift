@@ -17,7 +17,7 @@ struct LanguageView: View {
             isConnected: connection?.isConnected == true,
             isInstalling: model.isInstallingLanguagePack,
             progress: model.languagePackTransferProgress(on: watchID),
-            statusMessage: model.languageStatusMessage,
+            feedback: model.languageFeedback,
             install: { pack in
                 Task { await model.installLanguagePack(pack, watchID: watchID) }
             },
@@ -37,7 +37,7 @@ struct LanguageContent: View {
     var isConnected: Bool
     var isInstalling: Bool
     var progress: PutBytesTransferProgress?
-    var statusMessage: LocalizedStringKey?
+    var feedback: FeatureFeedback?
     var install: (PebbleLanguagePack) -> Void
     var installFile: (URL) -> Void
 
@@ -63,11 +63,7 @@ struct LanguageContent: View {
                 if let installedVersion, installedVersion > 0 {
                     LabeledContent("Pack Version", value: installedVersion, format: .number)
                 }
-                if let statusMessage {
-                    Text(statusMessage)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
+                FeedbackBanner(feedback: feedback)
                 if let progress, progress.totalBytes > 0 {
                     ProgressView(value: Double(progress.bytesSent), total: Double(progress.totalBytes))
                 }
@@ -140,7 +136,7 @@ struct LanguageContent: View {
             isConnected: true,
             isInstalling: false,
             progress: nil,
-            statusMessage: nil,
+            feedback: nil,
             install: { _ in },
             installFile: { _ in }
         )
@@ -156,7 +152,7 @@ struct LanguageContent: View {
             isConnected: false,
             isInstalling: true,
             progress: PreviewSamples.transferProgress,
-            statusMessage: "日本語 is being sent to the watch.",
+            feedback: .progress("日本語 is being sent to the watch."),
             install: { _ in },
             installFile: { _ in }
         )

@@ -94,7 +94,7 @@ struct FirmwareLifecycleTests {
         // progress display was hijacked from it.
         #expect(model.firmwareUpdateTask != nil)
         #expect(model.firmwareTransferProgress(on: device.id) == nil)
-        #expect(model.firmwareUpdateStatusMessage == "This firmware is already being transferred.")
+        #expect(model.firmwareUpdateFeedback == .failure("This firmware is already being transferred."))
 
         running.cancel()
         await model.discardPendingFirmwareUpdate()
@@ -227,7 +227,7 @@ struct FirmwareLifecycleTests {
         // Stop and Try Again for an update that had finished, and the watch's
         // own row went on saying an update was waiting.
         #expect(model.firmwareUpdateJournal == nil)
-        #expect(model.firmwareUpdateStatusMessage == nil)
+        #expect(model.firmwareUpdateFeedback == nil)
     }
 
     private func makeFirmwarePackage(versionTag: String? = nil) -> PBZFirmwarePackage {

@@ -28,9 +28,9 @@ struct WatchDetailView: View {
             firmwareJournalPhase: journal?.phase,
             downloadedFirmwareVersion: model.downloadedFirmware?.versionTag,
             languageName: languageName,
-            notificationStatusMessage: model.notificationStatusMessage,
-            resetStatusMessage: model.watchResetStatusMessages[watchID],
-            connectionErrorMessage: model.connectionFailures[watchID]?.message,
+            notificationFeedback: model.notificationFeedback,
+            resetFeedback: model.watchResetFeedback[watchID],
+            connectionFeedback: model.connectionFailures[watchID].map { .failure($0.message) },
             connect: {
                 guard let saved = model.savedWatches.first(where: { $0.id == watchID }) else { return }
                 Task { await model.connect(to: saved) }
@@ -65,9 +65,9 @@ struct WatchDetailContent<
     var firmwareJournalPhase: FirmwareUpdatePhase?
     var downloadedFirmwareVersion: String?
     var languageName: String?
-    var notificationStatusMessage: LocalizedStringKey?
-    var resetStatusMessage: LocalizedStringKey?
-    var connectionErrorMessage: LocalizedStringKey?
+    var notificationFeedback: FeatureFeedback?
+    var resetFeedback: FeatureFeedback?
+    var connectionFeedback: FeatureFeedback?
     var connect: () -> Void
     var setAutomaticallyConnects: (Bool) -> Void
     var disconnect: () -> Void
@@ -167,18 +167,12 @@ struct WatchDetailContent<
                 if watch.phase != nil {
                     Button("Disconnect", role: .destructive, action: disconnect)
                 }
-                if let connectionErrorMessage {
-                    Label(connectionErrorMessage, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                }
+                FeedbackBanner(feedback: connectionFeedback)
             }
             Section("Notifications") {
                 Button("Send Test Notification", systemImage: "bell.badge", action: sendTestNotification)
                     .disabled(!watch.isConnected)
-                if let notificationStatusMessage {
-                    Label(notificationStatusMessage, systemImage: "info.circle")
-                        .foregroundStyle(.secondary)
-                }
+                FeedbackBanner(feedback: notificationFeedback)
             }
             Section {
                 NavigationLink {
@@ -236,10 +230,7 @@ struct WatchDetailContent<
                     reset(.factoryReset)
                 }
                 .disabled(!watch.isConnected)
-                if let resetStatusMessage {
-                    Label(resetStatusMessage, systemImage: "info.circle")
-                        .foregroundStyle(.secondary)
-                }
+                FeedbackBanner(feedback: resetFeedback)
             } header: {
                 Text("Reset")
             } footer: {
@@ -274,9 +265,9 @@ struct WatchDetailContent<
             firmwareJournalPhase: nil,
             downloadedFirmwareVersion: nil,
             languageName: "日本語",
-            notificationStatusMessage: nil,
-            resetStatusMessage: nil,
-            connectionErrorMessage: nil,
+            notificationFeedback: nil,
+            resetFeedback: nil,
+            connectionFeedback: nil,
             connect: {},
             setAutomaticallyConnects: { _ in },
             disconnect: {},
@@ -298,9 +289,9 @@ struct WatchDetailContent<
             firmwareJournalPhase: .validated,
             downloadedFirmwareVersion: PreviewSamples.firmwareRelease.versionTag,
             languageName: nil,
-            notificationStatusMessage: "Queued for the next connection.",
-            resetStatusMessage: nil,
-            connectionErrorMessage: "The watch does not expose the expected Pebble connection service.",
+            notificationFeedback: .success("Queued for the next connection."),
+            resetFeedback: nil,
+            connectionFeedback: .failure("The watch does not expose the expected Pebble connection service."),
             connect: {},
             setAutomaticallyConnects: { _ in },
             disconnect: {},
@@ -322,9 +313,9 @@ struct WatchDetailContent<
             firmwareJournalPhase: nil,
             downloadedFirmwareVersion: nil,
             languageName: nil,
-            notificationStatusMessage: nil,
-            resetStatusMessage: "The watch is erasing itself. It has forgotten this device, so it cannot reconnect until it is forgotten here too.",
-            connectionErrorMessage: nil,
+            notificationFeedback: nil,
+            resetFeedback: .progress("The watch is erasing itself. It has forgotten this device, so it cannot reconnect until it is forgotten here too."),
+            connectionFeedback: nil,
             connect: {},
             setAutomaticallyConnects: { _ in },
             disconnect: {},

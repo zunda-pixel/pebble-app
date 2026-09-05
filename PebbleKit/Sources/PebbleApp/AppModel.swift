@@ -2,7 +2,7 @@ public import PebbleProtocol
 import Defaults
 public import Foundation
 import Observation
-public import SwiftUI
+import SwiftUI
 
 public enum ApplicationManagementOperation: Equatable, Sendable {
     case importing
@@ -43,38 +43,38 @@ public final class AppModel {
     public internal(set) var activeWatchfaceID: UUID?
     public internal(set) var isLoadingApplications = false
     public internal(set) var isImportingApplication = false
-    public internal(set) var applicationLibraryErrorMessage: LocalizedStringKey?
+    public internal(set) var applicationLibraryFeedback: FeatureFeedback?
     /// The library operations — importing, removing, reordering, synchronizing —
     /// are phone-side and take turns: each rewrites the one library and then
     /// pushes it to every watch, so this stays a single value rather than moving
     /// onto a connection. What belongs to a watch is the transfer, and that lives
     /// on `WatchConnection`.
     public internal(set) var applicationManagementOperation: ApplicationManagementOperation?
-    public internal(set) var applicationManagementStatusMessage: LocalizedStringKey?
+    public internal(set) var applicationManagementFeedback: FeatureFeedback?
     public internal(set) var configurationApplication: WatchApplication?
     public internal(set) var configurationURL: URL?
     public internal(set) var diagnosticReportURL: URL?
     public internal(set) var companionNotificationsEnabled = true
-    public internal(set) var notificationStatusMessage: LocalizedStringKey?
+    public internal(set) var notificationFeedback: FeatureFeedback?
     public internal(set) var notificationPreferences = NotificationDeliveryPreferences()
     /// Newest first. Only the notifications this app sent: another phone app's
     /// go to the watch over ANCS, where no app can see them.
     public internal(set) var sentNotifications: [SentNotification] = []
     public internal(set) var savedWatches: [SavedWatch] = []
     public internal(set) var unknownBondedWatches: [UnknownBondedWatch] = []
-    public internal(set) var watchManagementErrorMessage: LocalizedStringKey?
+    public internal(set) var watchManagementFeedback: FeatureFeedback?
     /// What each watch was last told to do to itself, until it comes back. A
     /// restart says nothing on its way out and nothing on its way in, so the
     /// only news the reader gets is the link returning.
-    public internal(set) var watchResetStatusMessages: [WatchID: LocalizedStringKey] = [:]
+    public internal(set) var watchResetFeedback: [WatchID: FeatureFeedback] = [:]
     public internal(set) var timelinePins: [TimelinePin] = []
     public internal(set) var reminders: [TimelinePin] = []
-    public internal(set) var reminderStatusMessage: LocalizedStringKey?
+    public internal(set) var reminderFeedback: FeatureFeedback?
     public internal(set) var watchSettings: [String: Bool] = [:]
     public internal(set) var activitySettings = ActivitySettings()
     public internal(set) var heartRateSettings = HeartRateSettings()
     public internal(set) var isReminderAppEnabled = true
-    public internal(set) var watchSettingsStatusMessage: LocalizedStringKey?
+    public internal(set) var watchSettingsFeedback: FeatureFeedback?
     public internal(set) var latestScreenshot: WatchScreenshot?
     public internal(set) var screenshotURL: URL?
     public internal(set) var watchLogLines: [WatchLogLine] = []
@@ -85,18 +85,18 @@ public final class AppModel {
     public internal(set) var isTakingScreenshot = false
     public internal(set) var isGatheringWatchLogs = false
     public internal(set) var isCollectingCoredump = false
-    public internal(set) var watchDiagnosticsStatusMessages: [WatchDiagnostic: LocalizedStringKey] = [:]
+    public internal(set) var watchDiagnosticsFeedback: [WatchDiagnostic: FeatureFeedback] = [:]
     public internal(set) var healthSamples: [WatchHealthSample] = []
     public internal(set) var catalogApplications: [CatalogApplication] = []
     public internal(set) var catalogLastUpdated: Date?
     public internal(set) var isUpdatingCatalog = false
     public internal(set) var installingCatalogApplicationID: UUID?
-    public internal(set) var firmwareUpdateStatusMessage: LocalizedStringKey?
+    public internal(set) var firmwareUpdateFeedback: FeatureFeedback?
     public internal(set) var firmwareUpdateJournal: FirmwareUpdateJournal?
     public internal(set) var firmwareRequiresConfirmation = false
     public internal(set) var availableFirmwareRelease: PebbleOSFirmwareRelease?
     public internal(set) var downloadedFirmware: DownloadedFirmware?
-    public internal(set) var languageStatusMessage: LocalizedStringKey?
+    public internal(set) var languageFeedback: FeatureFeedback?
     public internal(set) var isInstallingLanguagePack = false
     public internal(set) var weatherPlaces: [WeatherPlace] = []
     public internal(set) var weatherReports: [WeatherReport] = []
@@ -104,9 +104,10 @@ public final class AppModel {
     public internal(set) var weatherUpdated: Date?
     public internal(set) var weatherUsesFahrenheit = false
     public internal(set) var isRefreshingWeather = false
-    public internal(set) var weatherStatusMessage: LocalizedStringKey?
-    public internal(set) var dataSyncStatusMessage: LocalizedStringKey?
-    public internal(set) var timelineActionStatusMessage: LocalizedStringKey?
+    public internal(set) var weatherFeedback: FeatureFeedback?
+    public internal(set) var healthFeedback: FeatureFeedback?
+    public internal(set) var catalogFeedback: FeatureFeedback?
+    public internal(set) var timelineFeedback: FeatureFeedback?
     public internal(set) var healthExportURL: URL?
     public internal(set) var notificationSourceApps: [NotificationSourceApp] = []
     /// The line each watchapp shows in the launcher, for the apps that have one.
@@ -456,7 +457,7 @@ public final class AppModel {
             lastConnectionError = error
             connectionFailures[device.id] = error
             if !connections.isEmpty {
-                watchManagementErrorMessage = error.message
+                watchManagementFeedback = .failure(error.message)
             }
             await PebbleDiagnostics.shared.record(.error, category: "connection", message: error.logDescription)
         } catch {
@@ -487,7 +488,7 @@ public final class AppModel {
         connection.cancelApplicationFetch()
         connection.endTransfer()
         applicationManagementOperation = nil
-        applicationManagementStatusMessage = nil
+        applicationManagementFeedback = nil
     }
 
     func handleEvent(_ event: WatchClientEvent, from connection: WatchConnection) {
@@ -523,17 +524,19 @@ public final class AppModel {
             needsApplicationSynchronization = true
             clearBusyOperationState(on: connection)
         case .healthSyncCompleted(let succeeded):
-            dataSyncStatusMessage = succeeded ? "Health synchronization completed." : "The watch rejected health synchronization."
+            healthFeedback = succeeded
+                ? .success("Health synchronization completed.")
+                : .failure("The watch rejected health synchronization.")
         case .healthSamplesReceived(let samples):
             Task { [weak self] in
                 guard let self else { return }
                 do {
                     self.healthSamples = try await self.healthStore.merge(samples)
                 } catch {
-                    self.dataSyncStatusMessage = "Watch health data could not be saved."
+                    self.healthFeedback = .failure("Watch health data could not be saved.")
                     return
                 }
-                self.dataSyncStatusMessage = "Received \(samples.count) health update(s) from the watch."
+                self.healthFeedback = .success("Received \(samples.count) health update(s) from the watch.")
                 #if os(iOS)
                 do {
                     // The watch answered on its own account, so this must not raise the
@@ -544,7 +547,7 @@ public final class AppModel {
                     )
                 } catch HealthKitBridgeError.notGranted, HealthKitBridgeError.unavailable {
                 } catch {
-                    self.dataSyncStatusMessage = "The watch's health data was saved, but Apple Health did not accept it."
+                    self.healthFeedback = .failure("The watch's health data was saved, but Apple Health did not accept it.")
                 }
                 #endif
             }
@@ -569,7 +572,7 @@ public final class AppModel {
                 // the pin is about to be gone from `timelinePins` for good.
                 try? await self.queueTimelineOperation(.delete(invocation.itemID))
                 await self.synchronizeTimeline()
-                self.timelineActionStatusMessage = "Timeline action completed."
+                self.timelineFeedback = .success("Timeline action completed.")
             }
         case .applicationLogReceived(let applicationID, let line):
             recordApplicationLogLine(line, from: applicationID)
@@ -584,8 +587,9 @@ public final class AppModel {
     // and drops the link a few seconds after connecting.
     func synchronizeEverything(on connection: WatchConnection) async {
         if connection.watch.isRunningRecoveryFirmware {
-            watchManagementErrorMessage =
+            watchManagementFeedback = .failure(
                 "This watch started its recovery firmware. It works again once PebbleOS is installed."
+            )
             await PebbleDiagnostics.shared.record(
                 .error,
                 category: "connection",

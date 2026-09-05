@@ -18,7 +18,7 @@ struct WatchSettingsView: View {
             heartRateSettings: model.heartRateSettings,
             isReminderAppEnabled: model.isReminderAppEnabled,
             isConnected: connection?.isConnected == true,
-            statusMessage: model.watchSettingsStatusMessage,
+            feedback: model.watchSettingsFeedback,
             setWatchSetting: { setting, isOn in
                 Task { await model.setWatchSetting(setting, isOn: isOn) }
             },
@@ -42,7 +42,7 @@ struct WatchSettingsContent: View {
     var heartRateSettings: HeartRateSettings
     var isReminderAppEnabled: Bool
     var isConnected: Bool
-    var statusMessage: LocalizedStringKey?
+    var feedback: FeatureFeedback?
     var setWatchSetting: (WatchSetting, Bool) -> Void
     var setActivitySettings: (ActivitySettings) -> Void
     var setHeartRateSettings: (HeartRateSettings) -> Void
@@ -169,11 +169,8 @@ struct WatchSettingsContent: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            if let statusMessage {
-                Section {
-                    Label(statusMessage, systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.secondary)
-                }
+            if feedback != nil {
+                Section { FeedbackBanner(feedback: feedback) }
             }
         }
         .formStyle(.grouped)
@@ -211,7 +208,7 @@ struct WatchSettingsContent: View {
             heartRateSettings: HeartRateSettings(),
             isReminderAppEnabled: true,
             isConnected: true,
-            statusMessage: nil,
+            feedback: nil,
             setWatchSetting: { _, _ in },
             setActivitySettings: { _ in },
             setHeartRateSettings: { _ in },
@@ -232,7 +229,7 @@ struct WatchSettingsContent: View {
             ),
             isReminderAppEnabled: false,
             isConnected: false,
-            statusMessage: "Pebble 5209 did not accept the setting.",
+            feedback: .failure("Pebble 5209 did not accept the setting."),
             setWatchSetting: { _, _ in },
             setActivitySettings: { _ in },
             setHeartRateSettings: { _ in },

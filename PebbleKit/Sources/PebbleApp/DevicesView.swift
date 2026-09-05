@@ -16,7 +16,7 @@ struct DevicesView: View {
     var body: some View {
         DevicesContent(
             watches: listedWatchIDs.map { WatchSummary(watchID: $0, model: model) },
-            errorMessage: model.watchManagementErrorMessage,
+            feedback: model.watchManagementFeedback,
             addWatch: { isAddingWatch = true },
             destination: { watch in
                 WatchDetailView(model: model, watchID: watch.id)
@@ -34,7 +34,7 @@ struct DevicesView: View {
 
 struct DevicesContent<Destination: View>: View {
     var watches: [WatchSummary]
-    var errorMessage: LocalizedStringKey?
+    var feedback: FeatureFeedback?
     var addWatch: () -> Void
     @ViewBuilder var destination: (WatchSummary) -> Destination
 
@@ -60,10 +60,7 @@ struct DevicesContent<Destination: View>: View {
                 }
             }
 
-            if let errorMessage {
-                Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.red)
-            }
+            FeedbackBanner(feedback: feedback)
         }
         .navigationTitle(Text("Devices"))
         .toolbar {
@@ -86,18 +83,18 @@ struct AddWatchSheet: View {
     /// sheet scans in a loop the whole time it is open, and a scan in progress
     /// outranks a failure there — which is how a refused connect came to leave
     /// the screen exactly as it was.
-    private var connectionErrorMessage: LocalizedStringKey? {
+    private var connectionFeedback: FeatureFeedback? {
         if let watchBeingAdded, let failure = model.connectionFailures[watchBeingAdded] {
-            return failure.message
+            return .failure(failure.message)
         }
         guard case .failed(let error) = model.connectionState else { return nil }
-        return error.message
+        return .failure(error.message)
     }
 
     var body: some View {
         AddWatchContent(
-            connectionErrorMessage: connectionErrorMessage,
-            managementErrorMessage: model.watchManagementErrorMessage,
+            connectionFeedback: connectionFeedback,
+            managementFeedback: model.watchManagementFeedback,
             unknownBondedWatches: model.unknownBondedWatches,
             discoveredWatches: model.discoveredWatches,
             isConnecting: !model.connectingWatchIDs.isEmpty,
@@ -131,8 +128,8 @@ struct AddWatchSheet: View {
 }
 
 struct AddWatchContent: View {
-    var connectionErrorMessage: LocalizedStringKey?
-    var managementErrorMessage: LocalizedStringKey?
+    var connectionFeedback: FeatureFeedback?
+    var managementFeedback: FeatureFeedback?
     var unknownBondedWatches: [UnknownBondedWatch]
     var discoveredWatches: [DiscoveredWatch]
     var isConnecting: Bool
@@ -143,15 +140,9 @@ struct AddWatchContent: View {
     var body: some View {
         NavigationStack {
             List {
-                if let connectionErrorMessage {
-                    Label(connectionErrorMessage, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                        .accessibilityLabel(Text("Bluetooth error"))
-                }
-                if let managementErrorMessage {
-                    Label(managementErrorMessage, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                }
+                FeedbackBanner(feedback: connectionFeedback)
+                    .accessibilityLabel(Text("Bluetooth error"))
+                FeedbackBanner(feedback: managementFeedback)
 
                 if !unknownBondedWatches.isEmpty {
                     Section {
@@ -288,7 +279,7 @@ struct DiscoveredDeviceRow: View {
                 PreviewSamples.recoverySummary,
                 PreviewSamples.savedSummary,
             ],
-            errorMessage: nil,
+            feedback: nil,
             addWatch: {},
             destination: { watch in Text(verbatim: watch.name) }
         )
@@ -299,7 +290,7 @@ struct DiscoveredDeviceRow: View {
     NavigationStack {
         DevicesContent(
             watches: [],
-            errorMessage: "Bluetooth is off.",
+            feedback: .failure("Bluetooth is off."),
             addWatch: {},
             destination: { _ in EmptyView() }
         )
@@ -308,8 +299,8 @@ struct DiscoveredDeviceRow: View {
 
 #Preview("Add watch") {
     AddWatchContent(
-        connectionErrorMessage: nil,
-        managementErrorMessage: nil,
+        connectionFeedback: nil,
+        managementFeedback: nil,
         unknownBondedWatches: [
             UnknownBondedWatch(id: WatchID("bonded-watch"), name: "Pebble 33EE"),
         ],

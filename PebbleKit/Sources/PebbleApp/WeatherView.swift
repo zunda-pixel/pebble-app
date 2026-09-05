@@ -18,7 +18,7 @@ struct WeatherView: View {
             updated: model.weatherUpdated,
             usesFahrenheit: model.weatherUsesFahrenheit,
             isRefreshing: model.isRefreshingWeather,
-            statusMessage: model.weatherStatusMessage,
+            feedback: model.weatherFeedback,
             watchesWithoutWeather: watchesWithoutWeather,
             credit: model.weatherCredit,
             followPhone: { Task { await model.followPhoneForWeather() } },
@@ -51,7 +51,7 @@ struct WeatherContent: View {
     var updated: Date?
     var usesFahrenheit: Bool
     var isRefreshing: Bool
-    var statusMessage: LocalizedStringKey?
+    var feedback: FeatureFeedback?
     var watchesWithoutWeather: [String]
     var credit: WeatherCredit?
     var followPhone: () -> Void
@@ -128,10 +128,7 @@ struct WeatherContent: View {
                 }
                 Button("Refresh Now", systemImage: "arrow.clockwise", action: refresh)
                     .disabled(isRefreshing || places.isEmpty)
-                if let statusMessage {
-                    Label(statusMessage, systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.secondary)
-                }
+                FeedbackBanner(feedback: feedback)
             } footer: {
                 Text("The watch keeps the numbers it is given, so they are sent in this unit.")
             }
@@ -195,7 +192,7 @@ struct WeatherContent: View {
             updated: .now.addingTimeInterval(-600),
             usesFahrenheit: false,
             isRefreshing: false,
-            statusMessage: nil,
+            feedback: nil,
             watchesWithoutWeather: [],
             credit: PreviewSamples.weatherCredit,
             followPhone: {},
@@ -215,7 +212,7 @@ struct WeatherContent: View {
             updated: .now.addingTimeInterval(-4_000),
             usesFahrenheit: true,
             isRefreshing: false,
-            statusMessage: "The forecast for Kyoto was refused by WeatherKit.",
+            feedback: .failure("The forecast for Kyoto was refused by WeatherKit."),
             watchesWithoutWeather: ["Pebble 2 Duo"],
             credit: PreviewSamples.weatherCredit,
             followPhone: {},
@@ -235,7 +232,7 @@ struct WeatherContent: View {
             updated: nil,
             usesFahrenheit: false,
             isRefreshing: false,
-            statusMessage: nil,
+            feedback: nil,
             watchesWithoutWeather: [],
             credit: nil,
             followPhone: {},

@@ -206,7 +206,7 @@ struct CatalogApplicationDetailView: View {
             state: model.catalogInstallationState(for: application),
             isInstalling: model.installingCatalogApplicationID == application.id,
             isAnyInstallRunning: model.installingCatalogApplicationID != nil,
-            statusMessage: model.dataSyncStatusMessage,
+            feedback: model.catalogFeedback,
             install: { Task { await model.installCatalogApplication(application) } }
         )
     }
@@ -217,7 +217,7 @@ struct CatalogApplicationDetailContent: View {
     var state: CatalogInstallationState
     var isInstalling: Bool
     var isAnyInstallRunning: Bool
-    var statusMessage: LocalizedStringKey?
+    var feedback: FeatureFeedback?
     var install: () -> Void
 
     var body: some View {
@@ -253,7 +253,7 @@ struct CatalogApplicationDetailContent: View {
                 Button(installButtonTitle, systemImage: "arrow.down.app", action: install)
                     .disabled(!canInstall || isAnyInstallRunning)
                 if isInstalling { ProgressView() }
-                if let statusMessage { Text(statusMessage).foregroundStyle(.secondary) }
+                FeedbackBanner(feedback: feedback)
             }
         }
         .navigationTitle(application.name)
@@ -309,7 +309,7 @@ struct CatalogApplicationDetailContent: View {
             state: .available,
             isInstalling: false,
             isAnyInstallRunning: false,
-            statusMessage: nil,
+            feedback: nil,
             install: {}
         )
     }

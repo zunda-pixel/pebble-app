@@ -391,7 +391,7 @@ struct PendingWorkTests {
         // every pin the phone holds. A dropped delete never would, and the
         // event would stay on the watch for good.
         #expect(operations.contains(.delete(removedEventID)))
-        #expect(model.dataSyncStatusMessage == nil)
+        #expect(model.timelineFeedback == nil)
     }
 
     @Test
@@ -409,7 +409,9 @@ struct PendingWorkTests {
         // Nothing here can be reconstructed, so nothing is thrown away — and
         // the reader is told the watch is behind rather than left to find out.
         #expect(operations.count == 210)
-        #expect(model.dataSyncStatusMessage != nil)
+        // On the Timeline screen, which is where the reader asked. It used to be
+        // written to the property the Health and Catalog screens read (#60).
+        #expect(model.timelineFeedback?.isFailure == true)
     }
 
     @Test
@@ -467,7 +469,7 @@ struct PendingWorkTests {
         #expect(model.watchApplications.map(\.versionLabel) == ["1.0"])
         #expect(storedBytes == firstVersionBytes)
         #expect(model.pendingImportSnapshots.isEmpty)
-        #expect(model.applicationLibraryErrorMessage != nil)
+        #expect(model.applicationLibraryFeedback != nil)
         #expect(client.appFetchResponses.contains(.noData))
     }
 

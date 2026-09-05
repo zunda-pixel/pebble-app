@@ -11,12 +11,12 @@ extension AppModel {
             catalogApplications = snapshot?.applications ?? []
             catalogLastUpdated = snapshot?.fetchedAt
         }
-        catch { dataSyncStatusMessage = "The app catalog cache could not be loaded." }
+        catch { catalogFeedback = .failure("The app catalog cache could not be loaded.") }
     }
 
     public func updateCatalog(source: String) async {
         guard let url = URL(string: source), url.scheme?.lowercased() == "https" else {
-            dataSyncStatusMessage = "Enter a valid HTTPS catalog URL."
+            catalogFeedback = .failure("Enter a valid HTTPS catalog URL.")
             return
         }
         guard !isUpdatingCatalog else { return }
@@ -27,11 +27,13 @@ extension AppModel {
             catalogApplications = snapshot.applications
             catalogLastUpdated = snapshot.fetchedAt
             Defaults[.catalogSource] = source
-            dataSyncStatusMessage = "App catalog updated with \(catalogApplications.count) apps."
+            catalogFeedback = .success("App catalog updated with \(catalogApplications.count) apps.")
         } catch {
-            dataSyncStatusMessage = catalogApplications.isEmpty
-                ? "The app catalog could not be updated."
-                : "Catalog refresh failed; showing the offline cache."
+            catalogFeedback = .failure(
+                catalogApplications.isEmpty
+                    ? "The app catalog could not be updated."
+                    : "Catalog refresh failed; showing the offline cache."
+            )
         }
     }
 
@@ -53,42 +55,42 @@ extension AppModel {
 
     public func installCatalogApplication(_ application: CatalogApplication) async {
         guard application.downloadURL.scheme?.lowercased() == "https" else {
-            dataSyncStatusMessage = "The catalog provided an unsafe download URL."
+            catalogFeedback = .failure("The catalog provided an unsafe download URL.")
             return
         }
         if catalogInstallationState(for: application) == .incompatible {
-            dataSyncStatusMessage = "\(application.name) is not compatible with this watch."
+            catalogFeedback = .failure("\(application.name) is not compatible with this watch.")
             return
         }
         guard installingCatalogApplicationID == nil else { return }
         installingCatalogApplicationID = application.id
         defer { installingCatalogApplicationID = nil }
         do {
-            dataSyncStatusMessage = "Downloading \(application.name)…"
+            catalogFeedback = .progress("Downloading \(application.name)…")
             let packageURL = try await appCatalog.download(application)
             let decoded = try await Task.detached { try PBWPackageImporter.application(from: packageURL) }.value
             guard decoded.id == application.id else { throw AppCatalogError.applicationIDMismatch }
-            applicationLibraryErrorMessage = nil
+            applicationLibraryFeedback = nil
             await importApplication(from: packageURL)
             try? FileManager.default.removeItem(at: packageURL)
-            dataSyncStatusMessage = applicationLibraryErrorMessage == nil
-                ? "\(application.name) installed."
-                : applicationLibraryErrorMessage
+            // The import speaks for itself when it went wrong; only the
+            // success is this screen's to word.
+            catalogFeedback = applicationLibraryFeedback ?? .success("\(application.name) installed.")
         } catch {
-            dataSyncStatusMessage = "The catalog package was rejected: \(error.localizedDescription)"
+            catalogFeedback = .failure("The catalog package was rejected: \(error.localizedDescription)")
         }
     }
 
     public func installCatalogUpdates() async {
         let updates = catalogApplications.filter { catalogInstallationState(for: $0) == .updateAvailable }
         guard !updates.isEmpty else {
-            dataSyncStatusMessage = "Installed apps are up to date."
+            catalogFeedback = .success("Installed apps are up to date.")
             return
         }
         for application in updates {
             await installCatalogApplication(application)
-            if applicationLibraryErrorMessage != nil { return }
+            if applicationLibraryFeedback != nil { return }
         }
-        dataSyncStatusMessage = "Installed \(updates.count) catalog update(s)."
+        catalogFeedback = .success("Installed \(updates.count) catalog update(s).")
     }
 }

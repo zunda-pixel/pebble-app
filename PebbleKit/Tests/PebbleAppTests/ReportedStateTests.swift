@@ -74,7 +74,7 @@ struct ReportedStateTests {
         // ordering the watch is given, which is not something to be quiet
         // about.
         #expect(model.weatherReports.map(\.locationName) == ["Kyoto"])
-        #expect(model.weatherStatusMessage != nil)
+        #expect(model.weatherFeedback != nil)
     }
 
     @Test
@@ -112,7 +112,7 @@ struct ReportedStateTests {
         HealthContent(
             samples: samples,
             exportURL: nil,
-            statusMessage: nil,
+            feedback: nil,
             isWatchConnected: false,
             requestWatchSync: {},
             synchronizeWithHealthKit: {},

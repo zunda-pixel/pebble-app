@@ -8,16 +8,18 @@ extension AppModel {
     public func setCompanionNotificationsEnabled(_ enabled: Bool) {
         companionNotificationsEnabled = enabled
         Defaults[.companionNotificationsEnabled] = enabled
-        notificationStatusMessage = enabled
-            ? "Watch app notifications are enabled."
-            : "Watch app notifications are disabled."
+        notificationFeedback = .success(
+            enabled
+                ? "Watch app notifications are enabled."
+                : "Watch app notifications are disabled."
+        )
     }
 
     public func setNotificationsEnabled(_ enabled: Bool, applicationID: UUID) async {
         if enabled { notificationPreferences.mutedApplicationIDs.remove(applicationID) }
         else { notificationPreferences.mutedApplicationIDs.insert(applicationID) }
         try? await notificationPreferenceStore.save(notificationPreferences)
-        notificationStatusMessage = enabled ? "Notifications enabled for this app." : "Notifications muted for this app."
+        notificationFeedback = .success(enabled ? "Notifications enabled for this app." : "Notifications muted for this app.")
     }
 
     public func setQuietHours(enabled: Bool, start: Int? = nil, end: Int? = nil) async {
@@ -29,7 +31,7 @@ extension AppModel {
 
     public func sendTestNotification(watchID: WatchID? = nil) async {
         guard let connection = connection(for: watchID), connection.isConnected else {
-            notificationStatusMessage = "Connect a Pebble before sending a test notification."
+            notificationFeedback = .failure("Connect a Pebble before sending a test notification.")
             return
         }
         let notification = PebbleTimelineNotification(
@@ -40,14 +42,14 @@ extension AppModel {
         )
         do {
             try await connection.client.write(.notification(notification))
-            notificationStatusMessage = "Test notification sent."
+            notificationFeedback = .success("Test notification sent.")
             await record(notification, sentTo: [connection.watch.name])
             await PebbleDiagnostics.shared.record(
                 category: "notification",
                 message: "Test notification sent"
             )
         } catch {
-            notificationStatusMessage = "The test notification could not be sent."
+            notificationFeedback = .failure("The test notification could not be sent.")
             await PebbleDiagnostics.shared.record(
                 .error,
                 category: "notification",

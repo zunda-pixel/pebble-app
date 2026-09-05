@@ -12,7 +12,7 @@ extension AppModel {
               url.host != nil,
               url.user == nil,
               url.password == nil else {
-            applicationLibraryErrorMessage = "The application requested an unsafe settings URL."
+            applicationLibraryFeedback = .failure("The application requested an unsafe settings URL.")
             Task {
                 await PebbleDiagnostics.shared.record(
                     .warning,
@@ -38,9 +38,9 @@ extension AppModel {
         defer { isLoadingApplications = false }
         do {
             updateApplications(try await applicationLibrary.applications())
-            applicationLibraryErrorMessage = nil
+            applicationLibraryFeedback = nil
         } catch {
-            applicationLibraryErrorMessage = "The application library could not be read: \(error.localizedDescription)"
+            applicationLibraryFeedback = .failure("The application library could not be read: \(error.localizedDescription)")
         }
     }
 
@@ -59,7 +59,7 @@ extension AppModel {
                 message: "Requested configuration for \(application.displayName)"
             )
         } catch {
-            applicationLibraryErrorMessage = "The application settings could not be opened."
+            applicationLibraryFeedback = .failure("The application settings could not be opened.")
         }
     }
 
@@ -68,7 +68,7 @@ extension AppModel {
         guard !activeConnections.isEmpty else {
             // A watchface becomes active by being launched, and there is nothing to
             // launch it on.
-            applicationLibraryErrorMessage = "Connect a Pebble to change the watchface."
+            applicationLibraryFeedback = .failure("Connect a Pebble to change the watchface.")
             return
         }
         do {
@@ -80,9 +80,9 @@ extension AppModel {
             }
             activeWatchfaceID = application.id
             Defaults[.activeWatchfaceID] = application.id
-            applicationManagementStatusMessage = "\(application.displayName) is active."
+            applicationManagementFeedback = .success("\(application.displayName) is active.")
         } catch {
-            applicationLibraryErrorMessage = "The watchface could not be activated."
+            applicationLibraryFeedback = .failure("The watchface could not be activated.")
         }
     }
 
@@ -95,7 +95,7 @@ extension AppModel {
     public func removeApplication(id: UUID) async {
         if activeWatchfaceID == id {
             guard let fallback = watchfaces.first(where: { $0.id != id }) else {
-                applicationLibraryErrorMessage = "Install and activate another watchface before removing the active one."
+                applicationLibraryFeedback = .failure("Install and activate another watchface before removing the active one.")
                 return
             }
             if activeConnections.isEmpty {
@@ -115,9 +115,9 @@ extension AppModel {
             let applications = try await applicationLibrary.remove(applicationID: id)
             updateApplications(applications)
             try await synchronizeAllWatches()
-            applicationLibraryErrorMessage = nil
+            applicationLibraryFeedback = nil
         } catch {
-            applicationLibraryErrorMessage = applicationErrorMessage(error)
+            applicationLibraryFeedback = .failure(applicationErrorMessage(error))
         }
     }
 
@@ -154,14 +154,14 @@ extension AppModel {
                 expirePendingSnapshot(applicationID: application.id)
             }
             hasLoadedApplications = true
-            applicationLibraryErrorMessage = nil
+            applicationLibraryFeedback = nil
         } catch {
             // The watch refused the registration, not the bytes, so nothing has been
             // transferred and the import stands.
             if let importedApplicationID {
                 expirePendingSnapshot(applicationID: importedApplicationID)
             }
-            applicationLibraryErrorMessage = applicationErrorMessage(error)
+            applicationLibraryFeedback = .failure(applicationErrorMessage(error))
         }
     }
 
@@ -196,9 +196,9 @@ extension AppModel {
                 try? await synchronizeAllWatches()
                 throw error
             }
-            applicationLibraryErrorMessage = nil
+            applicationLibraryFeedback = nil
         } catch {
-            applicationLibraryErrorMessage = applicationErrorMessage(error)
+            applicationLibraryFeedback = .failure(applicationErrorMessage(error))
         }
     }
 
@@ -224,11 +224,11 @@ extension AppModel {
 
     func beginApplicationOperation(_ operation: ApplicationManagementOperation) -> Bool {
         guard applicationManagementOperation == nil, !isHandlingAppFetch else {
-            applicationLibraryErrorMessage = "Another application operation is already in progress."
+            applicationLibraryFeedback = .failure("Another application operation is already in progress.")
             return false
         }
         applicationManagementOperation = operation
-        applicationManagementStatusMessage = statusMessage(for: operation)
+        applicationManagementFeedback = .progress(statusMessage(for: operation))
         return true
     }
 
@@ -236,7 +236,7 @@ extension AppModel {
         guard applicationManagementOperation == operation else { return }
         let completedOperation = applicationManagementOperation
         applicationManagementOperation = nil
-        applicationManagementStatusMessage = nil
+        applicationManagementFeedback = nil
         if needsApplicationSynchronization,
            completedOperation != .synchronizing,
            !activeConnections.isEmpty {
@@ -267,10 +267,10 @@ extension AppModel {
 
         do {
             try await performApplicationSynchronization(on: connection)
-            applicationLibraryErrorMessage = nil
+            applicationLibraryFeedback = nil
         } catch {
             needsApplicationSynchronization = true
-            applicationLibraryErrorMessage = applicationErrorMessage(error)
+            applicationLibraryFeedback = .failure(applicationErrorMessage(error))
         }
     }
 
@@ -431,7 +431,7 @@ extension AppModel {
             || pendingImportSnapshots[request.applicationID] != nil
         if ownsOperation {
             applicationManagementOperation = .installing(request.applicationID)
-            applicationManagementStatusMessage = statusMessage(for: .installing(request.applicationID))
+            applicationManagementFeedback = .progress(statusMessage(for: .installing(request.applicationID)))
         }
         connection.appFetchTask = Task { [weak self] in
             guard let self else {
@@ -483,12 +483,12 @@ extension AppModel {
             let applications = try await applicationLibrary.applications()
             try await recordSynchronizedApplications(applications, device: connection.watch)
             pendingImportSnapshots[request.applicationID] = nil
-            applicationLibraryErrorMessage = nil
+            applicationLibraryFeedback = nil
         } catch {
             // Including when "the version they had" is none at all and the import has
             // to be undone entirely.
             await restorePendingSnapshot(applicationID: request.applicationID)
-            applicationLibraryErrorMessage = applicationErrorMessage(error)
+            applicationLibraryFeedback = .failure(applicationErrorMessage(error))
             try? await connection.client.respondToAppFetch(with: .noData)
         }
     }

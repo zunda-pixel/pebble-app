@@ -31,7 +31,7 @@ struct FirmwareView: View {
             downloadedFirmware: model.downloadedFirmware,
             journal: journal,
             progress: journal == nil ? nil : model.firmwareTransferProgress(on: watchID),
-            statusMessage: model.firmwareUpdateStatusMessage,
+            feedback: model.firmwareUpdateFeedback,
             requiresConfirmation: model.firmwareRequiresConfirmation,
             checkForUpdates: { Task { await model.checkForFirmwareUpdate(watchID: watchID) } },
             download: { Task { await model.downloadAvailableFirmware(watchID: watchID) } },
@@ -55,7 +55,7 @@ struct FirmwareContent: View {
     var downloadedFirmware: DownloadedFirmware?
     var journal: FirmwareUpdateJournal?
     var progress: PutBytesTransferProgress?
-    var statusMessage: LocalizedStringKey?
+    var feedback: FeatureFeedback?
     var requiresConfirmation: Bool
     var checkForUpdates: () -> Void
     var download: () -> Void
@@ -83,11 +83,7 @@ struct FirmwareContent: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
-                if let statusMessage {
-                    Text(statusMessage)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
+                FeedbackBanner(feedback: feedback)
             }
 
             Section("On the Watch") {
@@ -292,7 +288,7 @@ private struct FirmwareStatusRow: View {
             downloadedFirmware: nil,
             journal: nil,
             progress: nil,
-            statusMessage: nil,
+            feedback: nil,
             requiresConfirmation: false,
             checkForUpdates: {},
             download: {},
@@ -318,7 +314,7 @@ private struct FirmwareStatusRow: View {
             downloadedFirmware: PreviewSamples.downloadedFirmware,
             journal: PreviewSamples.firmwareJournal(phase: .transferring),
             progress: PreviewSamples.transferProgress,
-            statusMessage: "Sending PebbleOS v4.37.0 to Pebble 5209.",
+            feedback: .progress("Sending PebbleOS v4.37.0 to Pebble 5209."),
             requiresConfirmation: false,
             checkForUpdates: {},
             download: {},
@@ -344,7 +340,7 @@ private struct FirmwareStatusRow: View {
             downloadedFirmware: PreviewSamples.downloadedFirmware,
             journal: PreviewSamples.firmwareJournal(phase: .failed),
             progress: nil,
-            statusMessage: "The transfer stopped.",
+            feedback: .failure("The transfer stopped."),
             requiresConfirmation: false,
             checkForUpdates: {},
             download: {},
@@ -370,7 +366,7 @@ private struct FirmwareStatusRow: View {
             downloadedFirmware: PreviewSamples.downloadedFirmware,
             journal: PreviewSamples.firmwareJournal(phase: .validated),
             progress: nil,
-            statusMessage: nil,
+            feedback: nil,
             requiresConfirmation: true,
             checkForUpdates: {},
             download: {},

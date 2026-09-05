@@ -10,7 +10,7 @@ extension AppModel {
         guard !weatherPlaces.contains(where: \.followsPhone) else { return }
         guard phoneLocationSource.isAllowed else {
             phoneLocationSource.requestAuthorization()
-            weatherStatusMessage = "Allow location access to use where the phone is."
+            weatherFeedback = .failure("Allow location access to use where the phone is.")
             return
         }
         do {
@@ -29,7 +29,7 @@ extension AppModel {
             saveWeatherPlaces()
             await refreshWeather()
         } catch {
-            weatherStatusMessage = "The phone's position could not be read."
+            weatherFeedback = .failure("The phone's position could not be read.")
             await PebbleDiagnostics.shared.record(
                 .error,
                 category: "weather",
@@ -61,7 +61,7 @@ extension AppModel {
             saveWeatherPlaces()
             await refreshWeather()
         } catch {
-            weatherStatusMessage = "No place was found for “\(query)”."
+            weatherFeedback = .failure("No place was found for “\(query)”.")
         }
     }
 
@@ -84,7 +84,7 @@ extension AppModel {
 
     public func refreshWeather() async {
         guard !weatherPlaces.isEmpty else {
-            weatherStatusMessage = nil
+            weatherFeedback = nil
             return
         }
         isRefreshingWeather = true
@@ -107,7 +107,7 @@ extension AppModel {
                 )
             } catch {
                 placeFailed = true
-                weatherStatusMessage = weatherFailureMessage(for: error, place: place.name)
+                weatherFeedback = .failure(weatherFailureMessage(for: error, place: place.name))
                 // `localizedDescription` on a WeatherKit failure is usually "The operation
                 // couldn't be completed", which says nothing; the domain and code do.
                 await PebbleDiagnostics.shared.record(
@@ -122,7 +122,7 @@ extension AppModel {
         weatherUpdated = .now
         // A place whose forecast did not arrive shows a blank temperature and is
         // left out of the ordering the watch is given.
-        if !placeFailed { weatherStatusMessage = nil }
+        if !placeFailed { weatherFeedback = nil }
         for connection in activeConnections {
             await sendWeather(to: connection)
         }
@@ -140,8 +140,9 @@ extension AppModel {
         do {
             try await connection.client.write(.weatherOrder(weatherReports.map(\.id)))
         } catch {
-            weatherStatusMessage =
+            weatherFeedback = .failure(
                 "\(connection.watch.name) did not accept the list of places. \(Text(refusalReason(for: error)))"
+            )
             await PebbleDiagnostics.shared.record(
                 .error,
                 category: "weather",
@@ -155,8 +156,9 @@ extension AppModel {
                 // between "sent" and "shown".
                 try await connection.client.write(.weather(report))
             } catch {
-                weatherStatusMessage =
+                weatherFeedback = .failure(
                     "\(connection.watch.name) did not accept the forecast. \(Text(refusalReason(for: error)))"
+                )
                 await PebbleDiagnostics.shared.record(
                     .error,
                     category: "weather",

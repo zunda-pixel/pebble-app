@@ -10,7 +10,7 @@ struct HealthView: View {
         HealthContent(
             samples: model.healthSamples,
             exportURL: model.healthExportURL,
-            statusMessage: model.dataSyncStatusMessage,
+            feedback: model.healthFeedback,
             isWatchConnected: model.connectedWatch != nil,
             requestWatchSync: { Task { await model.requestHealthSync() } },
             synchronizeWithHealthKit: synchronizeWithHealthKit,
@@ -44,7 +44,7 @@ struct HealthView: View {
 struct HealthContent: View {
     var samples: [WatchHealthSample]
     var exportURL: URL?
-    var statusMessage: LocalizedStringKey?
+    var feedback: FeatureFeedback?
     var isWatchConnected: Bool
     var requestWatchSync: () -> Void
     var synchronizeWithHealthKit: () -> Void
@@ -152,7 +152,7 @@ struct HealthContent: View {
                 confirmationTitle: "Delete Health Data",
                 action: deleteLocalData
             )
-            if let statusMessage { Text(statusMessage).foregroundStyle(.secondary) }
+            FeedbackBanner(feedback: feedback)
         }
         .navigationTitle(Text("Health"))
         .fileImporter(isPresented: $isImportingArchive, allowedContentTypes: [.json]) { result in
@@ -194,7 +194,7 @@ struct HealthContent: View {
         HealthContent(
             samples: PreviewSamples.healthSamples,
             exportURL: nil,
-            statusMessage: "Received 3 health update(s) from the watch.",
+            feedback: .success("Received 3 health update(s) from the watch."),
             isWatchConnected: true,
             requestWatchSync: {},
             synchronizeWithHealthKit: {},
@@ -211,7 +211,7 @@ struct HealthContent: View {
         HealthContent(
             samples: [],
             exportURL: nil,
-            statusMessage: nil,
+            feedback: nil,
             isWatchConnected: false,
             requestWatchSync: {},
             synchronizeWithHealthKit: {},

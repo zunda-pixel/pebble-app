@@ -6,7 +6,7 @@ import SwiftUI
 extension AppModel {
     public func loadHealth() async {
         do { healthSamples = try await healthStore.samples() }
-        catch { dataSyncStatusMessage = "Health data could not be loaded." }
+        catch { healthFeedback = .failure("Health data could not be loaded.") }
     }
 
     public func requestHealthSync() async {
@@ -20,29 +20,29 @@ extension AppModel {
         do {
             try await connection.client.send(HealthDataLoggingCodec.reportOpenSessionsFrame())
             try await connection.client.send(HealthSyncCodec.requestFrame(since: healthSamples.map(\.date).max()))
-            dataSyncStatusMessage = "Health synchronization requested."
-        } catch { dataSyncStatusMessage = "Health synchronization will retry after reconnection." }
+            healthFeedback = .progress("Health synchronization requested.")
+        } catch { healthFeedback = .failure("Health synchronization will retry after reconnection.") }
     }
 
     #if os(iOS)
     public func synchronizeWithHealthKit() async {
         do {
             try await healthKitBridge.synchronize(healthSamples)
-            dataSyncStatusMessage = "Health data synchronized with HealthKit."
-        } catch { dataSyncStatusMessage = "HealthKit access or synchronization failed." }
+            healthFeedback = .success("Health data synchronized with HealthKit.")
+        } catch { healthFeedback = .failure("HealthKit access or synchronization failed.") }
     }
 
     public func importFromHealthKit() async {
         do {
             healthSamples = try await healthStore.merge(try await healthKitBridge.readRecentSamples())
-            dataSyncStatusMessage = "HealthKit data imported and deduplicated."
-        } catch { dataSyncStatusMessage = "HealthKit data could not be read." }
+            healthFeedback = .success("HealthKit data imported and deduplicated.")
+        } catch { healthFeedback = .failure("HealthKit data could not be read.") }
     }
     #endif
 
     public func exportHealthData() async {
         do { healthExportURL = try await healthStore.export() }
-        catch { dataSyncStatusMessage = "Health data could not be exported." }
+        catch { healthFeedback = .failure("Health data could not be exported.") }
     }
 
     public func importHealthData(from url: URL) async {
@@ -50,9 +50,9 @@ extension AppModel {
         defer { if accessed { url.stopAccessingSecurityScopedResource() } }
         do {
             healthSamples = try await healthStore.importArchive(from: url)
-            dataSyncStatusMessage = "Health archive imported and reconciled."
+            healthFeedback = .success("Health archive imported and reconciled.")
         } catch {
-            dataSyncStatusMessage = "The selected health archive is invalid or unsupported."
+            healthFeedback = .failure("The selected health archive is invalid or unsupported.")
         }
     }
 
@@ -60,6 +60,6 @@ extension AppModel {
         try? await healthStore.deleteAll()
         healthSamples = []
         healthExportURL = nil
-        dataSyncStatusMessage = "Local Pebble health data deleted."
+        healthFeedback = .success("Local Pebble health data deleted.")
     }
 }

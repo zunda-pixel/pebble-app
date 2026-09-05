@@ -7,7 +7,7 @@ struct TimelinePinsView: View {
     var body: some View {
         TimelinePinsContent(
             pins: model.timelinePins,
-            statusMessage: model.timelineActionStatusMessage
+            feedback: model.timelineFeedback
         ) { removed in
             Task { await model.removeTimelinePins(removed) }
         }
@@ -18,7 +18,7 @@ struct TimelinePinsView: View {
 /// month of events — so it is grouped and searchable.
 struct TimelinePinsContent: View {
     var pins: [TimelinePin]
-    var statusMessage: LocalizedStringKey?
+    var feedback: FeatureFeedback?
     var remove: ([TimelinePin]) -> Void
 
     @State private var search = ""
@@ -58,10 +58,8 @@ struct TimelinePinsContent: View {
                     Text(day.date, format: .dateTime.year().month().day())
                 }
             }
-            if let statusMessage {
-                Section {
-                    Text(statusMessage).foregroundStyle(.secondary)
-                }
+            if feedback != nil {
+                Section { FeedbackBanner(feedback: feedback) }
             }
         }
         .searchable(text: $search)
@@ -83,13 +81,13 @@ struct TimelinePinsContent: View {
     NavigationStack {
         TimelinePinsContent(
             pins: PreviewSamples.pins,
-            statusMessage: "Pebble 5209 snoozed a pin."
+            feedback: .success("Pebble 5209 snoozed a pin.")
         ) { _ in }
     }
 }
 
 #Preview("No pins") {
     NavigationStack {
-        TimelinePinsContent(pins: [], statusMessage: nil) { _ in }
+        TimelinePinsContent(pins: [], feedback: nil) { _ in }
     }
 }

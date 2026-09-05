@@ -145,7 +145,7 @@ struct AppModelTests {
         // The recovery firmware rejects these endpoints and drops the link
         // when it is flooded with them.
         #expect(client.reorderedApplicationIDs.isEmpty)
-        #expect(model.watchManagementErrorMessage != nil)
+        #expect(model.watchManagementFeedback != nil)
     }
 
     @Test
@@ -654,7 +654,7 @@ struct AppModelTests {
         #expect(model.connections.isEmpty)
         #expect(client.disconnectedWatches.map(\.id) == [discovered.id])
         #expect(model.installedApplicationIDs(on: discovered.id).isEmpty)
-        #expect(model.watchResetStatusMessages[discovered.id] != nil)
+        #expect(model.watchResetFeedback[discovered.id] != nil)
     }
 
     @Test
@@ -675,7 +675,7 @@ struct AppModelTests {
         let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
         await model.resetWatch(.restart, watchID: discovered.id)
-        #expect(model.watchResetStatusMessages[discovered.id] != nil)
+        #expect(model.watchResetFeedback[discovered.id] != nil)
 
         // The watch says nothing on its way back: the link returning is the
         // whole of the news, and until it was read as news the screen said the
@@ -683,7 +683,7 @@ struct AppModelTests {
         await model.scan()
         await model.connect(to: try #require(model.discoveredWatches.first))
 
-        #expect(model.watchResetStatusMessages[discovered.id] == nil)
+        #expect(model.watchResetFeedback[discovered.id] == nil)
     }
 
     @Test
@@ -703,7 +703,7 @@ struct AppModelTests {
         await model.resetWatch(.restart, watchID: WatchID("missing-watch"))
 
         #expect(client.sentFrames.isEmpty)
-        #expect(model.watchManagementErrorMessage != nil)
+        #expect(model.watchManagementFeedback != nil)
     }
 
     @Test

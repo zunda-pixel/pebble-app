@@ -8,7 +8,7 @@ extension AppModel {
     public func loadSavedWatches() async {
         do {
             savedWatches = try await watchStore.allWatches()
-            watchManagementErrorMessage = nil
+            watchManagementFeedback = nil
             let library = applicationLibrary
             let states = await savedWatches
                 .filter { installedApplicationIDsByWatch[$0.id] == nil }
@@ -20,7 +20,7 @@ extension AppModel {
                 installedApplicationIDsByWatch[watchID] = ids
             }
         } catch {
-            watchManagementErrorMessage = "Saved watches could not be loaded."
+            watchManagementFeedback = .failure("Saved watches could not be loaded.")
         }
     }
 
@@ -76,9 +76,9 @@ extension AppModel {
     public func setAutomaticallyConnects(_ enabled: Bool, watchID: WatchID) async {
         do {
             savedWatches = try await watchStore.setAutomaticallyConnects(enabled, watchID: watchID)
-            watchManagementErrorMessage = nil
+            watchManagementFeedback = nil
         } catch {
-            watchManagementErrorMessage = "The automatic connection preference could not be saved."
+            watchManagementFeedback = .failure("The automatic connection preference could not be saved.")
         }
     }
 
@@ -91,10 +91,10 @@ extension AppModel {
             savedWatches = try await watchStore.remove(watchID: id)
             installedApplicationIDsByWatch[id] = nil
             connectionFailures[id] = nil
-            watchResetStatusMessages[id] = nil
-            watchManagementErrorMessage = nil
+            watchResetFeedback[id] = nil
+            watchManagementFeedback = nil
         } catch {
-            watchManagementErrorMessage = "The watch could not be forgotten."
+            watchManagementFeedback = .failure("The watch could not be forgotten.")
         }
     }
 
@@ -127,14 +127,14 @@ extension AppModel {
                 applications: watchApplications + watchfaces
             )
         } catch {
-            applicationLibraryErrorMessage = "The diagnostic report could not be created."
+            applicationLibraryFeedback = .failure("The diagnostic report could not be created.")
         }
     }
 
     // The watch reboots without answering, so the connection is closed locally.
     public func resetWatch(_ kind: PebbleResetKind, watchID: WatchID? = nil) async {
         guard let connection = connection(for: watchID), connection.isConnected else {
-            watchManagementErrorMessage = "Connect the watch before resetting it."
+            watchManagementFeedback = .failure("Connect the watch before resetting it.")
             return
         }
         let device = connection.watch
@@ -149,30 +149,33 @@ extension AppModel {
                 category: "reset",
                 message: "Sent reset command \(kind) to the watch"
             )
-            watchManagementErrorMessage = nil
+            watchManagementFeedback = nil
             await close(connection)
-            watchResetStatusMessages[device.id] = switch kind {
+            let message: LocalizedStringKey = switch kind {
             case .restart: "The watch is restarting."
             case .recoveryFirmware: "The watch is restarting into recovery firmware."
             case .factoryReset:
                 "The watch is erasing itself. It has forgotten this device, so it cannot reconnect until it is forgotten here too."
             }
+            // Progress, not success: the watch has gone away to do it, and the
+            // only news afterwards is the link returning.
+            watchResetFeedback[device.id] = .progress(message)
         } catch {
-            watchResetStatusMessages[device.id] = nil
-            watchManagementErrorMessage = "The reset command could not be sent."
+            watchResetFeedback[device.id] = nil
+            watchManagementFeedback = .failure("The reset command could not be sent.")
         }
     }
 
     func recordConnectedWatch(_ device: ConnectedWatch) async {
         // A watch that is talking again has finished restarting, whoever opened
         // the link. Every way back in passes through here.
-        watchResetStatusMessages[device.id] = nil
+        watchResetFeedback[device.id] = nil
         noteFirmwareUpdateFinished(on: device)
         do {
             savedWatches = try await watchStore.record(device)
-            watchManagementErrorMessage = nil
+            watchManagementFeedback = nil
         } catch {
-            watchManagementErrorMessage = "The watch connection history could not be saved."
+            watchManagementFeedback = .failure("The watch connection history could not be saved.")
         }
     }
 }

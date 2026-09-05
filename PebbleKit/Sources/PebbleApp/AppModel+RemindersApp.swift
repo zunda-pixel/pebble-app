@@ -16,7 +16,7 @@ extension AppModel {
         do {
             items = try await remindersAppStore.reminders()
         } catch {
-            reminderStatusMessage = "The Reminders app could not be read."
+            reminderFeedback = .failure("The Reminders app could not be read.")
             await PebbleDiagnostics.shared.record(
                 .error,
                 category: "timeline",
@@ -38,7 +38,7 @@ extension AppModel {
         for reminder in outcome.finished { mirrored[reminder.id] = nil }
         try? await reminderStore.save(reminders)
         try? await reminderStore.setMirroredIdentifiers(mirrored)
-        reminderStatusMessage = nil
+        reminderFeedback = nil
         for connection in activeConnections {
             await synchronizeReminders(on: connection)
         }

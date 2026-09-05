@@ -22,7 +22,7 @@ struct WatchDiagnosticsView: View {
             applicationLogLines: model.applicationLogLines,
             coredumpURL: model.coredumpURL,
             isCollectingCoredump: model.isCollectingCoredump,
-            statusMessages: model.watchDiagnosticsStatusMessages,
+            feedback: model.watchDiagnosticsFeedback,
             takeScreenshot: { Task { await model.takeScreenshot(watchID: watchID) } },
             gatherWatchLogs: { Task { await model.gatherWatchLogs(watchID: watchID) } },
             setApplicationLogging: { isOn in Task { await model.setApplicationLoggingEnabled(isOn) } },
@@ -45,7 +45,7 @@ struct WatchDiagnosticsContent: View {
     var applicationLogLines: [WatchLogLine]
     var coredumpURL: URL?
     var isCollectingCoredump: Bool
-    var statusMessages: [WatchDiagnostic: LocalizedStringKey]
+    var feedback: [WatchDiagnostic: FeatureFeedback]
     var takeScreenshot: () -> Void
     var gatherWatchLogs: () -> Void
     var setApplicationLogging: (Bool) -> Void
@@ -70,7 +70,7 @@ struct WatchDiagnosticsContent: View {
                 if let screenshotURL {
                     ShareLink(item: screenshotURL) { Label("Share Screenshot", systemImage: "square.and.arrow.up") }
                 }
-                DiagnosticResult(statusMessages[.screenshot])
+                FeedbackBanner(feedback: feedback[.screenshot])
             } header: {
                 Text("Screen")
             }
@@ -84,7 +84,7 @@ struct WatchDiagnosticsContent: View {
                 if let watchLogsURL {
                     ShareLink(item: watchLogsURL) { Label("Share Logs", systemImage: "square.and.arrow.up") }
                 }
-                DiagnosticResult(statusMessages[.watchLogs])
+                FeedbackBanner(feedback: feedback[.watchLogs])
             } header: {
                 Text("Watch Logs")
             } footer: {
@@ -113,7 +113,7 @@ struct WatchDiagnosticsContent: View {
                 if let coredumpURL {
                     ShareLink(item: coredumpURL) { Label("Share Crash Report", systemImage: "square.and.arrow.up") }
                 }
-                DiagnosticResult(statusMessages[.coredump])
+                FeedbackBanner(feedback: feedback[.coredump])
             } header: {
                 Text("Crash Report")
             } footer: {
@@ -131,7 +131,7 @@ struct WatchDiagnosticsContent: View {
                     action: clearTimeline
                 )
                 .disabled(!isConnected)
-                DiagnosticResult(statusMessages[.timeline])
+                FeedbackBanner(feedback: feedback[.timeline])
             } header: {
                 Text("Timeline")
             } footer: {
@@ -145,20 +145,6 @@ struct WatchDiagnosticsContent: View {
 /// How the last attempt went, in the section that asked. The screen's buttons
 /// are sections apart and the app logs section can be fifty lines long, so a
 /// result gathered anywhere else is off the screen from whatever caused it.
-private struct DiagnosticResult: View {
-    var message: LocalizedStringKey?
-
-    init(_ message: LocalizedStringKey?) {
-        self.message = message
-    }
-
-    var body: some View {
-        if let message {
-            Label(message, systemImage: "info.circle").foregroundStyle(.secondary)
-        }
-    }
-}
-
 /// A picture the watch sent, ready to show.
 struct WatchScreenshotImage {
     var screenshot: WatchScreenshot
@@ -183,7 +169,7 @@ struct WatchScreenshotImage {
             applicationLogLines: PreviewSamples.logLines,
             coredumpURL: nil,
             isCollectingCoredump: false,
-            statusMessages: [.watchLogs: "3 log line(s) collected."],
+            feedback: [.watchLogs: .success("3 log line(s) collected.")],
             takeScreenshot: {},
             gatherWatchLogs: {},
             setApplicationLogging: { _ in },
@@ -207,7 +193,7 @@ struct WatchScreenshotImage {
             applicationLogLines: [],
             coredumpURL: nil,
             isCollectingCoredump: false,
-            statusMessages: [:],
+            feedback: [:],
             takeScreenshot: {},
             gatherWatchLogs: {},
             setApplicationLogging: { _ in },

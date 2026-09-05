@@ -22,7 +22,7 @@ extension AppModel {
             do {
                 try await connection.client.write(.watchSetting(setting, isOn: isOn))
             } catch {
-                watchSettingsStatusMessage = settingsFailureMessage(connection, error)
+                watchSettingsFeedback = .failure(settingsFailureMessage(connection, error))
             }
         }
     }
@@ -34,7 +34,7 @@ extension AppModel {
             do {
                 try await connection.client.write(.activitySettings(settings))
             } catch {
-                watchSettingsStatusMessage = settingsFailureMessage(connection, error)
+                watchSettingsFeedback = .failure(settingsFailureMessage(connection, error))
             }
         }
     }
@@ -46,7 +46,7 @@ extension AppModel {
             do {
                 try await connection.client.write(.heartRateSettings(settings))
             } catch {
-                watchSettingsStatusMessage = settingsFailureMessage(connection, error)
+                watchSettingsFeedback = .failure(settingsFailureMessage(connection, error))
             }
         }
     }

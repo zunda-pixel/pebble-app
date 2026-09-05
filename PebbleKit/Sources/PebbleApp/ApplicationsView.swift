@@ -53,8 +53,8 @@ struct ApplicationsView: View {
             activeWatchfaceID: model.activeWatchfaceID,
             installedApplicationIDs: displayedWatchID.map { model.installedApplicationIDs(on: $0) },
             isLoading: model.isLoadingApplications,
-            errorMessage: model.applicationLibraryErrorMessage,
-            operationStatusMessage: model.applicationManagementStatusMessage,
+            libraryFeedback: model.applicationLibraryFeedback,
+            operationFeedback: model.applicationManagementFeedback,
             isOperationInProgress: model.isApplicationManagementBusy,
             installingApplicationName: transfer?.name,
             installationProgress: transfer?.progress,
@@ -152,8 +152,8 @@ struct ApplicationsContent<Detail: View>: View {
     /// Nil when no watch is connected: install state is unknown, not shown.
     var installedApplicationIDs: Set<UUID>?
     var isLoading: Bool
-    var errorMessage: LocalizedStringKey?
-    var operationStatusMessage: LocalizedStringKey?
+    var libraryFeedback: FeatureFeedback?
+    var operationFeedback: FeatureFeedback?
     var isOperationInProgress: Bool
     var installingApplicationName: String?
     var installationProgress: PutBytesTransferProgress?
@@ -187,10 +187,10 @@ struct ApplicationsContent<Detail: View>: View {
             // invalid-update exception rather than drawing.
             VStack(spacing: 0) {
                 ApplicationOperationBanner(
-                    statusMessage: operationStatusMessage,
+                    operationFeedback: operationFeedback,
                     installingApplicationName: installingApplicationName,
                     installationProgress: installationProgress,
-                    errorMessage: errorMessage
+                    libraryFeedback: libraryFeedback
                 )
                 List {
                     // Each section carries the kind it is for as its identity.
@@ -264,33 +264,27 @@ private struct ApplicationGroup: Identifiable {
 
 /// What the library is in the middle of, and what went wrong doing it.
 struct ApplicationOperationBanner: View {
-    var statusMessage: LocalizedStringKey?
+    var operationFeedback: FeatureFeedback?
     var installingApplicationName: String?
     var installationProgress: PutBytesTransferProgress?
-    var errorMessage: LocalizedStringKey?
+    var libraryFeedback: FeatureFeedback?
 
     private var isEmpty: Bool {
-        statusMessage == nil && errorMessage == nil
+        operationFeedback == nil && libraryFeedback == nil
             && (installingApplicationName == nil || installationProgress == nil)
     }
 
     var body: some View {
         if !isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                if let statusMessage {
-                    Label(statusMessage, systemImage: "arrow.triangle.2.circlepath")
-                        .foregroundStyle(.secondary)
-                }
+                FeedbackBanner(feedback: operationFeedback)
                 if let installingApplicationName, let installationProgress {
                     InstallationProgressRow(
                         applicationName: installingApplicationName,
                         progress: installationProgress
                     )
                 }
-                if let errorMessage {
-                    Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                }
+                FeedbackBanner(feedback: libraryFeedback)
             }
             .font(.callout)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -490,8 +484,8 @@ struct ApplicationPlaceholderRow: View {
             activeWatchfaceID: PreviewSamples.watchfaces.first?.id,
             installedApplicationIDs: Set(PreviewSamples.watchApplications.prefix(1).map(\.id)),
             isLoading: false,
-            errorMessage: nil,
-            operationStatusMessage: nil,
+            libraryFeedback: nil,
+            operationFeedback: nil,
             isOperationInProgress: false,
             installingApplicationName: nil,
             installationProgress: nil,
@@ -513,8 +507,8 @@ struct ApplicationPlaceholderRow: View {
             activeWatchfaceID: nil,
             installedApplicationIDs: nil,
             isLoading: false,
-            errorMessage: nil,
-            operationStatusMessage: "Sending Timeline Weather to Pebble 5209.",
+            libraryFeedback: nil,
+            operationFeedback: .progress("Sending Timeline Weather to Pebble 5209."),
             isOperationInProgress: true,
             installingApplicationName: "Timeline Weather",
             installationProgress: PreviewSamples.transferProgress,
@@ -536,8 +530,8 @@ struct ApplicationPlaceholderRow: View {
             activeWatchfaceID: nil,
             installedApplicationIDs: nil,
             isLoading: false,
-            errorMessage: nil,
-            operationStatusMessage: nil,
+            libraryFeedback: nil,
+            operationFeedback: nil,
             isOperationInProgress: false,
             installingApplicationName: nil,
             installationProgress: nil,

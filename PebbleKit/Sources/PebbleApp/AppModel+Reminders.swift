@@ -24,10 +24,10 @@ extension AppModel {
         // `reminder_db.c` — and refuses anything older outright, which the list
         // already says about the ones that have passed.
         guard reminder.timestamp > .now else {
-            reminderStatusMessage = "That time has passed, so the reminder is kept here rather than sent to the watch."
+            reminderFeedback = .success("That time has passed, so the reminder is kept here rather than sent to the watch.")
             return
         }
-        reminderStatusMessage = nil
+        reminderFeedback = nil
         for connection in activeConnections {
             do {
                 try await connection.client.write(.timelineReminder(reminder))
@@ -39,8 +39,9 @@ extension AppModel {
                 written.insert(reminder.id)
                 try? await reminderStore.setWrittenPinIDs(written, watchID: watchID)
             } catch {
-                reminderStatusMessage =
+                reminderFeedback = .failure(
                     "\(connection.watch.name) did not accept the reminder. \(Text(refusalReason(for: error)))"
+                )
                 await PebbleDiagnostics.shared.record(
                     .error,
                     category: "timeline",
