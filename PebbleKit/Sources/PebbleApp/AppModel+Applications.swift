@@ -7,17 +7,42 @@ import Retry
 import SwiftUI
 
 extension AppModel {
+    /// Whether a settings page may be opened at all.
+    ///
+    /// `http` is allowed alongside `https` because the settings pages of the
+    /// applications people already own are largely plain: two of the reader's
+    /// were refused here, and the official app checks nothing at all
+    /// (libpebble3's `PKJSInterface.openURL` hands the string straight to the
+    /// web view). The cost is that a page's query string — which can carry the
+    /// watch token — travels in the clear, which is why the app carries an App
+    /// Transport Security exception for web content and nothing else.
+    ///
+    /// A URL with no host, or with a password in it, is still refused: neither
+    /// is something a settings page needs, and both are how a string that is not
+    /// a settings page at all tends to look.
+    static func mayOpenConfigurationURL(_ url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased() else { return false }
+        return (scheme == "https" || scheme == "http")
+            && url.host?.isEmpty == false
+            && url.user == nil
+            && url.password == nil
+    }
+
     func openConfigurationURL(_ url: URL) {
-        guard url.scheme?.lowercased() == "https",
-              url.host != nil,
-              url.user == nil,
-              url.password == nil else {
+        guard Self.mayOpenConfigurationURL(url) else {
             applications.libraryFeedback = .failure("The application requested an unsafe settings URL.")
-            Task {
+            Task { [
+                scheme = url.scheme ?? "none",
+                host = url.host ?? "none",
+                hasCredentials = url.user != nil || url.password != nil
+            ] in
+                // Which rule it broke, not the URL: a settings page's query
+                // string carries the watch token and the reader's account.
                 await PebbleDiagnostics.shared.record(
                     .warning,
                     category: "configuration",
-                    message: "Rejected an unsafe configuration URL"
+                    message: "Rejected a configuration URL: scheme=\(scheme)"
+                        + " host=\(host) credentials=\(hasCredentials)"
                 )
             }
             return

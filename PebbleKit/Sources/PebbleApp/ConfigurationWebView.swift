@@ -16,7 +16,10 @@ struct ConfigurationNavigationDecider: WebPage.NavigationDeciding {
             closeHandler(encodedResponse?.removingPercentEncoding ?? encodedResponse)
             return .cancel
         }
-        return url.scheme?.lowercased() == "https" ? .allow : .cancel
+        // The same two schemes the page was opened under. Refusing `http` here
+        // as well as there meant a page allowed through one gate was cancelled
+        // by the other, which read as a settings page that would not load.
+        return AppModel.mayOpenConfigurationURL(url) ? .allow : .cancel
     }
 }
 

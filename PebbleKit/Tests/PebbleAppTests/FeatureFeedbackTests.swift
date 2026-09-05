@@ -120,4 +120,42 @@ struct FeatureFeedbackTests {
         #expect(FeatureFeedback.success("Done.").isFailure == false)
         #expect(FeatureFeedback.failure("No.").isFailure == true)
     }
+
+    /// Which settings pages may be opened.
+    ///
+    /// `https` alone refused two of the reader's applications — 91 Dub 4.0 and
+    /// AgroWeatherApp — whose pages the official app opens without checking
+    /// anything. What is left refused is what a settings page never needs.
+    @Test func aSettingsPageMayBePlainButNotHostlessOrCredentialled() throws {
+        #expect(AppModel.mayOpenConfigurationURL(try #require(URL(string: "https://example.com/settings"))))
+        #expect(AppModel.mayOpenConfigurationURL(try #require(URL(string: "http://example.com/settings"))))
+        #expect(AppModel.mayOpenConfigurationURL(try #require(URL(string: "HTTP://example.com/settings"))))
+
+        // No host: a path with a scheme in front of it, not a page.
+        #expect(!AppModel.mayOpenConfigurationURL(try #require(URL(string: "http:///settings"))))
+        #expect(!AppModel.mayOpenConfigurationURL(try #require(URL(string: "file:///etc/passwd"))))
+        // The scheme the web view uses to say the page is finished is not one to
+        // open a page with.
+        #expect(!AppModel.mayOpenConfigurationURL(try #require(URL(string: "pebblejs://close#%7B%7D"))))
+        // Credentials in the URL: the page is asking to be someone.
+        #expect(!AppModel.mayOpenConfigurationURL(try #require(URL(string: "https://user:pw@example.com/s"))))
+        #expect(!AppModel.mayOpenConfigurationURL(try #require(URL(string: "https://user@example.com/s"))))
+    }
+
+    @Test func aSettingsPageThatIsRefusedAnswersOnTheApplicationsScreenAlone() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = makeModel(directory: directory, client: MockWatchClient())
+
+        model.openConfigurationURL(try #require(URL(string: "file:///etc/passwd")))
+
+        #expect(model.applications.configurationURL == nil)
+        #expect(model.applications.libraryFeedback == .failure("The application requested an unsafe settings URL."))
+        #expect(model.catalog.feedback == nil)
+
+        // And a plain page is opened rather than refused.
+        let plain = try #require(URL(string: "http://example.com/settings"))
+        model.openConfigurationURL(plain)
+        #expect(model.applications.configurationURL == plain)
+    }
 }

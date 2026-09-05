@@ -2,6 +2,16 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Watch applications' settings pages, which are largely plain http: the
+	     ones people already own were written years ago and are served as they
+	     were. `InWebContent` rather than the blanket key, so this reaches the
+	     configuration web view and nothing the app fetches itself — the
+	     application catalogue, the firmware and the weather all stay https. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<true/>
+	</dict>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-central</string>
