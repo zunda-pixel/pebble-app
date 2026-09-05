@@ -8,8 +8,46 @@ import SwiftUI
 
 extension AppModel {
     public func loadTimeline() async {
-        do { timeline.pins = try await timelineStore.pins() }
-        catch { timeline.feedback = .failure("Timeline could not be loaded.") }
+        do {
+            let stored = try await timelineStore.pins()
+            timeline.pins = Self.pinsUnderOneIdentifierEach(stored)
+            // Two pins under one identifier is not a state anything downstream
+            // can represent: BlobDB is keyed by it, so the watch keeps whichever
+            // arrived last, and the record of what was written keeps one digest
+            // for the key, so the others never match it and are sent on every
+            // synchronization for ever. The reader's watch was being written 32
+            // pins of 94 that way, and showing one week of a recurring event.
+            let collapsed = stored.count - timeline.pins.count
+            if collapsed > 0 {
+                // Written back so the file stops holding them: otherwise every
+                // load repairs the same thing again and the warning never stops.
+                try? await timelineStore.save(timeline.pins)
+                await PebbleDiagnostics.shared.record(
+                    .warning,
+                    category: "timeline",
+                    message: "\(collapsed) of \(stored.count) pin(s) shared an identifier with another;"
+                        + " the last of each was kept"
+                )
+            }
+        } catch {
+            timeline.feedback = .failure("Timeline could not be loaded.")
+        }
+    }
+
+    /// The pins with one entry per identifier, keeping the last of each and the
+    /// order they were in.
+    ///
+    /// The last rather than the first, because that is what a watch keyed by the
+    /// identifier ends up holding and what the digest record ends up describing:
+    /// collapsing them the same way is what makes the three agree.
+    static func pinsUnderOneIdentifierEach(_ pins: [TimelinePin]) -> [TimelinePin] {
+        var lastByID: [UUID: TimelinePin] = [:]
+        for pin in pins { lastByID[pin.id] = pin }
+        var seen: Set<UUID> = []
+        return pins.compactMap { pin in
+            guard seen.insert(pin.id).inserted else { return nil }
+            return lastByID[pin.id]
+        }
     }
 
     public func addTimelinePin(title: String, date: Date) async {

@@ -518,6 +518,57 @@ struct PendingWorkTests {
         #expect(client.timelinePinWrites.count == pinsBefore)
     }
 
+    /// Two pins under one identifier is not a state anything downstream can
+    /// represent, so the timeline does not hold one.
+    ///
+    /// BlobDB is keyed by the identifier, so the watch keeps whichever arrived
+    /// last; the record of what was written keeps one digest per key, so the
+    /// others never match it and are sent again on every synchronization. The
+    /// reader's watch was written 32 pins of 94 that way, every time, for ever.
+    @Test
+    func pinsSharingAnIdentifierAreCollapsedToTheLastOfThem() throws {
+        var first = timelinePin("Standup", minutesFromNow: 60)
+        let other = timelinePin("Dentist", minutesFromNow: 120)
+        var second = first
+        second.title = "Standup, moved"
+        first.title = "Standup"
+
+        let kept = AppModel.pinsUnderOneIdentifierEach([first, other, second])
+
+        // One entry per identifier, in the order they first appeared, and the
+        // last of each — which is what the watch and the digests end up with.
+        #expect(kept.map(\.id) == [first.id, other.id])
+        #expect(kept.first?.title == "Standup, moved")
+        // Nothing to do when they are already distinct.
+        #expect(AppModel.pinsUnderOneIdentifierEach([first, other]).count == 2)
+        #expect(AppModel.pinsUnderOneIdentifierEach([]).isEmpty)
+    }
+
+    @Test
+    func aTimelineLoadedWithDuplicatesSettlesAfterOnePass() async throws {
+        let client = MockWatchClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = makeModel(client: client, directory: directory)
+        let pin = timelinePin("Standup", minutesFromNow: 60)
+        var twin = pin
+        twin.title = "Standup, moved"
+        // What a shared calendar identifier left on disk.
+        try await model.timelineStore.save([pin, twin])
+        try await model.pendingTimelineOperationStore.save([])
+
+        await model.scan()
+        await model.connect(to: try #require(model.discoveredWatches.first))
+        await model.synchronizeTimeline()
+        #expect(model.timeline.pins.count == 1)
+        let afterFirst = client.timelinePinWrites.count
+
+        await model.synchronizeTimeline()
+
+        // Sent once and then left alone, rather than for ever.
+        #expect(client.timelinePinWrites.count == afterFirst)
+    }
+
     /// Every occurrence of a recurring event is its own pin.
     ///
     /// They shared one, because `EKEvent.eventIdentifier` is one per event and
