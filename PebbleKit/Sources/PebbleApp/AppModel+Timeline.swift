@@ -49,25 +49,48 @@ extension AppModel {
     public func synchronizeTimeline() async {
         await loadTimeline()
         guard !activeConnections.isEmpty else { return }
-        var operations = (try? await pendingTimelineOperationStore.operations()) ?? []
-        let queuedUpserts = Set(operations.compactMap { operation -> UUID? in
+        let queued = (try? await pendingTimelineOperationStore.operations()) ?? []
+        let queuedUpserts = Set(queued.compactMap { operation -> UUID? in
             if case .upsert(let pin) = operation { return pin.id }
             return nil
         })
-        // A pin the watch made is already on the watch, with actions and an icon
-        // this app does not model: writing it back would replace it with less.
-        operations += timeline.pins
-            .filter { !queuedUpserts.contains($0.id) && !$0.isFromWatch }
-            .map(PendingTimelineOperation.upsert)
         // A watch that stopped part-way keeps the rest of the queue for its next
         // connection, and so does every other watch: whatever the least
         // finished one did not get is what is kept.
-        var firstUnfinished = operations.count
+        var firstUnfinished = queued.count
         for connection in activeConnections {
             await removePinsTheAppHasForgotten(on: connection)
-            firstUnfinished = min(firstUnfinished, await send(operations, to: connection))
+            // Derived per watch, because what each already holds is its own: the
+            // queue is the durable work and goes first, so an index into it
+            // keeps its meaning however many pins this watch still needs.
+            let derived = await upsertsStillNeeded(besides: queuedUpserts, on: connection)
+            let stopped = await send(queued + derived, to: connection)
+            firstUnfinished = min(firstUnfinished, min(stopped, queued.count))
         }
-        try? await pendingTimelineOperationStore.save(Array(operations[firstUnfinished...]))
+        try? await pendingTimelineOperationStore.save(Array(queued[firstUnfinished...]))
+    }
+
+    /// The pins this watch does not already hold, as upserts.
+    ///
+    /// Without this every synchronization wrote every pin the app held — 93 of
+    /// them on the reader's watch, three times in 47 seconds — re-sending the
+    /// same bytes to the same keys. The app glances have always compared what
+    /// they last sent; this is the same idea, kept on disk because it has to
+    /// survive a launch.
+    private func upsertsStillNeeded(
+        besides queuedUpserts: Set<UUID>,
+        on connection: WatchConnection
+    ) async -> [PendingTimelineOperation] {
+        let written = (try? await timelineStore.writtenPinDigests(watchID: connection.watch.id)) ?? [:]
+        return timeline.pins
+            .filter { pin in
+                // A pin the watch made is already on the watch, with actions and
+                // an icon this app does not model: writing it back would replace
+                // it with less.
+                guard !queuedUpserts.contains(pin.id), !pin.isFromWatch else { return false }
+                return written[pin.id] != pin.writtenDigest
+            }
+            .map(PendingTimelineOperation.upsert)
     }
 
     /// Sends the operations to one watch and answers the index it stopped at.
@@ -93,9 +116,13 @@ extension AppModel {
             }
         }
         // This watch now holds exactly what the app holds, which is what makes
-        // the reconciliation above possible next time.
-        try? await timelineStore.setWrittenPinIDs(
-            Set(timeline.pins.map(\.id)),
+        // the reconciliation above possible next time — and, by the digests,
+        // what makes the next synchronization write only what changed.
+        try? await timelineStore.setWrittenPinDigests(
+            Dictionary(
+                timeline.pins.map { ($0.id, $0.writtenDigest) },
+                uniquingKeysWith: { _, latest in latest }
+            ),
             watchID: connection.watch.id
         )
         // Nothing to say when the queue was empty: this runs on every connection.
@@ -116,8 +143,8 @@ extension AppModel {
     /// missed — stays on the watch's timeline and is never mentioned again.
     private func removePinsTheAppHasForgotten(on connection: WatchConnection) async {
         let watchID = connection.watch.id
-        let written = (try? await timelineStore.writtenPinIDs(watchID: watchID)) ?? []
-        let forgotten = written.subtracting(timeline.pins.map(\.id))
+        let written = (try? await timelineStore.writtenPinDigests(watchID: watchID)) ?? [:]
+        let forgotten = Set(written.keys).subtracting(timeline.pins.map(\.id))
         guard !forgotten.isEmpty else { return }
         var removed: Set<UUID> = []
         let client = connection.client
@@ -129,7 +156,12 @@ extension AppModel {
                 break
             }
         }
-        try? await timelineStore.setWrittenPinIDs(written.subtracting(removed), watchID: watchID)
+        // The digests of the pins that stayed are kept: they are still what the
+        // watch holds, and re-deriving them would send every one again.
+        try? await timelineStore.setWrittenPinDigests(
+            written.filter { !removed.contains($0.key) },
+            watchID: watchID
+        )
         await PebbleDiagnostics.shared.record(
             category: "timeline",
             message: "\(connection.watch.name): removed \(removed.count)"

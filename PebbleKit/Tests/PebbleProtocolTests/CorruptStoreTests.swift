@@ -154,6 +154,48 @@ struct CorruptStoreTests {
         #expect(try await library.synchronizedApplicationIDs(watchID: WatchID("mock-flint")) == [applicationID])
     }
 
+    /// The record of what each watch was given gained a digest beside every
+    /// identifier. A file written before that still names every pin its watch
+    /// holds, and that record is the only way to find one the app has since
+    /// forgotten — so it is read rather than moved aside, unlike the files
+    /// above.
+    @Test func aWrittenPinFileFromBeforeTheDigestKeepsItsIdentifiers() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let writtenURL = directory.appending(path: "timeline-written.json")
+        let pinID = UUID()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data(#"{"mock-flint":["\#(pinID.uuidString)"]}"#.utf8).write(to: writtenURL)
+
+        let store = TimelinePinStore(fileURL: directory.appending(path: "timeline.json"))
+
+        #expect(try await store.writtenPinIDs(watchID: WatchID("mock-flint")) == [pinID])
+        #expect(FileManager.default.fileExists(atPath: writtenURL.path))
+        #expect(try quarantinedFiles(besides: writtenURL).isEmpty)
+        // No digest can match, so the pin is written once more and left alone.
+        #expect(try await store.writtenPinDigests(watchID: WatchID("mock-flint")) == [pinID: ""])
+    }
+
+    /// Neither shape: the same recovery as the files above, because a record
+    /// that cannot be read would fail every read from then on.
+    @Test func aWrittenPinFileThatIsNeitherShapeIsMovedAside() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let writtenURL = directory.appending(path: "timeline-written.json")
+        try writeTruncatedJSON(to: writtenURL)
+
+        let store = TimelinePinStore(fileURL: directory.appending(path: "timeline.json"))
+
+        #expect(try await store.writtenPinIDs(watchID: WatchID("mock-flint")).isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: writtenURL.path))
+        #expect(try quarantinedFiles(besides: writtenURL).count == 1)
+
+        // And it can be written again.
+        let pinID = UUID()
+        try await store.setWrittenPinDigests([pinID: "digest"], watchID: WatchID("mock-flint"))
+        #expect(try await store.writtenPinIDs(watchID: WatchID("mock-flint")) == [pinID])
+    }
+
     /// A `.pbw` holding one application built for the Pebble Time 2.
     private func makeApplicationPackage(
         in directory: URL,

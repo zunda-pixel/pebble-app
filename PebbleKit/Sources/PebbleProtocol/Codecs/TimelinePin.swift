@@ -1,4 +1,5 @@
 public import Foundation
+import CryptoKit
 import MemberwiseInit
 
 /// The number decides how the watch presents the item, and has to agree with
@@ -26,6 +27,20 @@ public struct TimelinePin: Codable, Equatable, Identifiable, Sendable {
     /// not model, so sending it back would replace what the watch has with a
     /// poorer copy of it. It is kept, shown and deletable; it is not written.
     public var isFromWatch: Bool = false
+
+    /// A digest of the bytes this pin is written to the watch as.
+    ///
+    /// Its own `Hashable` conformance would do for one run and not for two:
+    /// Swift seeds that per process, and this is written to disk and read back
+    /// after a launch to decide whether the watch already holds the pin.
+    public var writtenDigest: String {
+        guard let value = try? encoded() else {
+            // A pin that cannot be encoded cannot be written either, so it must
+            // not read as one the watch already holds. No digest is empty.
+            return ""
+        }
+        return SHA256.hash(data: Data(value)).hexadecimalString
+    }
 
     public func encoded() throws -> [UInt8] {
         // `MAX_ATTRIBUTE_LENGTHS`. The firmware cuts anything longer itself, and cuts

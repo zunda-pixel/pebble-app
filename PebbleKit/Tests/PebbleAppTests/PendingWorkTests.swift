@@ -351,15 +351,116 @@ struct PendingWorkTests {
         let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
 
+        let afterConnecting = client.timelinePinWrites.count
+
         await model.clearWatchTimeline(watchID: discovered.id)
 
         // The reader asked for this because the watch held pins nothing could
         // name; their own are not collateral.
         #expect(client.clearedTimelineCount == 1)
         #expect(client.timelinePins.map(\.id) == [pin.id])
+        // Written again rather than skipped: clearing forgets the digests with
+        // the identifiers, or the write-back would send nothing to a watch whose
+        // database is now empty.
+        #expect(client.timelinePinWrites.count == afterConnecting + 1)
 
         try await model.timelineStore.save([])
         try await model.timelineStore.forgetWrittenPinIDs(watchID: discovered.id)
+    }
+
+    private func timelinePin(_ title: String, minutesFromNow: Double) -> TimelinePin {
+        TimelinePin(
+            parentApplicationID: UUID(),
+            timestamp: Date(timeIntervalSince1970: 1_800_000_000 + minutesFromNow * 60),
+            title: title,
+            subtitle: nil,
+            body: nil
+        )
+    }
+
+    /// `synchronizeTimeline` derives an upsert for every pin the app holds, and
+    /// derived them all every time: on the reader's watch that was 74, then 92,
+    /// then 93 pins in 47 seconds, re-writing the same bytes to the same keys.
+    /// The app glances have always compared what they last sent; the pins now
+    /// do too, from a digest kept per watch.
+    @Test
+    func aPinTheWatchAlreadyHasIsNotWrittenAgain() async throws {
+        let client = MockWatchClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = makeModel(client: client, directory: directory)
+        let pins = [timelinePin("Dentist", minutesFromNow: 60), timelinePin("Standup", minutesFromNow: 120)]
+        try await model.timelineStore.save(pins)
+        try await model.pendingTimelineOperationStore.save([])
+
+        await model.scan()
+        await model.connect(to: try #require(model.discoveredWatches.first))
+        await model.synchronizeTimeline()
+        #expect(Set(client.timelinePinWrites) == Set(pins.map(\.id)))
+        let afterFirst = client.timelinePinWrites.count
+
+        // Nothing has changed here and nothing has changed there.
+        await model.synchronizeTimeline()
+        await model.synchronizeTimeline()
+
+        #expect(client.timelinePinWrites.count == afterFirst)
+    }
+
+    @Test
+    func onlyThePinThatChangedIsWrittenAgain() async throws {
+        let client = MockWatchClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = makeModel(client: client, directory: directory)
+        var pins = [timelinePin("Dentist", minutesFromNow: 60), timelinePin("Standup", minutesFromNow: 120)]
+        try await model.timelineStore.save(pins)
+        try await model.pendingTimelineOperationStore.save([])
+
+        await model.scan()
+        await model.connect(to: try #require(model.discoveredWatches.first))
+        await model.synchronizeTimeline()
+        let afterFirst = client.timelinePinWrites.count
+
+        // Retitled, so the bytes the watch holds are no longer the bytes here.
+        pins[1].title = "Standup, moved"
+        try await model.timelineStore.save(pins)
+        await model.synchronizeTimeline()
+
+        #expect(client.timelinePinWrites.count == afterFirst + 1)
+        #expect(client.timelinePinWrites.last == pins[1].id)
+        #expect(client.timelinePins.first { $0.id == pins[1].id }?.title == "Standup, moved")
+    }
+
+    /// A second watch has been given nothing, whatever the first one holds.
+    @Test
+    func eachWatchIsMeasuredAgainstWhatItWasGiven() async throws {
+        let client = MockWatchClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: WatchApplicationLibrary(
+                fileURL: directory.appending(path: "applications.json")
+            ),
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
+            clientFactory: { _ in client }
+        )
+        let pins = [timelinePin("Dentist", minutesFromNow: 60), timelinePin("Standup", minutesFromNow: 120)]
+        try await model.timelineStore.save(pins)
+        try await model.pendingTimelineOperationStore.save([])
+
+        await model.scan()
+        let discovered = model.discoveredWatches
+        await model.connect(to: try #require(discovered.first))
+        await model.synchronizeTimeline()
+        let afterFirst = client.timelinePinWrites.count
+
+        await model.connect(to: try #require(discovered.dropFirst().first))
+        await model.synchronizeTimeline()
+
+        // Both pins again, for the watch that has not seen them.
+        #expect(client.timelinePinWrites.count == afterFirst + pins.count)
     }
 
     @Test

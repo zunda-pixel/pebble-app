@@ -10,6 +10,10 @@ public final class MockWatchClient: WatchClient {
     public private(set) var reorderedApplicationIDs: [[UUID]] = []
     public private(set) var sentNotifications: [PebbleTimelineNotification] = []
     public private(set) var timelinePins: [TimelinePin] = []
+    /// Every pin write in the order it was made, including the ones that
+    /// replaced a pin already here. `timelinePins` keeps one entry per pin the
+    /// way the watch does, so it cannot say how often the same one was sent.
+    public private(set) var timelinePinWrites: [UUID] = []
     public private(set) var clearedTimelineCount = 0
     public private(set) var installedObjects: [(bytes: [UInt8], objectType: PutBytesObjectType, appBankID: UInt32)] = []
     public private(set) var installedFirmwarePackages: [PBZFirmwarePackage] = []
@@ -175,6 +179,7 @@ public final class MockWatchClient: WatchClient {
         case .timelinePin(let pin):
             timelinePins.removeAll { $0.id == pin.id }
             timelinePins.append(pin)
+            timelinePinWrites.append(pin.id)
         case .timelineReminder(let reminder):
             timelineReminders.removeAll { $0.id == reminder.id }
             timelineReminders.append(reminder)

@@ -41,12 +41,45 @@ public actor TimelinePinStore {
     }
 
     public func writtenPinIDs(watchID: WatchID) throws -> Set<UUID> {
-        Set(try writtenStates()[watchID] ?? [])
+        Set(try writtenStates()[watchID]?.map(\.id) ?? [])
     }
 
+    /// Names the pins without saying what they were written as.
+    ///
+    /// The reminders are sent from a queue rather than derived from what the app
+    /// holds, so they have nothing to compare a digest against and keep only
+    /// this record. A pin that arrives with no digest keeps the one it already
+    /// had, so noting one more held item does not re-send all the others.
     public func setWrittenPinIDs(_ pinIDs: Set<UUID>, watchID: WatchID) throws {
         var states = try writtenStates()
-        states[watchID] = Array(pinIDs)
+        let existing = Dictionary(
+            (states[watchID] ?? []).map { ($0.id, $0.digest) },
+            uniquingKeysWith: { _, latest in latest }
+        )
+        states[watchID] = pinIDs
+            .map { WrittenPin(id: $0, digest: existing[$0] ?? "") }
+            .sorted { $0.id.uuidString < $1.id.uuidString }
+        try PersistentJSON.save(states, to: writtenURL)
+    }
+
+    /// Which pins this watch was given, and the digest of the bytes each was
+    /// written as. A pin whose digest still matches is one the watch already
+    /// holds, so writing it again would cost a round trip to leave the watch
+    /// exactly as it is.
+    public func writtenPinDigests(watchID: WatchID) throws -> [UUID: String] {
+        Dictionary(
+            (try writtenStates()[watchID] ?? []).map { ($0.id, $0.digest) },
+            uniquingKeysWith: { _, latest in latest }
+        )
+    }
+
+    public func setWrittenPinDigests(_ digests: [UUID: String], watchID: WatchID) throws {
+        var states = try writtenStates()
+        // Sorted for the same reason `PersistentJSON` sorts keys: this file is
+        // read by a person diagnosing a fault.
+        states[watchID] = digests
+            .map { WrittenPin(id: $0.key, digest: $0.value) }
+            .sorted { $0.id.uuidString < $1.id.uuidString }
         try PersistentJSON.save(states, to: writtenURL)
     }
 
@@ -56,8 +89,24 @@ public actor TimelinePinStore {
         try PersistentJSON.save(states, to: writtenURL)
     }
 
-    private func writtenStates() throws -> [WatchID: [UUID]] {
-        try PersistentJSON.loadRecovering([WatchID: [UUID]].self, from: writtenURL) ?? [:]
+    /// The digest was added after the plain identifiers, and a file from before
+    /// then still names every pin its watch was given — which is the only way
+    /// to find one the app has since forgotten. Such a file is read for its
+    /// identifiers and each given a digest no pin can match, so every pin is
+    /// written once more and left alone after that.
+    private func writtenStates() throws -> [WatchID: [WrittenPin]] {
+        guard FileManager.default.fileExists(atPath: writtenURL.path) else { return [:] }
+        if let states = try? PersistentJSON.load([WatchID: [WrittenPin]].self, from: writtenURL) {
+            return states
+        }
+        if let identifiers = try? PersistentJSON.load([WatchID: [UUID]].self, from: writtenURL) {
+            return identifiers.mapValues { $0.map { WrittenPin(id: $0, digest: "") } }
+        }
+        // Neither shape, the same recovery as the files beside it: a written
+        // record that cannot be read is worse than none, because every read
+        // would fail from here on.
+        try PersistentJSON.quarantine(writtenURL)
+        return [:]
     }
 
     /// A file that cannot be decoded is moved aside, the same as the two
@@ -72,4 +121,16 @@ public actor TimelinePinStore {
     public func save(_ pins: [TimelinePin]) throws {
         try PersistentJSON.save(pins, to: fileURL)
     }
+}
+
+/// A pin the app has written to a watch, and a digest of the bytes it wrote.
+///
+/// An array of these rather than a `[UUID: String]`: `UUID` is not a
+/// `CodingKeyRepresentable`, so that dictionary encodes as an alternating array
+/// of strings — which is indistinguishable from the array of identifiers this
+/// file used to hold, and would have read back as pins paired off as each
+/// other's digests. An array of objects cannot be read as an array of strings.
+private struct WrittenPin: Codable, Sendable {
+    var id: UUID
+    var digest: String
 }

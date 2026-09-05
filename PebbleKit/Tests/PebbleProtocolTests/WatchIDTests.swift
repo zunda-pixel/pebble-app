@@ -68,4 +68,76 @@ struct WatchIDTests {
         #expect(try await store.writtenPinIDs(watchID: WatchID("mock-flint")) == [pinID])
         #expect(try await store.writtenPinIDs(watchID: WatchID("mock-emery")).isEmpty)
     }
+
+    private func samplePin(title: String) -> TimelinePin {
+        TimelinePin(
+            parentApplicationID: UUID(),
+            timestamp: Date(timeIntervalSince1970: 1_800_000_000),
+            title: title,
+            subtitle: nil,
+            body: nil
+        )
+    }
+
+    /// Beside each identifier is a digest of the bytes the pin was written as,
+    /// so a synchronization can send only the pins that changed. It has to be
+    /// stable across launches, which `Hashable` is not: Swift seeds that hash
+    /// per process.
+    @Test func aPinsDigestFollowsTheBytesItIsWrittenAs() throws {
+        var pin = samplePin(title: "Dentist")
+        let first = pin.writtenDigest
+        #expect(first.count == 64)
+        #expect(pin.writtenDigest == first)
+
+        pin.title = "Dentist, moved"
+        #expect(pin.writtenDigest != first)
+
+        // Not the pin's identity: a field the watch is never told about does not
+        // move the digest, because the bytes it is written as do not change.
+        var elsewhere = pin
+        elsewhere.isFromWatch = !pin.isFromWatch
+        #expect(elsewhere.writtenDigest == pin.writtenDigest)
+    }
+
+    @Test func aPinsDigestIsKeptUnderItsWatchsIdentifier() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = TimelinePinStore(fileURL: directory.appending(path: "timeline.json"))
+        let pin = samplePin(title: "Dentist")
+
+        try await store.setWrittenPinDigests([pin.id: pin.writtenDigest], watchID: WatchID("mock-flint"))
+
+        #expect(
+            try await store.writtenPinDigests(watchID: WatchID("mock-flint"))
+                == [pin.id: pin.writtenDigest]
+        )
+        #expect(try await store.writtenPinIDs(watchID: WatchID("mock-flint")) == [pin.id])
+        #expect(try await store.writtenPinDigests(watchID: WatchID("mock-emery")).isEmpty)
+    }
+
+    /// The reminders are sent from a queue rather than derived from what the app
+    /// holds, so they name their pins without a digest. Noting one more must not
+    /// take the digests off the others, or the next synchronization would send
+    /// every pin again.
+    @Test func namingAPinDoesNotForgetTheDigestsBesideIt() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = TimelinePinStore(fileURL: directory.appending(path: "timeline.json"))
+        let watchID = WatchID("mock-flint")
+        let known = samplePin(title: "Dentist")
+        let arriving = samplePin(title: "Dictated on the watch")
+
+        try await store.setWrittenPinDigests([known.id: known.writtenDigest], watchID: watchID)
+        var held = try await store.writtenPinIDs(watchID: watchID)
+        held.insert(arriving.id)
+        try await store.setWrittenPinIDs(held, watchID: watchID)
+
+        let digests = try await store.writtenPinDigests(watchID: watchID)
+        #expect(digests[known.id] == known.writtenDigest)
+        // Named but never written by the app, so no digest can match it.
+        #expect(digests[arriving.id] == "")
+        #expect(digests[arriving.id] != arriving.writtenDigest)
+    }
 }
