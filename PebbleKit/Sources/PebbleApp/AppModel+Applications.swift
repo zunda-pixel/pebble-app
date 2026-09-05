@@ -17,10 +17,16 @@ extension AppModel {
     /// watch token — travels in the clear, which is why the app carries an App
     /// Transport Security exception for web content and nothing else.
     ///
+    /// A page an application built itself and handed over as a `data:` URL is
+    /// allowed too, and reaches the web view as HTML rather than as a
+    /// navigation: it never touches the network, and refusing it was the second
+    /// of the reader's two applications that could not be configured.
+    ///
     /// A URL with no host, or with a password in it, is still refused: neither
     /// is something a settings page needs, and both are how a string that is not
     /// a settings page at all tends to look.
     static func mayOpenConfigurationURL(_ url: URL) -> Bool {
+        if url.inlineHTML != nil { return true }
         guard let scheme = url.scheme?.lowercased() else { return false }
         return (scheme == "https" || scheme == "http")
             && url.host?.isEmpty == false

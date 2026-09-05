@@ -142,6 +142,38 @@ struct FeatureFeedbackTests {
         #expect(!AppModel.mayOpenConfigurationURL(try #require(URL(string: "https://user@example.com/s"))))
     }
 
+    /// A settings page an application built itself and handed over inline.
+    ///
+    /// AgroWeatherApp's is one of these — `scheme=data host=none` in the log —
+    /// and it is a page, not a URL with something missing from it.
+    @Test func aPageHandedOverInlineIsUnpackedRatherThanNavigatedTo() throws {
+        let plain = try #require(URL(string: "data:text/html,%3Ch1%3ESettings%3C%2Fh1%3E"))
+        #expect(plain.inlineHTML == "<h1>Settings</h1>")
+        #expect(AppModel.mayOpenConfigurationURL(plain))
+
+        // Base64, which is the other way an application sends its page.
+        let encoded = try #require(URL(string: "data:text/html;base64,PGgxPlNldHRpbmdzPC9oMT4="))
+        #expect(encoded.inlineHTML == "<h1>Settings</h1>")
+        #expect(AppModel.mayOpenConfigurationURL(encoded))
+
+        // No media type at all: RFC 2397 calls that text/plain, and
+        // applications leave it off while sending markup all the same.
+        let bare = try #require(URL(string: "data:,%3Cp%3EHello%3C%2Fp%3E"))
+        #expect(bare.inlineHTML == "<p>Hello</p>")
+
+        // Not a page: rendering an image as markup would be a guess.
+        #expect(try #require(URL(string: "data:image/png;base64,iVBORw0K")).inlineHTML == nil)
+        #expect(!AppModel.mayOpenConfigurationURL(try #require(URL(string: "data:image/png;base64,iVBORw0K"))))
+        // Base64 that is not base64 decodes to nothing, and a page with nothing
+        // in it is not a page.
+        #expect(try #require(URL(string: "data:text/html;base64,!!!!")).inlineHTML == nil)
+        #expect(try #require(URL(string: "data:text/html,")).inlineHTML == nil)
+        // Nothing to separate the header from the payload.
+        #expect(try #require(URL(string: "data:text/html")).inlineHTML == nil)
+        // And an ordinary page is not an inline one.
+        #expect(try #require(URL(string: "https://example.com/s")).inlineHTML == nil)
+    }
+
     @Test func aSettingsPageThatIsRefusedAnswersOnTheApplicationsScreenAlone() async throws {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
