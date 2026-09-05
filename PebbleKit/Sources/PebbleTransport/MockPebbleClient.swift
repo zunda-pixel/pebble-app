@@ -146,22 +146,84 @@ public final class MockPebbleClient: PebbleClient {
         appMessageResponses.append((transactionID, acknowledged))
     }
 
-    public func sendNotification(_ notification: PebbleTimelineNotification) async throws {
-        sentNotifications.append(notification)
+    /// One switch over every record, filling the same typed lists the tests
+    /// have always read. A recorder the app never writes to is a case that was
+    /// forgotten, and the compiler says which.
+    public func write(_ record: BlobDBRecord) async throws {
+        switch record {
+        case .application(let metadata):
+            registeredApplications.removeAll { $0.applicationID == metadata.applicationID }
+            registeredApplications.append(metadata)
+        case .notification(let notification):
+            sentNotifications.append(notification)
+        case .timelinePin(let pin):
+            timelinePins.removeAll { $0.id == pin.id }
+            timelinePins.append(pin)
+        case .timelineReminder(let reminder):
+            timelineReminders.removeAll { $0.id == reminder.id }
+            timelineReminders.append(reminder)
+        case .notificationSourceApp(let app):
+            writtenNotificationSourceApps.removeAll { $0.bundleID == app.bundleID }
+            writtenNotificationSourceApps.append(app)
+        case .appGlance(let glance):
+            writtenAppGlances.removeAll { $0.applicationID == glance.applicationID }
+            writtenAppGlances.append(glance)
+        case .weather(let report):
+            writtenWeather.removeAll { $0.id == report.id }
+            writtenWeather.append(report)
+        case .weatherOrder(let orderedIDs):
+            writtenWeatherLocationOrder = orderedIDs
+        case .watchSetting(let setting, let isOn):
+            writtenWatchSettings[setting] = isOn
+        case .activitySettings(let settings):
+            writtenActivitySettings = settings
+        case .heartRateSettings(let settings):
+            writtenHeartRateSettings = settings
+        case .healthDay(let day):
+            writtenHealthDays.removeAll { $0.weekday == day.weekday }
+            writtenHealthDays.append(day)
+        case .reminderAppState(let state):
+            writtenReminderAppState = state
+        }
     }
 
-    public func upsertTimelinePin(_ pin: PebbleTimelinePin) async throws {
-        timelinePins.removeAll { $0.id == pin.id }
-        timelinePins.append(pin)
+    public func remove(_ key: BlobDBKey) async throws {
+        switch key {
+        case .application(let applicationID):
+            unregisteredApplicationIDs.append(applicationID)
+            registeredApplications.removeAll { $0.applicationID == applicationID }
+        case .timelinePin(let id):
+            timelinePins.removeAll { $0.id == id }
+        case .timelineReminder(let id):
+            timelineReminders.removeAll { $0.id == id }
+            // Kept because a reminder the watch made was never written here, so
+            // its absence from `timelineReminders` says nothing on its own.
+            deletedTimelineReminderIDs.append(id)
+        case .notificationSourceApp(let bundleID):
+            writtenNotificationSourceApps.removeAll { $0.bundleID == bundleID }
+        case .appGlance(let applicationID):
+            writtenAppGlances.removeAll { $0.applicationID == applicationID }
+        case .weather(let id):
+            writtenWeather.removeAll { $0.id == id }
+        case .allTimelinePins:
+            clearedTimelineCount += 1
+            timelinePins.removeAll()
+        }
     }
 
-    public func deleteTimelinePin(id: UUID) async throws {
-        timelinePins.removeAll { $0.id == id }
-    }
-
-    public func clearTimelinePins() async throws {
-        clearedTimelineCount += 1
-        timelinePins.removeAll()
+    public func pull(_ request: WatchPullRequest) async throws -> WatchPullAnswer {
+        switch request {
+        case .screenshot:
+            screenshotRequestCount += 1
+            return .screenshot(screenshotToReturn)
+        case .logGeneration(let generation):
+            requestedLogGenerations.append(generation)
+            guard Int(generation) < logGenerations.count else { return .logLines(nil) }
+            return .logLines(logGenerations[Int(generation)])
+        case .file(let fileRequest):
+            getBytesRequests.append(fileRequest)
+            return .bytes(bytesToReturn)
+        }
     }
 
     public func launchApplication(id: UUID) async throws {
@@ -192,70 +254,6 @@ public final class MockPebbleClient: PebbleClient {
         installedFiles.append((bytes, filename))
     }
 
-    public func writeNotificationSourceApp(_ app: NotificationSourceApp) async throws {
-        writtenNotificationSourceApps.removeAll { $0.bundleID == app.bundleID }
-        writtenNotificationSourceApps.append(app)
-    }
-
-    public func removeNotificationSourceApp(bundleID: String) async throws {
-        writtenNotificationSourceApps.removeAll { $0.bundleID == bundleID }
-    }
-
-    public func writeAppGlance(_ glance: PebbleAppGlance) async throws {
-        writtenAppGlances.removeAll { $0.applicationID == glance.applicationID }
-        writtenAppGlances.append(glance)
-    }
-
-    public func removeAppGlance(applicationID: UUID) async throws {
-        writtenAppGlances.removeAll { $0.applicationID == applicationID }
-    }
-
-    public func upsertTimelineReminder(_ reminder: PebbleTimelinePin) async throws {
-        timelineReminders.removeAll { $0.id == reminder.id }
-        timelineReminders.append(reminder)
-    }
-
-    public func deleteTimelineReminder(id: UUID) async throws {
-        timelineReminders.removeAll { $0.id == id }
-        // Kept because a reminder the watch made was never written here, so
-        // its absence from `timelineReminders` says nothing on its own.
-        deletedTimelineReminderIDs.append(id)
-    }
-
-    public func writeWeather(_ report: PebbleWeatherReport) async throws {
-        writtenWeather.removeAll { $0.id == report.id }
-        writtenWeather.append(report)
-    }
-
-    public func removeWeather(id: UUID) async throws {
-        writtenWeather.removeAll { $0.id == id }
-    }
-
-    public func writeWeatherLocationOrder(_ orderedIDs: [UUID]) async throws {
-        writtenWeatherLocationOrder = orderedIDs
-    }
-
-    public func writeWatchSetting(_ setting: WatchSetting, isOn: Bool) async throws {
-        writtenWatchSettings[setting] = isOn
-    }
-
-    public func writeActivitySettings(_ settings: PebbleActivitySettings) async throws {
-        writtenActivitySettings = settings
-    }
-
-    public func writeHeartRateSettings(_ settings: PebbleHeartRateSettings) async throws {
-        writtenHeartRateSettings = settings
-    }
-
-    public func writeHealthDay(_ day: PebbleHealthDay) async throws {
-        writtenHealthDays.removeAll { $0.weekday == day.weekday }
-        writtenHealthDays.append(day)
-    }
-
-    public func writeReminderAppState(_ state: PebbleReminderAppState) async throws {
-        writtenReminderAppState = state
-    }
-
     public func sendImage(token: UInt8, kindValue: UInt8, image: PebbleEncodedImage?) async throws {
         sentImages.append((token: token, kindValue: kindValue, image: image))
     }
@@ -264,33 +262,7 @@ public final class MockPebbleClient: PebbleClient {
         declinedImageKinds.append(kindValue)
     }
 
-    public func takeScreenshot() async throws -> PebbleScreenshot {
-        screenshotRequestCount += 1
-        return screenshotToReturn
-    }
-
-    public func readLogGeneration(_ generation: UInt8) async throws -> [WatchLogLine]? {
-        requestedLogGenerations.append(generation)
-        guard Int(generation) < logGenerations.count else { return nil }
-        return logGenerations[Int(generation)]
-    }
-
     public func setApplicationLoggingEnabled(_ isEnabled: Bool) async throws {
         isApplicationLoggingEnabled = isEnabled
-    }
-
-    public func getBytes(_ request: GetBytesRequest) async throws -> [UInt8] {
-        getBytesRequests.append(request)
-        return bytesToReturn
-    }
-
-    public func registerApplication(_ metadata: PebbleAppMetadata) async throws {
-        registeredApplications.removeAll { $0.applicationID == metadata.applicationID }
-        registeredApplications.append(metadata)
-    }
-
-    public func unregisterApplication(applicationID: UUID) async throws {
-        unregisteredApplicationIDs.append(applicationID)
-        registeredApplications.removeAll { $0.applicationID == applicationID }
     }
 }

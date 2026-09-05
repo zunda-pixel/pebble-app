@@ -330,39 +330,15 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         )
     }
 
-    public func sendNotification(_ notification: PebbleTimelineNotification) async throws {
-        try await performBlobDBOperation(acceptedStatuses: [.success]) { token in
-            try TimelineNotificationCodec.insertFrame(notification, token: token)
+    public func write(_ record: BlobDBRecord) async throws {
+        for write in record.writes {
+            try await performBlobDBOperation(write)
         }
     }
 
-    public func upsertTimelinePin(_ pin: PebbleTimelinePin) async throws {
-        try await performBlobDBOperation(acceptedStatuses: [.success]) { token in
-            try TimelinePinCodec.insertFrame(pin, token: token)
-        }
-    }
-
-    public func deleteTimelinePin(id: UUID) async throws {
-        try await performBlobDBOperation(acceptedStatuses: [.success, .keyDoesNotExist]) { token in
-            TimelinePinCodec.deleteFrame(id: id, token: token)
-        }
-    }
-
-    public func clearTimelinePins() async throws {
-        try await performBlobDBOperation(acceptedStatuses: [.success]) { token in
-            TimelinePinCodec.clearFrame(token: token)
-        }
-    }
-
-    public func upsertTimelineReminder(_ reminder: PebbleTimelinePin) async throws {
-        try await performBlobDBOperation(acceptedStatuses: [.success]) { token in
-            try TimelineReminderCodec.insertFrame(reminder, token: token)
-        }
-    }
-
-    public func deleteTimelineReminder(id: UUID) async throws {
-        try await performBlobDBOperation(acceptedStatuses: [.success, .keyDoesNotExist]) { token in
-            TimelineReminderCodec.deleteFrame(id: id, token: token)
+    public func remove(_ key: BlobDBKey) async throws {
+        for write in key.writes {
+            try await performBlobDBOperation(write)
         }
     }
 
@@ -457,83 +433,6 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
     }
 
-    public func registerApplication(_ metadata: PebbleAppMetadata) async throws {
-        // A stale record means the watch already holds this entry and will
-        // never accept it again, which is as good as a successful insert.
-        try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
-            BlobDBCodec.insertApplicationFrame(metadata: metadata, token: token)
-        }
-    }
-
-    public func unregisterApplication(applicationID: UUID) async throws {
-        try await performBlobDBOperation(acceptedStatuses: [.success, .keyDoesNotExist]) { token in
-            BlobDBCodec.deleteApplicationFrame(applicationID: applicationID, token: token)
-        }
-    }
-
-    public func writeNotificationSourceApp(_ app: NotificationSourceApp) async throws {
-        try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
-            NotificationAppsCodec.insertFrame(app: app, token: token)
-        }
-    }
-
-    public func removeNotificationSourceApp(bundleID: String) async throws {
-        try await performBlobDBOperation(acceptedStatuses: [.success, .keyDoesNotExist]) { token in
-            NotificationAppsCodec.deleteFrame(bundleID: bundleID, token: token)
-        }
-    }
-
-    public func writeAppGlance(_ glance: PebbleAppGlance) async throws {
-        try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
-            AppGlanceCodec.insertFrame(glance, token: token)
-        }
-    }
-
-    public func removeAppGlance(applicationID: UUID) async throws {
-        try await performBlobDBOperation(acceptedStatuses: [.success, .keyDoesNotExist]) { token in
-            AppGlanceCodec.deleteFrame(applicationID: applicationID, token: token)
-        }
-    }
-
-    public func writeWeather(_ report: PebbleWeatherReport) async throws {
-        try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
-            WeatherCodec.insertFrame(report: report, token: token)
-        }
-    }
-
-    public func writeWatchSetting(_ setting: WatchSetting, isOn: Bool) async throws {
-        try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
-            WatchSettingsCodec.insertFrame(setting, isOn: isOn, token: token)
-        }
-    }
-
-    public func writeActivitySettings(_ settings: PebbleActivitySettings) async throws {
-        try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
-            HealthSettingsCodec.insertFrame(settings, token: token)
-        }
-    }
-
-    public func writeHeartRateSettings(_ settings: PebbleHeartRateSettings) async throws {
-        try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
-            HealthSettingsCodec.insertFrame(settings, token: token)
-        }
-    }
-
-    public func writeHealthDay(_ day: PebbleHealthDay) async throws {
-        try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
-            HealthStatsCodec.movementFrame(for: day, token: token)
-        }
-        try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
-            HealthStatsCodec.sleepFrame(for: day, token: token)
-        }
-    }
-
-    public func writeReminderAppState(_ state: PebbleReminderAppState) async throws {
-        try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
-            WeatherCodec.reminderAppFrame(state: state, token: token)
-        }
-    }
-
     public func sendImage(
         token: UInt8,
         kindValue: UInt8,
@@ -550,45 +449,44 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         try await send(ImagingCodec.unsupportedFrame(token: token, kindValue: kindValue))
     }
 
-    public func takeScreenshot() async throws -> PebbleScreenshot {
+    public func pull(_ request: WatchPullRequest) async throws -> WatchPullAnswer {
         let peripheral = try linkedPeripheral()
-        return try await screenshot.run(collecting: ScreenshotCollector()) {
-            try sendFrame(ScreenshotCodec.requestFrame(), to: peripheral)
-        }
-    }
+        switch request {
+        case .screenshot:
+            return .screenshot(try await screenshot.run(collecting: ScreenshotCollector()) {
+                try sendFrame(ScreenshotCodec.requestFrame(), to: peripheral)
+            })
 
-    public func readLogGeneration(_ generation: UInt8) async throws -> [WatchLogLine]? {
-        let peripheral = try linkedPeripheral()
-        let cookie = nextLogDumpCookie
-        nextLogDumpCookie &+= 1
-        let dump = try await logDump.run(collecting: LogDumpCollector(cookie: cookie)) {
-            try sendFrame(
-                LogDumpCodec.requestFrame(generation: generation, cookie: cookie),
-                to: peripheral
-            )
-        }
-        switch dump {
-        case .lines(let lines): return lines
-        case .noLogs: return nil
+        case .logGeneration(let generation):
+            let cookie = nextLogDumpCookie
+            nextLogDumpCookie &+= 1
+            let dump = try await logDump.run(collecting: LogDumpCollector(cookie: cookie)) {
+                try sendFrame(
+                    LogDumpCodec.requestFrame(generation: generation, cookie: cookie),
+                    to: peripheral
+                )
+            }
+            switch dump {
+            case .lines(let lines): return .logLines(lines)
+            case .noLogs: return .logLines(nil)
+            }
+
+        case .file(let fileRequest):
+            let transactionID = nextGetBytesTransactionID
+            nextGetBytesTransactionID &+= 1
+            return .bytes(try await fileBytes.run(
+                collecting: GetBytesCollector(transactionID: transactionID)
+            ) {
+                try sendFrame(
+                    GetBytesCodec.requestFrame(fileRequest, transactionID: transactionID),
+                    to: peripheral
+                )
+            })
         }
     }
 
     public func setApplicationLoggingEnabled(_ isEnabled: Bool) async throws {
         try await send(AppLogCodec.enableFrame(isEnabled))
-    }
-
-    public func getBytes(_ request: GetBytesRequest) async throws -> [UInt8] {
-        let peripheral = try linkedPeripheral()
-        let transactionID = nextGetBytesTransactionID
-        nextGetBytesTransactionID &+= 1
-        return try await fileBytes.run(
-            collecting: GetBytesCollector(transactionID: transactionID)
-        ) {
-            try sendFrame(
-                GetBytesCodec.requestFrame(request, transactionID: transactionID),
-                to: peripheral
-            )
-        }
     }
 
     private func failPulls(_ error: any Error) {
@@ -597,22 +495,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         fileBytes.finish(.failure(error))
     }
 
-    public func writeWeatherLocationOrder(_ orderedIDs: [UUID]) async throws {
-        try await performBlobDBOperation(acceptedStatuses: [.success, .dataStale]) { token in
-            WeatherCodec.preferencesFrame(orderedIDs: orderedIDs, token: token)
-        }
-    }
-
-    public func removeWeather(id: UUID) async throws {
-        try await performBlobDBOperation(acceptedStatuses: [.success, .keyDoesNotExist]) { token in
-            WeatherCodec.deleteFrame(id: id, token: token)
-        }
-    }
-
-    private func performBlobDBOperation(
-        acceptedStatuses: [BlobDBStatus],
-        frame: (UInt16) throws -> PebbleProtocolFrame
-    ) async throws {
+    private func performBlobDBOperation(_ write: BlobDBWrite) async throws {
         // Callers take turns rather than being turned away: they are unrelated
         // features on unrelated timers, and the one that lost the race used to
         // report that the watch had refused it.
@@ -623,7 +506,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         let token = nextBlobDBToken
         nextBlobDBToken &+= 1
         pendingBlobDBToken = token
-        acceptedBlobDBStatuses = acceptedStatuses
+        acceptedBlobDBStatuses = write.acceptedStatuses
         // A frame that cannot even be built fails the caller from inside `wait`,
         // which leaves the token behind for the next answer to match.
         defer {
@@ -631,7 +514,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             acceptedBlobDBStatuses.removeAll()
         }
         try await blobDBReply.wait(timeout: .seconds(20)) {
-            try sendFrame(try frame(token), to: peripheral)
+            try sendFrame(try write.makeFrame(token), to: peripheral)
         }
     }
 

@@ -76,10 +76,37 @@ final class SuspendingPebbleClient: PebbleClient {
         frameContinuation?.yield(frame)
     }
 
-    func sendNotification(_ notification: PebbleTimelineNotification) async throws {
-        await answer()
-        if let notificationFailure { throw notificationFailure }
-        sentNotifications.append(notification)
+    func write(_ record: BlobDBRecord) async throws {
+        switch record {
+        case .notification(let notification):
+            await answer()
+            if let notificationFailure { throw notificationFailure }
+            sentNotifications.append(notification)
+        case .timelinePin(let pin):
+            upsertedPins.removeAll { $0.id == pin.id }
+            upsertedPins.append(pin)
+        // Not what these tests are about: the watch takes it and says nothing.
+        default:
+            break
+        }
+    }
+
+    func remove(_ key: BlobDBKey) async throws {
+        switch key {
+        case .timelinePin(let id):
+            upsertedPins.removeAll { $0.id == id }
+            deletedPinIDs.append(id)
+        case .allTimelinePins:
+            await answer()
+            upsertedPins.removeAll()
+            clearedTimelineCount += 1
+        default:
+            break
+        }
+    }
+
+    func pull(_ request: WatchPullRequest) async throws -> WatchPullAnswer {
+        throw WatchPullError.notSupported
     }
 
     func sendAppMessage(applicationID: UUID, tuples: [AppMessageTuple]) async throws {
@@ -102,50 +129,15 @@ final class SuspendingPebbleClient: PebbleClient {
         appFetchResponses.append(status)
     }
 
-    func upsertTimelinePin(_ pin: PebbleTimelinePin) async throws {
-        upsertedPins.removeAll { $0.id == pin.id }
-        upsertedPins.append(pin)
-    }
-
-    func deleteTimelinePin(id: UUID) async throws {
-        upsertedPins.removeAll { $0.id == id }
-        deletedPinIDs.append(id)
-    }
-
-    func clearTimelinePins() async throws {
-        await answer()
-        upsertedPins.removeAll()
-        clearedTimelineCount += 1
-    }
-
     // Everything below is not what these tests are about: the watch takes it
     // and says nothing.
     func synchronizeTime() async throws {}
     func reorderApplications(_ applicationIDs: [UUID]) async throws {}
     func respondToAppMessage(transactionID: UInt8, acknowledged: Bool) async throws {}
-    func upsertTimelineReminder(_ reminder: PebbleTimelinePin) async throws {}
-    func deleteTimelineReminder(id: UUID) async throws {}
     func launchApplication(id: UUID) async throws {}
     func installFirmware(_ package: PBZFirmwarePackage) async throws {}
     func installFile(_ bytes: [UInt8], filename: String) async throws {}
-    func writeNotificationSourceApp(_ app: NotificationSourceApp) async throws {}
-    func removeNotificationSourceApp(bundleID: String) async throws {}
-    func writeAppGlance(_ glance: PebbleAppGlance) async throws {}
-    func removeAppGlance(applicationID: UUID) async throws {}
-    func writeWeather(_ report: PebbleWeatherReport) async throws {}
-    func removeWeather(id: UUID) async throws {}
-    func writeWeatherLocationOrder(_ orderedIDs: [UUID]) async throws {}
-    func writeWatchSetting(_ setting: WatchSetting, isOn: Bool) async throws {}
-    func writeActivitySettings(_ settings: PebbleActivitySettings) async throws {}
-    func writeHeartRateSettings(_ settings: PebbleHeartRateSettings) async throws {}
-    func writeHealthDay(_ day: PebbleHealthDay) async throws {}
-    func writeReminderAppState(_ state: PebbleReminderAppState) async throws {}
     func sendImage(token: UInt8, kindValue: UInt8, image: PebbleEncodedImage?) async throws {}
     func declineImageKind(token: UInt8, kindValue: UInt8) async throws {}
-    func takeScreenshot() async throws -> PebbleScreenshot { throw WatchPullError.notSupported }
-    func readLogGeneration(_ generation: UInt8) async throws -> [WatchLogLine]? { nil }
     func setApplicationLoggingEnabled(_ isEnabled: Bool) async throws {}
-    func getBytes(_ request: GetBytesRequest) async throws -> [UInt8] { [] }
-    func registerApplication(_ metadata: PebbleAppMetadata) async throws {}
-    func unregisterApplication(applicationID: UUID) async throws {}
 }

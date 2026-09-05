@@ -176,85 +176,20 @@ public final class QEMUPebbleClient: PebbleClient {
         ))
     }
 
-    public func sendNotification(_ notification: PebbleTimelineNotification) async throws {
-        try await performBlobOperation { token in
-            try TimelineNotificationCodec.insertFrame(notification, token: token)
+    public func write(_ record: BlobDBRecord) async throws {
+        for write in record.writes {
+            try await performBlobOperation(write)
         }
     }
 
-    public func upsertTimelinePin(_ pin: PebbleTimelinePin) async throws {
-        try await performBlobOperation { token in try TimelinePinCodec.insertFrame(pin, token: token) }
-    }
-
-    public func deleteTimelinePin(id: UUID) async throws {
-        try await performBlobOperation(acceptedStatuses: [.success, .keyDoesNotExist]) { token in
-            TimelinePinCodec.deleteFrame(id: id, token: token)
+    public func remove(_ key: BlobDBKey) async throws {
+        for write in key.writes {
+            try await performBlobOperation(write)
         }
-    }
-
-    public func clearTimelinePins() async throws {
-        try await performBlobOperation { token in TimelinePinCodec.clearFrame(token: token) }
     }
 
     public func launchApplication(id: UUID) async throws {
         try await send(AppRunStateCodec.startFrame(applicationID: id))
-    }
-
-    public func writeNotificationSourceApp(_ app: NotificationSourceApp) async throws {
-        throw BlobDBClientError.rejected(.notSupported)
-    }
-
-    public func removeNotificationSourceApp(bundleID: String) async throws {
-        throw BlobDBClientError.rejected(.notSupported)
-    }
-
-    public func writeAppGlance(_ glance: PebbleAppGlance) async throws {
-        throw BlobDBClientError.rejected(.notSupported)
-    }
-
-    public func removeAppGlance(applicationID: UUID) async throws {
-        throw BlobDBClientError.rejected(.notSupported)
-    }
-
-    public func upsertTimelineReminder(_ reminder: PebbleTimelinePin) async throws {
-        try await send(try TimelineReminderCodec.insertFrame(reminder, token: 1))
-    }
-
-    public func deleteTimelineReminder(id: UUID) async throws {
-        try await send(TimelineReminderCodec.deleteFrame(id: id, token: 1))
-    }
-
-    public func writeWeather(_ report: PebbleWeatherReport) async throws {
-        throw BlobDBClientError.rejected(.notSupported)
-    }
-
-    public func removeWeather(id: UUID) async throws {
-        throw BlobDBClientError.rejected(.notSupported)
-    }
-
-    public func writeWeatherLocationOrder(_ orderedIDs: [UUID]) async throws {
-        throw BlobDBClientError.rejected(.notSupported)
-    }
-
-    public func writeWatchSetting(_ setting: WatchSetting, isOn: Bool) async throws {
-        try await send(WatchSettingsCodec.insertFrame(setting, isOn: isOn, token: 1))
-    }
-
-    public func writeActivitySettings(_ settings: PebbleActivitySettings) async throws {
-        try await send(HealthSettingsCodec.insertFrame(settings, token: 1))
-    }
-
-    public func writeHeartRateSettings(_ settings: PebbleHeartRateSettings) async throws {
-        try await send(HealthSettingsCodec.insertFrame(settings, token: 1))
-    }
-
-    public func writeHealthDay(_ day: PebbleHealthDay) async throws {
-        try await send(HealthStatsCodec.movementFrame(for: day, token: 1))
-        try await send(HealthStatsCodec.sleepFrame(for: day, token: 2))
-    }
-
-    public func writeReminderAppState(_ state: PebbleReminderAppState) async throws {
-        try await send(WeatherCodec.reminderAppFrame(state: state, token: 1))
     }
 
     public func sendImage(token: UInt8, kindValue: UInt8, image: PebbleEncodedImage?) async throws {
@@ -267,20 +202,16 @@ public final class QEMUPebbleClient: PebbleClient {
         try await send(ImagingCodec.unsupportedFrame(token: token, kindValue: kindValue))
     }
 
-    public func takeScreenshot() async throws -> PebbleScreenshot {
+    /// None of the three: the collectors that read a pull's pieces live with the
+    /// Bluetooth client, and the emulator's socket has never carried one.
+    /// `readLogGeneration` used to answer nil here, which reads as "the watch
+    /// does not go back that far" rather than "this transport cannot ask".
+    public func pull(_ request: WatchPullRequest) async throws -> WatchPullAnswer {
         throw WatchPullError.notSupported
-    }
-
-    public func readLogGeneration(_ generation: UInt8) async throws -> [WatchLogLine]? {
-        nil
     }
 
     public func setApplicationLoggingEnabled(_ isEnabled: Bool) async throws {
         try await send(AppLogCodec.enableFrame(isEnabled))
-    }
-
-    public func getBytes(_ request: GetBytesRequest) async throws -> [UInt8] {
-        throw WatchPullError.notSupported
     }
 
     public func installFile(_ bytes: [UInt8], filename: String) async throws {
@@ -332,28 +263,13 @@ public final class QEMUPebbleClient: PebbleClient {
         try await send(SystemMessageCodec.firmwareUpdateCompleteFrame())
     }
 
-    public func registerApplication(_ metadata: PebbleAppMetadata) async throws {
-        try await performBlobOperation { token in
-            BlobDBCodec.insertApplicationFrame(metadata: metadata, token: token)
-        }
-    }
-
-    public func unregisterApplication(applicationID: UUID) async throws {
-        try await performBlobOperation(acceptedStatuses: [.success, .keyDoesNotExist]) { token in
-            BlobDBCodec.deleteApplicationFrame(applicationID: applicationID, token: token)
-        }
-    }
-
-    private func performBlobOperation(
-        acceptedStatuses: [BlobDBStatus] = [.success],
-        frame: (UInt16) throws -> PebbleProtocolFrame
-    ) async throws {
+    private func performBlobOperation(_ write: BlobDBWrite) async throws {
         guard operationContinuation == nil else { throw BlobDBClientError.operationAlreadyInProgress }
         let token = nextBlobToken
         nextBlobToken &+= 1
         pendingBlobToken = token
-        expectedBlobStatuses = acceptedStatuses
-        try await performOperation(frame: try frame(token))
+        expectedBlobStatuses = write.acceptedStatuses
+        try await performOperation(frame: try write.makeFrame(token))
     }
 
     private func performOperation(

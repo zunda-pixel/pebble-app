@@ -281,7 +281,7 @@ extension AppModel {
         let compatibleApplications = compatibleApplications(applications, with: device.model)
         let localIDs = Set(compatibleApplications.map(\.id))
         for applicationID in synchronizedIDs where !localIDs.contains(applicationID) {
-            try await connection.client.unregisterApplication(applicationID: applicationID)
+            try await connection.client.remove(.application(applicationID))
         }
         // Reading and unzipping a package is disk work with nothing to do with the
         // watch, so a few run at once while `asyncMap` keeps them in library order.
@@ -295,7 +295,7 @@ extension AppModel {
                 return try PBWPackageImporter.load(from: packageURL, for: watchModel)
             }
         for package in packages {
-            try await connection.client.registerApplication(package.appMetadata)
+            try await connection.client.write(.application(package.appMetadata))
         }
         try await connection.client.reorderApplications(compatibleApplications.map(\.id))
         try await recordSynchronizedApplications(applications, device: device)

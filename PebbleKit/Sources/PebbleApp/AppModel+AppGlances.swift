@@ -36,7 +36,7 @@ extension AppModel {
             let value = AppGlanceCodec.value(for: glance)
             guard connection.synchronizedAppGlances[glance.applicationID] != value else { continue }
             do {
-                try await connection.client.writeAppGlance(glance)
+                try await connection.client.write(.appGlance(glance))
                 connection.synchronizedAppGlances[glance.applicationID] = value
             } catch {
                 await PebbleDiagnostics.shared.record(
@@ -51,7 +51,7 @@ extension AppModel {
         for applicationID in connection.synchronizedAppGlances.keys
         where !appGlances.contains(where: { $0.applicationID == applicationID }) {
             do {
-                try await connection.client.removeAppGlance(applicationID: applicationID)
+                try await connection.client.remove(.appGlance(applicationID: applicationID))
                 connection.synchronizedAppGlances[applicationID] = nil
             } catch {
                 await PebbleDiagnostics.shared.record(

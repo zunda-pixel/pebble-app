@@ -20,7 +20,7 @@ extension AppModel {
         Defaults[.watchSettings] = watchSettings
         for connection in activeConnections {
             do {
-                try await connection.client.writeWatchSetting(setting, isOn: isOn)
+                try await connection.client.write(.watchSetting(setting, isOn: isOn))
             } catch {
                 watchSettingsStatusMessage = settingsFailureMessage(connection, error)
             }
@@ -32,7 +32,7 @@ extension AppModel {
         Defaults[.activitySettings] = settings
         for connection in activeConnections {
             do {
-                try await connection.client.writeActivitySettings(settings)
+                try await connection.client.write(.activitySettings(settings))
             } catch {
                 watchSettingsStatusMessage = settingsFailureMessage(connection, error)
             }
@@ -44,7 +44,7 @@ extension AppModel {
         Defaults[.heartRateSettings] = settings
         for connection in activeConnections {
             do {
-                try await connection.client.writeHeartRateSettings(settings)
+                try await connection.client.write(.heartRateSettings(settings))
             } catch {
                 watchSettingsStatusMessage = settingsFailureMessage(connection, error)
             }
@@ -55,7 +55,7 @@ extension AppModel {
         isReminderAppEnabled = isEnabled
         Defaults[.reminderAppEnabled] = isEnabled
         for connection in activeConnections {
-            try? await connection.client.writeReminderAppState(isEnabled ? .enabled : .notEnabled)
+            try? await connection.client.write(.reminderAppState(isEnabled ? .enabled : .notEnabled))
         }
     }
 
@@ -64,12 +64,12 @@ extension AppModel {
     func synchronizeWatchSettings(on connection: WatchConnection) async {
         guard connection.isConnected, !connection.device.isRunningRecoveryFirmware else { return }
         for setting in WatchSetting.allCases {
-            try? await connection.client.writeWatchSetting(setting, isOn: isWatchSettingOn(setting))
+            try? await connection.client.write(.watchSetting(setting, isOn: isWatchSettingOn(setting)))
         }
-        try? await connection.client.writeActivitySettings(activitySettings)
-        try? await connection.client.writeHeartRateSettings(heartRateSettings)
-        try? await connection.client.writeReminderAppState(
-            isReminderAppEnabled ? .enabled : .notEnabled
+        try? await connection.client.write(.activitySettings(activitySettings))
+        try? await connection.client.write(.heartRateSettings(heartRateSettings))
+        try? await connection.client.write(
+            .reminderAppState(isReminderAppEnabled ? .enabled : .notEnabled)
         )
         await sendHealthDays(to: connection)
     }
@@ -79,7 +79,7 @@ extension AppModel {
         let days = healthDays()
         for day in days {
             do {
-                try await connection.client.writeHealthDay(day)
+                try await connection.client.write(.healthDay(day))
             } catch {
                 await PebbleDiagnostics.shared.record(
                     .error,

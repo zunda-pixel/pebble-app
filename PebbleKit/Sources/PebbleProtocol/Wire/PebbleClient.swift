@@ -84,15 +84,20 @@ public protocol PebbleClient: Sendable {
     func respondToAppFetch(with status: AppFetchResponseStatus) async throws
     func sendAppMessage(applicationID: UUID, tuples: [AppMessageTuple]) async throws
     func respondToAppMessage(transactionID: UInt8, acknowledged: Bool) async throws
-    func sendNotification(_ notification: PebbleTimelineNotification) async throws
-    func upsertTimelinePin(_ pin: PebbleTimelinePin) async throws
-    func deleteTimelinePin(id: UUID) async throws
-    /// Empties the watch's pin database, including pins this app never sent.
-    /// BlobDB cannot be listed, so this is the only way to reach a pin the app
-    /// has no record of.
-    func clearTimelinePins() async throws
-    func upsertTimelineReminder(_ reminder: PebbleTimelinePin) async throws
-    func deleteTimelineReminder(id: UUID) async throws
+    /// Writes one record into the watch's databases, in as many frames as the
+    /// record takes.
+    ///
+    /// There used to be twenty of these, one per record, written out in each of
+    /// the three transports — and by the time anyone counted, the emulator was
+    /// sending seven of them without reading the reply and refusing an
+    /// application record the real client accepts. What to send and what counts
+    /// as a yes now come from `BlobDBRecord` alone.
+    func write(_ record: BlobDBRecord) async throws
+    func remove(_ key: BlobDBKey) async throws
+    /// Asks the watch for one of its longer answers and waits for the last
+    /// piece. Read through `takeScreenshot()`, `readLogGeneration(_:)` or
+    /// `getBytes(_:)`, which give the answer back in its own type.
+    func pull(_ request: WatchPullRequest) async throws -> WatchPullAnswer
     func launchApplication(id: UUID) async throws
     func installApplicationObject(
         _ bytes: [UInt8],
@@ -104,22 +109,6 @@ public protocol PebbleClient: Sendable {
     /// knows what it is.
     func installFile(_ bytes: [UInt8], filename: String) async throws
     func refreshDeviceInformation() async throws
-    func writeNotificationSourceApp(_ app: NotificationSourceApp) async throws
-    func removeNotificationSourceApp(bundleID: String) async throws
-    /// The line the launcher shows under a watchapp. The watch refuses one for
-    /// an app it does not have installed.
-    func writeAppGlance(_ glance: PebbleAppGlance) async throws
-    func removeAppGlance(applicationID: UUID) async throws
-    func writeWeather(_ report: PebbleWeatherReport) async throws
-    func removeWeather(id: UUID) async throws
-    /// A forecast the watch holds but this list does not name is not shown.
-    func writeWeatherLocationOrder(_ orderedIDs: [UUID]) async throws
-    /// Only the settings the firmware lists as syncable are accepted.
-    func writeWatchSetting(_ setting: WatchSetting, isOn: Bool) async throws
-    func writeActivitySettings(_ settings: PebbleActivitySettings) async throws
-    func writeHeartRateSettings(_ settings: PebbleHeartRateSettings) async throws
-    func writeHealthDay(_ day: PebbleHealthDay) async throws
-    func writeReminderAppState(_ state: PebbleReminderAppState) async throws
     /// A nil image says there is none, which is what lets the watch stop
     /// waiting.
     func sendImage(
@@ -128,14 +117,7 @@ public protocol PebbleClient: Sendable {
         image: PebbleEncodedImage?
     ) async throws
     func declineImageKind(token: UInt8, kindValue: UInt8) async throws
-    func takeScreenshot() async throws -> PebbleScreenshot
-    /// Generation zero is the run the watch is in now, one the run before it.
-    /// Nil once asked for further back than the watch goes.
-    func readLogGeneration(_ generation: UInt8) async throws -> [WatchLogLine]?
     func setApplicationLoggingEnabled(_ isEnabled: Bool) async throws
-    func getBytes(_ request: GetBytesRequest) async throws -> [UInt8]
-    func registerApplication(_ metadata: PebbleAppMetadata) async throws
-    func unregisterApplication(applicationID: UUID) async throws
 }
 
 public extension PebbleClient {
@@ -147,6 +129,29 @@ public extension PebbleClient {
     }
 
     func refreshDeviceInformation() async throws {}
+
+    func takeScreenshot() async throws -> PebbleScreenshot {
+        guard case .screenshot(let screenshot) = try await pull(.screenshot) else {
+            throw WatchPullError.answeredSomethingElse(.screenshot)
+        }
+        return screenshot
+    }
+
+    /// Generation zero is the run the watch is in now, one the run before it.
+    /// Nil once asked for further back than the watch goes.
+    func readLogGeneration(_ generation: UInt8) async throws -> [WatchLogLine]? {
+        guard case .logLines(let lines) = try await pull(.logGeneration(generation)) else {
+            throw WatchPullError.answeredSomethingElse(.logGeneration(generation))
+        }
+        return lines
+    }
+
+    func getBytes(_ request: GetBytesRequest) async throws -> [UInt8] {
+        guard case .bytes(let bytes) = try await pull(.file(request)) else {
+            throw WatchPullError.answeredSomethingElse(.file(request))
+        }
+        return bytes
+    }
 }
 
 public enum BlobDBClientError: Error, Equatable, Sendable {
@@ -162,6 +167,10 @@ public enum AppReorderClientError: Error, Equatable, Sendable {
 public enum WatchPullError: Error, Equatable, Sendable {
     case operationAlreadyInProgress
     case notSupported
+    /// A transport handed back an answer of another kind. Nothing here can read
+    /// it, and guessing at it would report one of the watch's answers as
+    /// another's.
+    case answeredSomethingElse(WatchPullRequest)
 }
 
 public enum AppMessageClientError: Error, Equatable, Sendable {

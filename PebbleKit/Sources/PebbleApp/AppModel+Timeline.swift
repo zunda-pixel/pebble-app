@@ -80,9 +80,9 @@ extension AppModel {
             do {
                 switch operation {
                 case .upsert(let pin):
-                    try await retry(with: .watchWork) { try await client.upsertTimelinePin(pin) }
+                    try await retry(with: .watchWork) { try await client.write(.timelinePin(pin)) }
                 case .delete(let id):
-                    try await retry(with: .watchWork) { try await client.deleteTimelinePin(id: id) }
+                    try await retry(with: .watchWork) { try await client.remove(.timelinePin(id)) }
                 }
             } catch {
                 return index
@@ -112,7 +112,7 @@ extension AppModel {
         let client = connection.client
         for id in forgotten {
             do {
-                try await retry(with: .watchWork) { try await client.deleteTimelinePin(id: id) }
+                try await retry(with: .watchWork) { try await client.remove(.timelinePin(id)) }
                 removed.insert(id)
             } catch {
                 break
@@ -138,7 +138,7 @@ extension AppModel {
             return
         }
         do {
-            try await connection.client.clearTimelinePins()
+            try await connection.client.remove(.allTimelinePins)
         } catch {
             watchDiagnosticsStatusMessages[.timeline] =
                 "\(connection.device.name) did not clear its timeline. \(Text(refusalReason(for: error)))"

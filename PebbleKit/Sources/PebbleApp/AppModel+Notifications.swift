@@ -39,7 +39,7 @@ extension AppModel {
             appName: "Pebble"
         )
         do {
-            try await connection.client.sendNotification(notification)
+            try await connection.client.write(.notification(notification))
             notificationStatusMessage = "Test notification sent."
             await record(notification, sentTo: [connection.device.name])
             await PebbleDiagnostics.shared.record(
@@ -107,7 +107,7 @@ extension AppModel {
             let client = connection.client
             do {
                 try await retry(with: .watchWork) {
-                    try await client.sendNotification(notification)
+                    try await client.write(.notification(notification))
                 }
                 delivered.insert(connection.device.id)
                 watchNames.append(connection.device.name)
@@ -243,7 +243,7 @@ extension AppModel {
             do {
                 // Recorded as synchronized only once the watch says it took it, so a
                 // refusal is retried on the next pass.
-                try await connection.client.writeNotificationSourceApp(record)
+                try await connection.client.write(.notificationSourceApp(record))
                 connection.synchronizedNotificationAppRecords[app.bundleID] = value
             } catch {
                 await PebbleDiagnostics.shared.record(
@@ -353,7 +353,7 @@ extension AppModel {
             for connection in activeConnections {
                 connection.synchronizedNotificationAppRecords[app.bundleID] = nil
                 do {
-                    try await connection.client.removeNotificationSourceApp(bundleID: app.bundleID)
+                    try await connection.client.remove(.notificationSourceApp(bundleID: app.bundleID))
                 } catch {
                     await PebbleDiagnostics.shared.record(
                         .error,
@@ -419,7 +419,7 @@ extension AppModel {
                 let client = connection.client
                 do {
                     try await retry(with: .watchWork) {
-                        try await client.sendNotification(next.work)
+                        try await client.write(.notification(next.work))
                     }
                     delivered.insert(connection.device.id)
                     watchNames.append(connection.device.name)

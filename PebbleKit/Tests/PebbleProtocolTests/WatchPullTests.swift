@@ -9,6 +9,23 @@ import Testing
 @Suite
 @MainActor
 struct WatchPullTests {
+    /// `pull(_:)` answers with a sum type, and the three typed readers on
+    /// `PebbleClient` unwrap it by case: a transport that answered with the
+    /// wrong one would have them all throwing rather than one of them lying.
+    @Test
+    func eachPullComesBackAsItsOwnKindOfAnswer() async throws {
+        let client = MockPebbleClient()
+        client.logGenerations = [[
+            WatchLogLine(date: Date(timeIntervalSince1970: 0), level: 100, file: "a.c", line: 1, message: "up"),
+        ]]
+        client.bytesToReturn = [0xAB, 0xCD]
+
+        #expect(try await client.takeScreenshot() == client.screenshotToReturn)
+        #expect(try await client.readLogGeneration(0)?.count == 1)
+        #expect(try await client.readLogGeneration(9) == nil)
+        #expect(try await client.getBytes(.unreadCoredump) == [0xAB, 0xCD])
+    }
+
     @Test
     func theLastPieceHandsTheWholeThingBack() async throws {
         let pull = WatchPull<CountingCollector>(timeout: .seconds(30))

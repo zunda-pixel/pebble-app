@@ -34,10 +34,10 @@ struct AppModelTests {
 
         let discovered = try #require(try await client.scan().first)
         let device = try await client.connect(to: discovered)
-        try await client.registerApplication(metadata)
+        try await client.write(.application(metadata))
         try await client.sendAppMessage(applicationID: applicationID, tuples: [])
-        try await client.upsertTimelinePin(pin)
-        try await client.unregisterApplication(applicationID: applicationID)
+        try await client.write(.timelinePin(pin))
+        try await client.remove(.application(applicationID))
         await client.disconnect(from: device)
 
         #expect(client.sentAppMessages.map(\.applicationID) == [applicationID])
@@ -325,14 +325,14 @@ struct AppModelTests {
             shortPhrase: "Clear",
             updated: .now
         )
-        try await client.writeWeather(report)
+        try await client.write(.weather(report))
         #expect(client.writtenWeather.map(\.id) == [report.id])
 
         // Writing the same place again replaces it rather than adding a second.
-        try await client.writeWeather(report)
+        try await client.write(.weather(report))
         #expect(client.writtenWeather.count == 1)
 
-        try await client.removeWeather(id: report.id)
+        try await client.remove(.weather(report.id))
         #expect(client.writtenWeather.isEmpty)
     }
 
@@ -346,18 +346,18 @@ struct AppModelTests {
             stateUpdated: .now
         )
 
-        try await client.writeNotificationSourceApp(app)
+        try await client.write(.notificationSourceApp(app))
         #expect(client.writtenNotificationSourceApps.map(\.bundleID) == ["com.example.chat"])
 
         // The same app written again replaces its setting rather than adding
         // a second record.
         var muted = app
         muted.muteState = .never
-        try await client.writeNotificationSourceApp(muted)
+        try await client.write(.notificationSourceApp(muted))
         #expect(client.writtenNotificationSourceApps.count == 1)
         #expect(client.writtenNotificationSourceApps.first?.muteState == .never)
 
-        try await client.removeNotificationSourceApp(bundleID: app.bundleID)
+        try await client.remove(.notificationSourceApp(bundleID: app.bundleID))
         #expect(client.writtenNotificationSourceApps.isEmpty)
     }
 

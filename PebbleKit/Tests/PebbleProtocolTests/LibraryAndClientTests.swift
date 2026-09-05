@@ -179,7 +179,7 @@ struct LibraryAndClientTests {
             appName: nil
         )
 
-        try await client.sendNotification(notification)
+        try await client.write(.notification(notification))
 
         #expect(client.sentNotifications == [notification])
     }

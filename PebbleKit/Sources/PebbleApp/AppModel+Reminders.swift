@@ -30,7 +30,7 @@ extension AppModel {
         reminderStatusMessage = nil
         for connection in activeConnections {
             do {
-                try await connection.client.upsertTimelineReminder(reminder)
+                try await connection.client.write(.timelineReminder(reminder))
                 // Written down before it can be deleted: a reminder added,
                 // then deleted while the watch is away, is one only this record
                 // can name when the watch comes back.
@@ -87,7 +87,7 @@ extension AppModel {
         let client = connection.client
         for id in forgotten {
             do {
-                try await retry(with: .watchWork) { try await client.deleteTimelineReminder(id: id) }
+                try await retry(with: .watchWork) { try await client.remove(.timelineReminder(id)) }
                 removed.insert(id)
             } catch {
                 // Kept in the record, so the next connection asks again.
@@ -113,7 +113,7 @@ extension AppModel {
         var written = (try? await reminderStore.writtenPinIDs(deviceID: deviceID)) ?? []
         for reminder in reminders where reminder.timestamp > .now && !reminder.isFromWatch {
             do {
-                try await connection.client.upsertTimelineReminder(reminder)
+                try await connection.client.write(.timelineReminder(reminder))
                 written.insert(reminder.id)
             } catch {
                 await PebbleDiagnostics.shared.record(
