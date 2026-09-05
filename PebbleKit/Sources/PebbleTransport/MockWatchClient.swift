@@ -43,6 +43,10 @@ public final class MockWatchClient: WatchClient {
     private var eventContinuation: AsyncStream<WatchClientEvent>.Continuation?
 
     public private(set) var startBluetoothCount = 0
+    public private(set) var reportedHandshakePhases: [WatchHandshakePhase] = []
+    /// Called just after each phase has been reported, so a test can look at
+    /// what the app made of it without waiting for the connect to finish.
+    public var afterReportingPhase: (@MainActor (WatchHandshakePhase) -> Void)?
 
     public init() {}
 
@@ -85,11 +89,23 @@ public final class MockWatchClient: WatchClient {
     /// protocol service does.
     public var connectionFailure: WatchConnectionError?
 
-    public func connect(to device: DiscoveredWatch) async throws -> ConnectedWatch {
-        try await Task.sleep(for: .milliseconds(500))
+    /// Reports both handshake phases, so a test can see the states a real
+    /// connect passes through rather than only its result.
+    public func connect(
+        to device: DiscoveredWatch,
+        reportingPhase: @escaping @MainActor (WatchHandshakePhase) -> Void
+    ) async throws -> ConnectedWatch {
+        try await Task.sleep(for: .milliseconds(250))
+        reportingPhase(.linkOpen)
+        reportedHandshakePhases.append(.linkOpen)
+        afterReportingPhase?(.linkOpen)
+        try await Task.sleep(for: .milliseconds(250))
         if let connectionFailure {
             throw connectionFailure
         }
+        reportingPhase(.transportOpen)
+        reportedHandshakePhases.append(.transportOpen)
+        afterReportingPhase?(.transportOpen)
 
         return ConnectedWatch(
             id: device.id,

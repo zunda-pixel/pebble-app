@@ -4,10 +4,30 @@ public enum WatchConnectionState: Equatable, Sendable {
     case idle
     case scanning
     case connecting(watchID: WatchID)
+    /// The link is up and the watch has not finished answering. Between a
+    /// third of a second and several seconds on a real watch, and the whole
+    /// time on one whose protocol service turns out to be unusable.
     case negotiating(watchID: WatchID)
     case connected(ConnectedWatch)
     case reconnecting(watchID: WatchID)
     case failed(WatchConnectionError)
+}
+
+/// How far a connect has got, for the part between the link coming up and the
+/// watch saying what it is.
+///
+/// `connect(to:)` resolves one continuation, so without this there is no
+/// channel for an intermediate phase: the app only hears the result. The Add
+/// Watch sheet said "Connecting…" for the whole handshake, including the
+/// several seconds a watch can spend discovering services and opening its
+/// transport.
+public enum WatchHandshakePhase: Equatable, Sendable {
+    /// CoreBluetooth has the link. The watch has said nothing yet, and its
+    /// protocol service has not been found.
+    case linkOpen
+    /// The PPoG session is open, so a frame can be sent. The version request
+    /// is on its way and the watch's answer is what finishes the connect.
+    case transportOpen
 }
 
 public enum WatchClientEvent: Equatable, Sendable {
@@ -74,7 +94,15 @@ public protocol WatchClient: Sendable {
     /// A bonded Pebble usually does not advertise, so scanning alone can never
     /// rediscover it; it has to be looked up by its stored identifier.
     func retrieveKnownWatches(_ hints: [DiscoveredWatch]) async throws -> [DiscoveredWatch]
-    func connect(to device: DiscoveredWatch) async throws -> ConnectedWatch
+    /// Opens a link and waits for the watch to say what it is.
+    ///
+    /// `reportingPhase` is called as the handshake passes each stage, on the
+    /// main actor, before this returns. A transport with nothing to report
+    /// between the two simply never calls it.
+    func connect(
+        to device: DiscoveredWatch,
+        reportingPhase: @escaping @MainActor (WatchHandshakePhase) -> Void
+    ) async throws -> ConnectedWatch
     func disconnect(from device: ConnectedWatch) async
     func send(_ frame: PebbleProtocolFrame) async throws
     func frames() -> AsyncStream<PebbleProtocolFrame>
@@ -123,6 +151,12 @@ public protocol WatchClient: Sendable {
 public extension WatchClient {
     /// A transport with no radio to open has nothing to do here.
     func startBluetooth() {}
+
+    /// For the call sites that only want the watch: a reconnect the app did not
+    /// ask for, and every test that is not about the handshake.
+    func connect(to device: DiscoveredWatch) async throws -> ConnectedWatch {
+        try await connect(to: device, reportingPhase: { _ in })
+    }
 
     func retrieveKnownWatches(_ hints: [DiscoveredWatch]) async throws -> [DiscoveredWatch] {
         []

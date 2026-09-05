@@ -45,6 +45,9 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     var bluetoothWaiters: [CheckedContinuation<Void, any Error>] = []
     private var scanContinuation: CheckedContinuation<[DiscoveredWatch], any Error>?
     var connectionContinuation: CheckedContinuation<ConnectedWatch, any Error>?
+    /// Whoever asked for the connect that is in flight, for the phases between
+    /// the link coming up and the watch answering. Nil once it has answered.
+    var handshakePhaseReporter: (@MainActor (WatchHandshakePhase) -> Void)?
     var pendingDevice: DiscoveredWatch?
     var activeWriteCharacteristic: CBCharacteristic?
     var activeBatteryCharacteristic: CBCharacteristic?
@@ -215,12 +218,19 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         return retrieved
     }
 
-    public func connect(to device: DiscoveredWatch) async throws -> ConnectedWatch {
+    public func connect(
+        to device: DiscoveredWatch,
+        reportingPhase: @escaping @MainActor (WatchHandshakePhase) -> Void
+    ) async throws -> ConnectedWatch {
         try await waitForBluetooth()
 
         guard connectionContinuation == nil else {
             throw WatchConnectionError.connectionAlreadyInProgress
         }
+        // Held for the length of the handshake, and cleared with the
+        // continuation: a phase reported against a connect that has already
+        // finished would move the app off `connected`.
+        handshakePhaseReporter = reportingPhase
         if let connectedWatch, connectedWatch.id == device.id {
             return connectedWatch
         }
@@ -425,6 +435,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         let initialConnectionContinuation = connectionContinuation
         initialConnectionContinuation?.resume(returning: connectedWatch)
         connectionContinuation = nil
+        handshakePhaseReporter = nil
         pendingDevice = nil
         connectedPeripheral = peripheral
         reconnects.follow(device)
@@ -467,6 +478,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         activePairingTriggerCharacteristic = nil
         connectionContinuation?.resume(throwing: error)
         connectionContinuation = nil
+        handshakePhaseReporter = nil
         // Withdraw the pending connect request: CoreBluetooth otherwise keeps
         // it queued forever and a late didConnect would create a session the
         // app no longer expects.

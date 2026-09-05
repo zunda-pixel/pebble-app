@@ -498,6 +498,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
                 ppogSession = session
                 frameDecoder = PebbleProtocolFrameDecoder()
                 connectedPeripheral = peripheral
+                handshakePhaseReporter?(.transportOpen)
                 try sendFrame(WatchVersionCodec.requestFrame(), to: peripheral)
             case .data, .acknowledgement:
                 guard var session = ppogSession else {

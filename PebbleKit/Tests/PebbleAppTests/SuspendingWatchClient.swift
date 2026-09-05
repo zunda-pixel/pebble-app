@@ -41,7 +41,12 @@ final class SuspendingWatchClient: WatchClient {
         [DiscoveredWatch(id: WatchID("suspending-emery"), name: "Pebble Time 2", model: .pebbleTime2, signalStrength: -50)]
     }
 
-    func connect(to device: DiscoveredWatch) async throws -> ConnectedWatch {
+    /// No phases: these tests are about the queues, and a connect that reports
+    /// nothing between the link and the answer is what the protocol allows.
+    func connect(
+        to device: DiscoveredWatch,
+        reportingPhase: @escaping @MainActor (WatchHandshakePhase) -> Void
+    ) async throws -> ConnectedWatch {
         ConnectedWatch(
             id: device.id,
             name: device.name,

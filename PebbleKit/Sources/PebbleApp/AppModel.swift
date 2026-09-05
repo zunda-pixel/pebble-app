@@ -38,6 +38,11 @@ public final class AppModel {
     public internal(set) var connectionFailures: [WatchID: WatchConnectionError] = [:]
     public internal(set) var isScanning = false
     public internal(set) var discoveredWatches: [DiscoveredWatch] = []
+    /// Which of the watches being connected have got past the link coming up.
+    ///
+    /// Not observable in its own right: it is only ever read by
+    /// `refreshConnectionState`, and `connectionState` is what a screen shows.
+    @ObservationIgnored var negotiatingWatchIDs: Set<WatchID> = []
 
     // Everything else a screen reads lives on the feature it belongs to.
     //
@@ -366,12 +371,22 @@ public final class AppModel {
         }
         defer {
             connectingWatchIDs.remove(device.id)
+            negotiatingWatchIDs.remove(device.id)
             refreshConnectionState()
         }
 
         let connectionClient = clientFactory(device.id)
         do {
-            let connectedWatch = try await connectionClient.connect(to: device)
+            let connectedWatch = try await connectionClient.connect(to: device) { [weak self] _ in
+                // Both phases mean the same thing to a screen: the link is up
+                // and the watch has not finished answering. They are reported
+                // separately because a watch that reaches the first and never
+                // the second is one whose protocol service is unusable, and
+                // the log needs to tell those apart.
+                guard let self else { return }
+                self.negotiatingWatchIDs.insert(device.id)
+                self.refreshConnectionState()
+            }
             lastConnectionError = nil
             connectionFailures[device.id] = nil
             let connection = WatchConnection(
@@ -412,7 +427,11 @@ public final class AppModel {
     }
 
     func refreshConnectionState() {
-        if let connectingID = connectingWatchIDs.first {
+        // `.negotiating` before `.connecting`: they are one connect at two
+        // stages, and the second is the one that takes the seconds.
+        if let negotiatingID = connectingWatchIDs.first(where: negotiatingWatchIDs.contains) {
+            connectionState = .negotiating(watchID: negotiatingID)
+        } else if let connectingID = connectingWatchIDs.first {
             connectionState = .connecting(watchID: connectingID)
         } else if let primary = activeConnections.first {
             connectionState = .connected(primary.watch)

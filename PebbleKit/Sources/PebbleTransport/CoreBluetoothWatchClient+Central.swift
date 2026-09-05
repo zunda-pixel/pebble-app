@@ -69,6 +69,11 @@ extension CoreBluetoothWatchClient: CBCentralManagerDelegate {
             return
         }
         setup.reset()
+        // The link is up. Everything from here to the watch's version answer —
+        // discovering services, pairing if it is not bonded, opening the PPoG
+        // transport — is the handshake, and on a real watch it is where the
+        // seconds go.
+        handshakePhaseReporter?(.linkOpen)
         Task { [tag = clientTag] in
             await PebbleDiagnostics.shared.record(
                 category: "pairing",

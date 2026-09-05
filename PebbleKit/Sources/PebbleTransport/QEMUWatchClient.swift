@@ -51,13 +51,19 @@ public final class QEMUWatchClient: WatchClient {
         )]
     }
 
-    public func connect(to device: DiscoveredWatch) async throws -> ConnectedWatch {
+    public func connect(
+        to device: DiscoveredWatch,
+        reportingPhase: @escaping @MainActor (WatchHandshakePhase) -> Void
+    ) async throws -> ConnectedWatch {
         reconnectWatch = device
         isManualDisconnect = false
-        return try await establishConnection(to: device)
+        return try await establishConnection(to: device, reportingPhase: reportingPhase)
     }
 
-    private func establishConnection(to device: DiscoveredWatch) async throws -> ConnectedWatch {
+    private func establishConnection(
+        to device: DiscoveredWatch,
+        reportingPhase: @MainActor (WatchHandshakePhase) -> Void = { _ in }
+    ) async throws -> ConnectedWatch {
         guard connection == nil else { throw WatchConnectionError.connectionAlreadyInProgress }
         // Half a message and half a frame belong to the link that dropped, and a
         // data-logging session id means only what the emulator said on that link.
@@ -76,6 +82,11 @@ public final class QEMUWatchClient: WatchClient {
             connection.start(queue: .global(qos: .userInitiated))
         }
         receiveNextMessage(from: generation)
+        // The socket is the link and the transport at once here: there is no
+        // service discovery and no PPoG handshake, so both phases land
+        // together and the emulator's connect looks instantaneous.
+        reportingPhase(.linkOpen)
+        reportingPhase(.transportOpen)
         let information = try await withCheckedThrowingContinuation { continuation in
             versionContinuation = continuation
             Task {
