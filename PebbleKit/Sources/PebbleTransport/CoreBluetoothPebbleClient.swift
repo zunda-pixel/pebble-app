@@ -717,20 +717,6 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     /// `step` names what the link was doing. Eleven places report the same
     /// `protocolNegotiationFailed`, and a log that only carries the error says
     /// nothing about which of them a watch stopped at.
-    /// Lets a watch go that has closed the session on this companion.
-    ///
-    /// Not chased: the watch keeps one companion session and hands it to
-    /// whoever asked last, so reconnecting would take it straight back off
-    /// whatever now has it, and the two would pull it back and forth for as
-    /// long as both were running. Saying so and stopping leaves the choice
-    /// where it belongs.
-    func endSessionTheWatchClosed(_ peripheral: CBPeripheral) {
-        reconnects.stop()
-        reconnects.expectDisconnect(of: peripheral.identifier.uuidString)
-        eventContinuation?.yield(.disconnected(.sessionClosedByWatch))
-        cancelLink(peripheral, reason: "the watch closed the session with the link still up")
-    }
-
     func abortLink(
         _ peripheral: CBPeripheral,
         error: PebbleConnectionError,

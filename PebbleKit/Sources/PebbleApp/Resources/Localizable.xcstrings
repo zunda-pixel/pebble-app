@@ -4456,11 +4456,22 @@
       }
     },
     "The connection failed: the watch has forgotten this phone, and the phone still holds the old pairing. Forget the watch in the system Bluetooth settings, then add it again here." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "接続に失敗しました。ウォッチ側はこのiPhoneを忘れていますが、iPhone側には以前のペアリング情報が残っています。“設定”のBluetoothでこのウォッチの登録を解除してから、もう一度追加してください。"
+          }
+        }
+      }
+    },
+    "The connection failed: the watch has thrown away its pairing with this device. A Pebble keeps one, so pairing it with another phone or computer does this. Forget the watch in the system Bluetooth settings, then pair it again here." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "接続に失敗しました。ウォッチがこのデバイスとのペアリング情報を破棄しています。Pebbleはペアリングを1つしか保持しないため、ほかのiPhoneやコンピュータとペアリングするとこうなります。“設定”のBluetoothでこのウォッチの登録を解除してから、もう一度ペアリングしてください。"
           }
         }
       }
@@ -4862,6 +4873,7 @@
       }
     },
     "The watch ended the connection. A Pebble talks to one phone or computer at a time, and gives itself to whichever asked last, so another device connecting takes it from this one. Connect again here to take it back." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {

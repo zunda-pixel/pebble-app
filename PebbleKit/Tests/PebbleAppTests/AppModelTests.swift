@@ -841,30 +841,6 @@ struct AppModelTests {
     }
 
     @Test
-    func aWatchGivenToAnotherDeviceSaysSoAndIsNotChased() async throws {
-        let client = MockPebbleClient()
-        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let model = AppModel(
-            client: client,
-            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
-        )
-        await model.scan()
-        let discovered = try #require(model.discoveredDevices.first)
-        await model.connect(to: discovered)
-
-        client.emit(.disconnected(.sessionClosedByWatch))
-        try await Task.sleep(for: .milliseconds(20))
-
-        #expect(model.connectionState == .failed(.sessionClosedByWatch))
-        #expect(model.connectionFailures[discovered.id] == .sessionClosedByWatch)
-        // Taking it back would only take it off whatever has it now, and the
-        // two would pull it back and forth for as long as both were running.
-        #expect(!PebbleConnectionError.sessionClosedByWatch.isWorthAnotherAttempt)
-    }
-
-    @Test
     func aWatchThatKeepsFailingItsHandshakeSaysSoOnItsOwnScreen() async throws {
         let client = MockPebbleClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)

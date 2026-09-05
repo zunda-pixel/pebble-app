@@ -237,13 +237,6 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
             },
             onUnsubscribe: { [weak self] in
                 guard let self, self.setup.transport == .forward else { return }
-                // A session that goes while the link stays is the watch letting
-                // go of this companion rather than the link failing, which is
-                // what another phone or computer taking the watch looks like.
-                if peripheral.state == .connected, self.ppogSession != nil {
-                    self.endSessionTheWatchClosed(peripheral)
-                    return
-                }
                 self.abortLink(peripheral, error: .disconnected, step: "hosting the transport: the watch unsubscribed")
             }
         )
