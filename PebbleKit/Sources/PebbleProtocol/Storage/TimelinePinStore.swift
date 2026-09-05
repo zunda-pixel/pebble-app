@@ -56,13 +56,16 @@ public actor TimelinePinStore {
         try PersistentJSON.loadRecovering([String: [UUID]].self, from: writtenURL) ?? [:]
     }
 
+    /// A file that cannot be decoded is moved aside, the same as the two
+    /// dictionaries beside it. There is nothing to rebuild pins from here — the
+    /// calendar and the phone's reminders put them back on the next
+    /// synchronization — but handing the `DecodingError` back on every read
+    /// would have meant no pin could be shown or saved again.
     public func pins() throws -> [PebbleTimelinePin] {
-        guard FileManager.default.fileExists(atPath: fileURL.path) else { return [] }
-        return try JSONDecoder().decode([PebbleTimelinePin].self, from: Data(contentsOf: fileURL))
+        try PersistentJSON.loadRecovering([PebbleTimelinePin].self, from: fileURL) ?? []
     }
 
     public func save(_ pins: [PebbleTimelinePin]) throws {
-        try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try JSONEncoder().encode(pins).write(to: fileURL, options: .atomic)
+        try PersistentJSON.save(pins, to: fileURL)
     }
 }

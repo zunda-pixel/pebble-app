@@ -20,14 +20,45 @@ public actor PebbleApplicationLibrary {
         if let cachedApplications {
             return cachedApplications
         }
-        guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            cachedApplications = []
-            return []
+        if let stored = try PersistentJSON.loadRecovering([PebbleApplication].self, from: fileURL) {
+            cachedApplications = stored
+            return stored
         }
-        let data = try Data(contentsOf: fileURL)
-        let applications = try JSONDecoder().decode([PebbleApplication].self, from: data)
-        cachedApplications = applications
-        return applications
+        // Either nothing has ever been saved or the file has just been
+        // quarantined. Both read the same way from here, and the packages under
+        // `Packages/` are the real record either way.
+        let rebuilt = rebuiltFromPackages()
+        if !rebuilt.isEmpty {
+            try persist(rebuilt)
+        } else {
+            cachedApplications = []
+        }
+        return rebuilt
+    }
+
+    /// The library read back off the `.pbw` files still on disk.
+    ///
+    /// A package is what an application was installed from, so nothing about it
+    /// is lost by reading it again — except the order the reader put them in,
+    /// which lives only in `applications.json`. Newest file last, which is the
+    /// order they were imported in and so usually the order that was lost.
+    ///
+    /// A package that cannot be read is skipped rather than failing the
+    /// rebuild: one unreadable file must not cost the reader the rest of their
+    /// library, which is exactly the trap the corrupt index was.
+    private func rebuiltFromPackages() -> [PebbleApplication] {
+        let contents = try? FileManager.default.contentsOfDirectory(
+            at: packagesDirectoryURL,
+            includingPropertiesForKeys: [.creationDateKey]
+        )
+        let packages = (contents ?? [])
+            .filter { $0.pathExtension == "pbw" }
+            .sorted { lhs, rhs in
+                let left = (try? lhs.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? .distantPast
+                let right = (try? rhs.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? .distantPast
+                return left == right ? lhs.lastPathComponent < rhs.lastPathComponent : left < right
+            }
+        return packages.compactMap { try? PBWPackageImporter.application(from: $0) }
     }
 
     @discardableResult
@@ -134,41 +165,29 @@ public actor PebbleApplicationLibrary {
     public func setSynchronizedApplicationIDs(_ applicationIDs: [UUID], deviceID: String) throws {
         var states = try synchronizationStates()
         states[deviceID] = applicationIDs
-        let url = synchronizationStateURL
-        try FileManager.default.createDirectory(
-            at: url.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(states).write(to: url, options: .atomic)
+        try PersistentJSON.save(states, to: synchronizationStateURL)
     }
 
     private func persist(_ applications: [PebbleApplication]) throws {
-        try FileManager.default.createDirectory(
-            at: fileURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(applications).write(to: fileURL, options: .atomic)
+        try PersistentJSON.save(applications, to: fileURL)
         cachedApplications = applications
     }
 
-    private func packageURL(applicationID: UUID) -> URL {
+    private var packagesDirectoryURL: URL {
         fileURL.deletingLastPathComponent()
             .appending(path: "Packages", directoryHint: .isDirectory)
+    }
+
+    private func packageURL(applicationID: UUID) -> URL {
+        packagesDirectoryURL
             .appending(path: "\(applicationID.uuidString).pbw", directoryHint: .notDirectory)
     }
 
+    /// Which applications each watch was last given. Nothing rebuilds this —
+    /// only the watch knows — so a file that cannot be read is moved aside and
+    /// every watch is synchronized again, which is work rather than a fault.
     private func synchronizationStates() throws -> [String: [UUID]] {
-        guard FileManager.default.fileExists(atPath: synchronizationStateURL.path) else {
-            return [:]
-        }
-        return try JSONDecoder().decode(
-            [String: [UUID]].self,
-            from: Data(contentsOf: synchronizationStateURL)
-        )
+        try PersistentJSON.loadRecovering([String: [UUID]].self, from: synchronizationStateURL) ?? [:]
     }
 
     private var synchronizationStateURL: URL {
@@ -177,12 +196,6 @@ public actor PebbleApplicationLibrary {
     }
 
     private static var defaultFileURL: URL {
-        let baseURL = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first ?? URL.temporaryDirectory
-        return baseURL
-            .appending(path: "Pebble", directoryHint: .isDirectory)
-            .appending(path: "applications.json", directoryHint: .notDirectory)
+        applicationSupportURL("applications.json")
     }
 }

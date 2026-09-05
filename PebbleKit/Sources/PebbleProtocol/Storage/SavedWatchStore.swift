@@ -70,30 +70,25 @@ public actor SavedWatchStore {
         return updated
     }
 
+    /// A file that cannot be decoded is moved aside rather than thrown at every
+    /// caller for ever. This store used to hand the `DecodingError` back, and
+    /// because nothing ever cached the failure the next read did it again: the
+    /// screen said "Saved watches could not be loaded." and no watch could be
+    /// saved again, with no way out but deleting the file by hand.
+    ///
+    /// There is nothing to rebuild a watch list from, so what comes back is
+    /// empty and the reader adds their watch again — which they can.
     private func loadIfNeeded() throws {
         guard watches == nil else { return }
-        guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            watches = []
-            return
-        }
-        watches = try JSONDecoder().decode([SavedPebbleWatch].self, from: Data(contentsOf: fileURL))
+        watches = try PersistentJSON.loadRecovering([SavedPebbleWatch].self, from: fileURL) ?? []
     }
 
     private func persist(_ updated: [SavedPebbleWatch]) throws {
-        try FileManager.default.createDirectory(
-            at: fileURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(updated).write(to: fileURL, options: .atomic)
+        try PersistentJSON.save(updated, to: fileURL)
         watches = updated
     }
 
     private static func defaultFileURL() -> URL {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? FileManager.default.temporaryDirectory
-        return base.appending(path: "Pebble", directoryHint: .isDirectory)
-            .appending(path: "watches.json")
+        applicationSupportURL("watches.json")
     }
 }

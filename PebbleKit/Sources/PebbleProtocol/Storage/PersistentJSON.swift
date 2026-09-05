@@ -9,9 +9,14 @@ enum PersistentJSON {
         return try JSONDecoder().decode(type, from: Data(contentsOf: url))
     }
 
+    /// Written so that a person diagnosing a fault can read the file: these are
+    /// the only account of what the app believed, and the one that gets sent in
+    /// when something has gone wrong.
     static func save<Value: Encodable>(_ value: Value, to url: URL) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try JSONEncoder().encode(value).write(to: url, options: .atomic)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try encoder.encode(value).write(to: url, options: .atomic)
     }
 
     static func loadRecovering<Value: Decodable>(_ type: Value.Type, from url: URL) throws -> Value? {

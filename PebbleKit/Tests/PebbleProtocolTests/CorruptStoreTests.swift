@@ -1,0 +1,209 @@
+import Foundation
+import Testing
+import ZIPFoundation
+@testable import PebbleProtocol
+
+/// What each store does with a file it cannot read.
+///
+/// Every one of these used to hand the `DecodingError` straight back, and
+/// because nothing cached the failure the next read did it again: one bad byte
+/// in `watches.json` meant no watch could ever be saved again, with no way out
+/// but deleting the file by hand.
+@Suite
+@MainActor
+struct CorruptStoreTests {
+    private func temporaryDirectory() -> URL {
+        FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+    }
+
+    /// Half a JSON array: valid UTF-8, and `JSONDecoder` refuses it.
+    private func writeTruncatedJSON(to url: URL) throws {
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data(#"[{"id":"mock-flint","name":"Pebble 2 Duo""#.utf8).write(to: url)
+    }
+
+    private func quarantinedFiles(besides url: URL) throws -> [URL] {
+        try FileManager.default
+            .contentsOfDirectory(at: url.deletingLastPathComponent(), includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix("\(url.lastPathComponent).corrupt-") }
+    }
+
+    @Test func aTruncatedWatchListIsMovedAsideAndReadsEmpty() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fileURL = directory.appending(path: "watches.json")
+        try writeTruncatedJSON(to: fileURL)
+
+        let store = SavedWatchStore(fileURL: fileURL)
+        #expect(try await store.allWatches().isEmpty)
+        #expect(try quarantinedFiles(besides: fileURL).count == 1)
+        #expect(!FileManager.default.fileExists(atPath: fileURL.path))
+
+        // The point of moving it aside: a watch can be saved again afterwards.
+        let saved = try await store.record(
+            PebbleDevice(
+                id: "mock-flint",
+                name: "Pebble 2 Duo",
+                model: .pebble2Duo,
+                firmwareVersion: "v5.0.0",
+                batteryLevel: 84
+            )
+        )
+        #expect(saved.count == 1)
+        #expect(try await SavedWatchStore(fileURL: fileURL).allWatches().count == 1)
+    }
+
+    @Test func aTruncatedPinFileIsMovedAsideAndReadsEmpty() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fileURL = directory.appending(path: "timeline.json")
+        try writeTruncatedJSON(to: fileURL)
+
+        let store = TimelinePinStore(fileURL: fileURL)
+        #expect(try await store.pins().isEmpty)
+        #expect(try quarantinedFiles(besides: fileURL).count == 1)
+
+        let pin = PebbleTimelinePin(
+            parentApplicationID: UUID(),
+            timestamp: Date(timeIntervalSince1970: 1_788_393_600),
+            title: "Stand up",
+            subtitle: nil,
+            body: nil
+        )
+        try await store.save([pin])
+        #expect(try await store.pins() == [pin])
+    }
+
+    /// The packages are the record; `applications.json` is only the order.
+    @Test func aCorruptApplicationIndexIsRebuiltFromThePackagesOnDisk() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fileURL = directory.appending(path: "applications.json")
+        let packages = directory.appending(path: "Packages", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: packages, withIntermediateDirectories: true)
+
+        var identifiers: [UUID] = []
+        for index in 0..<3 {
+            let applicationID = UUID()
+            identifiers.append(applicationID)
+            let source = try makeApplicationPackage(
+                in: directory,
+                applicationID: applicationID,
+                name: "App \(index)"
+            )
+            try FileManager.default.moveItem(
+                at: source,
+                to: packages.appending(path: "\(applicationID.uuidString).pbw")
+            )
+        }
+        try writeTruncatedJSON(to: fileURL)
+
+        let library = PebbleApplicationLibrary(fileURL: fileURL)
+        let rebuilt = try await library.applications()
+
+        #expect(Set(rebuilt.map(\.id)) == Set(identifiers))
+        #expect(try quarantinedFiles(besides: fileURL).count == 1)
+        // Rebuilt and written back, so the next launch does not scan again.
+        #expect(try await PebbleApplicationLibrary(fileURL: fileURL).applications().count == 3)
+    }
+
+    /// One unreadable package must not cost the reader the other two: the whole
+    /// point of the rebuild is that a single bad file is survivable.
+    @Test func anUnreadablePackageIsSkippedRatherThanFailingTheRebuild() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fileURL = directory.appending(path: "applications.json")
+        let packages = directory.appending(path: "Packages", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: packages, withIntermediateDirectories: true)
+
+        for index in 0..<2 {
+            let applicationID = UUID()
+            let source = try makeApplicationPackage(
+                in: directory,
+                applicationID: applicationID,
+                name: "App \(index)"
+            )
+            try FileManager.default.moveItem(
+                at: source,
+                to: packages.appending(path: "\(applicationID.uuidString).pbw")
+            )
+        }
+        try Data("not a zip archive".utf8)
+            .write(to: packages.appending(path: "\(UUID().uuidString).pbw"))
+        try writeTruncatedJSON(to: fileURL)
+
+        #expect(try await PebbleApplicationLibrary(fileURL: fileURL).applications().count == 2)
+    }
+
+    @Test func aCorruptSynchronizationRecordReadsAsNothingSynchronized() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fileURL = directory.appending(path: "applications.json")
+        let syncURL = directory.appending(path: "application-sync.json")
+        try writeTruncatedJSON(to: syncURL)
+
+        let library = PebbleApplicationLibrary(fileURL: fileURL)
+        #expect(try await library.synchronizedApplicationIDs(deviceID: "mock-flint").isEmpty)
+
+        let applicationID = UUID()
+        try await library.setSynchronizedApplicationIDs([applicationID], deviceID: "mock-flint")
+        #expect(try await library.synchronizedApplicationIDs(deviceID: "mock-flint") == [applicationID])
+    }
+
+    /// A `.pbw` holding one application built for the Pebble Time 2.
+    private func makeApplicationPackage(
+        in directory: URL,
+        applicationID: UUID,
+        name: String
+    ) throws -> URL {
+        let url = directory.appending(path: "\(UUID().uuidString).pbw")
+        let archive = try Archive(url: url, accessMode: .create)
+
+        func add(_ path: String, _ data: Data) throws {
+            try archive.addEntry(
+                with: path,
+                type: .file,
+                uncompressedSize: Int64(data.count),
+                provider: { position, size in
+                    data.subdata(in: Int(position)..<Int(position) + size)
+                }
+            )
+        }
+
+        try add("appinfo.json", Data("""
+        {
+          "uuid": "\(applicationID.uuidString.lowercased())",
+          "shortName": "\(name)",
+          "longName": "\(name)",
+          "companyName": "Pebble",
+          "versionLabel": "1.0",
+          "targetPlatforms": ["emery"],
+          "watchapp": { "watchface": false }
+        }
+        """.utf8))
+
+        // The executable carries the identifier the importer checks the package
+        // against, so its header has to name this application.
+        var executable = [UInt8](repeating: 0, count: PBWBinaryHeaderDecoder.size)
+        executable.replaceSubrange(0..<8, with: [0x50, 0x42, 0x4C, 0x41, 0x50, 0x50, 0, 0])
+        executable.replaceSubrange(8..<14, with: [1, 0, 4, 2, 3, 7])
+        let identifier = applicationID.uuid
+        executable.replaceSubrange(104..<120, with: [
+            identifier.0, identifier.1, identifier.2, identifier.3,
+            identifier.4, identifier.5, identifier.6, identifier.7,
+            identifier.8, identifier.9, identifier.10, identifier.11,
+            identifier.12, identifier.13, identifier.14, identifier.15,
+        ])
+        try add("emery/pebble-app.bin", Data(executable))
+        try add("emery/manifest.json", Data("""
+        {
+          "application": { "name": "pebble-app.bin", "size": \(executable.count) }
+        }
+        """.utf8))
+        return url
+    }
+}
