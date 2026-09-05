@@ -17,7 +17,7 @@ struct PendingWorkTests {
             applicationLibrary: PebbleApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
     }
 
@@ -27,7 +27,7 @@ struct PendingWorkTests {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = makeModel(client: client, directory: directory)
-        try await model.pendingNotificationLibrary.save([])
+        try await model.pendingNotificationStore.save([])
 
         await model.scan()
         let discovered = try #require(model.discoveredDevices.first)
@@ -65,14 +65,14 @@ struct PendingWorkTests {
             applicationLibrary: PebbleApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json")),
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
             clientFactory: { deviceID in
                 let client = SuspendingPebbleClient()
                 clients[deviceID] = client
                 return client
             }
         )
-        try await model.pendingNotificationLibrary.save([])
+        try await model.pendingNotificationStore.save([])
         await model.scan()
         let devices = model.discoveredDevices
         let first = try #require(devices.first)
@@ -107,7 +107,7 @@ struct PendingWorkTests {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = makeModel(client: client, directory: directory)
-        try await model.pendingAppMessageLibrary.save([])
+        try await model.pendingAppMessageStore.save([])
 
         await model.scan()
         let discovered = try #require(model.discoveredDevices.first)
@@ -139,7 +139,7 @@ struct PendingWorkTests {
             applicationLibrary: PebbleApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json")),
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
             clientFactory: { _ in client }
         )
         let pin = PebbleTimelinePin(
@@ -149,7 +149,7 @@ struct PendingWorkTests {
             subtitle: nil,
             body: nil
         )
-        try await model.timelineLibrary.save([pin])
+        try await model.timelineStore.save([pin])
         await model.scan()
         let discovered = try #require(model.discoveredDevices.first)
         await model.connect(to: discovered)
@@ -158,16 +158,16 @@ struct PendingWorkTests {
 
         // The pin goes from under the app: a queue that was lost, or an app that
         // was reinstalled and never knew about it.
-        try await model.timelineLibrary.save([])
-        try await model.pendingTimelineOperationLibrary.save([])
+        try await model.timelineStore.save([])
+        try await model.pendingTimelineOperationStore.save([])
         await model.synchronizeTimeline()
 
         // Nothing else can name it: BlobDB has no listing, and no delete was
         // ever queued for it.
         #expect(client.timelinePins.isEmpty)
-        #expect(try await model.timelineLibrary.writtenPinIDs(deviceID: discovered.id).isEmpty)
+        #expect(try await model.timelineStore.writtenPinIDs(deviceID: discovered.id).isEmpty)
 
-        try await model.timelineLibrary.forgetWrittenPinIDs(deviceID: discovered.id)
+        try await model.timelineStore.forgetWrittenPinIDs(deviceID: discovered.id)
     }
 
     @Test
@@ -180,7 +180,7 @@ struct PendingWorkTests {
             applicationLibrary: PebbleApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json")),
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
             clientFactory: { _ in client }
         )
         await model.scan()
@@ -214,7 +214,7 @@ struct PendingWorkTests {
         // so writing this back would replace it with less than it already has.
         #expect(client.timelinePins.isEmpty)
 
-        try await model.timelineLibrary.forgetWrittenPinIDs(deviceID: discovered.id)
+        try await model.timelineStore.forgetWrittenPinIDs(deviceID: discovered.id)
     }
 
     /// The frame a watch sends to hand over a record of a database of its own.
@@ -228,8 +228,8 @@ struct PendingWorkTests {
             applicationLibrary: PebbleApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json")),
-            reminderLibrary: TimelinePinLibrary(fileURL: directory.appending(path: "reminders.json")),
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
+            reminderStore: TimelinePinStore(fileURL: directory.appending(path: "reminders.json")),
             clientFactory: { _ in client }
         )
         await model.scan()
@@ -274,8 +274,8 @@ struct PendingWorkTests {
             applicationLibrary: PebbleApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json")),
-            reminderLibrary: TimelinePinLibrary(fileURL: directory.appending(path: "reminders.json")),
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
+            reminderStore: TimelinePinStore(fileURL: directory.appending(path: "reminders.json")),
             clientFactory: { _ in client }
         )
         await model.scan()
@@ -328,7 +328,7 @@ struct PendingWorkTests {
             applicationLibrary: PebbleApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json")),
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
             clientFactory: { _ in client }
         )
         let pin = PebbleTimelinePin(
@@ -338,8 +338,8 @@ struct PendingWorkTests {
             subtitle: nil,
             body: nil
         )
-        try await model.timelineLibrary.save([pin])
-        try await model.pendingTimelineOperationLibrary.save([])
+        try await model.timelineStore.save([pin])
+        try await model.pendingTimelineOperationStore.save([])
         await model.scan()
         let discovered = try #require(model.discoveredDevices.first)
         await model.connect(to: discovered)
@@ -351,8 +351,8 @@ struct PendingWorkTests {
         #expect(client.clearedTimelineCount == 1)
         #expect(client.timelinePins.map(\.id) == [pin.id])
 
-        try await model.timelineLibrary.save([])
-        try await model.timelineLibrary.forgetWrittenPinIDs(deviceID: discovered.id)
+        try await model.timelineStore.save([])
+        try await model.timelineStore.forgetWrittenPinIDs(deviceID: discovered.id)
     }
 
     @Test
@@ -416,7 +416,7 @@ struct PendingWorkTests {
         let model = AppModel(
             client: client,
             applicationLibrary: library,
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
 
         await model.scan()

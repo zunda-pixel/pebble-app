@@ -77,8 +77,8 @@ struct RemindersAppTests {
             applicationLibrary: PebbleApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json")),
-            reminderLibrary: TimelinePinLibrary(fileURL: directory.appending(path: "reminders.json")),
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
+            reminderStore: TimelinePinStore(fileURL: directory.appending(path: "reminders.json")),
             clientFactory: { _ in client }
         )
         model.remindersAppStore = remindersApp

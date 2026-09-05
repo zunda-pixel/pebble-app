@@ -5,7 +5,7 @@ import SwiftUI
 
 extension AppModel {
     public func loadReminders() async {
-        reminders = (try? await reminderLibrary.pins()) ?? []
+        reminders = (try? await reminderStore.pins()) ?? []
     }
 
     public func addReminder(title: String, date: Date) async {
@@ -19,7 +19,7 @@ extension AppModel {
         )
         reminders.append(reminder)
         reminders.sort { $0.timestamp < $1.timestamp }
-        try? await reminderLibrary.save(reminders)
+        try? await reminderStore.save(reminders)
         // The watch keeps a fifteen-minute window — `MAX_REMINDER_AGE` in
         // `reminder_db.c` — and refuses anything older outright, which the list
         // already says about the ones that have passed.
@@ -35,9 +35,9 @@ extension AppModel {
                 // then deleted while the watch is away, is one only this record
                 // can name when the watch comes back.
                 let deviceID = connection.device.id
-                var written = (try? await reminderLibrary.writtenPinIDs(deviceID: deviceID)) ?? []
+                var written = (try? await reminderStore.writtenPinIDs(deviceID: deviceID)) ?? []
                 written.insert(reminder.id)
-                try? await reminderLibrary.setWrittenPinIDs(written, deviceID: deviceID)
+                try? await reminderStore.setWrittenPinIDs(written, deviceID: deviceID)
             } catch {
                 reminderStatusMessage =
                     "\(connection.device.name) did not accept the reminder. \(Text(refusalReason(for: error)))"
@@ -56,7 +56,7 @@ extension AppModel {
         guard !removed.isEmpty else { return }
         let identifiers = Set(removed.map(\.id))
         reminders.removeAll { identifiers.contains($0.id) }
-        try? await reminderLibrary.save(reminders)
+        try? await reminderStore.save(reminders)
         // One reminder kept in two places is let go of in both: leaving the
         // Reminders app's copy behind would only have the next read put the
         // reminder back.
@@ -80,7 +80,7 @@ extension AppModel {
         alsoRemoving extra: Set<UUID> = []
     ) async {
         let deviceID = connection.device.id
-        let written = (try? await reminderLibrary.writtenPinIDs(deviceID: deviceID)) ?? []
+        let written = (try? await reminderStore.writtenPinIDs(deviceID: deviceID)) ?? []
         let forgotten = written.union(extra).subtracting(reminders.map(\.id))
         guard !forgotten.isEmpty else { return }
         var removed: Set<UUID> = []
@@ -100,7 +100,7 @@ extension AppModel {
                 break
             }
         }
-        try? await reminderLibrary.setWrittenPinIDs(written.subtracting(removed), deviceID: deviceID)
+        try? await reminderStore.setWrittenPinIDs(written.subtracting(removed), deviceID: deviceID)
     }
 
     // One in the past has already been shown, or missed, and sending it would
@@ -110,7 +110,7 @@ extension AppModel {
         await loadReminders()
         await removeRemindersTheWatchStillHas(on: connection)
         let deviceID = connection.device.id
-        var written = (try? await reminderLibrary.writtenPinIDs(deviceID: deviceID)) ?? []
+        var written = (try? await reminderStore.writtenPinIDs(deviceID: deviceID)) ?? []
         for reminder in reminders where reminder.timestamp > .now && !reminder.isFromWatch {
             do {
                 try await connection.client.upsertTimelineReminder(reminder)
@@ -126,6 +126,6 @@ extension AppModel {
         }
         // Whatever got through, so that a reminder deleted before the next
         // connection can still be named.
-        try? await reminderLibrary.setWrittenPinIDs(written, deviceID: deviceID)
+        try? await reminderStore.setWrittenPinIDs(written, deviceID: deviceID)
     }
 }

@@ -16,7 +16,7 @@ struct ReportedStateTests {
             applicationLibrary: PebbleApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
     }
 
@@ -153,7 +153,7 @@ struct ReportedStateTests {
         let model = AppModel(
             client: client,
             applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         let now = try #require(Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 2, hour: 12)))
         let yesterday = try #require(Calendar.current.date(byAdding: .day, value: -1, to: now))
@@ -192,7 +192,7 @@ struct ReportedStateTests {
         let model = AppModel(
             client: client,
             applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         let now = try #require(Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 2, hour: 12)))
         let yesterday = try #require(Calendar.current.date(byAdding: .day, value: -1, to: now))

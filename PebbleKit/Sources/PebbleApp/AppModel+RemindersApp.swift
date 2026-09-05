@@ -24,7 +24,7 @@ extension AppModel {
             )
             return
         }
-        var mirrored = (try? await reminderLibrary.mirroredIdentifiers()) ?? [:]
+        var mirrored = (try? await reminderStore.mirroredIdentifiers()) ?? [:]
         let outcome = RemindersAppSync.merged(
             kept: reminders,
             fromApp: items,
@@ -36,8 +36,8 @@ extension AppModel {
         // here too, so letting go of it in this app can reach it there.
         for item in items { mirrored[item.reminder.id] = item.identifier }
         for reminder in outcome.finished { mirrored[reminder.id] = nil }
-        try? await reminderLibrary.save(reminders)
-        try? await reminderLibrary.setMirroredIdentifiers(mirrored)
+        try? await reminderStore.save(reminders)
+        try? await reminderStore.setMirroredIdentifiers(mirrored)
         reminderStatusMessage = nil
         for connection in activeConnections {
             await synchronizeReminders(on: connection)
@@ -50,14 +50,14 @@ extension AppModel {
     /// keeps a window: once its time has passed it is gone from there and there
     /// was nowhere else it was written down.
     func mirrorInRemindersApp(_ reminder: PebbleTimelinePin) async {
-        var mirrored = (try? await reminderLibrary.mirroredIdentifiers()) ?? [:]
+        var mirrored = (try? await reminderStore.mirroredIdentifiers()) ?? [:]
         do {
             if let identifier = mirrored[reminder.id] {
                 try await remindersAppStore.update(reminder, identifier: identifier)
                 return
             }
             mirrored[reminder.id] = try await remindersAppStore.add(reminder)
-            try await reminderLibrary.setMirroredIdentifiers(mirrored)
+            try await reminderStore.setMirroredIdentifiers(mirrored)
         } catch {
             await PebbleDiagnostics.shared.record(
                 .error,
@@ -70,7 +70,7 @@ extension AppModel {
     /// Takes these reminders out of the phone's Reminders app, if they were ever
     /// in it.
     func forgetInRemindersApp(_ identifiers: Set<UUID>) async {
-        var mirrored = (try? await reminderLibrary.mirroredIdentifiers()) ?? [:]
+        var mirrored = (try? await reminderStore.mirroredIdentifiers()) ?? [:]
         var changed = false
         for id in identifiers {
             guard let identifier = mirrored[id] else { continue }
@@ -88,6 +88,6 @@ extension AppModel {
             }
         }
         guard changed else { return }
-        try? await reminderLibrary.setMirroredIdentifiers(mirrored)
+        try? await reminderStore.setMirroredIdentifiers(mirrored)
     }
 }

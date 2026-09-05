@@ -3,7 +3,7 @@ public import Foundation
 
 extension AppModel {
     func loadAppGlances() async {
-        appGlances = (try? await appGlanceLibrary.glances()) ?? []
+        appGlances = (try? await appGlanceStore.glances()) ?? []
     }
 
     public func glance(for applicationID: UUID) -> PebbleAppGlance? {
@@ -17,7 +17,7 @@ extension AppModel {
         // The watch refuses a glance that is not newer than the one it holds,
         // and the reader saving the same words twice still means "show this".
         written.updatedAt = .now
-        if let glances = try? await appGlanceLibrary.update(written) {
+        if let glances = try? await appGlanceStore.update(written) {
             appGlances = glances
         }
         for connection in activeConnections {

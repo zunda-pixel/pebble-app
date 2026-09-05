@@ -1,6 +1,23 @@
 import PebbleProtocol
 import Foundation
 
+struct PebbleReconnectBackoff: Equatable, Sendable {
+    var attempt: Int = 0
+    var initialDelay: Duration = .seconds(2)
+    var maximumDelay: Duration = .seconds(30)
+
+    mutating func nextDelay() -> Duration {
+        let multiplier = 1 << min(attempt, 10)
+        let delay = min(initialDelay * multiplier, maximumDelay)
+        attempt = min(attempt + 1, 10)
+        return delay
+    }
+
+    mutating func reset() {
+        attempt = 0
+    }
+}
+
 /// Whether a watch that dropped should be chased, and how long to wait before
 /// each attempt.
 ///

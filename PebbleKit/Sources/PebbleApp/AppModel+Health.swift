@@ -5,7 +5,7 @@ import SwiftUI
 /// Health samples, and their exchange with HealthKit.
 extension AppModel {
     public func loadHealth() async {
-        do { healthSamples = try await healthLibrary.samples() }
+        do { healthSamples = try await healthStore.samples() }
         catch { dataSyncStatusMessage = "Health data could not be loaded." }
     }
 
@@ -34,14 +34,14 @@ extension AppModel {
 
     public func importFromHealthKit() async {
         do {
-            healthSamples = try await healthLibrary.merge(try await healthKitBridge.readRecentSamples())
+            healthSamples = try await healthStore.merge(try await healthKitBridge.readRecentSamples())
             dataSyncStatusMessage = "HealthKit data imported and deduplicated."
         } catch { dataSyncStatusMessage = "HealthKit data could not be read." }
     }
     #endif
 
     public func exportHealthData() async {
-        do { healthExportURL = try await healthLibrary.export() }
+        do { healthExportURL = try await healthStore.export() }
         catch { dataSyncStatusMessage = "Health data could not be exported." }
     }
 
@@ -49,7 +49,7 @@ extension AppModel {
         let accessed = url.startAccessingSecurityScopedResource()
         defer { if accessed { url.stopAccessingSecurityScopedResource() } }
         do {
-            healthSamples = try await healthLibrary.importArchive(from: url)
+            healthSamples = try await healthStore.importArchive(from: url)
             dataSyncStatusMessage = "Health archive imported and reconciled."
         } catch {
             dataSyncStatusMessage = "The selected health archive is invalid or unsupported."
@@ -57,7 +57,7 @@ extension AppModel {
     }
 
     public func deleteHealthData() async {
-        try? await healthLibrary.deleteAll()
+        try? await healthStore.deleteAll()
         healthSamples = []
         healthExportURL = nil
         dataSyncStatusMessage = "Local Pebble health data deleted."

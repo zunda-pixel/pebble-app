@@ -10,7 +10,12 @@ targets iOS 27 and macOS 27; the app target also builds for visionOS.
 | `Pebble.xcodeproj` | The app project. One shared scheme, `Pebble`. |
 | `Pebble/` | App target: `MainApp.swift`, `Info.plist`, entitlements, app-level strings. |
 | `PebbleKit/` | Local Swift package with everything else. Its only product, `PebbleKit`, exports the `PebbleApp` target. |
-| `PebbleKit/Sources/PebbleProtocol` | What the watch says and what the phone says back: frames, PPoG, the endpoint codecs, the package formats (`.pbw`, `.pbz`), the persistence and the catalogues. **Foundation only** — no CoreBluetooth, no SwiftUI, so it holds anywhere and a test of it needs no radio. |
+| `PebbleKit/Sources/PebbleProtocol` | What the watch says and what the phone says back. **Foundation only** — no CoreBluetooth, no SwiftUI, so it holds anywhere and a test of it needs no radio. Five folders, below. |
+| &nbsp;&nbsp;`Wire/` | The link itself: frames, PPoG, the advertisement, the pairing state, the `PebbleClient` protocol every transport implements, and the byte helpers. |
+| &nbsp;&nbsp;`Codecs/` | One endpoint codec per file, plus the values they carry over the wire. |
+| &nbsp;&nbsp;`Storage/` | The stores, one per file, all of them over `PersistentJSON`. |
+| &nbsp;&nbsp;`Catalogs/` | What is fetched from the network: apps, firmware, language packs, and the download and retry policy they share. |
+| &nbsp;&nbsp;`Packages/` | The package formats: `.pbw` and `.pbz`. |
 | `PebbleKit/Sources/PebbleAudio` | What the watch's microphone sent, turned back into samples: the only place that imports `speex`. |
 | `PebbleKit/Sources/PebbleTransport` | How those bytes reach a watch: the CoreBluetooth client in both roles, the phone-hosted GATT server, the emulator socket, and the mock a test or a preview stands in. |
 | `PebbleKit/Sources/PebbleApp` | The app: `AppModel` (split across `AppModel+*.swift`), the screens, and the phone's own frameworks (HealthKit, EventKit, MediaPlayer, CallKit, WebKit). |
@@ -24,9 +29,15 @@ neither a codec nor a transport can reach for SwiftUI. A seam between two of the
 uses `package` access rather than `public` — the package is one unit, and the
 library's public surface is only what the app target needs.
 
-One endpoint codec per file, named after the endpoint. One view per file. When a
-file grows past roughly 500 lines, split it along a seam that already exists
-rather than by line count.
+One endpoint codec per file, named after the endpoint, and **nothing else in it**
+— a store that lived beside a codec was reached for by the app on the strength of
+having imported the module, and neither file could then be read on its own. One
+store per file too, under `Storage/`, named `…Store`. `PebbleApplicationLibrary`
+is the exception: the reader's collection of watch apps really is a library, and
+that is what the screens call it.
+
+One view per file. When a file grows past roughly 500 lines, split it along a
+seam that already exists rather than by line count.
 
 ## Building and testing
 

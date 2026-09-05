@@ -16,7 +16,7 @@ extension AppModel {
     public func setNotificationsEnabled(_ enabled: Bool, applicationID: UUID) async {
         if enabled { notificationPreferences.mutedApplicationIDs.remove(applicationID) }
         else { notificationPreferences.mutedApplicationIDs.insert(applicationID) }
-        try? await notificationPreferenceLibrary.save(notificationPreferences)
+        try? await notificationPreferenceStore.save(notificationPreferences)
         notificationStatusMessage = enabled ? "Notifications enabled for this app." : "Notifications muted for this app."
     }
 
@@ -24,7 +24,7 @@ extension AppModel {
         notificationPreferences.quietHoursEnabled = enabled
         if let start { notificationPreferences.quietHoursStart = min(23, max(0, start)) }
         if let end { notificationPreferences.quietHoursEnd = min(23, max(0, end)) }
-        try? await notificationPreferenceLibrary.save(notificationPreferences)
+        try? await notificationPreferenceStore.save(notificationPreferences)
     }
 
     public func sendTestNotification(deviceID: String? = nil) async {
@@ -143,13 +143,13 @@ extension AppModel {
             sentAt: notification.timestamp,
             watchNames: watchNames
         )
-        if let history = try? await sentNotificationLibrary.record(sent) {
+        if let history = try? await sentNotificationStore.record(sent) {
             sentNotifications = history
         }
     }
 
     public func forgetSentNotifications() async {
-        try? await sentNotificationLibrary.clear()
+        try? await sentNotificationStore.clear()
         sentNotifications = []
     }
 
@@ -158,7 +158,7 @@ extension AppModel {
         if pendingNotifications.count > 20 {
             pendingNotifications.removeFirst(pendingNotifications.count - 20)
         }
-        try? await pendingNotificationLibrary.save(pendingNotifications)
+        try? await pendingNotificationStore.save(pendingNotifications)
         await PebbleDiagnostics.shared.record(
             category: "notification",
             message: "Watch app notification queued: \(reason)"
@@ -202,7 +202,7 @@ extension AppModel {
                     value: write.value,
                     timestamp: write.timestamp
                 ),
-                let apps = try? await notificationSourceAppLibrary.merge(app) {
+                let apps = try? await notificationSourceAppStore.merge(app) {
                     notificationSourceApps = apps
                     connection.synchronizedNotificationAppRecords[app.bundleID] = NotificationAppsCodec.value(
                         for: (apps.first { $0.bundleID == app.bundleID } ?? app)
@@ -263,7 +263,7 @@ extension AppModel {
         }
         app.icon = icon
         app.stateUpdated = .now
-        if let apps = try? await notificationSourceAppLibrary.update(app) {
+        if let apps = try? await notificationSourceAppStore.update(app) {
             notificationSourceApps = apps
         }
         for connection in activeConnections {
@@ -282,7 +282,7 @@ extension AppModel {
         app.backgroundColor = background
         app.foregroundColor = foreground
         app.stateUpdated = .now
-        if let apps = try? await notificationSourceAppLibrary.update(app) {
+        if let apps = try? await notificationSourceAppStore.update(app) {
             notificationSourceApps = apps
         }
         for connection in activeConnections {
@@ -299,7 +299,7 @@ extension AppModel {
         }
         app.vibePattern = pattern
         app.stateUpdated = .now
-        if let apps = try? await notificationSourceAppLibrary.update(app) {
+        if let apps = try? await notificationSourceAppStore.update(app) {
             notificationSourceApps = apps
         }
         for connection in activeConnections {
@@ -316,7 +316,7 @@ extension AppModel {
         }
         app.filterRules = rules
         app.stateUpdated = .now
-        if let apps = try? await notificationSourceAppLibrary.update(app) {
+        if let apps = try? await notificationSourceAppStore.update(app) {
             notificationSourceApps = apps
         }
         for connection in activeConnections {
@@ -333,7 +333,7 @@ extension AppModel {
         app.stateUpdated = .now
         // `merge` is for records the watch sends, and its timestamp gate can
         // discard a change made in the same second.
-        if let apps = try? await notificationSourceAppLibrary.update(app) {
+        if let apps = try? await notificationSourceAppStore.update(app) {
             notificationSourceApps = apps
         }
         for connection in activeConnections {
@@ -347,8 +347,8 @@ extension AppModel {
         guard !removed.isEmpty else { return }
         let identifiers = Set(removed.map(\.bundleID))
         let apps = notificationSourceApps.filter { !identifiers.contains($0.bundleID) }
-        try? await notificationSourceAppLibrary.save(apps)
-        notificationSourceApps = (try? await notificationSourceAppLibrary.apps()) ?? apps
+        try? await notificationSourceAppStore.save(apps)
+        notificationSourceApps = (try? await notificationSourceAppStore.apps()) ?? apps
         for app in removed {
             for connection in activeConnections {
                 connection.synchronizedNotificationAppRecords[app.bundleID] = nil
@@ -445,7 +445,7 @@ extension AppModel {
                 pendingNotifications.remove(at: index)
             }
         }
-        try? await pendingNotificationLibrary.save(pendingNotifications)
+        try? await pendingNotificationStore.save(pendingNotifications)
         if pendingNotifications.isEmpty {
             await PebbleDiagnostics.shared.record(
                 category: "notification",
@@ -462,7 +462,7 @@ extension AppModel {
     }
 
     func restorePendingNotifications() async {
-        if let saved = try? await pendingNotificationLibrary.notifications() {
+        if let saved = try? await pendingNotificationStore.notifications() {
             pendingNotifications = saved
         }
     }
@@ -471,7 +471,7 @@ extension AppModel {
         guard let connection = activeConnections.first else {
             pendingAppMessages.append(StoredAppMessage(applicationID: applicationID, tuples: tuples))
             if pendingAppMessages.count > 50 { pendingAppMessages.removeFirst(pendingAppMessages.count - 50) }
-            try await pendingAppMessageLibrary.save(pendingAppMessages)
+            try await pendingAppMessageStore.save(pendingAppMessages)
             return
         }
         try await connection.client.sendAppMessage(applicationID: applicationID, tuples: tuples)
@@ -500,6 +500,6 @@ extension AppModel {
             // afterwards need not be the one just sent.
             pendingAppMessages.removeAll { $0.id == message.id }
         }
-        try? await pendingAppMessageLibrary.save(pendingAppMessages)
+        try? await pendingAppMessageStore.save(pendingAppMessages)
     }
 }

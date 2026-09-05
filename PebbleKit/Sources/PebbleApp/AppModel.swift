@@ -177,10 +177,10 @@ public final class AppModel {
     let scannerClient: any PebbleClient
     let clientFactory: @MainActor (String) -> any PebbleClient
     let applicationLibrary: PebbleApplicationLibrary
-    let watchLibrary: PebbleWatchLibrary
-    let timelineLibrary = TimelinePinLibrary()
-    let reminderLibrary: TimelinePinLibrary
-    let healthLibrary = PebbleHealthLibrary()
+    let watchStore: SavedWatchStore
+    let timelineStore = TimelinePinStore()
+    let reminderStore: TimelinePinStore
+    let healthStore = WatchHealthStore()
     let appCatalog = PebbleAppCatalog()
     let languagePackCatalog = PebbleLanguagePackCatalog()
     let weatherBridge = WeatherBridge()
@@ -192,12 +192,12 @@ public final class AppModel {
         try await WeatherBridge().report(for: place, inFahrenheit: usesFahrenheit)
     }
     let phoneLocationSource = PhoneLocationSource()
-    let pendingNotificationLibrary = PendingNotificationLibrary()
-    let sentNotificationLibrary = SentNotificationLibrary()
-    let notificationPreferenceLibrary = NotificationPreferenceLibrary()
-    let pendingTimelineOperationLibrary = PendingTimelineOperationLibrary()
-    let pendingAppMessageLibrary = PendingAppMessageLibrary()
-    let pendingFirmwareUpdateLibrary = PendingFirmwareUpdateLibrary()
+    let pendingNotificationStore = PendingNotificationStore()
+    let sentNotificationStore = SentNotificationStore()
+    let notificationPreferenceStore = NotificationPreferenceStore()
+    let pendingTimelineOperationStore = PendingTimelineOperationStore()
+    let pendingAppMessageStore = PendingAppMessageStore()
+    let pendingFirmwareUpdateStore = PendingFirmwareUpdateStore()
     let firmwareCatalog = PebbleOSFirmwareCatalog()
     var pendingAppMessages: [StoredAppMessage] = []
     let calendarBridge = CalendarBridge()
@@ -208,8 +208,8 @@ public final class AppModel {
     #if os(iOS)
     let healthKitBridge = HealthKitBridge()
     #endif
-    let notificationSourceAppLibrary = NotificationSourceAppLibrary()
-    let appGlanceLibrary: AppGlanceLibrary
+    let notificationSourceAppStore = NotificationSourceAppStore()
+    let appGlanceStore: AppGlanceStore
     let speechBridge = SpeechBridge()
     var voiceTranscriptionReadiness = VoiceTranscriptionReadiness.turnedOff
     @ObservationIgnored lazy var musicCoordinator = MusicCoordinator(
@@ -252,9 +252,9 @@ public final class AppModel {
     public init(
         client: any PebbleClient,
         applicationLibrary: PebbleApplicationLibrary = PebbleApplicationLibrary(),
-        watchLibrary: PebbleWatchLibrary = PebbleWatchLibrary(),
-        appGlanceLibrary: AppGlanceLibrary = AppGlanceLibrary(),
-        reminderLibrary: TimelinePinLibrary = TimelinePinLibrary(
+        watchStore: SavedWatchStore = SavedWatchStore(),
+        appGlanceStore: AppGlanceStore = AppGlanceStore(),
+        reminderStore: TimelinePinStore = TimelinePinStore(
             fileURL: URL.applicationSupportDirectory.appending(path: "Pebble/reminders.json")
         ),
         clientFactory: (@MainActor (String) -> any PebbleClient)? = nil
@@ -264,9 +264,9 @@ public final class AppModel {
         // limits the app to one watch at a time (mock and QEMU transports).
         self.clientFactory = clientFactory ?? { _ in client }
         self.applicationLibrary = applicationLibrary
-        self.watchLibrary = watchLibrary
-        self.appGlanceLibrary = appGlanceLibrary
-        self.reminderLibrary = reminderLibrary
+        self.watchStore = watchStore
+        self.appGlanceStore = appGlanceStore
+        self.reminderStore = reminderStore
         companionNotificationsEnabled = Defaults[.companionNotificationsEnabled]
         activeWatchfaceID = Defaults[.activeWatchfaceID]
     }
@@ -276,17 +276,17 @@ public final class AppModel {
         hasStarted = true
         await loadSavedWatches()
         await restorePendingNotifications()
-        notificationPreferences = (try? await notificationPreferenceLibrary.preferences()) ?? NotificationDeliveryPreferences()
-        pendingAppMessages = (try? await pendingAppMessageLibrary.messages()) ?? []
+        notificationPreferences = (try? await notificationPreferenceStore.preferences()) ?? NotificationDeliveryPreferences()
+        pendingAppMessages = (try? await pendingAppMessageStore.messages()) ?? []
         await loadTimeline()
         await loadHealth()
         await loadCatalog()
-        firmwareUpdateJournal = try? await pendingFirmwareUpdateLibrary.journal()
+        firmwareUpdateJournal = try? await pendingFirmwareUpdateStore.journal()
         loadDownloadedFirmware()
         loadWeatherPlaces()
         loadWatchSettings()
-        notificationSourceApps = (try? await notificationSourceAppLibrary.apps()) ?? []
-        sentNotifications = (try? await sentNotificationLibrary.notifications()) ?? []
+        notificationSourceApps = (try? await notificationSourceAppStore.apps()) ?? []
+        sentNotifications = (try? await sentNotificationStore.notifications()) ?? []
         await loadAppGlances()
         musicCoordinator.start()
         phoneCallCoordinator.start()
@@ -313,7 +313,7 @@ public final class AppModel {
                 try? await connection.client.synchronizeTime()
             }
             await restorePendingNotifications()
-            pendingAppMessages = (try? await pendingAppMessageLibrary.messages()) ?? pendingAppMessages
+            pendingAppMessages = (try? await pendingAppMessageStore.messages()) ?? pendingAppMessages
             await flushPendingNotifications()
             await flushPendingAppMessages()
             await synchronizeTimeline()
@@ -457,10 +457,6 @@ public final class AppModel {
         }
     }
 
-    #if os(iOS)
-
-    #endif
-
     /// Drops the work a watch was in the middle of when its link went, and the
     /// library operation that was driving it.
     func clearBusyOperationState(on connection: WatchConnection) {
@@ -508,7 +504,7 @@ public final class AppModel {
             Task { [weak self] in
                 guard let self else { return }
                 do {
-                    self.healthSamples = try await self.healthLibrary.merge(samples)
+                    self.healthSamples = try await self.healthStore.merge(samples)
                 } catch {
                     self.dataSyncStatusMessage = "Watch health data could not be saved."
                     return
@@ -544,7 +540,7 @@ public final class AppModel {
                       let index = self.timelinePins.firstIndex(where: { $0.id == invocation.itemID })
                 else { return }
                 self.timelinePins.remove(at: index)
-                try? await self.timelineLibrary.save(self.timelinePins)
+                try? await self.timelineStore.save(self.timelinePins)
                 // Only the watch the action was taken on removed the pin for itself, and
                 // the pin is about to be gone from `timelinePins` for good.
                 try? await self.queueTimelineOperation(.delete(invocation.itemID))

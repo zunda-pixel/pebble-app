@@ -7,7 +7,7 @@ import SwiftUI
 extension AppModel {
     public func loadSavedWatches() async {
         do {
-            savedWatches = try await watchLibrary.allWatches()
+            savedWatches = try await watchStore.allWatches()
             watchManagementErrorMessage = nil
             let library = applicationLibrary
             let states = await savedWatches
@@ -74,7 +74,7 @@ extension AppModel {
 
     public func setAutomaticallyConnects(_ enabled: Bool, watchID: String) async {
         do {
-            savedWatches = try await watchLibrary.setAutomaticallyConnects(enabled, watchID: watchID)
+            savedWatches = try await watchStore.setAutomaticallyConnects(enabled, watchID: watchID)
             watchManagementErrorMessage = nil
         } catch {
             watchManagementErrorMessage = "The automatic connection preference could not be saved."
@@ -87,7 +87,7 @@ extension AppModel {
             await close(connection)
         }
         do {
-            savedWatches = try await watchLibrary.remove(watchID: id)
+            savedWatches = try await watchStore.remove(watchID: id)
             installedApplicationIDsByWatch[id] = nil
             connectionFailures[id] = nil
             watchResetStatusMessages[id] = nil
@@ -168,7 +168,7 @@ extension AppModel {
         watchResetStatusMessages[device.id] = nil
         noteFirmwareUpdateFinished(on: device)
         do {
-            savedWatches = try await watchLibrary.record(device)
+            savedWatches = try await watchStore.record(device)
             watchManagementErrorMessage = nil
         } catch {
             watchManagementErrorMessage = "The watch connection history could not be saved."

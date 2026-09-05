@@ -64,8 +64,8 @@ struct AppModelTests {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
-        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+        let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
 
         await model.scan()
         let discovered = try #require(model.discoveredDevices.first)
@@ -124,8 +124,8 @@ struct AppModelTests {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
-        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+        let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
 
         await model.scan()
         let discovered = try #require(model.discoveredDevices.first)
@@ -144,17 +144,17 @@ struct AppModelTests {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
-        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         // A previously paired watch that no longer advertises: it is absent
         // from the mock's scan results and only reachable via retrieval.
-        try await watchLibrary.record(PebbleDevice(
+        try await watchStore.record(PebbleDevice(
             id: "saved-bonded-watch",
             name: "My Pebble",
             model: .pebbleTime2,
             firmwareVersion: "v5.0.0",
             batteryLevel: 60
         ))
-        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
 
         await model.scan()
 
@@ -169,15 +169,15 @@ struct AppModelTests {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
-        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
-        try await watchLibrary.record(PebbleDevice(
+        let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        try await watchStore.record(PebbleDevice(
             id: "saved-bonded-watch",
             name: "My Pebble",
             model: .pebbleTime2,
             firmwareVersion: "v5.0.0",
             batteryLevel: 60
         ))
-        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
         await model.loadSavedWatches()
 
         // The watch subscribed to the phone's protocol service by itself; no
@@ -193,8 +193,8 @@ struct AppModelTests {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
-        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+        let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
         await model.loadSavedWatches()
 
         // Bonded but never added here: offered rather than connected, because
@@ -218,8 +218,8 @@ struct AppModelTests {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
-        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+        let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
 
         await model.scan()
         let discovered = try #require(model.discoveredDevices.first)
@@ -239,11 +239,11 @@ struct AppModelTests {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
-        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         let model = AppModel(
             client: scanner,
             applicationLibrary: library,
-            watchLibrary: watchLibrary,
+            watchStore: watchStore,
             clientFactory: { deviceID in
                 let client = MockPebbleClient()
                 connectionClients[deviceID] = client
@@ -278,8 +278,8 @@ struct AppModelTests {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
-        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+        let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
 
         await model.scan()
         let discovered = try #require(model.discoveredDevices.first)
@@ -304,8 +304,8 @@ struct AppModelTests {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
-        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+        let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
 
         await model.scan()
         let discovered = try #require(model.discoveredDevices.first)
@@ -369,8 +369,8 @@ struct AppModelTests {
         let model = AppModel(
             client: client,
             applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json")),
-            appGlanceLibrary: AppGlanceLibrary(fileURL: directory.appending(path: "glances.json"))
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
+            appGlanceStore: AppGlanceStore(fileURL: directory.appending(path: "glances.json"))
         )
         await model.scan()
         let discovered = try #require(model.discoveredDevices.first)
@@ -410,7 +410,7 @@ struct AppModelTests {
         let model = AppModel(
             client: scanner,
             applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json")),
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
             clientFactory: { deviceID in
                 let client = MockPebbleClient()
                 connectionClients[deviceID] = client
@@ -451,11 +451,11 @@ struct AppModelTests {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
-        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         let model = AppModel(
             client: scanner,
             applicationLibrary: library,
-            watchLibrary: watchLibrary,
+            watchStore: watchStore,
             clientFactory: { deviceID in
                 let client = MockPebbleClient()
                 connectionClients[deviceID] = client
@@ -511,8 +511,8 @@ struct AppModelTests {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
-        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+        let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
 
         await model.scan()
         let discovered = try #require(model.discoveredDevices.first)
@@ -529,8 +529,8 @@ struct AppModelTests {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
-        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+        let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
 
         await model.scan()
         let discovered = try #require(model.discoveredDevices.first)
@@ -554,8 +554,8 @@ struct AppModelTests {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
-        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+        let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
 
         await model.scan()
         let discovered = try #require(model.discoveredDevices.first)
@@ -576,8 +576,8 @@ struct AppModelTests {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
-        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+        let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
 
         await model.scan()
         let discovered = try #require(model.discoveredDevices.first)
@@ -599,8 +599,8 @@ struct AppModelTests {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
-        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+        let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
 
         await model.scan()
         let discovered = try #require(model.discoveredDevices.first)
@@ -623,8 +623,8 @@ struct AppModelTests {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
-        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+        let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
 
         await model.resetWatch(.restart, deviceID: "missing-watch")
 
@@ -640,8 +640,8 @@ struct AppModelTests {
         let model = AppModel(
             client: client,
             applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json")),
-            reminderLibrary: TimelinePinLibrary(fileURL: directory.appending(path: "reminders.json"))
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
+            reminderStore: TimelinePinStore(fileURL: directory.appending(path: "reminders.json"))
         )
         await model.connect(to: DiscoveredPebble(
             id: "mock-emery",
@@ -672,8 +672,8 @@ struct AppModelTests {
         let model = AppModel(
             client: client,
             applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json")),
-            reminderLibrary: TimelinePinLibrary(fileURL: directory.appending(path: "reminders.json"))
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
+            reminderStore: TimelinePinStore(fileURL: directory.appending(path: "reminders.json"))
         )
         let watch = DiscoveredPebble(
             id: "mock-emery",
@@ -699,8 +699,8 @@ struct AppModelTests {
         let afterRelaunch = AppModel(
             client: client,
             applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json")),
-            reminderLibrary: TimelinePinLibrary(fileURL: directory.appending(path: "reminders.json"))
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
+            reminderStore: TimelinePinStore(fileURL: directory.appending(path: "reminders.json"))
         )
         await afterRelaunch.connect(to: watch)
 
@@ -715,7 +715,7 @@ struct AppModelTests {
         let model = AppModel(
             client: client,
             applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         let watch = DiscoveredPebble(id: "mock-emery", name: "My Pebble", model: .pebbleTime2, signalStrength: -50)
         client.connectionFailure = .protocolNegotiationFailed
@@ -741,7 +741,7 @@ struct AppModelTests {
         let model = AppModel(
             client: client,
             applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         let watch = DiscoveredPebble(id: "mock-emery", name: "My Pebble", model: .pebbleTime2, signalStrength: -50)
         client.connectionFailure = .pairingRemovedByWatch
@@ -762,8 +762,8 @@ struct AppModelTests {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
-        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+        let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
         await model.scan()
         let discovered = try #require(model.discoveredDevices.first)
         await model.connect(to: discovered)
@@ -789,7 +789,7 @@ struct AppModelTests {
         let model = AppModel(
             client: client,
             applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         await model.scan()
         let discovered = try #require(model.discoveredDevices.first)
@@ -823,7 +823,7 @@ struct AppModelTests {
         let model = AppModel(
             client: client,
             applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         await model.scan()
         let discovered = try #require(model.discoveredDevices.first)
@@ -847,7 +847,7 @@ struct AppModelTests {
         let model = AppModel(
             client: client,
             applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         await model.scan()
         let discovered = try #require(model.discoveredDevices.first)
@@ -873,7 +873,7 @@ struct AppModelTests {
         let model = AppModel(
             client: client,
             applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         await model.scan()
         let discovered = try #require(model.discoveredDevices.first)

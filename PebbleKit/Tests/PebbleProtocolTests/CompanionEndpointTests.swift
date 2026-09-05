@@ -1076,7 +1076,7 @@ struct NotificationAppsTests {
     @Test func libraryMergeKeepsNewerState() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "notification-apps-\(UUID().uuidString).json")
-        let library = NotificationSourceAppLibrary(fileURL: directory)
+        let library = NotificationSourceAppStore(fileURL: directory)
         let older = NotificationSourceApp(
             bundleID: "a.b",
             displayName: "Old",

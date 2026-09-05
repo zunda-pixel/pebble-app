@@ -270,7 +270,7 @@ struct PackageImportTests {
         #expect(package.sha256.count == 64)
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
-        let library = PendingFirmwareUpdateLibrary(
+        let library = PendingFirmwareUpdateStore(
             fileURL: directory.appending(path: "package.json"),
             journalURL: directory.appending(path: "journal.json")
         )

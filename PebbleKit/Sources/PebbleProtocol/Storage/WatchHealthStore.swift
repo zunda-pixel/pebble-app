@@ -64,7 +64,7 @@ public struct PebbleHealthArchive: Codable, Equatable, Sendable {
     public var samples: [PebbleHealthSample]
 }
 
-public actor PebbleHealthLibrary {
+public actor WatchHealthStore {
     private var fileURL: URL
 
     public init(fileURL: URL? = nil) {

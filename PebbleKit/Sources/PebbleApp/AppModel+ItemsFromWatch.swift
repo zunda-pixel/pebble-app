@@ -15,8 +15,8 @@ extension AppModel {
             reminders.removeAll { $0.id == item.id }
             reminders.append(item)
             reminders.sort { $0.timestamp < $1.timestamp }
-            try? await reminderLibrary.save(reminders)
-            await noteHeld(item.id, by: connection, in: reminderLibrary)
+            try? await reminderStore.save(reminders)
+            await noteHeld(item.id, by: connection, in: reminderStore)
             // Written where the reader will look for it: a reminder spoken to
             // the watch belongs in the app they keep their reminders in, and it
             // goes there now rather than at the next sweep, because the watch
@@ -25,8 +25,8 @@ extension AppModel {
         case .pin, .notification:
             timelinePins.removeAll { $0.id == item.id }
             timelinePins.append(item)
-            try? await timelineLibrary.save(timelinePins)
-            await noteHeld(item.id, by: connection, in: timelineLibrary)
+            try? await timelineStore.save(timelinePins)
+            await noteHeld(item.id, by: connection, in: timelineStore)
         }
         await PebbleDiagnostics.shared.record(
             category: "timeline",
@@ -44,7 +44,7 @@ extension AppModel {
     private func noteHeld(
         _ id: UUID,
         by connection: WatchConnection,
-        in library: TimelinePinLibrary
+        in library: TimelinePinStore
     ) async {
         let deviceID = connection.device.id
         var held = (try? await library.writtenPinIDs(deviceID: deviceID)) ?? []

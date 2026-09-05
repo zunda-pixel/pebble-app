@@ -38,7 +38,7 @@ extension AppModel {
                 targetVersion: package.manifest.firmware.versionTag,
                 packageSHA256: package.sha256
             )
-            try await pendingFirmwareUpdateLibrary.save(package, journal: journal)
+            try await pendingFirmwareUpdateStore.save(package, journal: journal)
             firmwareUpdateJournal = journal
             if package.manifest.firmware.type == "recovery" {
                 firmwareRequiresConfirmation = true
@@ -126,8 +126,8 @@ extension AppModel {
 
     public func confirmRecoveryFirmwareUpdate() async {
         guard firmwareRequiresConfirmation,
-              let package = try? await pendingFirmwareUpdateLibrary.package(),
-              let journal = try? await pendingFirmwareUpdateLibrary.journal(),
+              let package = try? await pendingFirmwareUpdateStore.package(),
+              let journal = try? await pendingFirmwareUpdateStore.journal(),
               let connection = connection(for: journal.deviceID) else { return }
         firmwareRequiresConfirmation = false
         do { try await performFirmwareUpdate(package, on: connection) }
@@ -138,8 +138,8 @@ extension AppModel {
         firmwareUpdateTask?.cancel()
         firmwareUpdateTask = nil
         firmwareRequiresConfirmation = false
-        try? await pendingFirmwareUpdateLibrary.updatePhase(.cancelled)
-        firmwareUpdateJournal = try? await pendingFirmwareUpdateLibrary.journal()
+        try? await pendingFirmwareUpdateStore.updatePhase(.cancelled)
+        firmwareUpdateJournal = try? await pendingFirmwareUpdateStore.journal()
         firmwareUpdateStatusMessage = "Firmware update cancelled; recovery data was retained."
         if let deviceID = firmwareUpdateJournal?.deviceID,
            let connection = connection(for: deviceID) {
@@ -150,7 +150,7 @@ extension AppModel {
     public func discardPendingFirmwareUpdate() async {
         firmwareUpdateTask?.cancel()
         firmwareUpdateTask = nil
-        await pendingFirmwareUpdateLibrary.clear()
+        await pendingFirmwareUpdateStore.clear()
         firmwareUpdateJournal = nil
         firmwareRequiresConfirmation = false
         firmwareUpdateStatusMessage = "Pending firmware update removed."
@@ -161,13 +161,13 @@ extension AppModel {
         on connection: WatchConnection
     ) async throws {
         try package.validateIntegrity()
-        guard let journal = try await pendingFirmwareUpdateLibrary.journal(),
+        guard let journal = try await pendingFirmwareUpdateStore.journal(),
               journal.packageSHA256 == package.sha256,
               journal.deviceID == connection.device.id else {
             throw PBZFirmwareError.unsafeManifest
         }
-        try await pendingFirmwareUpdateLibrary.updatePhase(.transferring)
-        firmwareUpdateJournal = try await pendingFirmwareUpdateLibrary.journal()
+        try await pendingFirmwareUpdateStore.updatePhase(.transferring)
+        firmwareUpdateJournal = try await pendingFirmwareUpdateStore.journal()
         // One at a time. Two can be asked for at once — a staged update starting
         // itself as the watch reconnects, while the reader taps Install — and the
         // second would take over the task and flags the first is using.
@@ -200,21 +200,21 @@ extension AppModel {
             )
             // So the next connection offers the update again instead of silently
             // starting the whole transfer over.
-            let stopped = try? await pendingFirmwareUpdateLibrary.journal()
+            let stopped = try? await pendingFirmwareUpdateStore.journal()
             if stopped?.phase == .transferring {
-                try? await pendingFirmwareUpdateLibrary.updatePhase(.failed)
-                firmwareUpdateJournal = try? await pendingFirmwareUpdateLibrary.journal()
+                try? await pendingFirmwareUpdateStore.updatePhase(.failed)
+                firmwareUpdateJournal = try? await pendingFirmwareUpdateStore.journal()
             }
             throw error
         }
-        try await pendingFirmwareUpdateLibrary.updatePhase(.awaitingRestart)
-        firmwareUpdateJournal = try await pendingFirmwareUpdateLibrary.journal()
+        try await pendingFirmwareUpdateStore.updatePhase(.awaitingRestart)
+        firmwareUpdateJournal = try await pendingFirmwareUpdateStore.journal()
         firmwareUpdateStatusMessage = "Firmware installed. Waiting for the watch to restart."
         await PebbleDiagnostics.shared.record(
             category: "firmware",
             message: "the watch took the firmware and is restarting"
         )
-        await pendingFirmwareUpdateLibrary.clear()
+        await pendingFirmwareUpdateStore.clear()
         discardDownloadedFirmware(matching: package)
     }
 
@@ -249,8 +249,8 @@ extension AppModel {
     // The only case that runs unasked, which is the whole point of staging one.
     func resumePendingFirmwareUpdate(on connection: WatchConnection) async {
         let device = connection.device
-        guard let package = try? await pendingFirmwareUpdateLibrary.package(),
-              let journal = try? await pendingFirmwareUpdateLibrary.journal(),
+        guard let package = try? await pendingFirmwareUpdateStore.package(),
+              let journal = try? await pendingFirmwareUpdateStore.journal(),
               journal.deviceID == device.id,
               journal.hardwareRevision == device.board?.rawValue,
               journal.packageSHA256 == package.sha256,
@@ -274,8 +274,8 @@ extension AppModel {
     }
 
     public func resumeFirmwareUpdate(deviceID: String? = nil) async {
-        guard let package = try? await pendingFirmwareUpdateLibrary.package(),
-              let journal = try? await pendingFirmwareUpdateLibrary.journal(),
+        guard let package = try? await pendingFirmwareUpdateStore.package(),
+              let journal = try? await pendingFirmwareUpdateStore.journal(),
               let connection = connection(for: deviceID ?? journal.deviceID),
               connection.isConnected else {
             firmwareUpdateStatusMessage = "Connect the watch to resume its firmware update."

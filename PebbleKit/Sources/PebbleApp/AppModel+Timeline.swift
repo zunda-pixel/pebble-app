@@ -8,7 +8,7 @@ import SwiftUI
 
 extension AppModel {
     public func loadTimeline() async {
-        do { timelinePins = try await timelineLibrary.pins() }
+        do { timelinePins = try await timelineStore.pins() }
         catch { dataSyncStatusMessage = "Timeline could not be loaded." }
     }
 
@@ -18,7 +18,7 @@ extension AppModel {
         )
         timelinePins.append(pin)
         do {
-            try await timelineLibrary.save(timelinePins)
+            try await timelineStore.save(timelinePins)
         } catch {
             timelinePins.removeAll { $0.id == pin.id }
             dataSyncStatusMessage = "The timeline pin could not be saved."
@@ -41,7 +41,7 @@ extension AppModel {
         guard !removed.isEmpty else { return }
         let identifiers = Set(removed.map(\.id))
         timelinePins.removeAll { identifiers.contains($0.id) }
-        try? await timelineLibrary.save(timelinePins)
+        try? await timelineStore.save(timelinePins)
         for pin in removed { try? await queueTimelineOperation(.delete(pin.id)) }
         if connectedDevice != nil { await synchronizeTimeline() }
     }
@@ -49,7 +49,7 @@ extension AppModel {
     public func synchronizeTimeline() async {
         await loadTimeline()
         guard !activeConnections.isEmpty else { return }
-        var operations = (try? await pendingTimelineOperationLibrary.operations()) ?? []
+        var operations = (try? await pendingTimelineOperationStore.operations()) ?? []
         let queuedUpserts = Set(operations.compactMap { operation -> UUID? in
             if case .upsert(let pin) = operation { return pin.id }
             return nil
@@ -67,7 +67,7 @@ extension AppModel {
             await removePinsTheAppHasForgotten(on: connection)
             firstUnfinished = min(firstUnfinished, await send(operations, to: connection))
         }
-        try? await pendingTimelineOperationLibrary.save(Array(operations[firstUnfinished...]))
+        try? await pendingTimelineOperationStore.save(Array(operations[firstUnfinished...]))
     }
 
     /// Sends the operations to one watch and answers the index it stopped at.
@@ -90,7 +90,7 @@ extension AppModel {
         }
         // This watch now holds exactly what the app holds, which is what makes
         // the reconciliation above possible next time.
-        try? await timelineLibrary.setWrittenPinIDs(
+        try? await timelineStore.setWrittenPinIDs(
             Set(timelinePins.map(\.id)),
             deviceID: connection.device.id
         )
@@ -105,7 +105,7 @@ extension AppModel {
     /// missed — stays on the watch's timeline and is never mentioned again.
     private func removePinsTheAppHasForgotten(on connection: WatchConnection) async {
         let deviceID = connection.device.id
-        let written = (try? await timelineLibrary.writtenPinIDs(deviceID: deviceID)) ?? []
+        let written = (try? await timelineStore.writtenPinIDs(deviceID: deviceID)) ?? []
         let forgotten = written.subtracting(timelinePins.map(\.id))
         guard !forgotten.isEmpty else { return }
         var removed: Set<UUID> = []
@@ -118,7 +118,7 @@ extension AppModel {
                 break
             }
         }
-        try? await timelineLibrary.setWrittenPinIDs(written.subtracting(removed), deviceID: deviceID)
+        try? await timelineStore.setWrittenPinIDs(written.subtracting(removed), deviceID: deviceID)
         await PebbleDiagnostics.shared.record(
             category: "timeline",
             message: "\(connection.device.name): removed \(removed.count)"
@@ -144,7 +144,7 @@ extension AppModel {
                 "\(connection.device.name) did not clear its timeline. \(Text(refusalReason(for: error)))"
             return
         }
-        try? await timelineLibrary.forgetWrittenPinIDs(deviceID: connection.device.id)
+        try? await timelineStore.forgetWrittenPinIDs(deviceID: connection.device.id)
         await PebbleDiagnostics.shared.record(
             .warning,
             category: "timeline",
@@ -156,7 +156,7 @@ extension AppModel {
     }
 
     func queueTimelineOperation(_ operation: PendingTimelineOperation) async throws {
-        var operations = try await pendingTimelineOperationLibrary.operations()
+        var operations = try await pendingTimelineOperationStore.operations()
         let id: UUID
         switch operation {
         case .upsert(let pin): id = pin.id
@@ -170,7 +170,7 @@ extension AppModel {
         }
         operations.append(operation)
         trimQueuedOperations(&operations)
-        try await pendingTimelineOperationLibrary.save(operations)
+        try await pendingTimelineOperationStore.save(operations)
     }
 
     /// An upsert is reconstructable — `synchronizeTimeline` derives one for every
@@ -197,7 +197,7 @@ extension AppModel {
             let oldCalendarPins = timelinePins.filter { $0.parentApplicationID == CalendarBridge.calendarApplicationID }
             timelinePins.removeAll { $0.parentApplicationID == CalendarBridge.calendarApplicationID }
             timelinePins.append(contentsOf: calendarPins)
-            try await timelineLibrary.save(timelinePins)
+            try await timelineStore.save(timelinePins)
             let newIDs = Set(calendarPins.map(\.id))
             for pin in oldCalendarPins where !newIDs.contains(pin.id) {
                 try await queueTimelineOperation(.delete(pin.id))

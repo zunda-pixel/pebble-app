@@ -18,8 +18,8 @@ struct BluetoothStartTests {
             applicationLibrary: PebbleApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json")),
-            reminderLibrary: TimelinePinLibrary(fileURL: directory.appending(path: "reminders.json")),
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
+            reminderStore: TimelinePinStore(fileURL: directory.appending(path: "reminders.json")),
             clientFactory: { _ in client }
         )
     }
@@ -44,8 +44,8 @@ struct BluetoothStartTests {
         let client = MockPebbleClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
-        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
-        _ = try await watchLibrary.record(PebbleDevice(
+        let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        _ = try await watchStore.record(PebbleDevice(
             id: "saved-watch",
             name: "Pebble Time 2",
             model: .pebbleTime2,
@@ -58,8 +58,8 @@ struct BluetoothStartTests {
             applicationLibrary: PebbleApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
-            watchLibrary: watchLibrary,
-            reminderLibrary: TimelinePinLibrary(fileURL: directory.appending(path: "reminders.json")),
+            watchStore: watchStore,
+            reminderStore: TimelinePinStore(fileURL: directory.appending(path: "reminders.json")),
             clientFactory: { _ in client }
         )
 

@@ -186,13 +186,13 @@ struct LibraryAndClientTests {
 }
 
 @Suite
-struct PebbleWatchLibraryTests {
+struct SavedWatchStoreTests {
     @Test func recordsUpdatesPreferencesAndForgetsWatches() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let fileURL = directory.appending(path: "watches.json")
         defer { try? FileManager.default.removeItem(at: directory) }
-        let library = PebbleWatchLibrary(fileURL: fileURL)
+        let library = SavedWatchStore(fileURL: fileURL)
         let device = PebbleDevice(
             id: "watch-1",
             name: "Pebble QEMU",
@@ -210,7 +210,7 @@ struct PebbleWatchLibraryTests {
         watches = try await library.setAutomaticallyConnects(false, watchID: device.id)
         #expect(!watches[0].automaticallyConnects)
 
-        let reloaded = PebbleWatchLibrary(fileURL: fileURL)
+        let reloaded = SavedWatchStore(fileURL: fileURL)
         #expect(try await reloaded.allWatches()[0].firmwareVersion == "v1")
         #expect(try await reloaded.remove(watchID: device.id).isEmpty)
     }
@@ -509,7 +509,7 @@ struct CompanionStorageTests {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         let url = directory.appending(path: "health.json")
         defer { try? FileManager.default.removeItem(at: directory) }
-        let library = PebbleHealthLibrary(fileURL: url)
+        let library = WatchHealthStore(fileURL: url)
         let sample = PebbleHealthSample(
             date: Date(timeIntervalSince1970: 10), steps: 1234, sleepMinutes: 420,
             timeZoneIdentifier: "UTC", updatedAt: Date(timeIntervalSince1970: 20)
@@ -531,7 +531,7 @@ struct CompanionStorageTests {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         let url = directory.appending(path: "health.json")
         defer { try? FileManager.default.removeItem(at: directory) }
-        let library = PebbleHealthLibrary(fileURL: url)
+        let library = WatchHealthStore(fileURL: url)
         let watch = PebbleHealthSample(
             date: Date(timeIntervalSince1970: 100), steps: 8_000, sleepMinutes: 300,
             timeZoneIdentifier: "UTC", updatedAt: Date(timeIntervalSince1970: 200)
@@ -550,7 +550,7 @@ struct CompanionStorageTests {
     @Test func whatOnlyAppleHealthKnowsSurvivesTheWatchsOwnRecord() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
-        let library = PebbleHealthLibrary(fileURL: directory.appending(path: "health.json"))
+        let library = WatchHealthStore(fileURL: directory.appending(path: "health.json"))
         let phone = PebbleHealthSample(
             date: Date(timeIntervalSince1970: 100),
             steps: 7_000,
@@ -588,10 +588,10 @@ struct CompanionStorageTests {
         let sourceURL = directory.appending(path: "source.json")
         let destinationURL = directory.appending(path: "destination.json")
         defer { try? FileManager.default.removeItem(at: directory) }
-        let source = PebbleHealthLibrary(fileURL: sourceURL)
+        let source = WatchHealthStore(fileURL: sourceURL)
         try await source.save([PebbleHealthSample(date: .now, steps: 123, sleepMinutes: 45)])
         let archiveURL = try await source.export()
-        let destination = PebbleHealthLibrary(fileURL: destinationURL)
+        let destination = WatchHealthStore(fileURL: destinationURL)
         let imported = try await destination.importArchive(from: archiveURL)
         #expect(imported.count == 1)
         #expect(imported[0].steps == 123)
@@ -624,7 +624,7 @@ struct CompanionStorageTests {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         let url = directory.appending(path: "timeline-operations.json")
         defer { try? FileManager.default.removeItem(at: directory) }
-        let library = PendingTimelineOperationLibrary(fileURL: url)
+        let library = PendingTimelineOperationStore(fileURL: url)
         let id = UUID()
         try await library.save([.delete(id)])
         #expect(try await library.operations() == [.delete(id)])
@@ -730,7 +730,7 @@ struct CompanionStorageTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try Data("not-json".utf8).write(to: url)
-        let library = PendingTimelineOperationLibrary(fileURL: url)
+        let library = PendingTimelineOperationStore(fileURL: url)
 
         #expect(try await library.operations().isEmpty)
         #expect(!FileManager.default.fileExists(atPath: url.path))
@@ -770,7 +770,7 @@ struct CompanionStorageTests {
                 sleepMinutes: index % 480
             )
         }
-        let library = PebbleHealthLibrary(fileURL: url)
+        let library = WatchHealthStore(fileURL: url)
 
         let merged = try await library.merge(samples)
 

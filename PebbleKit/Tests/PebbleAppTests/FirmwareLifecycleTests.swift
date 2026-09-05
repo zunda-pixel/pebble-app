@@ -21,10 +21,10 @@ struct FirmwareLifecycleTests {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
-        let watchLibrary = PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+        let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         // A watch running recovery firmware stays connected for only a few
         // seconds, so the file has to be accepted while it is away.
-        try await watchLibrary.record(PebbleDevice(
+        try await watchStore.record(PebbleDevice(
             id: "recovery-watch",
             name: "My Pebble",
             model: .pebbleTime2,
@@ -32,7 +32,7 @@ struct FirmwareLifecycleTests {
             batteryLevel: nil,
             board: .obelixPVT
         ))
-        let model = AppModel(client: client, applicationLibrary: library, watchLibrary: watchLibrary)
+        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
         await model.loadSavedWatches()
         let firmwareURL = try makeFirmwareArchive(in: directory)
 
@@ -58,7 +58,7 @@ struct FirmwareLifecycleTests {
         let model = AppModel(
             client: client,
             applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         let device = PebbleDevice(
             id: "watch-1",
@@ -70,7 +70,7 @@ struct FirmwareLifecycleTests {
         )
         let connection = WatchConnection(client: client, device: device)
         let package = makeFirmwarePackage()
-        try await model.pendingFirmwareUpdateLibrary.save(package, journal: FirmwareUpdateJournal(
+        try await model.pendingFirmwareUpdateStore.save(package, journal: FirmwareUpdateJournal(
             deviceID: device.id,
             hardwareRevision: PebbleWatchBoard.obelixPVT.rawValue,
             previousVersion: nil,
@@ -103,7 +103,7 @@ struct FirmwareLifecycleTests {
         let model = AppModel(
             client: client,
             applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         let device = PebbleDevice(
             id: "watch-1",
@@ -114,7 +114,7 @@ struct FirmwareLifecycleTests {
             board: .obelixPVT
         )
         let package = makeFirmwarePackage(versionTag: "v4.36.2")
-        try await model.pendingFirmwareUpdateLibrary.save(package, journal: FirmwareUpdateJournal(
+        try await model.pendingFirmwareUpdateStore.save(package, journal: FirmwareUpdateJournal(
             deviceID: device.id,
             hardwareRevision: PebbleWatchBoard.obelixPVT.rawValue,
             previousVersion: "v4.9.142",
@@ -146,7 +146,7 @@ struct FirmwareLifecycleTests {
         let model = AppModel(
             client: client,
             applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         let device = PebbleDevice(
             id: "watch-1",
@@ -157,7 +157,7 @@ struct FirmwareLifecycleTests {
             board: .obelixPVT
         )
         let package = makeFirmwarePackage(versionTag: "v4.36.2")
-        try await model.pendingFirmwareUpdateLibrary.save(package, journal: FirmwareUpdateJournal(
+        try await model.pendingFirmwareUpdateStore.save(package, journal: FirmwareUpdateJournal(
             deviceID: device.id,
             hardwareRevision: PebbleWatchBoard.obelixPVT.rawValue,
             previousVersion: nil,
@@ -189,7 +189,7 @@ struct FirmwareLifecycleTests {
         let model = AppModel(
             client: client,
             applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
-            watchLibrary: PebbleWatchLibrary(fileURL: directory.appending(path: "watches.json"))
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         let device = PebbleDevice(
             id: "watch-1",
@@ -200,7 +200,7 @@ struct FirmwareLifecycleTests {
             board: .obelixPVT
         )
         let package = makeFirmwarePackage(versionTag: "v4.36.2")
-        try await model.pendingFirmwareUpdateLibrary.save(package, journal: FirmwareUpdateJournal(
+        try await model.pendingFirmwareUpdateStore.save(package, journal: FirmwareUpdateJournal(
             deviceID: device.id,
             hardwareRevision: PebbleWatchBoard.obelixPVT.rawValue,
             previousVersion: "v4.9.142",

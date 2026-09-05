@@ -16,7 +16,7 @@ public struct SavedPebbleWatch: Codable, Equatable, Identifiable, Sendable {
     public var board: PebbleWatchBoard? = nil
 }
 
-public actor PebbleWatchLibrary {
+public actor SavedWatchStore {
     private var fileURL: URL
     private var watches: [SavedPebbleWatch]?
 

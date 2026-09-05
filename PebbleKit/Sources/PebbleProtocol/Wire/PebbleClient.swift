@@ -1,23 +1,4 @@
 public import Foundation
-import MemberwiseInit
-
-@MemberwiseInit(.public)
-public struct PebbleReconnectBackoff: Equatable, Sendable {
-    public var attempt: Int = 0
-    public var initialDelay: Duration = .seconds(2)
-    public var maximumDelay: Duration = .seconds(30)
-
-    public mutating func nextDelay() -> Duration {
-        let multiplier = 1 << min(attempt, 10)
-        let delay = min(initialDelay * multiplier, maximumDelay)
-        attempt = min(attempt + 1, 10)
-        return delay
-    }
-
-    public mutating func reset() {
-        attempt = 0
-    }
-}
 
 public enum PebbleConnectionState: Equatable, Sendable {
     case idle
