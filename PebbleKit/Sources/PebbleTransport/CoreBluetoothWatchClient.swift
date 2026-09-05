@@ -14,14 +14,18 @@ private final class NotificationObserverStorage: @unchecked Sendable {
     }
 }
 
-/// What is not `private` here is what the two delegate conformances need, and
-/// they are in files of their own — `+Central` for the radio and the link,
-/// `+Peripheral` for the watch's own services and the PPoG transport. Swift has
-/// no access level for "this type across its files", so the alternative to
-/// widening these was keeping two thousand lines together. Everything a caller
-/// waits on — the pending replies, the queues, the pulls, the frame
-/// dispatch — stayed private, and `internal` reaches no further than this
-/// module.
+/// What is left here is the link: the radio, the handshake, the PPoG session,
+/// the frame dispatch and the health check that decides a link has died. What
+/// the watch is *asked* for lives beside it — `+Records` for the BlobDB writes
+/// and the transfers, `+Pulls` for the three longer answers — and the two
+/// delegate conformances in `+Central` and `+Peripheral`.
+///
+/// Swift has no access level for "this type across its files", so everything
+/// those four files touch is `internal` rather than `private`. That is the
+/// price of the split, and it was worth paying only once the twenty typed
+/// BlobDB methods had collapsed into `write(_:)` and `remove(_:)`: before
+/// that, the records and the link were interleaved and there was no seam to
+/// cut along. `internal` reaches no further than this module.
 @MainActor
 public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     static var ppogService = CBUUID(string: "40000000-328E-0FBB-C642-1AA6699BDADA")
@@ -72,26 +76,26 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     private var healthCheckTimeoutTask: Task<Void, Never>?
     let reconnects = ReconnectPolicy()
     private var isAwaitingHealthCheckReply = false
-    private var activeTransferSession: PutBytesTransferSession?
-    private var completedTransferCookie: UInt32?
-    private let firmwareReply = PendingReply<Void>()
-    private var waitingForFirmwareStart = false
-    private var isInstallingFirmware = false
-    private var pendingInstallCookie: UInt32?
-    private let transferReply = PendingReply<Void>()
-    private var nextBlobDBToken: UInt16 = 1
-    private var pendingBlobDBToken: UInt16?
-    private var acceptedBlobDBStatuses: [BlobDBStatus] = []
-    private let blobDBReply = PendingReply<Void>()
-    private let blobDBQueue = BlobDBQueue()
-    private let appReorderReply = PendingReply<Void>()
+    var activeTransferSession: PutBytesTransferSession?
+    var completedTransferCookie: UInt32?
+    let firmwareReply = PendingReply<Void>()
+    var waitingForFirmwareStart = false
+    var isInstallingFirmware = false
+    var pendingInstallCookie: UInt32?
+    let transferReply = PendingReply<Void>()
+    var nextBlobDBToken: UInt16 = 1
+    var pendingBlobDBToken: UInt16?
+    var acceptedBlobDBStatuses: [BlobDBStatus] = []
+    let blobDBReply = PendingReply<Void>()
+    let blobDBQueue = BlobDBQueue()
+    let appReorderReply = PendingReply<Void>()
     private let appMessages = AppMessageQueue()
     private var healthDataLoggingProcessor = HealthDataLoggingProcessor()
-    private let screenshot = WatchPull<ScreenshotCollector>(timeout: .seconds(30))
-    private let logDump = WatchPull<LogDumpCollector>(timeout: .seconds(30))
-    private var nextLogDumpCookie: UInt32 = 1
-    private let fileBytes = WatchPull<GetBytesCollector>(timeout: .seconds(60))
-    private var nextGetBytesTransactionID: UInt8 = 1
+    let screenshot = WatchPull<ScreenshotCollector>(timeout: .seconds(30))
+    let logDump = WatchPull<LogDumpCollector>(timeout: .seconds(30))
+    var nextLogDumpCookie: UInt32 = 1
+    let fileBytes = WatchPull<GetBytesCollector>(timeout: .seconds(60))
+    var nextGetBytesTransactionID: UInt8 = 1
 
     let clientTag: String
 
@@ -131,7 +135,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     /// peripheral is not enough: the transport is not open until the PPoG
     /// handshake finishes, and anything sent before that is lost rather than
     /// queued.
-    private func linkedPeripheral() throws -> CBPeripheral {
+    func linkedPeripheral() throws -> CBPeripheral {
         guard let peripheral = connectedPeripheral, ppogSession != nil else {
             throw WatchConnectionError.disconnected
         }
@@ -305,16 +309,6 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         try sendFrame(TimeSynchronizationCodec.frame(), to: peripheral)
     }
 
-    public func reorderApplications(_ applicationIDs: [UUID]) async throws {
-        let peripheral = try linkedPeripheral()
-        guard !appReorderReply.isWaiting else {
-            throw AppReorderClientError.operationAlreadyInProgress
-        }
-        try await appReorderReply.wait(timeout: .seconds(20)) {
-            try sendFrame(AppReorderCodec.frame(applicationIDs: applicationIDs), to: peripheral)
-        }
-    }
-
     public func respondToAppFetch(with status: AppFetchResponseStatus) async throws {
         let peripheral = try linkedPeripheral()
         try sendFrame(AppFetchCodec.responseFrame(status: status), to: peripheral)
@@ -333,107 +327,13 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         )
     }
 
-    public func write(_ record: BlobDBRecord) async throws {
-        for write in record.writes {
-            try await performBlobDBOperation(write)
-        }
-    }
-
-    public func remove(_ key: BlobDBKey) async throws {
-        for write in key.writes {
-            try await performBlobDBOperation(write)
-        }
-    }
-
     public func launchApplication(id: UUID) async throws {
         try await send(AppRunStateCodec.startFrame(applicationID: id))
-    }
-
-    public func installApplicationObject(
-        _ bytes: [UInt8],
-        objectType: PutBytesObjectType,
-        appBankID: UInt32
-    ) async throws {
-        try await transferObject(bytes, objectType: objectType, appBankID: appBankID, filename: nil)
     }
 
     public func refreshWatchInformation() async throws {
         guard let peripheral = connectedPeripheral else { throw WatchConnectionError.disconnected }
         try sendFrame(WatchVersionCodec.requestFrame(), to: peripheral)
-    }
-
-    public func installFile(_ bytes: [UInt8], filename: String) async throws {
-        try await transferObject(bytes, objectType: .file, appBankID: 0, filename: filename)
-    }
-
-    private func transferObject(
-        _ bytes: [UInt8],
-        objectType: PutBytesObjectType,
-        appBankID: UInt32,
-        filename: String?
-    ) async throws {
-        completedTransferCookie = nil
-        let peripheral = try linkedPeripheral()
-        guard activeTransferSession == nil else {
-            throw PutBytesClientError.transferAlreadyInProgress
-        }
-
-        var session = PutBytesTransferSession(
-            bytes: bytes,
-            objectType: objectType,
-            appBankID: appBankID,
-            filename: filename
-        )
-        let firstAction = try session.start()
-        activeTransferSession = session
-
-        try await transferReply.wait(timeout: .seconds(20)) {
-            try handleTransferActions([firstAction], peripheral: peripheral)
-        }
-    }
-
-    public func installFirmware(_ package: PBZFirmwarePackage) async throws {
-        // Claimed with nothing awaited in between: a second install would take
-        // over the control reply slot and strand the first.
-        guard !isInstallingFirmware else {
-            throw PutBytesClientError.firmwareUpdateAlreadyInProgress
-        }
-        isInstallingFirmware = true
-        defer { isInstallingFirmware = false }
-        let total = package.firmware.count + (package.resources?.count ?? 0)
-        guard let byteCount = UInt32(exactly: total) else { throw PutBytesTransferError.invalidConfiguration }
-        try await sendFirmwareControl(
-            SystemMessageCodec.firmwareUpdateStartFrame(bytesToSend: byteCount),
-            waitingForStart: true
-        )
-        try await installApplicationObject(
-            [UInt8](package.firmware),
-            objectType: package.manifest.firmware.type == "recovery" ? .recovery : .firmware,
-            appBankID: 0
-        )
-        guard let firmwareCookie = completedTransferCookie else { throw PutBytesTransferError.invalidState }
-        var cookies = [firmwareCookie]
-        if let resources = package.resources {
-            try await installApplicationObject([UInt8](resources), objectType: .systemResource, appBankID: 0)
-            guard let resourceCookie = completedTransferCookie else { throw PutBytesTransferError.invalidState }
-            cookies.append(resourceCookie)
-        }
-        for cookie in cookies {
-            pendingInstallCookie = cookie
-            try await sendFirmwareControl(PutBytesCodec.installFrame(cookie: cookie), waitingForStart: false)
-        }
-        try await send(SystemMessageCodec.firmwareUpdateCompleteFrame())
-    }
-
-    private func sendFirmwareControl(_ frame: PebbleProtocolFrame, waitingForStart: Bool) async throws {
-        guard let peripheral = connectedPeripheral else { throw WatchConnectionError.disconnected }
-        guard !firmwareReply.isWaiting else {
-            throw PutBytesClientError.firmwareUpdateAlreadyInProgress
-        }
-        self.waitingForFirmwareStart = waitingForStart
-        try await firmwareReply.wait(timeout: .seconds(10)) {
-            try sendFrame(frame, to: peripheral)
-        }
     }
 
     public func sendImage(
@@ -452,73 +352,8 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         try await send(ImagingCodec.unsupportedFrame(token: token, kindValue: kindValue))
     }
 
-    public func pull(_ request: WatchPullRequest) async throws -> WatchPullAnswer {
-        let peripheral = try linkedPeripheral()
-        switch request {
-        case .screenshot:
-            return .screenshot(try await screenshot.run(collecting: ScreenshotCollector()) {
-                try sendFrame(ScreenshotCodec.requestFrame(), to: peripheral)
-            })
-
-        case .logGeneration(let generation):
-            let cookie = nextLogDumpCookie
-            nextLogDumpCookie &+= 1
-            let dump = try await logDump.run(collecting: LogDumpCollector(cookie: cookie)) {
-                try sendFrame(
-                    LogDumpCodec.requestFrame(generation: generation, cookie: cookie),
-                    to: peripheral
-                )
-            }
-            switch dump {
-            case .lines(let lines): return .logLines(lines)
-            case .noLogs: return .logLines(nil)
-            }
-
-        case .file(let fileRequest):
-            let transactionID = nextGetBytesTransactionID
-            nextGetBytesTransactionID &+= 1
-            return .bytes(try await fileBytes.run(
-                collecting: GetBytesCollector(transactionID: transactionID)
-            ) {
-                try sendFrame(
-                    GetBytesCodec.requestFrame(fileRequest, transactionID: transactionID),
-                    to: peripheral
-                )
-            })
-        }
-    }
-
     public func setApplicationLoggingEnabled(_ isEnabled: Bool) async throws {
         try await send(AppLogCodec.enableFrame(isEnabled))
-    }
-
-    private func failPulls(_ error: any Error) {
-        screenshot.finish(.failure(error))
-        logDump.finish(.failure(error))
-        fileBytes.finish(.failure(error))
-    }
-
-    private func performBlobDBOperation(_ write: BlobDBWrite) async throws {
-        // Callers take turns rather than being turned away: they are unrelated
-        // features on unrelated timers, and the one that lost the race used to
-        // report that the watch had refused it.
-        try await blobDBQueue.begin()
-        defer { blobDBQueue.finish() }
-        let peripheral = try linkedPeripheral()
-
-        let token = nextBlobDBToken
-        nextBlobDBToken &+= 1
-        pendingBlobDBToken = token
-        acceptedBlobDBStatuses = write.acceptedStatuses
-        // A frame that cannot even be built fails the caller from inside `wait`,
-        // which leaves the token behind for the next answer to match.
-        defer {
-            pendingBlobDBToken = nil
-            acceptedBlobDBStatuses.removeAll()
-        }
-        try await blobDBReply.wait(timeout: .seconds(20)) {
-            try sendFrame(try write.makeFrame(token), to: peripheral)
-        }
     }
 
     private func waitForBluetooth() async throws {
@@ -868,26 +703,6 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         return true
     }
 
-    private func answerPutBytes(
-        _ frame: PebbleProtocolFrame,
-        peripheral: CBPeripheral
-    ) throws -> Bool {
-        if activeTransferSession != nil {
-            try processPutBytesResponse(frame, peripheral: peripheral)
-            return true
-        }
-        guard pendingInstallCookie != nil else { return false }
-        // The install cookie comes back as zero: the firmware answers from
-        // `prv_cleanup_and_send_response`, whose transfer state the preceding
-        // commit already cleared.
-        let response = try PutBytesCodec.decodeResponse(frame)
-        pendingInstallCookie = nil
-        response.result == .acknowledgement
-            ? finishFirmwareControl()
-            : finishFirmwareControl(throwing: PutBytesTransferError.negativeAcknowledgement)
-        return true
-    }
-
     private func answerWatchVersion(
         _ frame: PebbleProtocolFrame,
         peripheral: CBPeripheral
@@ -934,12 +749,6 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         try sendFrame(TimeSynchronizationCodec.frame(), to: peripheral)
         finishConnection(peripheral: peripheral, information: information)
         return true
-    }
-
-    private func finishFirmwareControl(throwing error: (any Error)? = nil) {
-        waitingForFirmwareStart = false
-        pendingInstallCookie = nil
-        if let error { firmwareReply.fail(error) } else { firmwareReply.finish() }
     }
 
     private func processAppMessage(_ frame: PebbleProtocolFrame) {
@@ -1031,107 +840,6 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         healthCheckTask?.cancel()
         healthCheckTask = nil
         clearPendingHealthCheck()
-    }
-
-    private func processPutBytesResponse(
-        _ frame: PebbleProtocolFrame,
-        peripheral: CBPeripheral
-    ) throws {
-        guard var session = activeTransferSession else {
-            return
-        }
-        let response = try PutBytesCodec.decodeResponse(frame)
-        do {
-            let actions = try session.receive(response)
-            activeTransferSession = session
-            try handleTransferActions(actions, peripheral: peripheral)
-            updateTransferTimeout()
-        } catch {
-            try? sendFrame(PutBytesCodec.abortFrame(cookie: response.cookie), to: peripheral)
-            failTransfer(error)
-        }
-    }
-
-    private func processBlobDBResponse(_ frame: PebbleProtocolFrame) {
-        do {
-            let response = try BlobDBCodec.decodeResponse(frame)
-            guard response.token == pendingBlobDBToken else { return }
-            guard acceptedBlobDBStatuses.contains(response.status) else {
-                // The status is the watch's whole explanation, and a refusal that
-                // only reached the caller as an error value left the log showing a
-                // request answered in milliseconds and nothing else.
-                Task { [tag = clientTag, status = response.status] in
-                    await PebbleDiagnostics.shared.record(
-                        .warning,
-                        category: "blobdb",
-                        message: "[\(tag)] the watch refused the write: \(status)"
-                    )
-                }
-                failBlobDBOperation(BlobDBClientError.rejected(response.status))
-                return
-            }
-            pendingBlobDBToken = nil
-            acceptedBlobDBStatuses.removeAll()
-            blobDBReply.finish()
-        } catch {
-            failBlobDBOperation(error)
-        }
-    }
-
-    private func processAppReorderResponse(_ frame: PebbleProtocolFrame) {
-        do {
-            let result = try AppReorderCodec.decodeResult(frame)
-            guard result == .success else {
-                failAppReorder(AppReorderClientError.rejected(result))
-                return
-            }
-            appReorderReply.finish()
-        } catch {
-            failAppReorder(error)
-        }
-    }
-
-    private func failAppReorder(_ error: any Error) {
-        appReorderReply.fail(error)
-    }
-
-    private func failBlobDBOperation(_ error: any Error) {
-        pendingBlobDBToken = nil
-        acceptedBlobDBStatuses.removeAll()
-        blobDBReply.fail(error)
-    }
-
-    private func handleTransferActions(
-        _ actions: [PutBytesTransferAction],
-        peripheral: CBPeripheral
-    ) throws {
-        for action in actions {
-            switch action {
-            case .send(let frame):
-                try sendFrame(frame, to: peripheral)
-            case .progress(let progress):
-                eventContinuation?.yield(.transferProgress(progress))
-            case .finished:
-                completedTransferCookie = activeTransferSession?.completedCookie
-                activeTransferSession = nil
-                transferReply.finish()
-            }
-        }
-    }
-
-    // Each chunk the watch acknowledges puts the deadline back: a transfer is
-    // megabytes and only silence means it has stopped.
-    private func updateTransferTimeout() {
-        guard activeTransferSession != nil else {
-            transferReply.cancelDeadline()
-            return
-        }
-        transferReply.extendDeadline(.seconds(20))
-    }
-
-    private func failTransfer(_ error: any Error) {
-        activeTransferSession = nil
-        transferReply.fail(error)
     }
 
     func clearTransportState() {
