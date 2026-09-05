@@ -48,6 +48,18 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     /// Whoever asked for the connect that is in flight, for the phases between
     /// the link coming up and the watch answering. Nil once it has answered.
     var handshakePhaseReporter: (@MainActor (WatchHandshakePhase) -> Void)?
+    /// Set while a session started over on a live link waits for the watch to
+    /// answer its version request.
+    ///
+    /// That answer is almost always word for word the one before, and the app
+    /// has to hear it anyway: it is the only thing that says the transport is
+    /// usable again and the work interrupted by the restart needs re-doing.
+    var isRestartingSession = false
+    /// Deadline for a session started over on a live link. Without it a watch
+    /// that asks for a reset and then says nothing leaves the link up with no
+    /// transport on it, and nothing notices until the health check fails a
+    /// minute later.
+    var sessionRestartTimeoutTask: Task<Void, Never>?
     var pendingDevice: DiscoveredWatch?
     var activeWriteCharacteristic: CBCharacteristic?
     var activeBatteryCharacteristic: CBCharacteristic?
@@ -499,13 +511,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         healthDataLoggingProcessor = HealthDataLoggingProcessor()
         completedTransferCookie = nil
         stopHealthChecks()
-        failTransfer(error)
-        failBlobDBOperation(error)
-        blobDBQueue.failAll(error)
-        failPulls(error)
-        failAppReorder(error)
-        appMessages.failAll(error)
-        finishFirmwareControl(throwing: error)
+        failWorkInFlight(error)
     }
 
     func model(from advertisementData: [String: Any]) -> WatchModel? {
@@ -736,10 +742,13 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
             connectedWatch = updated
             // The health check asks for this once a minute and the answer is
             // almost always the same one; announcing it anyway had the app
-            // rewriting its watch library every minute.
-            if updated != device {
+            // rewriting its watch library every minute. A session started over
+            // is the exception: the app is waiting to hear that the transport
+            // works before it re-sends anything.
+            if updated != device || isRestartingSession {
                 eventContinuation?.yield(.watchUpdated(updated))
             }
+            isRestartingSession = false
             return true
         }
 
@@ -854,7 +863,54 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         clearPendingHealthCheck()
     }
 
+    /// Gives up the protocol session while keeping the link that carries it.
+    ///
+    /// The watch sends a reset mid-session when its acknowledgement timeouts have
+    /// run out. What it is asking for is the transport reopened, not the link
+    /// dropped — and dropping the link cost a whole reconnect, the bond check and
+    /// the several seconds of handshake with it. The work in flight goes either
+    /// way, because its tokens belonged to the session that has just ended, and
+    /// the app is told the same way a reconnect tells it so that it re-sends
+    /// what it has to.
+    func abandonSession(on peripheral: CBPeripheral, because reason: String) {
+        Task { [tag = clientTag] in
+            await PebbleDiagnostics.shared.record(
+                .warning,
+                category: "ppog",
+                message: "[\(tag)] starting the session over: \(reason)"
+            )
+        }
+        ppogSession = nil
+        frameDecoder = PebbleProtocolFrameDecoder()
+        // The next handshake owes a ResetComplete again.
+        setup.forgetResetComplete()
+        pendingGattWrites.removeAll()
+        acknowledgementTimeoutTask?.cancel()
+        acknowledgementTimeoutTask = nil
+        // A reply to the check sent over the session that has gone is not coming;
+        // the periodic check itself keeps running and is what notices if the
+        // restart quietly fails.
+        clearPendingHealthCheck()
+        failWorkInFlight(.disconnected)
+        // Deliberately left alone, unlike `clearTransportState`: the bond, the
+        // watch, the health-logging session and the records the watch holds all
+        // outlive a transport that was reopened.
+        isRestartingSession = true
+        sessionRestartTimeoutTask?.cancel()
+        sessionRestartTimeoutTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(10))
+            guard !Task.isCancelled, self?.ppogSession == nil else { return }
+            self?.cancelLink(peripheral, reason: "the session was never started over")
+        }
+        if let device = connectedWatch {
+            eventContinuation?.yield(.reconnecting(watchID: device.id))
+        }
+    }
+
     func clearTransportState() {
+        isRestartingSession = false
+        sessionRestartTimeoutTask?.cancel()
+        sessionRestartTimeoutTask = nil
         activeWriteCharacteristic = nil
         activeBatteryCharacteristic = nil
         activePairingTriggerCharacteristic = nil
@@ -880,18 +936,25 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         healthDataLoggingProcessor = HealthDataLoggingProcessor()
         completedTransferCookie = nil
         stopHealthChecks()
-        failTransfer(WatchConnectionError.disconnected)
-        failBlobDBOperation(WatchConnectionError.disconnected)
-        blobDBQueue.failAll(WatchConnectionError.disconnected)
-        failPulls(WatchConnectionError.disconnected)
-        failAppReorder(WatchConnectionError.disconnected)
-        // A firmware control exchange is waiting on a reply that the watch can
-        // no longer send; saying so now beats a timeout ten seconds later that
-        // blames the deadline instead of the dropped link.
-        finishFirmwareControl(throwing: WatchConnectionError.disconnected)
+        failWorkInFlight(.disconnected)
+    }
+
+    /// Fails everything the watch was in the middle of answering.
+    ///
+    /// A BlobDB token, a transfer cookie, a pull, an app reorder and a firmware
+    /// control exchange all mean something only inside the session that started
+    /// them. When it ends the watch will never answer any of them, and saying so
+    /// now beats each one's own deadline blaming itself ten seconds later.
+    func failWorkInFlight(_ error: WatchConnectionError) {
+        failTransfer(error)
+        failBlobDBOperation(error)
+        blobDBQueue.failAll(error)
+        failPulls(error)
+        failAppReorder(error)
+        finishFirmwareControl(throwing: error)
         // `AppModel` keeps its own list of undelivered messages and flushes it
         // on the next connection, so a copy held here would be sent twice.
-        appMessages.failAll(WatchConnectionError.disconnected)
+        appMessages.failAll(error)
     }
 
     /// Asks iOS for the notification-sharing decision as part of connecting.

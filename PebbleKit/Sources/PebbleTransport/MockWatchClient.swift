@@ -38,6 +38,10 @@ public final class MockWatchClient: WatchClient {
     public var bytesToReturn: [UInt8] = []
     public private(set) var writtenNotificationSourceApps: [NotificationSourceApp] = []
     public private(set) var writtenAppGlances: [AppGlance] = []
+    /// Every glance write in order, including the ones that replaced a glance
+    /// already here. `writtenAppGlances` keeps one entry per application the way
+    /// the watch does, so it cannot say how often the same one was sent.
+    public private(set) var appGlanceWrites: [UUID] = []
     public private(set) var deletedTimelineReminderIDs: [UUID] = []
     public private(set) var registeredApplications: [PebbleAppMetadata] = []
     public private(set) var unregisteredApplicationIDs: [UUID] = []
@@ -189,6 +193,7 @@ public final class MockWatchClient: WatchClient {
         case .appGlance(let glance):
             writtenAppGlances.removeAll { $0.applicationID == glance.applicationID }
             writtenAppGlances.append(glance)
+            appGlanceWrites.append(glance.applicationID)
         case .weather(let report):
             writtenWeather.removeAll { $0.id == report.id }
             writtenWeather.append(report)

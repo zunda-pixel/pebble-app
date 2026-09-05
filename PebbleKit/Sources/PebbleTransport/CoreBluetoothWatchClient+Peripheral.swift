@@ -451,9 +451,8 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
             recordPPoGPacket(packet, direction: "in")
             switch packet {
             case .resetRequest(_, let version):
-                guard ppogSession == nil else {
-                    handleInSessionReset(on: peripheral)
-                    return
+                if ppogSession != nil {
+                    abandonSession(on: peripheral, because: "the watch asked for a new one")
                 }
                 try write(
                     .resetComplete(sequence: 0, receiveWindow: 25, transmitWindow: 25),
@@ -464,8 +463,12 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
                     return
                 }
             case .resetComplete(_, let receiveWindow, let transmitWindow):
-                guard ppogSession == nil else {
-                    handleInSessionReset(on: peripheral)
+                if ppogSession != nil {
+                    // A ResetComplete with no request of ours behind it: the
+                    // watch has decided the session is new and this one is not,
+                    // so it goes and the handshake is opened again from here.
+                    abandonSession(on: peripheral, because: "the watch answered a reset nobody asked for")
+                    try write(.resetRequest(sequence: 0, version: .one), to: peripheral)
                     return
                 }
                 if setup.claimResetComplete() {
@@ -498,6 +501,8 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
                 ppogSession = session
                 frameDecoder = PebbleProtocolFrameDecoder()
                 connectedPeripheral = peripheral
+                sessionRestartTimeoutTask?.cancel()
+                sessionRestartTimeoutTask = nil
                 handshakePhaseReporter?(.transportOpen)
                 try sendFrame(WatchVersionCodec.requestFrame(), to: peripheral)
             case .data, .acknowledgement:
@@ -541,12 +546,6 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
                 message: "[\(tag)] \(direction) \(description)"
             )
         }
-    }
-
-    private func handleInSessionReset(on peripheral: CBPeripheral) {
-        ppogSession = nil
-        frameDecoder = PebbleProtocolFrameDecoder()
-        abortLink(peripheral, error: .disconnected, step: "the watch asked to start the session over")
     }
 
     public func peripheralIsReady(toSendWriteWithoutResponse peripheral: CBPeripheral) {

@@ -86,6 +86,26 @@ struct LinkSetupTests {
         #expect(!owedAgain)
     }
 
+    /// A watch that asks for a reset mid-session gets the session started over on
+    /// the same link, and that second handshake owes a ResetComplete of its own.
+    /// Without this the answer is never sent and the watch waits for a session
+    /// that nobody opens.
+    @Test
+    func aSessionStartedOverOwesAResetCompleteAgain() {
+        var setup = LinkSetup()
+        _ = setup.apply(status(paired: true, encrypted: true))
+        _ = setup.claimResetComplete()
+
+        setup.forgetResetComplete()
+
+        // Claimed outside the expectation: `#expect` captures its operand
+        // immutably and this is a mutating call.
+        let owedAgain = setup.claimResetComplete()
+        #expect(owedAgain)
+        // The bond is not part of it: the link never went.
+        #expect(setup.mayStartProtocol)
+    }
+
     @Test
     func aFreshLinkKeepsNothingFromTheLastOne() {
         var setup = LinkSetup()

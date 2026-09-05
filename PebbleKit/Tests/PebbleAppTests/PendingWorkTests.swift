@@ -463,6 +463,61 @@ struct PendingWorkTests {
         #expect(client.timelinePinWrites.count == afterFirst + pins.count)
     }
 
+    /// What a watch is sent again after its protocol session was started over on
+    /// a live link.
+    ///
+    /// The transport used to drop the whole link when the watch asked for a new
+    /// session, which cost a reconnect and the bond check with it. Now the link
+    /// stays and the app hears the same pair of events a reconnect gives it: what
+    /// it holds only per connection is thrown away and sent again, and what the
+    /// watch holds in its own databases is left where it is. A restart that
+    /// forgot the pin digests too would re-write every pin the watch already had,
+    /// which is the cost this pair of changes exists to remove.
+    @Test
+    func aSessionStartedOverLeavesTheWatchsOwnRecordsAlone() async throws {
+        let client = MockWatchClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = makeModel(client: client, directory: directory)
+        let pins = [timelinePin("Dentist", minutesFromNow: 60), timelinePin("Standup", minutesFromNow: 120)]
+        try await model.timelineStore.save(pins)
+        try await model.pendingTimelineOperationStore.save([])
+
+        await model.scan()
+        let discovered = try #require(model.discoveredWatches.first)
+        await model.connect(to: discovered)
+        let connection = try #require(model.connections.first)
+        let application = UUID()
+        model.applications.installedIDsByWatch[connection.watch.id] = [application]
+        await model.setAppGlance(AppGlance(
+            applicationID: application,
+            slices: [AppGlanceSlice(subtitleTemplate: "Kyoto 18°")]
+        ))
+        await model.synchronizeAppGlances(on: connection)
+        await model.synchronizeTimeline()
+        #expect(client.appGlanceWrites == [application])
+        let pinsBefore = client.timelinePinWrites.count
+        // Taken before: a connection in the middle of a restart is not connected,
+        // so the app has no watch to name until the watch has answered again.
+        let watch = try #require(model.connectedWatch)
+
+        // The pair the transport sends: the session has gone, and then the watch
+        // has answered on the new one.
+        client.emit(.reconnecting(watchID: discovered.id))
+        await Task.yield()
+        client.emit(.watchUpdated(watch))
+        try await Task.sleep(for: .milliseconds(200))
+
+        #expect(model.connectionState == .connected(watch))
+        // What the app was holding about this watch went with the session, so a
+        // glance is sent again as soon as the app knows the watch has the app to
+        // put it on — which `aLauncherLineGoesOnlyToAWatchThatHasTheApp` covers.
+        #expect(connection.synchronizedAppGlances.isEmpty)
+        // The watch's timeline database did not go with the session, so its pins
+        // are left alone.
+        #expect(client.timelinePinWrites.count == pinsBefore)
+    }
+
     @Test
     func aFullTimelineQueueGivesUpUpsertsRatherThanDeletes() async throws {
         let client = SuspendingWatchClient()
