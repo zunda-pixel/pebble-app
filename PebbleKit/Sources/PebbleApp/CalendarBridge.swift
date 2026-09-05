@@ -23,7 +23,10 @@ final class CalendarBridge {
         // where they could only be looked at.
         let pins = events.map { event in
             TimelinePin(
-                id: stableID(event.eventIdentifier ?? "\(event.title ?? "")|\(event.startDate.timeIntervalSince1970)"),
+                id: stableID(Self.occurrenceKey(
+                    identity: event.eventIdentifier ?? event.title ?? "Calendar Event",
+                    occurrence: event.occurrenceDate ?? event.startDate
+                )),
                 parentApplicationID: Self.calendarApplicationID,
                 timestamp: event.startDate,
                 durationMinutes: UInt16(clamping: Int(event.endDate.timeIntervalSince(event.startDate) / 60)),
@@ -34,6 +37,23 @@ final class CalendarBridge {
             )
         }
         return pins.sorted { $0.timestamp < $1.timestamp }
+    }
+
+    /// What tells one occurrence of an event from another.
+    ///
+    /// `EKEvent.eventIdentifier` is one per event, not one per occurrence:
+    /// every week of a weekly meeting carries the same one, which is why
+    /// `occurrenceDate` exists at all. Keying pins on the identifier alone gave
+    /// a whole recurring series a single pin — the app held several under that
+    /// one id, the watch overwrote them into one BlobDB record so only one week
+    /// ever showed, and every synchronization sent all of them again because
+    /// only one could match the digest kept under the key.
+    ///
+    /// `occurrenceDate` rather than `startDate`: it stays put when an
+    /// occurrence is detached and moved, so editing one week does not turn it
+    /// into a new pin and orphan the old one on the watch.
+    static func occurrenceKey(identity: String, occurrence: Date) -> String {
+        "\(identity)|\(occurrence.timeIntervalSince1970)"
     }
 
     private func stableID(_ value: String) -> UUID {

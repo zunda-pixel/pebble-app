@@ -518,6 +518,32 @@ struct PendingWorkTests {
         #expect(client.timelinePinWrites.count == pinsBefore)
     }
 
+    /// Every occurrence of a recurring event is its own pin.
+    ///
+    /// They shared one, because `EKEvent.eventIdentifier` is one per event and
+    /// was the whole of the key. On the reader's watch that was 32 of 94 pins
+    /// sent on every synchronization — the digest kept under the shared key
+    /// could only match one of them — and, worse, a weekly meeting appeared on
+    /// the watch once, because the occurrences overwrote each other in a BlobDB
+    /// keyed by the same id.
+    @Test
+    func eachOccurrenceOfARecurringEventIsItsOwnPin() {
+        let weekly = "weekly-standup"
+        let first = Date(timeIntervalSince1970: 1_800_000_000)
+        let second = first.addingTimeInterval(7 * 24 * 60 * 60)
+
+        let keys = [first, second].map {
+            CalendarBridge.occurrenceKey(identity: weekly, occurrence: $0)
+        }
+
+        #expect(keys[0] != keys[1])
+        // And the same occurrence read twice is the same pin, or it would be
+        // written again on every synchronization.
+        #expect(CalendarBridge.occurrenceKey(identity: weekly, occurrence: first) == keys[0])
+        // Two events at the same moment are still two events.
+        #expect(CalendarBridge.occurrenceKey(identity: "dentist", occurrence: first) != keys[0])
+    }
+
     /// A calendar read that changed nothing queues nothing.
     ///
     /// Queueing every pin put them all past the digest comparison, because the
