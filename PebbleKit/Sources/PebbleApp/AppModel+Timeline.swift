@@ -76,13 +76,17 @@ extension AppModel {
         to connection: WatchConnection
     ) async -> Int {
         let client = connection.client
+        var taken = 0
+        var dropped = 0
         for (index, operation) in operations.indexed() {
             do {
                 switch operation {
                 case .upsert(let pin):
                     try await retry(with: .watchWork) { try await client.write(.timelinePin(pin)) }
+                    taken += 1
                 case .delete(let id):
                     try await retry(with: .watchWork) { try await client.remove(.timelinePin(id)) }
+                    dropped += 1
                 }
             } catch {
                 return index
@@ -94,6 +98,13 @@ extension AppModel {
             Set(timeline.pins.map(\.id)),
             watchID: connection.watch.id
         )
+        // Nothing to say when the queue was empty: this runs on every connection.
+        if taken + dropped > 0 {
+            await PebbleDiagnostics.shared.record(
+                category: "timeline",
+                message: "\(connection.watch.name) took \(taken) pin(s) and dropped \(dropped)"
+            )
+        }
         return operations.count
     }
 

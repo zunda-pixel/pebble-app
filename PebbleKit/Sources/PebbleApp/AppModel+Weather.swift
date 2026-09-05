@@ -167,6 +167,12 @@ extension AppModel {
                 return
             }
         }
+        // Said out loud because a refusal is the only other thing recorded here,
+        // and silence alone cannot tell "the watch took it" from "nothing ran".
+        await PebbleDiagnostics.shared.record(
+            category: "weather",
+            message: "\(connection.watch.name) took \(weather.reports.count) forecast(s) and their order"
+        )
     }
 
     func loadWeatherPlaces() {

@@ -26,6 +26,8 @@ extension AppModel {
     }
 
     func synchronizeAppGlances(on connection: WatchConnection) async {
+        var taken = 0
+        var dropped = 0
         for glance in appGlances.glances {
             // A glance for an app the watch does not have is refused, and
             // asking is how this app finds out — but a watch that has not
@@ -38,6 +40,7 @@ extension AppModel {
             do {
                 try await connection.client.write(.appGlance(glance))
                 connection.synchronizedAppGlances[glance.applicationID] = value
+                taken += 1
             } catch {
                 await PebbleDiagnostics.shared.record(
                     .error,
@@ -53,6 +56,7 @@ extension AppModel {
             do {
                 try await connection.client.remove(.appGlance(applicationID: applicationID))
                 connection.synchronizedAppGlances[applicationID] = nil
+                dropped += 1
             } catch {
                 await PebbleDiagnostics.shared.record(
                     .error,
@@ -62,5 +66,12 @@ extension AppModel {
                 return
             }
         }
+        // Nothing to say when nothing changed: this runs on every connection, and
+        // a glance already on the watch is skipped above.
+        guard taken + dropped > 0 else { return }
+        await PebbleDiagnostics.shared.record(
+            category: "glance",
+            message: "\(connection.watch.name) took \(taken) glance(s) and dropped \(dropped)"
+        )
     }
 }

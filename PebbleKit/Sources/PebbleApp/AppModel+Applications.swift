@@ -280,8 +280,10 @@ extension AppModel {
         let synchronizedIDs = try await applicationLibrary.synchronizedApplicationIDs(watchID: device.id)
         let compatibleApplications = compatibleApplications(installed, with: device.model)
         let localIDs = Set(compatibleApplications.map(\.id))
+        var dropped = 0
         for applicationID in synchronizedIDs where !localIDs.contains(applicationID) {
             try await connection.client.remove(.application(applicationID))
+            dropped += 1
         }
         // Reading and unzipping a package is disk work with nothing to do with the
         // watch, so a few run at once while `asyncMap` keeps them in library order.
@@ -300,6 +302,12 @@ extension AppModel {
         try await connection.client.reorderApplications(compatibleApplications.map(\.id))
         try await recordSynchronizedApplications(installed, device: device)
         updateApplications(installed)
+        // The whole compatible library is registered on every synchronization, so
+        // the count is the library as this watch now sees it, not a delta.
+        await PebbleDiagnostics.shared.record(
+            category: "application",
+            message: "\(device.name) took \(packages.count) registration(s) and dropped \(dropped)"
+        )
     }
 
     public func installedApplicationIDs(on watchID: WatchID) -> Set<UUID> {
@@ -484,6 +492,13 @@ extension AppModel {
             try await recordSynchronizedApplications(library, device: connection.watch)
             pendingImportSnapshots[request.applicationID] = nil
             applications.libraryFeedback = nil
+            // The only record that a transfer finished: the watch commits and
+            // installs the binary itself, and says nothing back about it.
+            await PebbleDiagnostics.shared.record(
+                category: "application",
+                message: "\(connection.watch.name) took \(package.objects.count) object(s)"
+                    + " of \(package.application.displayName)"
+            )
         } catch {
             // Including when "the version they had" is none at all and the import has
             // to be undone entirely.
