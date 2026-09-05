@@ -84,6 +84,14 @@ struct ApplicationsView: View {
                     target.toggleFavoriteWatchface(application)
                 }
                 undoManager?.setActionName("Favorite Watchface")
+            },
+            detail: { application in
+                ApplicationDetailView(
+                    model: model,
+                    application: application,
+                    watchID: displayedWatchID,
+                    editGlance: { glanceApplication = $0 }
+                )
             }
         )
         .navigationTitle(Text("Apps"))
@@ -145,7 +153,7 @@ struct ApplicationsView: View {
     }
 }
 
-struct ApplicationsContent: View {
+struct ApplicationsContent<Detail: View>: View {
     var watchApplications: [PebbleApplication]
     var watchfaces: [PebbleApplication]
     var activeWatchfaceID: UUID?
@@ -164,6 +172,7 @@ struct ApplicationsContent: View {
     var editGlance: (PebbleApplication) -> Void
     var activateWatchface: (PebbleApplication) -> Void
     var toggleFavoriteWatchface: (PebbleApplication) -> Void
+    @ViewBuilder var detail: (PebbleApplication) -> Detail
 
     @State private var applicationToRemove: PebbleApplication?
 
@@ -215,7 +224,8 @@ struct ApplicationsContent: View {
                             toggleFavoriteWatchface: toggleFavoriteWatchface,
                             moveApplications: { offsets, destination in
                                 reorderApplications(group.kind, offsets, destination)
-                            }
+                            },
+                            detail: detail
                         )
                     }
                 }
@@ -329,7 +339,7 @@ struct InstallationProgressRow: View {
     }
 }
 
-struct ApplicationSection: View {
+struct ApplicationSection<Detail: View>: View {
     var title: LocalizedStringKey
     var applications: [PebbleApplication]
     var activeWatchfaceID: UUID?
@@ -342,6 +352,7 @@ struct ApplicationSection: View {
     var activateWatchface: (PebbleApplication) -> Void
     var toggleFavoriteWatchface: (PebbleApplication) -> Void
     var moveApplications: (IndexSet, Int) -> Void
+    @ViewBuilder var detail: (PebbleApplication) -> Detail
 
     var body: some View {
         Section(title) {
@@ -356,7 +367,8 @@ struct ApplicationSection: View {
                     configureApplication: { configureApplication(application) },
                     editGlance: { editGlance(application) },
                     activateWatchface: { activateWatchface(application) },
-                    toggleFavoriteWatchface: { toggleFavoriteWatchface(application) }
+                    toggleFavoriteWatchface: { toggleFavoriteWatchface(application) },
+                    detail: { detail(application) }
                 )
             }
             .onMove(perform: moveApplications)
@@ -365,7 +377,7 @@ struct ApplicationSection: View {
     }
 }
 
-struct ApplicationListRow: View {
+struct ApplicationListRow<Detail: View>: View {
     var application: PebbleApplication
     var isActive: Bool
     var isFavorite: Bool
@@ -376,21 +388,22 @@ struct ApplicationListRow: View {
     var editGlance: () -> Void
     var activateWatchface: () -> Void
     var toggleFavoriteWatchface: () -> Void
+    @ViewBuilder var detail: () -> Detail
 
     var body: some View {
-        ApplicationRow(
-            name: application.displayName,
-            companyName: application.companyName,
-            versionLabel: application.versionLabel,
-            kind: application.kind,
-            isActive: isActive,
-            isFavorite: isFavorite,
-            isInstalled: isInstalled,
-            isConfigurable: application.isConfigurable,
-            configure: configureApplication,
-            activate: activateWatchface,
-            toggleFavorite: toggleFavoriteWatchface
-        )
+        NavigationLink {
+            detail()
+        } label: {
+            ApplicationRow(
+                name: application.displayName,
+                companyName: application.companyName,
+                versionLabel: application.versionLabel,
+                kind: application.kind,
+                isActive: isActive,
+                isFavorite: isFavorite,
+                isInstalled: isInstalled
+            )
+        }
         // Red, but not `role: .destructive`: that role takes the row out of the
         // list by itself, and the library still had the application until the
         // alert was answered — a row deleted from under a count that had not
@@ -423,6 +436,9 @@ struct ApplicationListRow: View {
     }
 }
 
+/// A row that leads to the application rather than acting on it: what used to
+/// be three buttons crowded in beside the name is on the screen the row opens,
+/// where each has room to say what it does.
 struct ApplicationRow: View {
     var name: String
     var companyName: String
@@ -432,10 +448,6 @@ struct ApplicationRow: View {
     var isFavorite: Bool
     /// Nil when no watch is connected.
     var isInstalled: Bool?
-    var isConfigurable: Bool
-    var configure: () -> Void
-    var activate: () -> Void
-    var toggleFavorite: () -> Void
 
     var body: some View {
         HStack(spacing: 16) {
@@ -464,25 +476,23 @@ struct ApplicationRow: View {
                 }
             }
             Spacer()
+            // Said rather than offered: tapping the row opens the screen that
+            // can change them.
             if kind == .watchface {
-                Button(isFavorite ? "Remove Favorite" : "Favorite", systemImage: isFavorite ? "star.fill" : "star", action: toggleFavorite)
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.borderless)
-                Button(isActive ? "Active" : "Activate", systemImage: isActive ? "checkmark.circle.fill" : "play.circle", action: activate)
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.borderless)
-                    .disabled(isActive)
-                    .accessibilityHint(Text("Makes this the active watchface"))
+                if isFavorite {
+                    Image(systemName: "star.fill")
+                        .foregroundStyle(.yellow)
+                        .accessibilityLabel(Text("Favorite"))
+                }
+                if isActive {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                        .accessibilityLabel(Text("Active"))
+                }
             }
             Text(versionLabel)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            if isConfigurable {
-                Button("Configure", systemImage: "gearshape", action: configure)
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.borderless)
-                    .accessibilityHint(Text("Opens this watch application's settings"))
-            }
         }
         .frame(minHeight: 44)
         .accessibilityElement(children: .contain)
@@ -523,7 +533,8 @@ struct ApplicationPlaceholderRow: View {
             configureApplication: { _ in },
             editGlance: { _ in },
             activateWatchface: { _ in },
-            toggleFavoriteWatchface: { _ in }
+            toggleFavoriteWatchface: { _ in },
+            detail: { application in Text(verbatim: application.displayName) }
         )
     }
 }
@@ -547,7 +558,8 @@ struct ApplicationPlaceholderRow: View {
             configureApplication: { _ in },
             editGlance: { _ in },
             activateWatchface: { _ in },
-            toggleFavoriteWatchface: { _ in }
+            toggleFavoriteWatchface: { _ in },
+            detail: { application in Text(verbatim: application.displayName) }
         )
     }
 }
@@ -571,7 +583,8 @@ struct ApplicationPlaceholderRow: View {
             configureApplication: { _ in },
             editGlance: { _ in },
             activateWatchface: { _ in },
-            toggleFavoriteWatchface: { _ in }
+            toggleFavoriteWatchface: { _ in },
+            detail: { application in Text(verbatim: application.displayName) }
         )
     }
 }

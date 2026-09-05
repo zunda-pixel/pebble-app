@@ -450,6 +450,16 @@
         }
       }
     },
+    "About" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "情報"
+          }
+        }
+      }
+    },
     "About You" : {
       "localizations" : {
         "ja" : {
@@ -978,6 +988,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ブラウズ"
+          }
+        }
+      }
+    },
+    "Built For" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "対応機種"
           }
         }
       }
@@ -2155,6 +2175,16 @@
         }
       }
     },
+    "Has companion JavaScript" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "コンパニオンJavaScriptあり"
+          }
+        }
+      }
+    },
     "Health" : {
       "localizations" : {
         "ja" : {
@@ -2575,6 +2605,16 @@
         }
       }
     },
+    "Kind" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "種類"
+          }
+        }
+      }
+    },
     "Language" : {
       "localizations" : {
         "ja" : {
@@ -2726,6 +2766,7 @@
       }
     },
     "Makes this the active watchface" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -3216,6 +3257,7 @@
       }
     },
     "Opens this watch application's settings" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -3751,6 +3793,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "お気に入りから削除"
+          }
+        }
+      }
+    },
+    "Removed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "削除されました"
           }
         }
       }
@@ -5003,6 +5055,16 @@
         }
       }
     },
+    "The watch is told about this application the next time it connects." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このアプリケーションは、次にウォッチが接続したときに伝えられます。"
+          }
+        }
+      }
+    },
     "The watch is using it right now." : {
       "localizations" : {
         "ja" : {
@@ -5259,6 +5321,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このアプリケーションは接続中のPebbleのモデルに対応していません。"
+          }
+        }
+      }
+    },
+    "This application is no longer in the library." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このアプリケーションはライブラリにありません。"
           }
         }
       }
@@ -5784,6 +5856,16 @@
         }
       }
     },
+    "Watch App" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチアプリ"
+          }
+        }
+      }
+    },
     "Watch App Notifications" : {
       "localizations" : {
         "ja" : {
@@ -5860,6 +5942,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチ設定"
+          }
+        }
+      }
+    },
+    "Watchface" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチフェイス"
           }
         }
       }
