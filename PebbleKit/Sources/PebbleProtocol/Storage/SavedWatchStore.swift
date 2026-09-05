@@ -20,8 +20,12 @@ public actor SavedWatchStore {
     private var fileURL: URL
     private var watches: [SavedWatch]?
 
-    public init(fileURL: URL? = nil) {
-        self.fileURL = fileURL ?? Self.defaultFileURL()
+    public init(directory: StorageDirectory = .applicationSupport) {
+        fileURL = directory.file("watches.json")
+    }
+
+    public init(fileURL: URL) {
+        self.fileURL = fileURL
     }
 
     public func allWatches() throws -> [SavedWatch] {
@@ -86,9 +90,5 @@ public actor SavedWatchStore {
     private func persist(_ updated: [SavedWatch]) throws {
         try PersistentJSON.save(updated, to: fileURL)
         watches = updated
-    }
-
-    private static func defaultFileURL() -> URL {
-        applicationSupportURL("watches.json")
     }
 }

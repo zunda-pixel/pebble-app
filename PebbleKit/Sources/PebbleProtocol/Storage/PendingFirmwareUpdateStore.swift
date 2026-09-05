@@ -28,9 +28,14 @@ public actor PendingFirmwareUpdateStore {
     private var fileURL: URL
     private var journalURL: URL
 
-    public init(fileURL: URL? = nil, journalURL: URL? = nil) {
-        self.fileURL = fileURL ?? applicationSupportURL("pending-firmware.json")
-        self.journalURL = journalURL ?? applicationSupportURL("pending-firmware-journal.json")
+    public init(directory: StorageDirectory = .applicationSupport) {
+        fileURL = directory.file("pending-firmware.json")
+        journalURL = directory.file("pending-firmware-journal.json")
+    }
+
+    public init(fileURL: URL, journalURL: URL) {
+        self.fileURL = fileURL
+        self.journalURL = journalURL
     }
 
     public func package() throws -> PBZFirmwarePackage? {

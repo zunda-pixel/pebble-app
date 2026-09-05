@@ -65,7 +65,12 @@ struct AppModelTests {
         let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
+        let model = AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: library,
+            watchStore: watchStore
+        )
 
         await model.scan()
         let discovered = try #require(model.discoveredWatches.first)
@@ -125,7 +130,12 @@ struct AppModelTests {
         let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
+        let model = AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: library,
+            watchStore: watchStore
+        )
 
         await model.scan()
         let discovered = try #require(model.discoveredWatches.first)
@@ -154,7 +164,12 @@ struct AppModelTests {
             firmwareVersion: "v5.0.0",
             batteryLevel: 60
         ))
-        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
+        let model = AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: library,
+            watchStore: watchStore
+        )
 
         await model.scan()
 
@@ -177,7 +192,12 @@ struct AppModelTests {
             firmwareVersion: "v5.0.0",
             batteryLevel: 60
         ))
-        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
+        let model = AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: library,
+            watchStore: watchStore
+        )
         await model.loadSavedWatches()
 
         // The watch subscribed to the phone's protocol service by itself; no
@@ -194,7 +214,12 @@ struct AppModelTests {
         let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
+        let model = AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: library,
+            watchStore: watchStore
+        )
         await model.loadSavedWatches()
 
         // Bonded but never added here: offered rather than connected, because
@@ -219,7 +244,12 @@ struct AppModelTests {
         let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
+        let model = AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: library,
+            watchStore: watchStore
+        )
 
         await model.scan()
         let discovered = try #require(model.discoveredWatches.first)
@@ -242,6 +272,7 @@ struct AppModelTests {
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         let model = AppModel(
             client: scanner,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: library,
             watchStore: watchStore,
             clientFactory: { watchID in
@@ -279,7 +310,12 @@ struct AppModelTests {
         let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
+        let model = AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: library,
+            watchStore: watchStore
+        )
 
         await model.scan()
         let discovered = try #require(model.discoveredWatches.first)
@@ -305,7 +341,12 @@ struct AppModelTests {
         let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
+        let model = AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: library,
+            watchStore: watchStore
+        )
 
         await model.scan()
         let discovered = try #require(model.discoveredWatches.first)
@@ -368,6 +409,7 @@ struct AppModelTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
             appGlanceStore: AppGlanceStore(fileURL: directory.appending(path: "glances.json"))
@@ -409,6 +451,7 @@ struct AppModelTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: scanner,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
             clientFactory: { watchID in
@@ -454,6 +497,7 @@ struct AppModelTests {
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         let model = AppModel(
             client: scanner,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: library,
             watchStore: watchStore,
             clientFactory: { watchID in
@@ -512,7 +556,12 @@ struct AppModelTests {
         let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
+        let model = AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: library,
+            watchStore: watchStore
+        )
 
         await model.scan()
         let discovered = try #require(model.discoveredWatches.first)
@@ -530,7 +579,12 @@ struct AppModelTests {
         let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
+        let model = AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: library,
+            watchStore: watchStore
+        )
 
         await model.scan()
         let discovered = try #require(model.discoveredWatches.first)
@@ -555,7 +609,12 @@ struct AppModelTests {
         let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
+        let model = AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: library,
+            watchStore: watchStore
+        )
 
         await model.scan()
         let discovered = try #require(model.discoveredWatches.first)
@@ -577,7 +636,12 @@ struct AppModelTests {
         let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
+        let model = AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: library,
+            watchStore: watchStore
+        )
 
         await model.scan()
         let discovered = try #require(model.discoveredWatches.first)
@@ -600,7 +664,12 @@ struct AppModelTests {
         let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
+        let model = AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: library,
+            watchStore: watchStore
+        )
 
         await model.scan()
         let discovered = try #require(model.discoveredWatches.first)
@@ -624,7 +693,12 @@ struct AppModelTests {
         let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
+        let model = AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: library,
+            watchStore: watchStore
+        )
 
         await model.resetWatch(.restart, watchID: WatchID("missing-watch"))
 
@@ -639,6 +713,7 @@ struct AppModelTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
             reminderStore: TimelinePinStore(fileURL: directory.appending(path: "reminders.json"))
@@ -671,6 +746,7 @@ struct AppModelTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
             reminderStore: TimelinePinStore(fileURL: directory.appending(path: "reminders.json"))
@@ -698,6 +774,7 @@ struct AppModelTests {
         // disk to be taken back.
         let afterRelaunch = AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
             reminderStore: TimelinePinStore(fileURL: directory.appending(path: "reminders.json"))
@@ -714,6 +791,7 @@ struct AppModelTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
@@ -740,6 +818,7 @@ struct AppModelTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
@@ -763,7 +842,12 @@ struct AppModelTests {
         let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
-        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
+        let model = AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: library,
+            watchStore: watchStore
+        )
         await model.scan()
         let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
@@ -788,6 +872,7 @@ struct AppModelTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
@@ -822,6 +907,7 @@ struct AppModelTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
@@ -846,6 +932,7 @@ struct AppModelTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
@@ -872,6 +959,7 @@ struct AppModelTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )

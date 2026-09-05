@@ -14,6 +14,7 @@ struct PendingWorkTests {
     private func makeModel(client: any WatchClient, directory: URL) -> AppModel {
         AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
@@ -62,6 +63,7 @@ struct PendingWorkTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: MockWatchClient(),
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
@@ -136,6 +138,7 @@ struct PendingWorkTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
@@ -177,6 +180,7 @@ struct PendingWorkTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
@@ -225,6 +229,7 @@ struct PendingWorkTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
@@ -271,6 +276,7 @@ struct PendingWorkTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
@@ -325,6 +331,7 @@ struct PendingWorkTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
@@ -415,6 +422,7 @@ struct PendingWorkTests {
         let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         let model = AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: library,
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )

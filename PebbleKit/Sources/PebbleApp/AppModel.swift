@@ -178,10 +178,10 @@ public final class AppModel {
     let clientFactory: @MainActor (WatchID) -> any WatchClient
     let applicationLibrary: WatchApplicationLibrary
     let watchStore: SavedWatchStore
-    let timelineStore = TimelinePinStore()
+    let timelineStore: TimelinePinStore
     let reminderStore: TimelinePinStore
-    let healthStore = WatchHealthStore()
-    let appCatalog = AppCatalog()
+    let healthStore: WatchHealthStore
+    let appCatalog: AppCatalog
     let languagePackCatalog = PebbleLanguagePackCatalog()
     let weatherBridge = WeatherBridge()
     // Held as a function so a test can answer for some places and refuse for
@@ -192,12 +192,12 @@ public final class AppModel {
         try await WeatherBridge().report(for: place, inFahrenheit: usesFahrenheit)
     }
     let phoneLocationSource = PhoneLocationSource()
-    let pendingNotificationStore = PendingNotificationStore()
-    let sentNotificationStore = SentNotificationStore()
-    let notificationPreferenceStore = NotificationPreferenceStore()
-    let pendingTimelineOperationStore = PendingTimelineOperationStore()
-    let pendingAppMessageStore = PendingAppMessageStore()
-    let pendingFirmwareUpdateStore = PendingFirmwareUpdateStore()
+    let pendingNotificationStore: PendingNotificationStore
+    let sentNotificationStore: SentNotificationStore
+    let notificationPreferenceStore: NotificationPreferenceStore
+    let pendingTimelineOperationStore: PendingTimelineOperationStore
+    let pendingAppMessageStore: PendingAppMessageStore
+    let pendingFirmwareUpdateStore: PendingFirmwareUpdateStore
     let firmwareCatalog = PebbleOSFirmwareCatalog()
     var pendingAppMessages: [StoredAppMessage] = []
     let calendarBridge = CalendarBridge()
@@ -208,7 +208,7 @@ public final class AppModel {
     #if os(iOS)
     let healthKitBridge = HealthKitBridge()
     #endif
-    let notificationSourceAppStore = NotificationSourceAppStore()
+    let notificationSourceAppStore: NotificationSourceAppStore
     let appGlanceStore: AppGlanceStore
     let speechBridge = SpeechBridge()
     var voiceTranscriptionReadiness = VoiceTranscriptionReadiness.turnedOff
@@ -249,24 +249,48 @@ public final class AppModel {
         activeWatchHandler: { [weak self] in self?.connectedWatch }
     )
 
+    /// One directory for the fourteen stores.
+    ///
+    /// Four of them were injectable and the other ten took their own default,
+    /// which was the reader's real Application Support directory. In the app
+    /// that is right and invisible — there is one model. In the test suite,
+    /// which Swift Testing runs concurrently, it meant every model shared the
+    /// same queues: one test's pending notification was flushed to another
+    /// test's watch, and a full run rewrote a real notification history (#59).
+    /// Each store still owns its own filename; only where they all sit is
+    /// anyone else's business.
     public init(
         client: any WatchClient,
-        applicationLibrary: WatchApplicationLibrary = WatchApplicationLibrary(),
-        watchStore: SavedWatchStore = SavedWatchStore(),
-        appGlanceStore: AppGlanceStore = AppGlanceStore(),
-        reminderStore: TimelinePinStore = TimelinePinStore(
-            fileURL: URL.applicationSupportDirectory.appending(path: "Pebble/reminders.json")
-        ),
+        storageDirectory: StorageDirectory = .applicationSupport,
+        applicationLibrary: WatchApplicationLibrary? = nil,
+        watchStore: SavedWatchStore? = nil,
+        appGlanceStore: AppGlanceStore? = nil,
+        reminderStore: TimelinePinStore? = nil,
         clientFactory: (@MainActor (WatchID) -> any WatchClient)? = nil
     ) {
-        self.scannerClient = client
+        scannerClient = client
         // Without a factory every connection shares the scanning client, which
         // limits the app to one watch at a time (mock and QEMU transports).
         self.clientFactory = clientFactory ?? { _ in client }
-        self.applicationLibrary = applicationLibrary
-        self.watchStore = watchStore
-        self.appGlanceStore = appGlanceStore
+        // These four are still passed in where a test has to hold the same
+        // instance the model holds — seeding a library and then reading what
+        // the model did with it. Two actors over one file would each have
+        // their own cache of it.
+        self.applicationLibrary = applicationLibrary ?? WatchApplicationLibrary(directory: storageDirectory)
+        self.watchStore = watchStore ?? SavedWatchStore(directory: storageDirectory)
+        self.appGlanceStore = appGlanceStore ?? AppGlanceStore(directory: storageDirectory)
         self.reminderStore = reminderStore
+            ?? TimelinePinStore(directory: storageDirectory, name: "reminders")
+        timelineStore = TimelinePinStore(directory: storageDirectory, name: "timeline")
+        healthStore = WatchHealthStore(directory: storageDirectory)
+        appCatalog = AppCatalog(directory: storageDirectory)
+        pendingNotificationStore = PendingNotificationStore(directory: storageDirectory)
+        sentNotificationStore = SentNotificationStore(directory: storageDirectory)
+        notificationPreferenceStore = NotificationPreferenceStore(directory: storageDirectory)
+        pendingTimelineOperationStore = PendingTimelineOperationStore(directory: storageDirectory)
+        pendingAppMessageStore = PendingAppMessageStore(directory: storageDirectory)
+        pendingFirmwareUpdateStore = PendingFirmwareUpdateStore(directory: storageDirectory)
+        notificationSourceAppStore = NotificationSourceAppStore(directory: storageDirectory)
         companionNotificationsEnabled = Defaults[.companionNotificationsEnabled]
         activeWatchfaceID = Defaults[.activeWatchfaceID]
     }

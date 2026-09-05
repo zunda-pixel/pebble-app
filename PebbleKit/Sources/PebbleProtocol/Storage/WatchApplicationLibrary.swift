@@ -12,8 +12,12 @@ public actor WatchApplicationLibrary {
     private var fileURL: URL
     private var cachedApplications: [WatchApplication]?
 
-    public init(fileURL: URL? = nil) {
-        self.fileURL = fileURL ?? Self.defaultFileURL
+    public init(directory: StorageDirectory = .applicationSupport) {
+        fileURL = directory.file("applications.json")
+    }
+
+    public init(fileURL: URL) {
+        self.fileURL = fileURL
     }
 
     public func applications() throws -> [WatchApplication] {
@@ -195,7 +199,4 @@ public actor WatchApplicationLibrary {
             .appending(path: "application-sync.json", directoryHint: .notDirectory)
     }
 
-    private static var defaultFileURL: URL {
-        applicationSupportURL("applications.json")
-    }
 }

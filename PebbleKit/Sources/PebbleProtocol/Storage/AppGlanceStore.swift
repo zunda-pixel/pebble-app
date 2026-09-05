@@ -3,8 +3,12 @@ public import Foundation
 public actor AppGlanceStore {
     private var fileURL: URL
 
-    public init(fileURL: URL? = nil) {
-        self.fileURL = fileURL ?? applicationSupportURL("app-glances.json")
+    public init(directory: StorageDirectory = .applicationSupport) {
+        fileURL = directory.file("app-glances.json")
+    }
+
+    public init(fileURL: URL) {
+        self.fileURL = fileURL
     }
 
     public func glances() throws -> [AppGlance] {

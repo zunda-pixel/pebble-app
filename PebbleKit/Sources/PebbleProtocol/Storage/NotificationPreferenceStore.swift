@@ -22,8 +22,12 @@ public struct NotificationDeliveryPreferences: Codable, Equatable, Sendable {
 public actor NotificationPreferenceStore {
     private var fileURL: URL
 
-    public init(fileURL: URL? = nil) {
-        self.fileURL = fileURL ?? applicationSupportURL("notification-preferences.json")
+    public init(directory: StorageDirectory = .applicationSupport) {
+        fileURL = directory.file("notification-preferences.json")
+    }
+
+    public init(fileURL: URL) {
+        self.fileURL = fileURL
     }
 
     public func preferences() throws -> NotificationDeliveryPreferences {

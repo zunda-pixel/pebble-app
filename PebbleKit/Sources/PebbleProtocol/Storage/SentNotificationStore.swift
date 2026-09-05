@@ -26,8 +26,12 @@ public actor SentNotificationStore {
 
     private var fileURL: URL
 
-    public init(fileURL: URL? = nil) {
-        self.fileURL = fileURL ?? applicationSupportURL("sent-notifications.json")
+    public init(directory: StorageDirectory = .applicationSupport) {
+        fileURL = directory.file("sent-notifications.json")
+    }
+
+    public init(fileURL: URL) {
+        self.fileURL = fileURL
     }
 
     public func notifications() throws -> [SentNotification] {

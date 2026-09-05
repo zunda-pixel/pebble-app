@@ -3,8 +3,12 @@ public import Foundation
 public actor NotificationSourceAppStore {
     private var fileURL: URL
 
-    public init(fileURL: URL? = nil) {
-        self.fileURL = fileURL ?? applicationSupportURL("notification-source-apps.json")
+    public init(directory: StorageDirectory = .applicationSupport) {
+        fileURL = directory.file("notification-source-apps.json")
+    }
+
+    public init(fileURL: URL) {
+        self.fileURL = fileURL
     }
 
     public func apps() throws -> [NotificationSourceApp] {

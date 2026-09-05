@@ -15,6 +15,7 @@ struct BluetoothStartTests {
     private func model(in directory: URL, client: MockWatchClient) -> AppModel {
         AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
@@ -55,6 +56,7 @@ struct BluetoothStartTests {
         ))
         let model = AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),

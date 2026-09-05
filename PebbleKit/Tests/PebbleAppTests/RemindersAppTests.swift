@@ -74,6 +74,7 @@ struct RemindersAppTests {
     ) async throws -> AppModel {
         let model = AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),

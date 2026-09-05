@@ -14,18 +14,22 @@ public actor TimelinePinStore {
     /// reminder let go of on one side cannot be found on the other.
     private var mirroredURL: URL
 
-    public init(fileURL: URL? = nil, writtenURL: URL? = nil) {
-        let items = fileURL ?? applicationSupportURL("timeline.json")
-        self.fileURL = items
-        // Named after the items it accounts for: pins and reminders are two of
-        // these stores, and one shared file would have each claiming to have
-        // written the other's.
-        self.writtenURL = writtenURL ?? items
+    /// `name` because the app keeps two of these — the timeline's pins and the
+    /// reminders — and one shared file would have each claiming to have written
+    /// the other's.
+    public init(directory: StorageDirectory = .applicationSupport, name: String = "timeline") {
+        self.init(fileURL: directory.file("\(name).json"))
+    }
+
+    public init(fileURL: URL, writtenURL: URL? = nil) {
+        self.fileURL = fileURL
+        let stem = fileURL.deletingPathExtension().lastPathComponent
+        self.writtenURL = writtenURL ?? fileURL
             .deletingLastPathComponent()
-            .appending(path: "\(items.deletingPathExtension().lastPathComponent)-written.json")
-        self.mirroredURL = items
+            .appending(path: "\(stem)-written.json")
+        mirroredURL = fileURL
             .deletingLastPathComponent()
-            .appending(path: "\(items.deletingPathExtension().lastPathComponent)-mirrored.json")
+            .appending(path: "\(stem)-mirrored.json")
     }
 
     public func mirroredIdentifiers() throws -> [UUID: String] {

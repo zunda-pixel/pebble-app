@@ -32,7 +32,12 @@ struct FirmwareLifecycleTests {
             batteryLevel: nil,
             board: .obelixPVT
         ))
-        let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
+        let model = AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: library,
+            watchStore: watchStore
+        )
         await model.loadSavedWatches()
         let firmwareURL = try makeFirmwareArchive(in: directory)
 
@@ -57,6 +62,7 @@ struct FirmwareLifecycleTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
@@ -102,6 +108,7 @@ struct FirmwareLifecycleTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
@@ -145,6 +152,7 @@ struct FirmwareLifecycleTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
@@ -188,6 +196,7 @@ struct FirmwareLifecycleTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )

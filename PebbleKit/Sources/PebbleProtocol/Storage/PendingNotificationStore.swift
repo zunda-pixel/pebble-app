@@ -4,8 +4,12 @@ public import Foundation
 public actor PendingNotificationStore {
     private var fileURL: URL
 
-    public init(fileURL: URL? = nil) {
-        self.fileURL = fileURL ?? applicationSupportURL("pending-notifications.json")
+    public init(directory: StorageDirectory = .applicationSupport) {
+        fileURL = directory.file("pending-notifications.json")
+    }
+
+    public init(fileURL: URL) {
+        self.fileURL = fileURL
     }
 
     public func notifications() throws -> [PendingDelivery<PebbleTimelineNotification>] {

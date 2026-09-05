@@ -67,8 +67,12 @@ public struct WatchHealthArchive: Codable, Equatable, Sendable {
 public actor WatchHealthStore {
     private var fileURL: URL
 
-    public init(fileURL: URL? = nil) {
-        self.fileURL = fileURL ?? applicationSupportURL("health.json")
+    public init(directory: StorageDirectory = .applicationSupport) {
+        fileURL = directory.file("health.json")
+    }
+
+    public init(fileURL: URL) {
+        self.fileURL = fileURL
     }
 
     public func samples() throws -> [WatchHealthSample] { try PersistentJSON.loadRecovering([WatchHealthSample].self, from: fileURL) ?? [] }

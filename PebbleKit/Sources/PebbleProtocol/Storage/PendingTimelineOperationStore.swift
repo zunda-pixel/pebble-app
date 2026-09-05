@@ -8,8 +8,12 @@ public enum PendingTimelineOperation: Codable, Equatable, Sendable {
 public actor PendingTimelineOperationStore {
     private var fileURL: URL
 
-    public init(fileURL: URL? = nil) {
-        self.fileURL = fileURL ?? applicationSupportURL("pending-timeline.json")
+    public init(directory: StorageDirectory = .applicationSupport) {
+        fileURL = directory.file("pending-timeline.json")
+    }
+
+    public init(fileURL: URL) {
+        self.fileURL = fileURL
     }
 
     public func operations() throws -> [PendingTimelineOperation] {

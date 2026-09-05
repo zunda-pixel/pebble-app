@@ -70,6 +70,12 @@ ships, so a green SwiftPM run says little about the app.
   memory-safety failure that a clean build makes go away was never in the code.
 - `XcodeRefreshCodeIssuesInFile` is the fast way to check one file before paying
   for a full build.
+- **A test that builds an `AppModel` passes it a `storageDirectory` of its
+  own.** Swift Testing runs tests concurrently, so two models sharing a
+  directory share their queues: one test's pending notification was flushed to
+  another test's watch, and a full run rewrote the reader's real notification
+  history (#59). A full run that fails two or three of the wall-clock bridge
+  tests and passes each of them alone is this, not the code under test.
 
 Anything that touches Bluetooth has to be verified on a real iPhone against a
 real watch. The simulator has no CoreBluetooth peripheral or GATT server.

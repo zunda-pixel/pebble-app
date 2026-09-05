@@ -13,6 +13,7 @@ struct ReportedStateTests {
     private func makeModel(directory: URL) -> AppModel {
         AppModel(
             client: MockWatchClient(),
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
@@ -152,6 +153,7 @@ struct ReportedStateTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
@@ -191,6 +193,7 @@ struct ReportedStateTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
+            storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )

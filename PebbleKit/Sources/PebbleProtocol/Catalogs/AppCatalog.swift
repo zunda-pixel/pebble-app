@@ -73,8 +73,12 @@ public actor AppCatalog {
     private var cacheURL: URL
     private let session: URLSession
 
-    public init(cacheURL: URL? = nil, session: URLSession? = nil) {
-        self.cacheURL = cacheURL ?? applicationSupportURL("catalog.json")
+    public init(directory: StorageDirectory = .applicationSupport, session: URLSession? = nil) {
+        self.init(cacheURL: directory.file("catalog.json"), session: session)
+    }
+
+    public init(cacheURL: URL, session: URLSession? = nil) {
+        self.cacheURL = cacheURL
         if let session {
             self.session = session
         } else {

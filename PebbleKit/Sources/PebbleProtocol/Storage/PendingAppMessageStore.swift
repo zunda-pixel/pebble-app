@@ -12,8 +12,12 @@ public struct StoredAppMessage: Codable, Equatable, Identifiable, Sendable {
 public actor PendingAppMessageStore {
     private var fileURL: URL
 
-    public init(fileURL: URL? = nil) {
-        self.fileURL = fileURL ?? applicationSupportURL("pending-appmessages.json")
+    public init(directory: StorageDirectory = .applicationSupport) {
+        fileURL = directory.file("pending-appmessages.json")
+    }
+
+    public init(fileURL: URL) {
+        self.fileURL = fileURL
     }
 
     /// A plain list: an app message is addressed to an application and sent to

@@ -50,8 +50,3 @@ enum PersistentJSON {
     }
 }
 
-func applicationSupportURL(_ name: String) -> URL {
-    let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-        ?? FileManager.default.temporaryDirectory
-    return base.appending(path: "Pebble", directoryHint: .isDirectory).appending(path: name)
-}
