@@ -518,6 +518,48 @@ struct PendingWorkTests {
         #expect(client.timelinePinWrites.count == pinsBefore)
     }
 
+    /// A calendar read that changed nothing queues nothing.
+    ///
+    /// Queueing every pin put them all past the digest comparison, because the
+    /// queue is a change and `synchronizeTimeline` does not second-guess it: on
+    /// the reader's watch that was 32 unchanged pins written again after one
+    /// disconnect, and once more for every `EKEventStoreChanged`.
+    @Test
+    func onlyTheCalendarPinsThatChangedAreWorthQueueing() throws {
+        let unchanged = timelinePin("Standup", minutesFromNow: 60)
+        var edited = timelinePin("Dentist", minutesFromNow: 120)
+        let before = [unchanged, edited]
+
+        // Retitled where it stands, which is what an edited event looks like:
+        // the identifier comes from the event and does not move.
+        edited.title = "Dentist, moved"
+        let added = timelinePin("Lunch", minutesFromNow: 180)
+
+        let worth = AppModel.calendarPinsWorthQueueing([unchanged, edited, added], replacing: before)
+
+        #expect(worth.map(\.id) == [edited.id, added.id])
+    }
+
+    /// The pin the comparison skipped is not lost: a watch that never got it is
+    /// sent it from the digests instead, which is the other half of the pair.
+    @Test
+    func aCalendarPinNotWorthQueueingIsStillSentToAWatchWithoutIt() async throws {
+        let client = MockWatchClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = makeModel(client: client, directory: directory)
+        let pin = timelinePin("Standup", minutesFromNow: 60)
+        try await model.timelineStore.save([pin])
+        // Nothing queued, the way a calendar read that changed nothing leaves it.
+        try await model.pendingTimelineOperationStore.save([])
+
+        await model.scan()
+        await model.connect(to: try #require(model.discoveredWatches.first))
+        await model.synchronizeTimeline()
+
+        #expect(client.timelinePinWrites == [pin.id])
+    }
+
     @Test
     func aFullTimelineQueueGivesUpUpsertsRatherThanDeletes() async throws {
         let client = SuspendingWatchClient()

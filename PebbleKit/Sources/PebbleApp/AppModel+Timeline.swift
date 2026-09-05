@@ -236,6 +236,28 @@ extension AppModel {
         }
     }
 
+    /// The calendar pins whose bytes differ from the ones they replace.
+    ///
+    /// The queue carries a change and `synchronizeTimeline` does not second-guess
+    /// what is in it, so queueing every pin on every calendar read put all of
+    /// them past the comparison that would otherwise have skipped them: an
+    /// on-device synchronization wrote 32 unchanged pins that way, once per
+    /// `EKEventStoreChanged`, which one edited event is enough to raise.
+    ///
+    /// What the watch is missing is not this decision's business — the pins are
+    /// derived from the digests for that, and a pin dropped here because nothing
+    /// about it changed is picked up there if the watch never got it.
+    static func calendarPinsWorthQueueing(
+        _ current: [TimelinePin],
+        replacing previous: [TimelinePin]
+    ) -> [TimelinePin] {
+        let digests = Dictionary(
+            previous.map { ($0.id, $0.writtenDigest) },
+            uniquingKeysWith: { _, latest in latest }
+        )
+        return current.filter { digests[$0.id] != $0.writtenDigest }
+    }
+
     public func synchronizeCalendar() async {
         do {
             let calendarPins = try await calendarBridge.timelinePins()
@@ -247,7 +269,9 @@ extension AppModel {
             for pin in oldCalendarPins where !newIDs.contains(pin.id) {
                 try await queueTimelineOperation(.delete(pin.id))
             }
-            for pin in calendarPins { try await queueTimelineOperation(.upsert(pin)) }
+            for pin in Self.calendarPinsWorthQueueing(calendarPins, replacing: oldCalendarPins) {
+                try await queueTimelineOperation(.upsert(pin))
+            }
             if connectedWatch != nil { await synchronizeTimeline() }
             timeline.feedback = .success("Calendar synchronized with Timeline.")
         } catch { timeline.feedback = .failure("Calendar access or synchronization failed.") }
