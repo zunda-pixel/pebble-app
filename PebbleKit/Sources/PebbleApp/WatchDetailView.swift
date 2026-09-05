@@ -7,7 +7,7 @@ struct WatchDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     private var journal: FirmwareUpdateJournal? {
-        guard let journal = model.firmwareUpdateJournal, journal.watchID == watchID else {
+        guard let journal = model.firmware.journal, journal.watchID == watchID else {
             return nil
         }
         return journal
@@ -26,13 +26,13 @@ struct WatchDetailView: View {
         WatchDetailContent(
             watch: WatchSummary(watchID: watchID, model: model),
             firmwareJournalPhase: journal?.phase,
-            downloadedFirmwareVersion: model.downloadedFirmware?.versionTag,
+            downloadedFirmwareVersion: model.firmware.downloaded?.versionTag,
             languageName: languageName,
-            notificationFeedback: model.notificationFeedback,
-            resetFeedback: model.watchResetFeedback[watchID],
+            notificationFeedback: model.notifications.feedback,
+            resetFeedback: model.watches.resetFeedback[watchID],
             connectionFeedback: model.connectionFailures[watchID].map { .failure($0.message) },
             connect: {
-                guard let saved = model.savedWatches.first(where: { $0.id == watchID }) else { return }
+                guard let saved = model.watches.saved.first(where: { $0.id == watchID }) else { return }
                 Task { await model.connect(to: saved) }
             },
             setAutomaticallyConnects: { enabled in

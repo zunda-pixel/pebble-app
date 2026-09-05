@@ -5,18 +5,18 @@ import SwiftUI
 extension AppModel {
     public func takeScreenshot(watchID: WatchID? = nil) async {
         guard let connection = connection(for: watchID), connection.isConnected else {
-            watchDiagnosticsFeedback[.screenshot] = .failure("Connect the watch before taking a screenshot.")
+            diagnostics.feedback[.screenshot] = .failure("Connect the watch before taking a screenshot.")
             return
         }
-        isTakingScreenshot = true
-        defer { isTakingScreenshot = false }
+        diagnostics.isTakingScreenshot = true
+        defer { diagnostics.isTakingScreenshot = false }
         do {
             let screenshot = try await connection.client.takeScreenshot()
-            latestScreenshot = screenshot
-            screenshotURL = try writeScreenshot(screenshot, name: connection.watch.name)
-            watchDiagnosticsFeedback[.screenshot] = nil
+            diagnostics.latestScreenshot = screenshot
+            diagnostics.screenshotURL = try writeScreenshot(screenshot, name: connection.watch.name)
+            diagnostics.feedback[.screenshot] = nil
         } catch {
-            watchDiagnosticsFeedback[.screenshot] = .failure("The watch would not send a screenshot.")
+            diagnostics.feedback[.screenshot] = .failure("The watch would not send a screenshot.")
             await PebbleDiagnostics.shared.record(
                 .error,
                 category: "screenshot",
@@ -29,25 +29,25 @@ extension AppModel {
     /// and so on until the watch says it has no more.
     public func gatherWatchLogs(watchID: WatchID? = nil) async {
         guard let connection = connection(for: watchID), connection.isConnected else {
-            watchDiagnosticsFeedback[.watchLogs] = .failure("Connect the watch before gathering its logs.")
+            diagnostics.feedback[.watchLogs] = .failure("Connect the watch before gathering its logs.")
             return
         }
-        isGatheringWatchLogs = true
-        defer { isGatheringWatchLogs = false }
-        watchLogLines = []
+        diagnostics.isGatheringWatchLogs = true
+        defer { diagnostics.isGatheringWatchLogs = false }
+        diagnostics.watchLogLines = []
         do {
             for generation in UInt8(0)..<UInt8(Self.maximumLogGenerations) {
                 guard let lines = try await connection.client.readLogGeneration(generation) else {
                     break
                 }
-                watchLogLines += lines
+                diagnostics.watchLogLines += lines
             }
-            watchLogsURL = try writeWatchLogs(name: connection.watch.name)
-            watchDiagnosticsFeedback[.watchLogs] = nil
+            diagnostics.watchLogsURL = try writeWatchLogs(name: connection.watch.name)
+            diagnostics.feedback[.watchLogs] = nil
         } catch {
             // A log that stops halfway is more use than none.
-            watchLogsURL = try? writeWatchLogs(name: connection.watch.name)
-            watchDiagnosticsFeedback[.watchLogs] = .failure("The watch stopped part way through its logs.")
+            diagnostics.watchLogsURL = try? writeWatchLogs(name: connection.watch.name)
+            diagnostics.feedback[.watchLogs] = .failure("The watch stopped part way through its logs.")
             await PebbleDiagnostics.shared.record(
                 .error,
                 category: "watchlog",
@@ -59,27 +59,27 @@ extension AppModel {
     // The watch forgets on the next connection, so this is asked for again each
     // time.
     public func setApplicationLoggingEnabled(_ isEnabled: Bool) async {
-        isApplicationLoggingEnabled = isEnabled
+        diagnostics.isApplicationLoggingEnabled = isEnabled
         for connection in activeConnections {
             try? await connection.client.setApplicationLoggingEnabled(isEnabled)
         }
-        if !isEnabled { applicationLogLines = [] }
+        if !isEnabled { diagnostics.applicationLogLines = [] }
     }
 
     func synchronizeApplicationLogging(on connection: WatchConnection) async {
-        guard isApplicationLoggingEnabled, connection.isConnected else { return }
+        guard diagnostics.isApplicationLoggingEnabled, connection.isConnected else { return }
         try? await connection.client.setApplicationLoggingEnabled(true)
     }
 
     func recordApplicationLogLine(_ line: WatchLogLine, from applicationID: UUID) {
-        let name = (watchApplications + watchfaces)
+        let name = (applications.apps + applications.watchfaces)
             .first { $0.id == applicationID }?
             .displayName
         var line = line
         if let name { line.file = "\(name) \(line.file)" }
-        applicationLogLines.append(line)
-        if applicationLogLines.count > 500 {
-            applicationLogLines.removeFirst(applicationLogLines.count - 500)
+        diagnostics.applicationLogLines.append(line)
+        if diagnostics.applicationLogLines.count > 500 {
+            diagnostics.applicationLogLines.removeFirst(diagnostics.applicationLogLines.count - 500)
         }
     }
 
@@ -88,23 +88,23 @@ extension AppModel {
     // alone.
     public func collectCoredump(watchID: WatchID? = nil) async {
         guard let connection = connection(for: watchID), connection.isConnected else {
-            watchDiagnosticsFeedback[.coredump] = .failure("Connect the watch before collecting a crash report.")
+            diagnostics.feedback[.coredump] = .failure("Connect the watch before collecting a crash report.")
             return
         }
-        isCollectingCoredump = true
-        defer { isCollectingCoredump = false }
+        diagnostics.isCollectingCoredump = true
+        defer { diagnostics.isCollectingCoredump = false }
         do {
             let bytes = try await connection.client.getBytes(.unreadCoredump)
             guard !bytes.isEmpty else {
-                watchDiagnosticsFeedback[.coredump] = .success("The watch has no crash report that has not been read.")
+                diagnostics.feedback[.coredump] = .success("The watch has no crash report that has not been read.")
                 return
             }
-            coredumpURL = try write(bytes, name: "\(connection.watch.name)-coredump.bin")
-            watchDiagnosticsFeedback[.coredump] = nil
+            diagnostics.coredumpURL = try write(bytes, name: "\(connection.watch.name)-coredump.bin")
+            diagnostics.feedback[.coredump] = nil
         } catch GetBytesError.refused(3) {
-            watchDiagnosticsFeedback[.coredump] = .success("The watch has no crash report.")
+            diagnostics.feedback[.coredump] = .success("The watch has no crash report.")
         } catch {
-            watchDiagnosticsFeedback[.coredump] = .failure("The crash report could not be read.")
+            diagnostics.feedback[.coredump] = .failure("The crash report could not be read.")
             await PebbleDiagnostics.shared.record(
                 .error,
                 category: "coredump",
@@ -116,7 +116,7 @@ extension AppModel {
     static var maximumLogGenerations: Int { 16 }
 
     private func writeWatchLogs(name: String) throws -> URL {
-        let text = watchLogLines.map(\.formatted).joined(separator: "\n")
+        let text = diagnostics.watchLogLines.map(\.formatted).joined(separator: "\n")
         return try write(Array(text.utf8), name: "\(name)-logs.txt")
     }
 

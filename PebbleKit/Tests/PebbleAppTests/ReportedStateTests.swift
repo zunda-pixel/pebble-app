@@ -28,7 +28,7 @@ struct ReportedStateTests {
         let model = makeModel(directory: directory)
         // Already credited, so the refresh has no reason to reach WeatherKit
         // for the attribution it must show.
-        model.weatherCredit = WeatherCredit(
+        model.weather.credit = WeatherCredit(
             serviceName: "Test Weather",
             lightMarkURL: URL(string: "https://example.com/light")!,
             darkMarkURL: URL(string: "https://example.com/dark")!,
@@ -48,7 +48,7 @@ struct ReportedStateTests {
             longitude: 0,
             followsPhone: false
         )
-        model.weatherPlaces = [kyoto, refused]
+        model.weather.places = [kyoto, refused]
         model.fetchWeatherReport = { place, _ in
             guard place.id == kyoto.id else { throw WeatherSourceError.placeNotFound }
             return WeatherReport(
@@ -73,8 +73,8 @@ struct ReportedStateTests {
         // warning: it shows with a blank temperature and is left out of the
         // ordering the watch is given, which is not something to be quiet
         // about.
-        #expect(model.weatherReports.map(\.locationName) == ["Kyoto"])
-        #expect(model.weatherFeedback != nil)
+        #expect(model.weather.reports.map(\.locationName) == ["Kyoto"])
+        #expect(model.weather.feedback != nil)
     }
 
     @Test
@@ -159,7 +159,7 @@ struct ReportedStateTests {
         )
         let now = try #require(Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 2, hour: 12)))
         let yesterday = try #require(Calendar.current.date(byAdding: .day, value: -1, to: now))
-        model.healthSamples = [
+        model.health.samples = [
             WatchHealthSample(
                 date: yesterday,
                 steps: 9_400,
@@ -202,7 +202,7 @@ struct ReportedStateTests {
         // What the merge leaves after the watch synced later than Apple Health
         // was read: one record marked `watch`, carrying figures the watch has
         // no way of counting.
-        model.healthSamples = [
+        model.health.samples = [
             WatchHealthSample(
                 date: yesterday,
                 steps: 9_400,

@@ -14,11 +14,11 @@ struct WatchSettingsView: View {
             watchSettings: Dictionary(
                 uniqueKeysWithValues: WatchSetting.allCases.map { ($0, model.isWatchSettingOn($0)) }
             ),
-            activitySettings: model.activitySettings,
-            heartRateSettings: model.heartRateSettings,
-            isReminderAppEnabled: model.isReminderAppEnabled,
+            activitySettings: model.watchSettings.activity,
+            heartRateSettings: model.watchSettings.heartRate,
+            isReminderAppEnabled: model.timeline.isReminderAppEnabled,
             isConnected: connection?.isConnected == true,
-            feedback: model.watchSettingsFeedback,
+            feedback: model.watchSettings.feedback,
             setWatchSetting: { setting, isOn in
                 Task { await model.setWatchSetting(setting, isOn: isOn) }
             },

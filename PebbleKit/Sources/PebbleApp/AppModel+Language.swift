@@ -13,17 +13,17 @@ extension AppModel {
     // it went away beats holding a transfer open through a download.
     public func installLanguagePack(_ pack: PebbleLanguagePack, watchID: WatchID? = nil) async {
         guard let connection = connection(for: watchID), connection.isConnected else {
-            languageFeedback = .failure("Connect the watch to change its language.")
+            language.feedback = .failure("Connect the watch to change its language.")
             return
         }
-        isInstallingLanguagePack = true
-        defer { isInstallingLanguagePack = false }
-        languageFeedback = .progress("Downloading \(pack.localName)…")
+        language.isInstalling = true
+        defer { language.isInstalling = false }
+        language.feedback = .progress("Downloading \(pack.localName)…")
         let data: Data
         do {
             data = try await languagePackCatalog.download(pack)
         } catch {
-            languageFeedback = .failure("\(pack.localName) could not be downloaded right now.")
+            language.feedback = .failure("\(pack.localName) could not be downloaded right now.")
             return
         }
         await send([UInt8](data), named: pack.localName, on: connection)
@@ -31,20 +31,20 @@ extension AppModel {
 
     public func installLanguagePack(from url: URL, watchID: WatchID? = nil) async {
         guard let connection = connection(for: watchID), connection.isConnected else {
-            languageFeedback = .failure("Connect the watch to change its language.")
+            language.feedback = .failure("Connect the watch to change its language.")
             return
         }
-        isInstallingLanguagePack = true
-        defer { isInstallingLanguagePack = false }
+        language.isInstalling = true
+        defer { language.isInstalling = false }
         let data: Data
         do {
             data = try Data(contentsOf: url, options: .mappedIfSafe)
         } catch {
-            languageFeedback = .failure("That language pack could not be read.")
+            language.feedback = .failure("That language pack could not be read.")
             return
         }
         guard !data.isEmpty else {
-            languageFeedback = .failure("That language pack could not be read.")
+            language.feedback = .failure("That language pack could not be read.")
             return
         }
         await send([UInt8](data), named: url.deletingPathExtension().lastPathComponent, on: connection)
@@ -55,10 +55,10 @@ extension AppModel {
         // never read it, and recovery firmware refuses files outright.
         guard connection.watch.supportsLanguagePacks || connection.watch.capabilities == 0,
               !connection.watch.isRunningRecoveryFirmware else {
-            languageFeedback = .failure("This watch cannot take a language pack.")
+            language.feedback = .failure("This watch cannot take a language pack.")
             return
         }
-        languageFeedback = .progress("Sending \(name) to the watch…")
+        language.feedback = .progress("Sending \(name) to the watch…")
         connection.beginTransfer(.languagePack)
         defer {
             connection.endTransfer()
@@ -69,10 +69,10 @@ extension AppModel {
             }
             // The watch does not restart: it notices the file, reloads it and says so on
             // its own screen. Nothing it reports about itself changes until it is asked.
-            languageFeedback = .success("\(name) is installed. The watch switches to it now.")
+            language.feedback = .success("\(name) is installed. The watch switches to it now.")
             await confirmLanguageChange(on: connection)
         } catch {
-            languageFeedback = .failure("\(name) could not be installed. \(error.localizedDescription)")
+            language.feedback = .failure("\(name) could not be installed. \(error.localizedDescription)")
         }
     }
 }

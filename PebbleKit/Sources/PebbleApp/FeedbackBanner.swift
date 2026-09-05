@@ -3,7 +3,7 @@ import SwiftUI
 /// The one place a `FeatureFeedback` is drawn.
 ///
 /// Nothing, when there is nothing to say — so a screen writes
-/// `FeedbackBanner(feedback: model.weatherFeedback)` rather than unwrapping an
+/// `FeedbackBanner(feedback: model.weather.feedback)` rather than unwrapping an
 /// optional itself and choosing a glyph while it is there.
 struct FeedbackBanner: View {
     var feedback: FeatureFeedback?

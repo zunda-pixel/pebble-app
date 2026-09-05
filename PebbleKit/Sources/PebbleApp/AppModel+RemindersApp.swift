@@ -3,20 +3,20 @@ import Foundation
 import SwiftUI
 
 extension AppModel {
-    /// Brings the phone's Reminders app and the watch to the same reminders.
+    /// Brings the phone's Reminders app and the watch to the same timeline.reminders.
     ///
     /// What the watch made goes there first, so that the reading which follows
     /// finds it and does not take it for one the reader has finished with.
     public func synchronizeRemindersApp() async {
         await loadReminders()
-        for reminder in reminders where reminder.isFromWatch && reminder.timestamp > .now {
+        for reminder in timeline.reminders where reminder.isFromWatch && reminder.timestamp > .now {
             await mirrorInRemindersApp(reminder)
         }
         let items: [RemindersAppItem]
         do {
             items = try await remindersAppStore.reminders()
         } catch {
-            reminderFeedback = .failure("The Reminders app could not be read.")
+            timeline.reminderFeedback = .failure("The Reminders app could not be read.")
             await PebbleDiagnostics.shared.record(
                 .error,
                 category: "timeline",
@@ -26,19 +26,19 @@ extension AppModel {
         }
         var mirrored = (try? await reminderStore.mirroredIdentifiers()) ?? [:]
         let outcome = RemindersAppSync.merged(
-            kept: reminders,
+            kept: timeline.reminders,
             fromApp: items,
             mirrored: mirrored,
             now: .now
         )
-        reminders = outcome.reminders
+        timeline.reminders = outcome.reminders
         // Named for both directions: what came from the Reminders app is named
         // here too, so letting go of it in this app can reach it there.
         for item in items { mirrored[item.reminder.id] = item.identifier }
         for reminder in outcome.finished { mirrored[reminder.id] = nil }
-        try? await reminderStore.save(reminders)
+        try? await reminderStore.save(timeline.reminders)
         try? await reminderStore.setMirroredIdentifiers(mirrored)
-        reminderFeedback = nil
+        timeline.reminderFeedback = nil
         for connection in activeConnections {
             await synchronizeReminders(on: connection)
         }
@@ -67,7 +67,7 @@ extension AppModel {
         }
     }
 
-    /// Takes these reminders out of the phone's Reminders app, if they were ever
+    /// Takes these timeline.reminders out of the phone's Reminders app, if they were ever
     /// in it.
     func forgetInRemindersApp(_ identifiers: Set<UUID>) async {
         var mirrored = (try? await reminderStore.mirroredIdentifiers()) ?? [:]

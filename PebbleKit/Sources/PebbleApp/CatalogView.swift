@@ -37,11 +37,11 @@ struct CatalogView: View {
 
     var body: some View {
         CatalogContent(
-            applications: model.catalogApplications,
+            applications: model.catalog.applications,
             state: { model.catalogInstallationState(for: $0) },
             isImportingApplication: isImportingApplication,
             isImportDisabled: isImportDisabled,
-            isUpdating: model.isUpdatingCatalog,
+            isUpdating: model.catalog.isUpdating,
             importApplication: importApplication,
             installUpdates: { Task { await model.installCatalogUpdates() } },
             refresh: { Task { await model.refreshCatalog() } },
@@ -52,7 +52,7 @@ struct CatalogView: View {
         )
         .task {
             await model.loadCatalog()
-            if model.catalogApplications.isEmpty { await model.refreshCatalog() }
+            if model.catalog.applications.isEmpty { await model.refreshCatalog() }
         }
     }
 }
@@ -204,9 +204,9 @@ struct CatalogApplicationDetailView: View {
         CatalogApplicationDetailContent(
             application: application,
             state: model.catalogInstallationState(for: application),
-            isInstalling: model.installingCatalogApplicationID == application.id,
-            isAnyInstallRunning: model.installingCatalogApplicationID != nil,
-            feedback: model.catalogFeedback,
+            isInstalling: model.catalog.installingApplicationID == application.id,
+            isAnyInstallRunning: model.catalog.installingApplicationID != nil,
+            feedback: model.catalog.feedback,
             install: { Task { await model.installCatalogApplication(application) } }
         )
     }

@@ -37,15 +37,15 @@ struct FeatureFeedbackTests {
         // Connecting asks the watch to synchronize its health, which is its own
         // feature answering for itself. What is under test is what saving a pin
         // adds to that.
-        model.healthFeedback = nil
-        model.catalogFeedback = nil
+        model.health.feedback = nil
+        model.catalog.feedback = nil
 
         await model.addTimelinePin(title: "Stand up", date: Date(timeIntervalSince1970: 1_788_393_600))
 
-        #expect(model.timelineFeedback == .success("Timeline pin saved."))
+        #expect(model.timeline.feedback == .success("Timeline pin saved."))
         // These are the two screens the answer used to land on.
-        #expect(model.healthFeedback == nil)
-        #expect(model.catalogFeedback == nil)
+        #expect(model.health.feedback == nil)
+        #expect(model.catalog.feedback == nil)
     }
 
     /// A pin that could not be saved is a failure, not a status: the reader who
@@ -64,9 +64,9 @@ struct FeatureFeedbackTests {
 
         await model.addTimelinePin(title: "Stand up", date: Date(timeIntervalSince1970: 1_788_393_600))
 
-        #expect(model.timelineFeedback == .failure("The timeline pin could not be saved."))
-        #expect(model.timelineFeedback?.isFailure == true)
-        #expect(model.timelinePins.isEmpty)
+        #expect(model.timeline.feedback == .failure("The timeline pin could not be saved."))
+        #expect(model.timeline.feedback?.isFailure == true)
+        #expect(model.timeline.pins.isEmpty)
     }
 
     /// Health keeps its own, and it is a success rather than bare words.
@@ -77,10 +77,10 @@ struct FeatureFeedbackTests {
 
         await model.deleteHealthData()
 
-        #expect(model.healthFeedback == .success("Local Pebble health data deleted."))
-        #expect(model.healthFeedback?.isFailure == false)
-        #expect(model.timelineFeedback == nil)
-        #expect(model.catalogFeedback == nil)
+        #expect(model.health.feedback == .success("Local Pebble health data deleted."))
+        #expect(model.health.feedback?.isFailure == false)
+        #expect(model.timeline.feedback == nil)
+        #expect(model.catalog.feedback == nil)
     }
 
     /// The catalog too, which shared `dataSync` with health.
@@ -91,8 +91,8 @@ struct FeatureFeedbackTests {
 
         await model.updateCatalog(source: "http://example.com/catalog.json")
 
-        #expect(model.catalogFeedback == .failure("Enter a valid HTTPS catalog URL."))
-        #expect(model.healthFeedback == nil)
+        #expect(model.catalog.feedback == .failure("Enter a valid HTTPS catalog URL."))
+        #expect(model.health.feedback == nil)
     }
 
     /// A watch asked to restart is under way, not finished: the only news
@@ -108,8 +108,8 @@ struct FeatureFeedbackTests {
 
         await model.resetWatch(.restart, watchID: watch.id)
 
-        #expect(model.watchResetFeedback[watch.id] == .progress("The watch is restarting."))
-        #expect(model.watchResetFeedback[watch.id]?.isFailure == false)
+        #expect(model.watches.resetFeedback[watch.id] == .progress("The watch is restarting."))
+        #expect(model.watches.resetFeedback[watch.id]?.isFailure == false)
     }
 
     @Test func theWordsComeBackWhicheverKindItIs() {

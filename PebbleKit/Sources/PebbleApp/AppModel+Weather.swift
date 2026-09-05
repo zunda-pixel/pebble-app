@@ -7,16 +7,16 @@ import SwiftUI
 
 extension AppModel {
     public func followPhoneForWeather() async {
-        guard !weatherPlaces.contains(where: \.followsPhone) else { return }
+        guard !weather.places.contains(where: \.followsPhone) else { return }
         guard phoneLocationSource.isAllowed else {
             phoneLocationSource.requestAuthorization()
-            weatherFeedback = .failure("Allow location access to use where the phone is.")
+            weather.feedback = .failure("Allow location access to use where the phone is.")
             return
         }
         do {
             let location = try await phoneLocationSource.currentLocation()
             let name = await placeName(for: location) ?? String(localized: "Current Location", bundle: .module)
-            weatherPlaces.insert(
+            weather.places.insert(
                 WeatherPlace(
                     id: UUID(),
                     name: name,
@@ -29,7 +29,7 @@ extension AppModel {
             saveWeatherPlaces()
             await refreshWeather()
         } catch {
-            weatherFeedback = .failure("The phone's position could not be read.")
+            weather.feedback = .failure("The phone's position could not be read.")
             await PebbleDiagnostics.shared.record(
                 .error,
                 category: "weather",
@@ -49,7 +49,7 @@ extension AppModel {
                 throw WeatherSourceError.placeNotFound
             }
             let coordinate = place.location.coordinate
-            weatherPlaces.append(
+            weather.places.append(
                 WeatherPlace(
                     id: UUID(),
                     name: placeName(of: place) ?? query,
@@ -61,40 +61,40 @@ extension AppModel {
             saveWeatherPlaces()
             await refreshWeather()
         } catch {
-            weatherFeedback = .failure("No place was found for “\(query)”.")
+            weather.feedback = .failure("No place was found for “\(query)”.")
         }
     }
 
     public func removeWeatherPlace(id: UUID) async {
-        weatherPlaces.removeAll { $0.id == id }
+        weather.places.removeAll { $0.id == id }
         saveWeatherPlaces()
-        weatherReports.removeAll { $0.id == id }
+        weather.reports.removeAll { $0.id == id }
         // The watch keeps what it was given until it is told otherwise.
         for connection in activeConnections where connection.watch.supportsWeatherApp {
             try? await connection.client.remove(.weather(id))
-            try? await connection.client.write(.weatherOrder(weatherReports.map(\.id)))
+            try? await connection.client.write(.weatherOrder(weather.reports.map(\.id)))
         }
     }
 
     public func setWeatherUsesFahrenheit(_ usesFahrenheit: Bool) async {
-        weatherUsesFahrenheit = usesFahrenheit
+        weather.usesFahrenheit = usesFahrenheit
         Defaults[.weatherUsesFahrenheit] = usesFahrenheit
         await refreshWeather()
     }
 
     public func refreshWeather() async {
-        guard !weatherPlaces.isEmpty else {
-            weatherFeedback = nil
+        guard !weather.places.isEmpty else {
+            weather.feedback = nil
             return
         }
-        isRefreshingWeather = true
-        defer { isRefreshingWeather = false }
-        if weatherCredit == nil {
-            weatherCredit = try? await weatherBridge.credit()
+        weather.isRefreshing = true
+        defer { weather.isRefreshing = false }
+        if weather.credit == nil {
+            weather.credit = try? await weatherBridge.credit()
         }
         var reports: [WeatherReport] = []
         var placeFailed = false
-        for place in weatherPlaces {
+        for place in weather.places {
             var place = place
             // The entry that follows the phone is only useful where the phone is now.
             if place.followsPhone, let location = try? await phoneLocationSource.currentLocation() {
@@ -103,11 +103,11 @@ extension AppModel {
             }
             do {
                 reports.append(
-                    try await fetchWeatherReport(place, weatherUsesFahrenheit)
+                    try await fetchWeatherReport(place, weather.usesFahrenheit)
                 )
             } catch {
                 placeFailed = true
-                weatherFeedback = .failure(weatherFailureMessage(for: error, place: place.name))
+                weather.feedback = .failure(weatherFailureMessage(for: error, place: place.name))
                 // `localizedDescription` on a WeatherKit failure is usually "The operation
                 // couldn't be completed", which says nothing; the domain and code do.
                 await PebbleDiagnostics.shared.record(
@@ -118,18 +118,18 @@ extension AppModel {
             }
         }
         guard !reports.isEmpty else { return }
-        weatherReports = reports
-        weatherUpdated = .now
+        weather.reports = reports
+        weather.updated = .now
         // A place whose forecast did not arrive shows a blank temperature and is
         // left out of the ordering the watch is given.
-        if !placeFailed { weatherFeedback = nil }
+        if !placeFailed { weather.feedback = nil }
         for connection in activeConnections {
             await sendWeather(to: connection)
         }
     }
 
     func sendWeather(to connection: WatchConnection) async {
-        guard connection.isConnected, !weatherReports.isEmpty else { return }
+        guard connection.isConnected, !weather.reports.isEmpty else { return }
         // A watch without the weather app refuses the write, and one in recovery
         // firmware refuses everything.
         guard connection.watch.supportsWeatherApp, !connection.watch.isRunningRecoveryFirmware else {
@@ -138,9 +138,9 @@ extension AppModel {
         // Before the forecasts: the watch skips a forecast whose key it has no
         // ordering for, and this is the only place that ordering comes from.
         do {
-            try await connection.client.write(.weatherOrder(weatherReports.map(\.id)))
+            try await connection.client.write(.weatherOrder(weather.reports.map(\.id)))
         } catch {
-            weatherFeedback = .failure(
+            weather.feedback = .failure(
                 "\(connection.watch.name) did not accept the list of places. \(Text(refusalReason(for: error)))"
             )
             await PebbleDiagnostics.shared.record(
@@ -150,13 +150,13 @@ extension AppModel {
             )
             return
         }
-        for report in weatherReports {
+        for report in weather.reports {
             do {
                 // A refusal — no weather app, a database that is full — is the difference
                 // between "sent" and "shown".
                 try await connection.client.write(.weather(report))
             } catch {
-                weatherFeedback = .failure(
+                weather.feedback = .failure(
                     "\(connection.watch.name) did not accept the forecast. \(Text(refusalReason(for: error)))"
                 )
                 await PebbleDiagnostics.shared.record(
@@ -170,12 +170,12 @@ extension AppModel {
     }
 
     func loadWeatherPlaces() {
-        weatherPlaces = Defaults[.weatherPlaces]
-        weatherUsesFahrenheit = Defaults[.weatherUsesFahrenheit]
+        weather.places = Defaults[.weatherPlaces]
+        weather.usesFahrenheit = Defaults[.weatherUsesFahrenheit]
     }
 
     private func saveWeatherPlaces() {
-        Defaults[.weatherPlaces] = weatherPlaces
+        Defaults[.weatherPlaces] = weather.places
     }
 
     private func placeName(for location: CLLocation) async -> String? {

@@ -12,7 +12,7 @@ extension AppModel {
               url.host != nil,
               url.user == nil,
               url.password == nil else {
-            applicationLibraryFeedback = .failure("The application requested an unsafe settings URL.")
+            applications.libraryFeedback = .failure("The application requested an unsafe settings URL.")
             Task {
                 await PebbleDiagnostics.shared.record(
                     .warning,
@@ -22,11 +22,11 @@ extension AppModel {
             }
             return
         }
-        configurationURL = url
+        applications.configurationURL = url
     }
 
     public var isApplicationManagementBusy: Bool {
-        applicationManagementOperation != nil || isHandlingAppFetch
+        applications.managementOperation != nil || isHandlingAppFetch
     }
 
     public func loadApplications() async {
@@ -34,13 +34,13 @@ extension AppModel {
             return
         }
         hasLoadedApplications = true
-        isLoadingApplications = true
-        defer { isLoadingApplications = false }
+        applications.isLoading = true
+        defer { applications.isLoading = false }
         do {
             updateApplications(try await applicationLibrary.applications())
-            applicationLibraryFeedback = nil
+            applications.libraryFeedback = nil
         } catch {
-            applicationLibraryFeedback = .failure("The application library could not be read: \(error.localizedDescription)")
+            applications.libraryFeedback = .failure("The application library could not be read: \(error.localizedDescription)")
         }
     }
 
@@ -50,8 +50,8 @@ extension AppModel {
             guard let source = try await applicationLibrary.companionJavaScript(
                 applicationID: application.id
             ) else { return }
-            configurationApplication = application
-            configurationURL = nil
+            applications.configurationApplication = application
+            applications.configurationURL = nil
             try await companionRuntime.load(source: source, application: application)
             try await companionRuntime.showConfiguration()
             await PebbleDiagnostics.shared.record(
@@ -59,7 +59,7 @@ extension AppModel {
                 message: "Requested configuration for \(application.displayName)"
             )
         } catch {
-            applicationLibraryFeedback = .failure("The application settings could not be opened.")
+            applications.libraryFeedback = .failure("The application settings could not be opened.")
         }
     }
 
@@ -68,7 +68,7 @@ extension AppModel {
         guard !activeConnections.isEmpty else {
             // A watchface becomes active by being launched, and there is nothing to
             // launch it on.
-            applicationLibraryFeedback = .failure("Connect a Pebble to change the watchface.")
+            applications.libraryFeedback = .failure("Connect a Pebble to change the watchface.")
             return
         }
         do {
@@ -78,54 +78,54 @@ extension AppModel {
                     try await client.launchApplication(id: application.id)
                 }
             }
-            activeWatchfaceID = application.id
+            applications.activeWatchfaceID = application.id
             Defaults[.activeWatchfaceID] = application.id
-            applicationManagementFeedback = .success("\(application.displayName) is active.")
+            applications.managementFeedback = .success("\(application.displayName) is active.")
         } catch {
-            applicationLibraryFeedback = .failure("The watchface could not be activated.")
+            applications.libraryFeedback = .failure("The watchface could not be activated.")
         }
     }
 
     public func closeConfiguration(response: String? = nil) async {
         try? await companionRuntime.closeConfiguration(response: response)
-        configurationURL = nil
-        configurationApplication = nil
+        applications.configurationURL = nil
+        applications.configurationApplication = nil
     }
 
     public func removeApplication(id: UUID) async {
-        if activeWatchfaceID == id {
-            guard let fallback = watchfaces.first(where: { $0.id != id }) else {
-                applicationLibraryFeedback = .failure("Install and activate another watchface before removing the active one.")
+        if applications.activeWatchfaceID == id {
+            guard let fallback = applications.watchfaces.first(where: { $0.id != id }) else {
+                applications.libraryFeedback = .failure("Install and activate another watchface before removing the active one.")
                 return
             }
             if activeConnections.isEmpty {
                 // The active watchface is remembered from the last session, so this is the
                 // ordinary offline case: record the choice and let the next connection
                 // register the library as it then stands.
-                activeWatchfaceID = fallback.id
+                applications.activeWatchfaceID = fallback.id
                 Defaults[.activeWatchfaceID] = fallback.id
             } else {
                 await activateWatchface(fallback)
-                guard activeWatchfaceID == fallback.id else { return }
+                guard applications.activeWatchfaceID == fallback.id else { return }
             }
         }
         guard beginApplicationOperation(.removing(id)) else { return }
         defer { finishApplicationOperation(.removing(id)) }
         do {
-            let applications = try await applicationLibrary.remove(applicationID: id)
-            updateApplications(applications)
+            let library = try await applicationLibrary.remove(applicationID: id)
+            updateApplications(library)
             try await synchronizeAllWatches()
-            applicationLibraryFeedback = nil
+            applications.libraryFeedback = nil
         } catch {
-            applicationLibraryFeedback = .failure(applicationErrorMessage(error))
+            applications.libraryFeedback = .failure(applicationErrorMessage(error))
         }
     }
 
     public func importApplication(from url: URL) async {
         guard beginApplicationOperation(.importing) else { return }
-        isImportingApplication = true
+        applications.isImporting = true
         defer {
-            isImportingApplication = false
+            applications.isImporting = false
             finishApplicationOperation(.importing)
         }
         let accessedSecurityScopedResource = url.startAccessingSecurityScopedResource()
@@ -141,8 +141,8 @@ extension AppModel {
             }.value
             importedApplicationID = application.id
             let snapshot = try await applicationLibrary.snapshot(applicationID: application.id)
-            let applications = try await applicationLibrary.importPackage(from: url)
-            updateApplications(applications)
+            let library = try await applicationLibrary.importPackage(from: url)
+            updateApplications(library)
             if !activeConnections.isEmpty {
                 pendingImportSnapshots[application.id] = snapshot
                 try await synchronizeAllWatches()
@@ -154,14 +154,14 @@ extension AppModel {
                 expirePendingSnapshot(applicationID: application.id)
             }
             hasLoadedApplications = true
-            applicationLibraryFeedback = nil
+            applications.libraryFeedback = nil
         } catch {
             // The watch refused the registration, not the bytes, so nothing has been
             // transferred and the import stands.
             if let importedApplicationID {
                 expirePendingSnapshot(applicationID: importedApplicationID)
             }
-            applicationLibraryFeedback = .failure(applicationErrorMessage(error))
+            applications.libraryFeedback = .failure(applicationErrorMessage(error))
         }
     }
 
@@ -172,20 +172,20 @@ extension AppModel {
     ) async {
         guard beginApplicationOperation(.reordering) else { return }
         defer { finishApplicationOperation(.reordering) }
-        var selectedApplications = kind == .watchapp ? watchApplications : watchfaces
+        var selectedApplications = kind == .watchapp ? applications.apps : applications.watchfaces
         guard move(&selectedApplications, fromOffsets: fromOffsets, toOffset: toOffset) else {
             return
         }
         let orderedApplications = kind == .watchapp
-            ? selectedApplications + watchfaces
-            : watchApplications + selectedApplications
+            ? selectedApplications + applications.watchfaces
+            : applications.apps + selectedApplications
 
         do {
             let previousApplications = try await applicationLibrary.applications()
-            let applications = try await applicationLibrary.reorder(
+            let reordered = try await applicationLibrary.reorder(
                 applicationIDs: orderedApplications.map(\.id)
             )
-            updateApplications(applications)
+            updateApplications(reordered)
             do {
                 try await synchronizeAllWatches()
             } catch {
@@ -196,9 +196,9 @@ extension AppModel {
                 try? await synchronizeAllWatches()
                 throw error
             }
-            applicationLibraryFeedback = nil
+            applications.libraryFeedback = nil
         } catch {
-            applicationLibraryFeedback = .failure(applicationErrorMessage(error))
+            applications.libraryFeedback = .failure(applicationErrorMessage(error))
         }
     }
 
@@ -223,20 +223,20 @@ extension AppModel {
     }
 
     func beginApplicationOperation(_ operation: ApplicationManagementOperation) -> Bool {
-        guard applicationManagementOperation == nil, !isHandlingAppFetch else {
-            applicationLibraryFeedback = .failure("Another application operation is already in progress.")
+        guard applications.managementOperation == nil, !isHandlingAppFetch else {
+            applications.libraryFeedback = .failure("Another application operation is already in progress.")
             return false
         }
-        applicationManagementOperation = operation
-        applicationManagementFeedback = .progress(statusMessage(for: operation))
+        applications.managementOperation = operation
+        applications.managementFeedback = .progress(statusMessage(for: operation))
         return true
     }
 
     func finishApplicationOperation(_ operation: ApplicationManagementOperation) {
-        guard applicationManagementOperation == operation else { return }
-        let completedOperation = applicationManagementOperation
-        applicationManagementOperation = nil
-        applicationManagementFeedback = nil
+        guard applications.managementOperation == operation else { return }
+        let completedOperation = applications.managementOperation
+        applications.managementOperation = nil
+        applications.managementFeedback = nil
         if needsApplicationSynchronization,
            completedOperation != .synchronizing,
            !activeConnections.isEmpty {
@@ -267,18 +267,18 @@ extension AppModel {
 
         do {
             try await performApplicationSynchronization(on: connection)
-            applicationLibraryFeedback = nil
+            applications.libraryFeedback = nil
         } catch {
             needsApplicationSynchronization = true
-            applicationLibraryFeedback = .failure(applicationErrorMessage(error))
+            applications.libraryFeedback = .failure(applicationErrorMessage(error))
         }
     }
 
     func performApplicationSynchronization(on connection: WatchConnection) async throws {
         let device = connection.watch
-        let applications = try await applicationLibrary.applications()
+        let installed = try await applicationLibrary.applications()
         let synchronizedIDs = try await applicationLibrary.synchronizedApplicationIDs(watchID: device.id)
-        let compatibleApplications = compatibleApplications(applications, with: device.model)
+        let compatibleApplications = compatibleApplications(installed, with: device.model)
         let localIDs = Set(compatibleApplications.map(\.id))
         for applicationID in synchronizedIDs where !localIDs.contains(applicationID) {
             try await connection.client.remove(.application(applicationID))
@@ -298,24 +298,24 @@ extension AppModel {
             try await connection.client.write(.application(package.appMetadata))
         }
         try await connection.client.reorderApplications(compatibleApplications.map(\.id))
-        try await recordSynchronizedApplications(applications, device: device)
-        updateApplications(applications)
+        try await recordSynchronizedApplications(installed, device: device)
+        updateApplications(installed)
     }
 
     public func installedApplicationIDs(on watchID: WatchID) -> Set<UUID> {
-        installedApplicationIDsByWatch[watchID] ?? []
+        applications.installedIDsByWatch[watchID] ?? []
     }
 
     func recordSynchronizedApplications(
-        _ applications: [WatchApplication],
+        _ library: [WatchApplication],
         device: ConnectedWatch
     ) async throws {
-        let synchronizedIDs = compatibleApplications(applications, with: device.model).map(\.id)
+        let synchronizedIDs = compatibleApplications(library, with: device.model).map(\.id)
         try await applicationLibrary.setSynchronizedApplicationIDs(
             synchronizedIDs,
             watchID: device.id
         )
-        installedApplicationIDsByWatch[device.id] = Set(synchronizedIDs)
+        applications.installedIDsByWatch[device.id] = Set(synchronizedIDs)
     }
 
     func compatibleApplications(
@@ -409,17 +409,17 @@ extension AppModel {
         }
     }
 
-    func updateApplications(_ applications: [WatchApplication]) {
-        watchApplications = applications.filter { $0.kind == .watchapp }
-        watchfaces = applications.filter { $0.kind == .watchface }
+    func updateApplications(_ library: [WatchApplication]) {
+        applications.apps = library.filter { $0.kind == .watchapp }
+        applications.watchfaces = library.filter { $0.kind == .watchface }
     }
 
     func beginHandlingAppFetchRequest(
         _ request: AppFetchRequest,
         from connection: WatchConnection
     ) {
-        let operationAllowsFetch = applicationManagementOperation == nil
-            || applicationManagementOperation == .synchronizing
+        let operationAllowsFetch = applications.managementOperation == nil
+            || applications.managementOperation == .synchronizing
             || pendingImportSnapshots[request.applicationID] != nil
         // This watch's own request, not any watch's: another watch waiting for an
         // app of its own is no reason to answer this one with "busy".
@@ -427,11 +427,11 @@ extension AppModel {
             Task { try? await connection.client.respondToAppFetch(with: .busy) }
             return
         }
-        let ownsOperation = applicationManagementOperation == nil
+        let ownsOperation = applications.managementOperation == nil
             || pendingImportSnapshots[request.applicationID] != nil
         if ownsOperation {
-            applicationManagementOperation = .installing(request.applicationID)
-            applicationManagementFeedback = .progress(statusMessage(for: .installing(request.applicationID)))
+            applications.managementOperation = .installing(request.applicationID)
+            applications.managementFeedback = .progress(statusMessage(for: .installing(request.applicationID)))
         }
         connection.appFetchTask = Task { [weak self] in
             guard let self else {
@@ -480,15 +480,15 @@ extension AppModel {
             }
             // The watch installs the binary itself once the transfer commits;
             // re-registering or reordering here only risks undoing it.
-            let applications = try await applicationLibrary.applications()
-            try await recordSynchronizedApplications(applications, device: connection.watch)
+            let library = try await applicationLibrary.applications()
+            try await recordSynchronizedApplications(library, device: connection.watch)
             pendingImportSnapshots[request.applicationID] = nil
-            applicationLibraryFeedback = nil
+            applications.libraryFeedback = nil
         } catch {
             // Including when "the version they had" is none at all and the import has
             // to be undone entirely.
             await restorePendingSnapshot(applicationID: request.applicationID)
-            applicationLibraryFeedback = .failure(applicationErrorMessage(error))
+            applications.libraryFeedback = .failure(applicationErrorMessage(error))
             try? await connection.client.respondToAppFetch(with: .noData)
         }
     }

@@ -138,7 +138,7 @@ struct ApplicationDetailView: View {
     /// Read from the library rather than held: a removal elsewhere, or a
     /// reinstall, should show here without going back first.
     private var current: WatchApplication? {
-        (model.watchApplications + model.watchfaces).first { $0.id == application.id }
+        (model.applications.apps + model.applications.watchfaces).first { $0.id == application.id }
     }
 
     var body: some View {
@@ -146,7 +146,7 @@ struct ApplicationDetailView: View {
             if let current {
                 ApplicationDetailContent(
                     application: current,
-                    isActive: model.activeWatchfaceID == current.id,
+                    isActive: model.applications.activeWatchfaceID == current.id,
                     isInstalled: watchID.map { model.installedApplicationIDs(on: $0).contains(current.id) },
                     isOperationInProgress: model.isApplicationManagementBusy,
                     configureApplication: { Task { await model.configureApplication(current) } },

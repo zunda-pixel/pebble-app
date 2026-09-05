@@ -8,20 +8,20 @@ import SwiftUI
 
 extension AppModel {
     public func loadTimeline() async {
-        do { timelinePins = try await timelineStore.pins() }
-        catch { timelineFeedback = .failure("Timeline could not be loaded.") }
+        do { timeline.pins = try await timelineStore.pins() }
+        catch { timeline.feedback = .failure("Timeline could not be loaded.") }
     }
 
     public func addTimelinePin(title: String, date: Date) async {
         let pin = TimelinePin(
             parentApplicationID: UUID(), timestamp: date, title: title, subtitle: nil, body: nil
         )
-        timelinePins.append(pin)
+        timeline.pins.append(pin)
         do {
-            try await timelineStore.save(timelinePins)
+            try await timelineStore.save(timeline.pins)
         } catch {
-            timelinePins.removeAll { $0.id == pin.id }
-            timelineFeedback = .failure("The timeline pin could not be saved.")
+            timeline.pins.removeAll { $0.id == pin.id }
+            timeline.feedback = .failure("The timeline pin could not be saved.")
             return
         }
         // `synchronizeTimeline` derives an upsert for every pin it holds, so a queue
@@ -29,9 +29,9 @@ extension AppModel {
         try? await queueTimelineOperation(.upsert(pin))
         if connectedWatch != nil {
             await synchronizeTimeline()
-            timelineFeedback = .success("Timeline pin saved.")
+            timeline.feedback = .success("Timeline pin saved.")
         } else {
-            timelineFeedback = .success("Timeline pin queued for the next connection.")
+            timeline.feedback = .success("Timeline pin queued for the next connection.")
         }
     }
 
@@ -40,8 +40,8 @@ extension AppModel {
     public func removeTimelinePins(_ removed: [TimelinePin]) async {
         guard !removed.isEmpty else { return }
         let identifiers = Set(removed.map(\.id))
-        timelinePins.removeAll { identifiers.contains($0.id) }
-        try? await timelineStore.save(timelinePins)
+        timeline.pins.removeAll { identifiers.contains($0.id) }
+        try? await timelineStore.save(timeline.pins)
         for pin in removed { try? await queueTimelineOperation(.delete(pin.id)) }
         if connectedWatch != nil { await synchronizeTimeline() }
     }
@@ -56,7 +56,7 @@ extension AppModel {
         })
         // A pin the watch made is already on the watch, with actions and an icon
         // this app does not model: writing it back would replace it with less.
-        operations += timelinePins
+        operations += timeline.pins
             .filter { !queuedUpserts.contains($0.id) && !$0.isFromWatch }
             .map(PendingTimelineOperation.upsert)
         // A watch that stopped part-way keeps the rest of the queue for its next
@@ -91,7 +91,7 @@ extension AppModel {
         // This watch now holds exactly what the app holds, which is what makes
         // the reconciliation above possible next time.
         try? await timelineStore.setWrittenPinIDs(
-            Set(timelinePins.map(\.id)),
+            Set(timeline.pins.map(\.id)),
             watchID: connection.watch.id
         )
         return operations.count
@@ -106,7 +106,7 @@ extension AppModel {
     private func removePinsTheAppHasForgotten(on connection: WatchConnection) async {
         let watchID = connection.watch.id
         let written = (try? await timelineStore.writtenPinIDs(watchID: watchID)) ?? []
-        let forgotten = written.subtracting(timelinePins.map(\.id))
+        let forgotten = written.subtracting(timeline.pins.map(\.id))
         guard !forgotten.isEmpty else { return }
         var removed: Set<UUID> = []
         let client = connection.client
@@ -134,13 +134,13 @@ extension AppModel {
     /// which is why it is asked for rather than done.
     public func clearWatchTimeline(watchID: WatchID? = nil) async {
         guard let connection = connection(for: watchID), connection.isConnected else {
-            watchDiagnosticsFeedback[.timeline] = .failure("Connect the watch before clearing its timeline.")
+            diagnostics.feedback[.timeline] = .failure("Connect the watch before clearing its timeline.")
             return
         }
         do {
             try await connection.client.remove(.allTimelinePins)
         } catch {
-            watchDiagnosticsFeedback[.timeline] = .failure(
+            diagnostics.feedback[.timeline] = .failure(
                 "\(connection.watch.name) did not clear its timeline. \(Text(refusalReason(for: error)))"
             )
             return
@@ -151,9 +151,9 @@ extension AppModel {
             category: "timeline",
             message: "\(connection.watch.name): cleared the pin database"
         )
-        watchDiagnosticsFeedback[.timeline] = .progress("The watch's timeline was cleared. Sending what the app has…")
+        diagnostics.feedback[.timeline] = .progress("The watch's timeline was cleared. Sending what the app has…")
         await synchronizeTimeline()
-        watchDiagnosticsFeedback[.timeline] = .success("The watch's timeline was cleared and written again from the app.")
+        diagnostics.feedback[.timeline] = .success("The watch's timeline was cleared and written again from the app.")
     }
 
     func queueTimelineOperation(_ operation: PendingTimelineOperation) async throws {
@@ -187,7 +187,7 @@ extension AppModel {
             return true
         }
         if operations.count > cap {
-            timelineFeedback = .failure(
+            timeline.feedback = .failure(
                 "The timeline queue is full. \(operations.count - cap) removed event(s) are still waiting for the watch."
             )
         }
@@ -196,18 +196,18 @@ extension AppModel {
     public func synchronizeCalendar() async {
         do {
             let calendarPins = try await calendarBridge.timelinePins()
-            let oldCalendarPins = timelinePins.filter { $0.parentApplicationID == CalendarBridge.calendarApplicationID }
-            timelinePins.removeAll { $0.parentApplicationID == CalendarBridge.calendarApplicationID }
-            timelinePins.append(contentsOf: calendarPins)
-            try await timelineStore.save(timelinePins)
+            let oldCalendarPins = timeline.pins.filter { $0.parentApplicationID == CalendarBridge.calendarApplicationID }
+            timeline.pins.removeAll { $0.parentApplicationID == CalendarBridge.calendarApplicationID }
+            timeline.pins.append(contentsOf: calendarPins)
+            try await timelineStore.save(timeline.pins)
             let newIDs = Set(calendarPins.map(\.id))
             for pin in oldCalendarPins where !newIDs.contains(pin.id) {
                 try await queueTimelineOperation(.delete(pin.id))
             }
             for pin in calendarPins { try await queueTimelineOperation(.upsert(pin)) }
             if connectedWatch != nil { await synchronizeTimeline() }
-            timelineFeedback = .success("Calendar synchronized with Timeline.")
-        } catch { timelineFeedback = .failure("Calendar access or synchronization failed.") }
+            timeline.feedback = .success("Calendar synchronized with Timeline.")
+        } catch { timeline.feedback = .failure("Calendar access or synchronization failed.") }
     }
 
     /// One store, one notification: EventKit says a calendar or a reminder

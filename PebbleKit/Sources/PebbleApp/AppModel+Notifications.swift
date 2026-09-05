@@ -6,9 +6,9 @@ import SwiftUI
 
 extension AppModel {
     public func setCompanionNotificationsEnabled(_ enabled: Bool) {
-        companionNotificationsEnabled = enabled
+        notifications.companionEnabled = enabled
         Defaults[.companionNotificationsEnabled] = enabled
-        notificationFeedback = .success(
+        notifications.feedback = .success(
             enabled
                 ? "Watch app notifications are enabled."
                 : "Watch app notifications are disabled."
@@ -16,22 +16,22 @@ extension AppModel {
     }
 
     public func setNotificationsEnabled(_ enabled: Bool, applicationID: UUID) async {
-        if enabled { notificationPreferences.mutedApplicationIDs.remove(applicationID) }
-        else { notificationPreferences.mutedApplicationIDs.insert(applicationID) }
-        try? await notificationPreferenceStore.save(notificationPreferences)
-        notificationFeedback = .success(enabled ? "Notifications enabled for this app." : "Notifications muted for this app.")
+        if enabled { notifications.preferences.mutedApplicationIDs.remove(applicationID) }
+        else { notifications.preferences.mutedApplicationIDs.insert(applicationID) }
+        try? await notificationPreferenceStore.save(notifications.preferences)
+        notifications.feedback = .success(enabled ? "Notifications enabled for this app." : "Notifications muted for this app.")
     }
 
     public func setQuietHours(enabled: Bool, start: Int? = nil, end: Int? = nil) async {
-        notificationPreferences.quietHoursEnabled = enabled
-        if let start { notificationPreferences.quietHoursStart = min(23, max(0, start)) }
-        if let end { notificationPreferences.quietHoursEnd = min(23, max(0, end)) }
-        try? await notificationPreferenceStore.save(notificationPreferences)
+        notifications.preferences.quietHoursEnabled = enabled
+        if let start { notifications.preferences.quietHoursStart = min(23, max(0, start)) }
+        if let end { notifications.preferences.quietHoursEnd = min(23, max(0, end)) }
+        try? await notificationPreferenceStore.save(notifications.preferences)
     }
 
     public func sendTestNotification(watchID: WatchID? = nil) async {
         guard let connection = connection(for: watchID), connection.isConnected else {
-            notificationFeedback = .failure("Connect a Pebble before sending a test notification.")
+            notifications.feedback = .failure("Connect a Pebble before sending a test notification.")
             return
         }
         let notification = PebbleTimelineNotification(
@@ -42,14 +42,14 @@ extension AppModel {
         )
         do {
             try await connection.client.write(.notification(notification))
-            notificationFeedback = .success("Test notification sent.")
+            notifications.feedback = .success("Test notification sent.")
             await record(notification, sentTo: [connection.watch.name])
             await PebbleDiagnostics.shared.record(
                 category: "notification",
                 message: "Test notification sent"
             )
         } catch {
-            notificationFeedback = .failure("The test notification could not be sent.")
+            notifications.feedback = .failure("The test notification could not be sent.")
             await PebbleDiagnostics.shared.record(
                 .error,
                 category: "notification",
@@ -78,8 +78,8 @@ extension AppModel {
         title: String,
         body: String
     ) async throws {
-        guard companionNotificationsEnabled else { return }
-        guard notificationPreferences.permits(applicationID: application.id, at: Date()) else {
+        guard notifications.companionEnabled else { return }
+        guard notifications.preferences.permits(applicationID: application.id, at: Date()) else {
             await PebbleDiagnostics.shared.record(category: "notification", message: "Notification suppressed by delivery preferences")
             return
         }
@@ -146,13 +146,13 @@ extension AppModel {
             watchNames: watchNames
         )
         if let history = try? await sentNotificationStore.record(sent) {
-            sentNotifications = history
+            notifications.sent = history
         }
     }
 
     public func forgetSentNotifications() async {
         try? await sentNotificationStore.clear()
-        sentNotifications = []
+        notifications.sent = []
     }
 
     private func queue(_ notification: PendingDelivery<PebbleTimelineNotification>, reason: String) async {
@@ -205,7 +205,7 @@ extension AppModel {
                     timestamp: write.timestamp
                 ),
                 let apps = try? await notificationSourceAppStore.merge(app) {
-                    notificationSourceApps = apps
+                    notifications.sourceApps = apps
                     connection.synchronizedNotificationAppRecords[app.bundleID] = NotificationAppsCodec.value(
                         for: (apps.first { $0.bundleID == app.bundleID } ?? app)
                             .asUnderstoodBy(connection.watch)
@@ -234,7 +234,7 @@ extension AppModel {
     }
 
     func synchronizeNotificationSourceApps(on connection: WatchConnection) async {
-        for app in notificationSourceApps {
+        for app in notifications.sourceApps {
             // Cut down here rather than in the client, so that what is written
             // down as sent is the record that was sent.
             let record = app.asUnderstoodBy(connection.watch)
@@ -260,13 +260,13 @@ extension AppModel {
     }
 
     public func setNotificationSourceAppIcon(bundleID: String, icon: PebbleTimelineIcon?) async {
-        guard var app = notificationSourceApps.first(where: { $0.bundleID == bundleID }) else {
+        guard var app = notifications.sourceApps.first(where: { $0.bundleID == bundleID }) else {
             return
         }
         app.icon = icon
         app.stateUpdated = .now
         if let apps = try? await notificationSourceAppStore.update(app) {
-            notificationSourceApps = apps
+            notifications.sourceApps = apps
         }
         for connection in activeConnections {
             await synchronizeNotificationSourceApps(on: connection)
@@ -278,14 +278,14 @@ extension AppModel {
         background: PebbleColor?,
         foreground: PebbleColor?
     ) async {
-        guard var app = notificationSourceApps.first(where: { $0.bundleID == bundleID }) else {
+        guard var app = notifications.sourceApps.first(where: { $0.bundleID == bundleID }) else {
             return
         }
         app.backgroundColor = background
         app.foregroundColor = foreground
         app.stateUpdated = .now
         if let apps = try? await notificationSourceAppStore.update(app) {
-            notificationSourceApps = apps
+            notifications.sourceApps = apps
         }
         for connection in activeConnections {
             await synchronizeNotificationSourceApps(on: connection)
@@ -296,13 +296,13 @@ extension AppModel {
         bundleID: String,
         pattern: NotificationVibePattern?
     ) async {
-        guard var app = notificationSourceApps.first(where: { $0.bundleID == bundleID }) else {
+        guard var app = notifications.sourceApps.first(where: { $0.bundleID == bundleID }) else {
             return
         }
         app.vibePattern = pattern
         app.stateUpdated = .now
         if let apps = try? await notificationSourceAppStore.update(app) {
-            notificationSourceApps = apps
+            notifications.sourceApps = apps
         }
         for connection in activeConnections {
             await synchronizeNotificationSourceApps(on: connection)
@@ -313,13 +313,13 @@ extension AppModel {
         bundleID: String,
         rules: [NotificationFilterRule]
     ) async {
-        guard var app = notificationSourceApps.first(where: { $0.bundleID == bundleID }) else {
+        guard var app = notifications.sourceApps.first(where: { $0.bundleID == bundleID }) else {
             return
         }
         app.filterRules = rules
         app.stateUpdated = .now
         if let apps = try? await notificationSourceAppStore.update(app) {
-            notificationSourceApps = apps
+            notifications.sourceApps = apps
         }
         for connection in activeConnections {
             await synchronizeNotificationSourceApps(on: connection)
@@ -327,7 +327,7 @@ extension AppModel {
     }
 
     public func setNotificationSourceAppMute(bundleID: String, muteState: NotificationAppMuteState) async {
-        guard var app = notificationSourceApps.first(where: { $0.bundleID == bundleID }) else {
+        guard var app = notifications.sourceApps.first(where: { $0.bundleID == bundleID }) else {
             return
         }
         app.muteState = muteState
@@ -336,7 +336,7 @@ extension AppModel {
         // `merge` is for records the watch sends, and its timestamp gate can
         // discard a change made in the same second.
         if let apps = try? await notificationSourceAppStore.update(app) {
-            notificationSourceApps = apps
+            notifications.sourceApps = apps
         }
         for connection in activeConnections {
             await synchronizeNotificationSourceApps(on: connection)
@@ -348,9 +348,9 @@ extension AppModel {
     public func removeNotificationSourceApps(_ removed: [NotificationSourceApp]) async {
         guard !removed.isEmpty else { return }
         let identifiers = Set(removed.map(\.bundleID))
-        let apps = notificationSourceApps.filter { !identifiers.contains($0.bundleID) }
+        let apps = notifications.sourceApps.filter { !identifiers.contains($0.bundleID) }
         try? await notificationSourceAppStore.save(apps)
-        notificationSourceApps = (try? await notificationSourceAppStore.apps()) ?? apps
+        notifications.sourceApps = (try? await notificationSourceAppStore.apps()) ?? apps
         for app in removed {
             for connection in activeConnections {
                 connection.synchronizedNotificationAppRecords[app.bundleID] = nil
@@ -370,7 +370,7 @@ extension AppModel {
 
     func handleAppMessage(_ message: AppMessageData, from connection: WatchConnection) async {
         do {
-            guard let application = (watchApplications + watchfaces).first(where: {
+            guard let application = (applications.apps + applications.watchfaces).first(where: {
                 $0.id == message.applicationID
             }), let source = try await applicationLibrary.companionJavaScript(
                 applicationID: application.id
@@ -459,7 +459,7 @@ extension AppModel {
     /// Which watches have still not had a piece of queued work: every watch the
     /// app knows of, so an entry is finished only once nobody is waiting for it.
     private func watchesOwed(_ deliveredTo: Set<WatchID>) -> Set<WatchID> {
-        let known = Set(savedWatches.map(\.id)).union(connections.map(\.watch.id))
+        let known = Set(watches.saved.map(\.id)).union(connections.map(\.watch.id))
         return known.subtracting(deliveredTo)
     }
 

@@ -6,7 +6,7 @@ struct NotificationHistoryView: View {
 
     var body: some View {
         NotificationHistoryContent(
-            notifications: model.sentNotifications,
+            notifications: model.notifications.sent,
             forget: { Task { await model.forgetSentNotifications() } }
         )
     }

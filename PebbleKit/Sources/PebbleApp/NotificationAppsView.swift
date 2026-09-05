@@ -6,7 +6,7 @@ struct NotificationAppsView: View {
 
     var body: some View {
         NotificationAppsContent(
-            apps: model.notificationSourceApps,
+            apps: model.notifications.sourceApps,
             remove: { removed in
                 Task { await model.removeNotificationSourceApps(removed) }
             },

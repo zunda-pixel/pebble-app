@@ -13,14 +13,14 @@ struct WeatherView: View {
 
     var body: some View {
         WeatherContent(
-            places: model.weatherPlaces,
-            reports: model.weatherReports,
-            updated: model.weatherUpdated,
-            usesFahrenheit: model.weatherUsesFahrenheit,
-            isRefreshing: model.isRefreshingWeather,
-            feedback: model.weatherFeedback,
+            places: model.weather.places,
+            reports: model.weather.reports,
+            updated: model.weather.updated,
+            usesFahrenheit: model.weather.usesFahrenheit,
+            isRefreshing: model.weather.isRefreshing,
+            feedback: model.weather.feedback,
             watchesWithoutWeather: watchesWithoutWeather,
-            credit: model.weatherCredit,
+            credit: model.weather.credit,
             followPhone: { Task { await model.followPhoneForWeather() } },
             addPlace: { query in Task { await model.addWeatherPlace(named: query) } },
             removePlaces: { ids in
@@ -36,7 +36,7 @@ struct WeatherView: View {
         .task {
             // A forecast an hour old is not worth sending; one from this
             // session is.
-            guard model.weatherUpdated == nil || model.weatherUpdated?.timeIntervalSinceNow ?? 0 < -3600 else {
+            guard model.weather.updated == nil || model.weather.updated?.timeIntervalSinceNow ?? 0 < -3600 else {
                 return
             }
             await model.refreshWeather()

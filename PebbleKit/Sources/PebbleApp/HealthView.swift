@@ -8,9 +8,9 @@ struct HealthView: View {
 
     var body: some View {
         HealthContent(
-            samples: model.healthSamples,
-            exportURL: model.healthExportURL,
-            feedback: model.healthFeedback,
+            samples: model.health.samples,
+            exportURL: model.health.exportURL,
+            feedback: model.health.feedback,
             isWatchConnected: model.connectedWatch != nil,
             requestWatchSync: { Task { await model.requestHealthSync() } },
             synchronizeWithHealthKit: synchronizeWithHealthKit,

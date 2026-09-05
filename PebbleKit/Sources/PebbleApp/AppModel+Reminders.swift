@@ -5,7 +5,7 @@ import SwiftUI
 
 extension AppModel {
     public func loadReminders() async {
-        reminders = (try? await reminderStore.pins()) ?? []
+        timeline.reminders = (try? await reminderStore.pins()) ?? []
     }
 
     public func addReminder(title: String, date: Date) async {
@@ -17,17 +17,17 @@ extension AppModel {
             body: nil,
             kind: .reminder
         )
-        reminders.append(reminder)
-        reminders.sort { $0.timestamp < $1.timestamp }
-        try? await reminderStore.save(reminders)
+        timeline.reminders.append(reminder)
+        timeline.reminders.sort { $0.timestamp < $1.timestamp }
+        try? await reminderStore.save(timeline.reminders)
         // The watch keeps a fifteen-minute window — `MAX_REMINDER_AGE` in
         // `reminder_db.c` — and refuses anything older outright, which the list
         // already says about the ones that have passed.
         guard reminder.timestamp > .now else {
-            reminderFeedback = .success("That time has passed, so the reminder is kept here rather than sent to the watch.")
+            timeline.reminderFeedback = .success("That time has passed, so the reminder is kept here rather than sent to the watch.")
             return
         }
-        reminderFeedback = nil
+        timeline.reminderFeedback = nil
         for connection in activeConnections {
             do {
                 try await connection.client.write(.timelineReminder(reminder))
@@ -39,7 +39,7 @@ extension AppModel {
                 written.insert(reminder.id)
                 try? await reminderStore.setWrittenPinIDs(written, watchID: watchID)
             } catch {
-                reminderFeedback = .failure(
+                timeline.reminderFeedback = .failure(
                     "\(connection.watch.name) did not accept the reminder. \(Text(refusalReason(for: error)))"
                 )
                 await PebbleDiagnostics.shared.record(
@@ -56,8 +56,8 @@ extension AppModel {
     public func removeReminders(_ removed: [TimelinePin]) async {
         guard !removed.isEmpty else { return }
         let identifiers = Set(removed.map(\.id))
-        reminders.removeAll { identifiers.contains($0.id) }
-        try? await reminderStore.save(reminders)
+        timeline.reminders.removeAll { identifiers.contains($0.id) }
+        try? await reminderStore.save(timeline.reminders)
         // One reminder kept in two places is let go of in both: leaving the
         // Reminders app's copy behind would only have the next read put the
         // reminder back.
@@ -69,7 +69,7 @@ extension AppModel {
         }
     }
 
-    /// Deletes the reminders this watch was given and the app no longer has.
+    /// Deletes the timeline.reminders this watch was given and the app no longer has.
     ///
     /// A reminder let go of while the watch was away used to be let go of here
     /// too: the delete went to every connected watch and, when there were none,
@@ -82,7 +82,7 @@ extension AppModel {
     ) async {
         let watchID = connection.watch.id
         let written = (try? await reminderStore.writtenPinIDs(watchID: watchID)) ?? []
-        let forgotten = written.union(extra).subtracting(reminders.map(\.id))
+        let forgotten = written.union(extra).subtracting(timeline.reminders.map(\.id))
         guard !forgotten.isEmpty else { return }
         var removed: Set<UUID> = []
         let client = connection.client
@@ -112,7 +112,7 @@ extension AppModel {
         await removeRemindersTheWatchStillHas(on: connection)
         let watchID = connection.watch.id
         var written = (try? await reminderStore.writtenPinIDs(watchID: watchID)) ?? []
-        for reminder in reminders where reminder.timestamp > .now && !reminder.isFromWatch {
+        for reminder in timeline.reminders where reminder.timestamp > .now && !reminder.isFromWatch {
             do {
                 try await connection.client.write(.timelineReminder(reminder))
                 written.insert(reminder.id)

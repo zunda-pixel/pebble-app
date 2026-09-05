@@ -48,13 +48,13 @@ struct ApplicationsView: View {
 
     private var applicationsContent: some View {
         ApplicationsContent(
-            watchApplications: model.watchApplications,
-            watchfaces: model.watchfaces,
-            activeWatchfaceID: model.activeWatchfaceID,
+            watchApplications: model.applications.apps,
+            watchfaces: model.applications.watchfaces,
+            activeWatchfaceID: model.applications.activeWatchfaceID,
             installedApplicationIDs: displayedWatchID.map { model.installedApplicationIDs(on: $0) },
-            isLoading: model.isLoadingApplications,
-            libraryFeedback: model.applicationLibraryFeedback,
-            operationFeedback: model.applicationManagementFeedback,
+            isLoading: model.applications.isLoading,
+            libraryFeedback: model.applications.libraryFeedback,
+            operationFeedback: model.applications.managementFeedback,
             isOperationInProgress: model.isApplicationManagementBusy,
             installingApplicationName: transfer?.name,
             installationProgress: transfer?.progress,
@@ -98,7 +98,7 @@ struct ApplicationsView: View {
         .sheet(isPresented: $isShowingCatalog) {
             CatalogView(
                 model: model,
-                isImportingApplication: model.isImportingApplication,
+                isImportingApplication: model.applications.isImporting,
                 isImportDisabled: model.isApplicationManagementBusy,
                 importApplication: { isChoosingPackage = true }
             )
@@ -120,20 +120,20 @@ struct ApplicationsView: View {
             return true
         }
         .sheet(isPresented: Binding(
-            get: { model.configurationURL != nil },
+            get: { model.applications.configurationURL != nil },
             set: { presented in
                 if !presented { Task { await model.closeConfiguration() } }
             }
         )) {
             NavigationStack {
                 Group {
-                    if let configurationURL = model.configurationURL {
+                    if let configurationURL = model.applications.configurationURL {
                         ConfigurationWebView(url: configurationURL) { response in
                             Task { await model.closeConfiguration(response: response) }
                         }
                     }
                 }
-                .navigationTitle(model.configurationApplication?.displayName ?? "App Settings")
+                .navigationTitle(model.applications.configurationApplication?.displayName ?? "App Settings")
                 .toolbar {
                     // Closing, not confirming: the page has its own submit, and
                     // whatever it posted has already been applied by the time

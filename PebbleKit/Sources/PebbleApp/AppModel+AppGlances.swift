@@ -3,11 +3,11 @@ public import Foundation
 
 extension AppModel {
     func loadAppGlances() async {
-        appGlances = (try? await appGlanceStore.glances()) ?? []
+        appGlances.glances = (try? await appGlanceStore.glances()) ?? []
     }
 
     public func glance(for applicationID: UUID) -> AppGlance? {
-        appGlances.first { $0.applicationID == applicationID }
+        appGlances.glances.first { $0.applicationID == applicationID }
     }
 
     /// Writes the line, or takes it away when nothing is left of it.
@@ -18,7 +18,7 @@ extension AppModel {
         // and the reader saving the same words twice still means "show this".
         written.updatedAt = .now
         if let glances = try? await appGlanceStore.update(written) {
-            appGlances = glances
+            appGlances.glances = glances
         }
         for connection in activeConnections {
             await synchronizeAppGlances(on: connection)
@@ -26,11 +26,11 @@ extension AppModel {
     }
 
     func synchronizeAppGlances(on connection: WatchConnection) async {
-        for glance in appGlances {
+        for glance in appGlances.glances {
             // A glance for an app the watch does not have is refused, and
             // asking is how this app finds out — but a watch that has not
             // finished telling us what it holds would refuse everything.
-            guard installedApplicationIDsByWatch[connection.watch.id]?.contains(glance.applicationID) != false else {
+            guard applications.installedIDsByWatch[connection.watch.id]?.contains(glance.applicationID) != false else {
                 continue
             }
             let value = AppGlanceCodec.value(for: glance)
@@ -49,7 +49,7 @@ extension AppModel {
         }
         // A glance the reader deleted is one the watch is still showing.
         for applicationID in connection.synchronizedAppGlances.keys
-        where !appGlances.contains(where: { $0.applicationID == applicationID }) {
+        where !appGlances.glances.contains(where: { $0.applicationID == applicationID }) {
             do {
                 try await connection.client.remove(.appGlance(applicationID: applicationID))
                 connection.synchronizedAppGlances[applicationID] = nil

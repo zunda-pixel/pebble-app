@@ -29,7 +29,7 @@ extension WatchSummary {
     @MainActor
     init(watchID: WatchID, model appModel: AppModel) {
         let connection = appModel.connections.first { $0.watch.id == watchID }
-        let saved = appModel.savedWatches.first { $0.id == watchID }
+        let saved = appModel.watches.saved.first { $0.id == watchID }
         self.init(
             id: watchID,
             name: connection?.watch.name ?? saved?.name ?? watchID.rawValue,

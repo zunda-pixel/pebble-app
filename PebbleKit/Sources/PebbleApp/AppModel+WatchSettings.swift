@@ -5,54 +5,54 @@ import SwiftUI
 
 extension AppModel {
     public func loadWatchSettings() {
-        watchSettings = Defaults[.watchSettings]
-        activitySettings = Defaults[.activitySettings]
-        heartRateSettings = Defaults[.heartRateSettings]
-        isReminderAppEnabled = Defaults[.reminderAppEnabled]
+        watchSettings.values = Defaults[.watchSettings]
+        watchSettings.activity = Defaults[.activitySettings]
+        watchSettings.heartRate = Defaults[.heartRateSettings]
+        timeline.isReminderAppEnabled = Defaults[.reminderAppEnabled]
     }
 
     public func isWatchSettingOn(_ setting: WatchSetting) -> Bool {
-        watchSettings[setting.rawValue] ?? setting.defaultValue
+        watchSettings.values[setting.rawValue] ?? setting.defaultValue
     }
 
     public func setWatchSetting(_ setting: WatchSetting, isOn: Bool) async {
-        watchSettings[setting.rawValue] = isOn
-        Defaults[.watchSettings] = watchSettings
+        watchSettings.values[setting.rawValue] = isOn
+        Defaults[.watchSettings] = watchSettings.values
         for connection in activeConnections {
             do {
                 try await connection.client.write(.watchSetting(setting, isOn: isOn))
             } catch {
-                watchSettingsFeedback = .failure(settingsFailureMessage(connection, error))
+                watchSettings.feedback = .failure(settingsFailureMessage(connection, error))
             }
         }
     }
 
     public func setActivitySettings(_ settings: ActivitySettings) async {
-        activitySettings = settings
+        watchSettings.activity = settings
         Defaults[.activitySettings] = settings
         for connection in activeConnections {
             do {
                 try await connection.client.write(.activitySettings(settings))
             } catch {
-                watchSettingsFeedback = .failure(settingsFailureMessage(connection, error))
+                watchSettings.feedback = .failure(settingsFailureMessage(connection, error))
             }
         }
     }
 
     public func setHeartRateSettings(_ settings: HeartRateSettings) async {
-        heartRateSettings = settings
+        watchSettings.heartRate = settings
         Defaults[.heartRateSettings] = settings
         for connection in activeConnections {
             do {
                 try await connection.client.write(.heartRateSettings(settings))
             } catch {
-                watchSettingsFeedback = .failure(settingsFailureMessage(connection, error))
+                watchSettings.feedback = .failure(settingsFailureMessage(connection, error))
             }
         }
     }
 
     public func setReminderAppEnabled(_ isEnabled: Bool) async {
-        isReminderAppEnabled = isEnabled
+        timeline.isReminderAppEnabled = isEnabled
         Defaults[.reminderAppEnabled] = isEnabled
         for connection in activeConnections {
             try? await connection.client.write(.reminderAppState(isEnabled ? .enabled : .notEnabled))
@@ -66,10 +66,10 @@ extension AppModel {
         for setting in WatchSetting.allCases {
             try? await connection.client.write(.watchSetting(setting, isOn: isWatchSettingOn(setting)))
         }
-        try? await connection.client.write(.activitySettings(activitySettings))
-        try? await connection.client.write(.heartRateSettings(heartRateSettings))
+        try? await connection.client.write(.activitySettings(watchSettings.activity))
+        try? await connection.client.write(.heartRateSettings(watchSettings.heartRate))
         try? await connection.client.write(
-            .reminderAppState(isReminderAppEnabled ? .enabled : .notEnabled)
+            .reminderAppState(timeline.isReminderAppEnabled ? .enabled : .notEnabled)
         )
         await sendHealthDays(to: connection)
     }
@@ -116,7 +116,7 @@ extension AppModel {
         guard let oldest = calendar.date(byAdding: .day, value: -6, to: startOfToday) else {
             return []
         }
-        return healthSamples.compactMap { sample in
+        return health.samples.compactMap { sample in
             let day = calendar.startOfDay(for: sample.date)
             guard day >= oldest, day < startOfToday else { return nil }
             // A day is worth writing if the phone knows something the watch

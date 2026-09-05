@@ -10,11 +10,11 @@ struct FirmwareView: View {
     }
 
     private var savedWatch: SavedWatch? {
-        model.savedWatches.first { $0.id == watchID }
+        model.watches.saved.first { $0.id == watchID }
     }
 
     private var journal: FirmwareUpdateJournal? {
-        guard let journal = model.firmwareUpdateJournal, journal.watchID == watchID else {
+        guard let journal = model.firmware.journal, journal.watchID == watchID else {
             return nil
         }
         return journal
@@ -27,12 +27,12 @@ struct FirmwareView: View {
             runningSlot: connection?.watch.runningFirmwareSlot,
             isConnected: connection?.isConnected == true,
             isRunningRecoveryFirmware: connection?.watch.isRunningRecoveryFirmware == true,
-            availableRelease: model.availableFirmwareRelease,
-            downloadedFirmware: model.downloadedFirmware,
+            availableRelease: model.firmware.availableRelease,
+            downloadedFirmware: model.firmware.downloaded,
             journal: journal,
             progress: journal == nil ? nil : model.firmwareTransferProgress(on: watchID),
-            feedback: model.firmwareUpdateFeedback,
-            requiresConfirmation: model.firmwareRequiresConfirmation,
+            feedback: model.firmware.feedback,
+            requiresConfirmation: model.firmware.requiresConfirmation,
             checkForUpdates: { Task { await model.checkForFirmwareUpdate(watchID: watchID) } },
             download: { Task { await model.downloadAvailableFirmware(watchID: watchID) } },
             installDownloaded: { Task { await model.installDownloadedFirmware(watchID: watchID) } },

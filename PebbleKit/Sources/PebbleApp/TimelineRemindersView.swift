@@ -6,8 +6,8 @@ struct TimelineRemindersView: View {
 
     var body: some View {
         TimelineRemindersContent(
-            reminders: model.reminders,
-            feedback: model.reminderFeedback
+            reminders: model.timeline.reminders,
+            feedback: model.timeline.reminderFeedback
         ) { removed in
             Task { await model.removeReminders(removed) }
         }

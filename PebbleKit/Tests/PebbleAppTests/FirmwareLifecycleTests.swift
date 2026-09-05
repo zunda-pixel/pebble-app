@@ -43,7 +43,7 @@ struct FirmwareLifecycleTests {
 
         await model.installFirmware(from: firmwareURL, watchID: WatchID("recovery-watch"))
 
-        let journal = try #require(model.firmwareUpdateJournal)
+        let journal = try #require(model.firmware.journal)
         #expect(journal.watchID == WatchID("recovery-watch"))
         #expect(client.installedFirmwarePackages.isEmpty)
 
@@ -94,7 +94,7 @@ struct FirmwareLifecycleTests {
         // progress display was hijacked from it.
         #expect(model.firmwareUpdateTask != nil)
         #expect(model.firmwareTransferProgress(on: device.id) == nil)
-        #expect(model.firmwareUpdateFeedback == .failure("This firmware is already being transferred."))
+        #expect(model.firmware.feedback == .failure("This firmware is already being transferred."))
 
         running.cancel()
         await model.discardPendingFirmwareUpdate()
@@ -130,7 +130,7 @@ struct FirmwareLifecycleTests {
         ))
         let onDisk = directory.appending(path: "pebbleos-obelix_pvt-v4.36.2.pbz")
         try Data([1]).write(to: onDisk)
-        model.downloadedFirmware = DownloadedFirmware(
+        model.firmware.downloaded = DownloadedFirmware(
             versionTag: "v4.36.2",
             board: .obelixPVT,
             url: onDisk
@@ -140,7 +140,7 @@ struct FirmwareLifecycleTests {
 
         // Otherwise the firmware screen goes on offering an install of what the
         // watch is at that moment restarting into.
-        #expect(model.downloadedFirmware == nil)
+        #expect(model.firmware.downloaded == nil)
         #expect(!FileManager.default.fileExists(atPath: onDisk.path(percentEncoded: false)))
     }
 
@@ -176,7 +176,7 @@ struct FirmwareLifecycleTests {
         try Data([1]).write(to: onDisk)
         // A watch installing firmware from a file is no reason to throw away a
         // download meant for another watch, or for the next release.
-        model.downloadedFirmware = DownloadedFirmware(
+        model.firmware.downloaded = DownloadedFirmware(
             versionTag: "v4.37.0",
             board: .obelixPVT,
             url: onDisk
@@ -184,7 +184,7 @@ struct FirmwareLifecycleTests {
 
         try await model.performFirmwareUpdate(package, on: WatchConnection(client: client, watch: device))
 
-        #expect(model.downloadedFirmware?.versionTag == "v4.37.0")
+        #expect(model.firmware.downloaded?.versionTag == "v4.37.0")
         #expect(FileManager.default.fileExists(atPath: onDisk.path(percentEncoded: false)))
     }
 
@@ -218,7 +218,7 @@ struct FirmwareLifecycleTests {
         ))
 
         try await model.performFirmwareUpdate(package, on: WatchConnection(client: client, watch: device))
-        #expect(model.firmwareUpdateJournal?.phase == .awaitingRestart)
+        #expect(model.firmware.journal?.phase == .awaitingRestart)
 
         await model.recordConnectedWatch(device)
 
@@ -226,8 +226,8 @@ struct FirmwareLifecycleTests {
         // itself can end this: left alone the firmware screen kept offering
         // Stop and Try Again for an update that had finished, and the watch's
         // own row went on saying an update was waiting.
-        #expect(model.firmwareUpdateJournal == nil)
-        #expect(model.firmwareUpdateFeedback == nil)
+        #expect(model.firmware.journal == nil)
+        #expect(model.firmware.feedback == nil)
     }
 
     private func makeFirmwarePackage(versionTag: String? = nil) -> PBZFirmwarePackage {

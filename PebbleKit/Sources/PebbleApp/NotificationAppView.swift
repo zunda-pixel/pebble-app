@@ -6,7 +6,7 @@ struct NotificationAppView: View {
     var app: NotificationSourceApp
 
     private var current: NotificationSourceApp {
-        model.notificationSourceApps.first { $0.bundleID == app.bundleID } ?? app
+        model.notifications.sourceApps.first { $0.bundleID == app.bundleID } ?? app
     }
 
     var body: some View {

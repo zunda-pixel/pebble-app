@@ -22,12 +22,12 @@ struct SettingsView: View {
 
     var body: some View {
         SettingsContent(
-            weatherPlaceNames: model.weatherPlaces.map(\.name),
-            notificationSourceAppCount: model.notificationSourceApps.count,
-            companionNotificationsEnabled: model.companionNotificationsEnabled,
-            notificationPreferences: model.notificationPreferences,
-            applications: model.watchApplications + model.watchfaces,
-            diagnosticReportURL: model.diagnosticReportURL,
+            weatherPlaceNames: model.weather.places.map(\.name),
+            notificationSourceAppCount: model.notifications.sourceApps.count,
+            companionNotificationsEnabled: model.notifications.companionEnabled,
+            notificationPreferences: model.notifications.preferences,
+            applications: model.applications.apps + model.applications.watchfaces,
+            diagnosticReportURL: model.diagnostics.reportURL,
             voiceTranscription: model.voiceTranscriptionReadiness,
             setVoiceTranscriptionEnabled: { enabled in
                 Task { await model.setVoiceTranscriptionEnabled(enabled) }

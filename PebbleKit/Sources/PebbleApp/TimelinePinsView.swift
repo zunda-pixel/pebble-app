@@ -6,8 +6,8 @@ struct TimelinePinsView: View {
 
     var body: some View {
         TimelinePinsContent(
-            pins: model.timelinePins,
-            feedback: model.timelineFeedback
+            pins: model.timeline.pins,
+            feedback: model.timeline.feedback
         ) { removed in
             Task { await model.removeTimelinePins(removed) }
         }

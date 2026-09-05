@@ -12,20 +12,20 @@ extension AppModel {
     func keep(_ item: TimelinePin, from connection: WatchConnection) async {
         switch item.kind {
         case .reminder:
-            reminders.removeAll { $0.id == item.id }
-            reminders.append(item)
-            reminders.sort { $0.timestamp < $1.timestamp }
-            try? await reminderStore.save(reminders)
+            timeline.reminders.removeAll { $0.id == item.id }
+            timeline.reminders.append(item)
+            timeline.reminders.sort { $0.timestamp < $1.timestamp }
+            try? await reminderStore.save(timeline.reminders)
             await noteHeld(item.id, by: connection, in: reminderStore)
             // Written where the reader will look for it: a reminder spoken to
-            // the watch belongs in the app they keep their reminders in, and it
+            // the watch belongs in the app they keep their timeline.reminders in, and it
             // goes there now rather than at the next sweep, because the watch
             // may be put down before then.
             if item.timestamp > .now { await mirrorInRemindersApp(item) }
         case .pin, .notification:
-            timelinePins.removeAll { $0.id == item.id }
-            timelinePins.append(item)
-            try? await timelineStore.save(timelinePins)
+            timeline.pins.removeAll { $0.id == item.id }
+            timeline.pins.append(item)
+            try? await timelineStore.save(timeline.pins)
             await noteHeld(item.id, by: connection, in: timelineStore)
         }
         await PebbleDiagnostics.shared.record(

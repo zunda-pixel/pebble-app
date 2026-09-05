@@ -7,20 +7,20 @@ import SwiftUI
 extension AppModel {
     public func loadSavedWatches() async {
         do {
-            savedWatches = try await watchStore.allWatches()
-            watchManagementFeedback = nil
+            watches.saved = try await watchStore.allWatches()
+            watches.feedback = nil
             let library = applicationLibrary
-            let states = await savedWatches
-                .filter { installedApplicationIDsByWatch[$0.id] == nil }
+            let states = await watches.saved
+                .filter { applications.installedIDsByWatch[$0.id] == nil }
                 .asyncMap(numberOfConcurrentTasks: 4) { watch in
                     let ids = (try? await library.synchronizedApplicationIDs(watchID: watch.id)) ?? []
                     return (watch.id, Set(ids))
                 }
             for (watchID, ids) in states {
-                installedApplicationIDsByWatch[watchID] = ids
+                applications.installedIDsByWatch[watchID] = ids
             }
         } catch {
-            watchManagementFeedback = .failure("Saved watches could not be loaded.")
+            watches.feedback = .failure("Saved watches could not be loaded.")
         }
     }
 
@@ -36,7 +36,7 @@ extension AppModel {
     }
 
     func noteWatchThatReconnectedItself(watchID: WatchID) async {
-        if let watch = savedWatches.first(where: { $0.id == watchID }) {
+        if let watch = watches.saved.first(where: { $0.id == watchID }) {
             await PebbleDiagnostics.shared.record(
                 category: "connection",
                 message: "\(watch.name) reconnected on its own; opening a link to it"
@@ -46,11 +46,11 @@ extension AppModel {
         }
         // Connecting to a watch the app has no record of is the reader's call, so it
         // is only offered.
-        guard !unknownBondedWatches.contains(where: { $0.id == watchID }) else {
+        guard !watches.unknownBonded.contains(where: { $0.id == watchID }) else {
             return
         }
         let watch = UnknownBondedWatch(id: watchID, name: await bondedWatchName(watchID: watchID))
-        unknownBondedWatches.append(watch)
+        watches.unknownBonded.append(watch)
         await PebbleDiagnostics.shared.record(
             category: "connection",
             message: "\(watch.name) is paired with this phone but not added; offering it"
@@ -75,10 +75,10 @@ extension AppModel {
 
     public func setAutomaticallyConnects(_ enabled: Bool, watchID: WatchID) async {
         do {
-            savedWatches = try await watchStore.setAutomaticallyConnects(enabled, watchID: watchID)
-            watchManagementFeedback = nil
+            watches.saved = try await watchStore.setAutomaticallyConnects(enabled, watchID: watchID)
+            watches.feedback = nil
         } catch {
-            watchManagementFeedback = .failure("The automatic connection preference could not be saved.")
+            watches.feedback = .failure("The automatic connection preference could not be saved.")
         }
     }
 
@@ -88,13 +88,13 @@ extension AppModel {
             await close(connection)
         }
         do {
-            savedWatches = try await watchStore.remove(watchID: id)
-            installedApplicationIDsByWatch[id] = nil
+            watches.saved = try await watchStore.remove(watchID: id)
+            applications.installedIDsByWatch[id] = nil
             connectionFailures[id] = nil
-            watchResetFeedback[id] = nil
-            watchManagementFeedback = nil
+            watches.resetFeedback[id] = nil
+            watches.feedback = nil
         } catch {
-            watchManagementFeedback = .failure("The watch could not be forgotten.")
+            watches.feedback = .failure("The watch could not be forgotten.")
         }
     }
 
@@ -122,19 +122,19 @@ extension AppModel {
 
     public func prepareDiagnosticReport() async {
         do {
-            diagnosticReportURL = try await PebbleDiagnostics.shared.exportReport(
+            diagnostics.reportURL = try await PebbleDiagnostics.shared.exportReport(
                 device: connectedWatch,
-                applications: watchApplications + watchfaces
+                applications: applications.apps + applications.watchfaces
             )
         } catch {
-            applicationLibraryFeedback = .failure("The diagnostic report could not be created.")
+            applications.libraryFeedback = .failure("The diagnostic report could not be created.")
         }
     }
 
     // The watch reboots without answering, so the connection is closed locally.
     public func resetWatch(_ kind: PebbleResetKind, watchID: WatchID? = nil) async {
         guard let connection = connection(for: watchID), connection.isConnected else {
-            watchManagementFeedback = .failure("Connect the watch before resetting it.")
+            watches.feedback = .failure("Connect the watch before resetting it.")
             return
         }
         let device = connection.watch
@@ -142,14 +142,14 @@ extension AppModel {
             try await connection.client.send(ResetCodec.frame(kind))
             if kind == .factoryReset {
                 try? await applicationLibrary.setSynchronizedApplicationIDs([], watchID: device.id)
-                installedApplicationIDsByWatch[device.id] = []
+                applications.installedIDsByWatch[device.id] = []
             }
             await PebbleDiagnostics.shared.record(
                 .warning,
                 category: "reset",
                 message: "Sent reset command \(kind) to the watch"
             )
-            watchManagementFeedback = nil
+            watches.feedback = nil
             await close(connection)
             let message: LocalizedStringKey = switch kind {
             case .restart: "The watch is restarting."
@@ -159,23 +159,23 @@ extension AppModel {
             }
             // Progress, not success: the watch has gone away to do it, and the
             // only news afterwards is the link returning.
-            watchResetFeedback[device.id] = .progress(message)
+            watches.resetFeedback[device.id] = .progress(message)
         } catch {
-            watchResetFeedback[device.id] = nil
-            watchManagementFeedback = .failure("The reset command could not be sent.")
+            watches.resetFeedback[device.id] = nil
+            watches.feedback = .failure("The reset command could not be sent.")
         }
     }
 
     func recordConnectedWatch(_ device: ConnectedWatch) async {
         // A watch that is talking again has finished restarting, whoever opened
         // the link. Every way back in passes through here.
-        watchResetFeedback[device.id] = nil
+        watches.resetFeedback[device.id] = nil
         noteFirmwareUpdateFinished(on: device)
         do {
-            savedWatches = try await watchStore.record(device)
-            watchManagementFeedback = nil
+            watches.saved = try await watchStore.record(device)
+            watches.feedback = nil
         } catch {
-            watchManagementFeedback = .failure("The watch connection history could not be saved.")
+            watches.feedback = .failure("The watch connection history could not be saved.")
         }
     }
 }

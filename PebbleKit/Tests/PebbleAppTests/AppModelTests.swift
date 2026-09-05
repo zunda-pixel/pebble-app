@@ -77,7 +77,7 @@ struct AppModelTests {
         await model.connect(to: discovered)
 
         #expect(model.connectedWatch?.id == discovered.id)
-        #expect(model.applicationManagementOperation == nil)
+        #expect(model.applications.managementOperation == nil)
         #expect(client.reorderedApplicationIDs.last == [])
     }
 
@@ -145,7 +145,7 @@ struct AppModelTests {
         // The recovery firmware rejects these endpoints and drops the link
         // when it is flooded with them.
         #expect(client.reorderedApplicationIDs.isEmpty)
-        #expect(model.watchManagementFeedback != nil)
+        #expect(model.watches.feedback != nil)
     }
 
     @Test
@@ -227,14 +227,14 @@ struct AppModelTests {
         await model.noteWatchThatReconnectedItself(watchID: WatchID("mock-emery"))
 
         #expect(model.connectedWatch == nil)
-        #expect(model.unknownBondedWatches.map(\.id) == [WatchID("mock-emery")])
+        #expect(model.watches.unknownBonded.map(\.id) == [WatchID("mock-emery")])
 
-        let offered = try #require(model.unknownBondedWatches.first)
+        let offered = try #require(model.watches.unknownBonded.first)
         await model.connect(to: offered)
 
         #expect(model.connectedWatch?.id == WatchID("mock-emery"))
-        #expect(model.savedWatches.contains { $0.id == WatchID("mock-emery") })
-        #expect(model.unknownBondedWatches.isEmpty)
+        #expect(model.watches.saved.contains { $0.id == WatchID("mock-emery") })
+        #expect(model.watches.unknownBonded.isEmpty)
     }
 
     @Test
@@ -428,7 +428,7 @@ struct AppModelTests {
         ))
         #expect(client.writtenAppGlances.isEmpty)
 
-        model.installedApplicationIDsByWatch[connection.watch.id] = [absent]
+        model.applications.installedIDsByWatch[connection.watch.id] = [absent]
         await model.synchronizeAppGlances(on: connection)
 
         #expect(client.writtenAppGlances.map(\.applicationID) == [absent])
@@ -439,7 +439,7 @@ struct AppModelTests {
             slices: [AppGlanceSlice(subtitleTemplate: "   ")]
         ))
 
-        #expect(model.appGlances.isEmpty)
+        #expect(model.appGlances.glances.isEmpty)
         #expect(client.writtenAppGlances.isEmpty)
     }
 
@@ -626,7 +626,7 @@ struct AppModelTests {
 
         #expect(client.disconnectedWatches.map(\.id) == [discovered.id])
         #expect(model.connections.isEmpty)
-        #expect(!model.savedWatches.contains { $0.id == discovered.id })
+        #expect(!model.watches.saved.contains { $0.id == discovered.id })
     }
 
     @Test
@@ -654,7 +654,7 @@ struct AppModelTests {
         #expect(model.connections.isEmpty)
         #expect(client.disconnectedWatches.map(\.id) == [discovered.id])
         #expect(model.installedApplicationIDs(on: discovered.id).isEmpty)
-        #expect(model.watchResetFeedback[discovered.id] != nil)
+        #expect(model.watches.resetFeedback[discovered.id] != nil)
     }
 
     @Test
@@ -675,7 +675,7 @@ struct AppModelTests {
         let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
         await model.resetWatch(.restart, watchID: discovered.id)
-        #expect(model.watchResetFeedback[discovered.id] != nil)
+        #expect(model.watches.resetFeedback[discovered.id] != nil)
 
         // The watch says nothing on its way back: the link returning is the
         // whole of the news, and until it was read as news the screen said the
@@ -683,7 +683,7 @@ struct AppModelTests {
         await model.scan()
         await model.connect(to: try #require(model.discoveredWatches.first))
 
-        #expect(model.watchResetFeedback[discovered.id] == nil)
+        #expect(model.watches.resetFeedback[discovered.id] == nil)
     }
 
     @Test
@@ -703,7 +703,7 @@ struct AppModelTests {
         await model.resetWatch(.restart, watchID: WatchID("missing-watch"))
 
         #expect(client.sentFrames.isEmpty)
-        #expect(model.watchManagementFeedback != nil)
+        #expect(model.watches.feedback != nil)
     }
 
     @Test
@@ -730,13 +730,13 @@ struct AppModelTests {
         // `MAX_REMINDER_AGE` is fifteen minutes: the watch refuses an older one
         // with a status the reader cannot act on, so it is never sent.
         #expect(client.timelineReminders.isEmpty)
-        #expect(model.reminders.contains { $0.title == "Past" })
+        #expect(model.timeline.reminders.contains { $0.title == "Past" })
 
         await model.addReminder(title: "Later", date: .now.addingTimeInterval(3600))
 
         #expect(client.timelineReminders.map(\.title) == ["Later"])
 
-        await model.removeReminders(model.reminders)
+        await model.removeReminders(model.timeline.reminders)
     }
 
     @Test
@@ -762,7 +762,7 @@ struct AppModelTests {
         #expect(client.timelineReminders.map(\.title) == ["Dentist"])
 
         await model.disconnect()
-        await model.removeReminders(model.reminders)
+        await model.removeReminders(model.timeline.reminders)
 
         // The watch was not there to be told, and nothing else was going to
         // mention it again: it went on buzzing for a reminder that had been

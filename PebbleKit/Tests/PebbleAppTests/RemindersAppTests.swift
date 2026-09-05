@@ -100,7 +100,7 @@ struct RemindersAppTests {
 
         await model.synchronizeRemindersApp()
 
-        #expect(model.reminders.map(\.title) == ["牛乳を買う"])
+        #expect(model.timeline.reminders.map(\.title) == ["牛乳を買う"])
         #expect(client.timelineReminders.map(\.id) == [shopping.reminder.id])
         #expect(client.timelineReminders.first?.kind == .reminder)
     }
@@ -141,7 +141,7 @@ struct RemindersAppTests {
         #expect(remindersApp.added.count == 1)
         // The copy read back is the same reminder, not a second one, and the
         // watch is not sent its own item back.
-        #expect(model.reminders.map(\.id) == [dictated.id])
+        #expect(model.timeline.reminders.map(\.id) == [dictated.id])
         #expect(client.timelineReminders.isEmpty)
     }
 
@@ -159,7 +159,7 @@ struct RemindersAppTests {
         remindersApp.items = []
         await model.synchronizeRemindersApp()
 
-        #expect(model.reminders.isEmpty)
+        #expect(model.timeline.reminders.isEmpty)
         #expect(client.timelineReminders.isEmpty)
         #expect(client.deletedTimelineReminderIDs == [dentist.reminder.id])
     }
@@ -183,7 +183,7 @@ struct RemindersAppTests {
         remindersApp.items = []
         await model.synchronizeRemindersApp()
 
-        #expect(model.reminders.isEmpty)
+        #expect(model.timeline.reminders.isEmpty)
         #expect(client.deletedTimelineReminderIDs == [dictated.id])
     }
 
@@ -198,7 +198,7 @@ struct RemindersAppTests {
         let model = try await connectedModel(in: directory, client: client, remindersApp: remindersApp)
         await model.synchronizeRemindersApp()
 
-        await model.removeReminders(model.reminders)
+        await model.removeReminders(model.timeline.reminders)
 
         #expect(remindersApp.removed == ["bins"])
         #expect(remindersApp.items.isEmpty)

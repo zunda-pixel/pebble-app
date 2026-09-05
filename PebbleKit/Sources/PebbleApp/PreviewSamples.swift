@@ -299,11 +299,11 @@ enum PreviewSamples {
     @MainActor
     static func appModel() -> AppModel {
         let model = AppModel(client: MockWatchClient())
-        model.savedWatches = [savedWatch]
-        model.watchApplications = watchApplications
-        model.watchfaces = watchfaces
-        model.weatherPlaces = weatherPlaces
-        model.notificationSourceApps = notificationApps
+        model.watches.saved = [savedWatch]
+        model.applications.apps = watchApplications
+        model.applications.watchfaces = watchfaces
+        model.weather.places = weatherPlaces
+        model.notifications.sourceApps = notificationApps
         return model
     }
 }

@@ -38,81 +38,26 @@ public final class AppModel {
     public internal(set) var connectionFailures: [WatchID: WatchConnectionError] = [:]
     public internal(set) var isScanning = false
     public internal(set) var discoveredWatches: [DiscoveredWatch] = []
-    public internal(set) var watchApplications: [WatchApplication] = []
-    public internal(set) var watchfaces: [WatchApplication] = []
-    public internal(set) var activeWatchfaceID: UUID?
-    public internal(set) var isLoadingApplications = false
-    public internal(set) var isImportingApplication = false
-    public internal(set) var applicationLibraryFeedback: FeatureFeedback?
-    /// The library operations — importing, removing, reordering, synchronizing —
-    /// are phone-side and take turns: each rewrites the one library and then
-    /// pushes it to every watch, so this stays a single value rather than moving
-    /// onto a connection. What belongs to a watch is the transfer, and that lives
-    /// on `WatchConnection`.
-    public internal(set) var applicationManagementOperation: ApplicationManagementOperation?
-    public internal(set) var applicationManagementFeedback: FeatureFeedback?
-    public internal(set) var configurationApplication: WatchApplication?
-    public internal(set) var configurationURL: URL?
-    public internal(set) var diagnosticReportURL: URL?
-    public internal(set) var companionNotificationsEnabled = true
-    public internal(set) var notificationFeedback: FeatureFeedback?
-    public internal(set) var notificationPreferences = NotificationDeliveryPreferences()
-    /// Newest first. Only the notifications this app sent: another phone app's
-    /// go to the watch over ANCS, where no app can see them.
-    public internal(set) var sentNotifications: [SentNotification] = []
-    public internal(set) var savedWatches: [SavedWatch] = []
-    public internal(set) var unknownBondedWatches: [UnknownBondedWatch] = []
-    public internal(set) var watchManagementFeedback: FeatureFeedback?
-    /// What each watch was last told to do to itself, until it comes back. A
-    /// restart says nothing on its way out and nothing on its way in, so the
-    /// only news the reader gets is the link returning.
-    public internal(set) var watchResetFeedback: [WatchID: FeatureFeedback] = [:]
-    public internal(set) var timelinePins: [TimelinePin] = []
-    public internal(set) var reminders: [TimelinePin] = []
-    public internal(set) var reminderFeedback: FeatureFeedback?
-    public internal(set) var watchSettings: [String: Bool] = [:]
-    public internal(set) var activitySettings = ActivitySettings()
-    public internal(set) var heartRateSettings = HeartRateSettings()
-    public internal(set) var isReminderAppEnabled = true
-    public internal(set) var watchSettingsFeedback: FeatureFeedback?
-    public internal(set) var latestScreenshot: WatchScreenshot?
-    public internal(set) var screenshotURL: URL?
-    public internal(set) var watchLogLines: [WatchLogLine] = []
-    public internal(set) var watchLogsURL: URL?
-    public internal(set) var applicationLogLines: [WatchLogLine] = []
-    public internal(set) var isApplicationLoggingEnabled = false
-    public internal(set) var coredumpURL: URL?
-    public internal(set) var isTakingScreenshot = false
-    public internal(set) var isGatheringWatchLogs = false
-    public internal(set) var isCollectingCoredump = false
-    public internal(set) var watchDiagnosticsFeedback: [WatchDiagnostic: FeatureFeedback] = [:]
-    public internal(set) var healthSamples: [WatchHealthSample] = []
-    public internal(set) var catalogApplications: [CatalogApplication] = []
-    public internal(set) var catalogLastUpdated: Date?
-    public internal(set) var isUpdatingCatalog = false
-    public internal(set) var installingCatalogApplicationID: UUID?
-    public internal(set) var firmwareUpdateFeedback: FeatureFeedback?
-    public internal(set) var firmwareUpdateJournal: FirmwareUpdateJournal?
-    public internal(set) var firmwareRequiresConfirmation = false
-    public internal(set) var availableFirmwareRelease: PebbleOSFirmwareRelease?
-    public internal(set) var downloadedFirmware: DownloadedFirmware?
-    public internal(set) var languageFeedback: FeatureFeedback?
-    public internal(set) var isInstallingLanguagePack = false
-    public internal(set) var weatherPlaces: [WeatherPlace] = []
-    public internal(set) var weatherReports: [WeatherReport] = []
-    public internal(set) var weatherCredit: WeatherCredit?
-    public internal(set) var weatherUpdated: Date?
-    public internal(set) var weatherUsesFahrenheit = false
-    public internal(set) var isRefreshingWeather = false
-    public internal(set) var weatherFeedback: FeatureFeedback?
-    public internal(set) var healthFeedback: FeatureFeedback?
-    public internal(set) var catalogFeedback: FeatureFeedback?
-    public internal(set) var timelineFeedback: FeatureFeedback?
-    public internal(set) var healthExportURL: URL?
-    public internal(set) var notificationSourceApps: [NotificationSourceApp] = []
-    /// The line each watchapp shows in the launcher, for the apps that have one.
-    public internal(set) var appGlances: [AppGlance] = []
-    public internal(set) var installedApplicationIDsByWatch: [WatchID: Set<UUID>] = [:]
+
+    // Everything else a screen reads lives on the feature it belongs to.
+    //
+    // There were eighty-six stored properties here, mutated from eighteen
+    // extensions, and the only way to find out which feature owned one was to
+    // read its name and hope. Each group is `@Observable` in its own right, so
+    // a view reading `model.weather.reports` is invalidated by a forecast and
+    // not by a screenshot.
+    public let watches = WatchesModel()
+    public let applications = ApplicationsModel()
+    public let appGlances = AppGlancesModel()
+    public let catalog = CatalogModel()
+    public let firmware = FirmwareModel()
+    public let language = LanguageModel()
+    public let timeline = TimelineModel()
+    public let notifications = NotificationsModel()
+    public let watchSettings = WatchSettingsModel()
+    public let diagnostics = DiagnosticsModel()
+    public let health = HealthModel()
+    public let weather = WeatherModel()
 
     public var isScanningOrConnecting: Bool {
         switch connectionState {
@@ -148,7 +93,7 @@ public final class AppModel {
         }
         return ApplicationTransfer(
             applicationID: applicationID,
-            name: (watchApplications + watchfaces).first { $0.id == applicationID }?.displayName,
+            name: (applications.apps + applications.watchfaces).first { $0.id == applicationID }?.displayName,
             progress: progress
         )
     }
@@ -281,7 +226,7 @@ public final class AppModel {
         self.watchStore = watchStore ?? SavedWatchStore(directory: storageDirectory)
         self.appGlanceStore = appGlanceStore ?? AppGlanceStore(directory: storageDirectory)
         self.reminderStore = reminderStore
-            ?? TimelinePinStore(directory: storageDirectory, name: "reminders")
+            ?? TimelinePinStore(directory: storageDirectory, name: "timeline.reminders")
         timelineStore = TimelinePinStore(directory: storageDirectory, name: "timeline")
         healthStore = WatchHealthStore(directory: storageDirectory)
         appCatalog = AppCatalog(directory: storageDirectory)
@@ -292,8 +237,8 @@ public final class AppModel {
         pendingAppMessageStore = PendingAppMessageStore(directory: storageDirectory)
         pendingFirmwareUpdateStore = PendingFirmwareUpdateStore(directory: storageDirectory)
         notificationSourceAppStore = NotificationSourceAppStore(directory: storageDirectory)
-        companionNotificationsEnabled = Defaults[.companionNotificationsEnabled]
-        activeWatchfaceID = Defaults[.activeWatchfaceID]
+        notifications.companionEnabled = Defaults[.companionNotificationsEnabled]
+        applications.activeWatchfaceID = Defaults[.activeWatchfaceID]
     }
 
     public func start() async {
@@ -301,17 +246,17 @@ public final class AppModel {
         hasStarted = true
         await loadSavedWatches()
         await restorePendingNotifications()
-        notificationPreferences = (try? await notificationPreferenceStore.preferences()) ?? NotificationDeliveryPreferences()
+        notifications.preferences = (try? await notificationPreferenceStore.preferences()) ?? NotificationDeliveryPreferences()
         pendingAppMessages = (try? await pendingAppMessageStore.messages()) ?? []
         await loadTimeline()
         await loadHealth()
         await loadCatalog()
-        firmwareUpdateJournal = try? await pendingFirmwareUpdateStore.journal()
+        firmware.journal = try? await pendingFirmwareUpdateStore.journal()
         loadDownloadedFirmware()
         loadWeatherPlaces()
         loadWatchSettings()
-        notificationSourceApps = (try? await notificationSourceAppStore.apps()) ?? []
-        sentNotifications = (try? await sentNotificationStore.notifications()) ?? []
+        notifications.sourceApps = (try? await notificationSourceAppStore.apps()) ?? []
+        notifications.sent = (try? await sentNotificationStore.notifications()) ?? []
         await loadAppGlances()
         musicCoordinator.start()
         phoneCallCoordinator.start()
@@ -321,10 +266,10 @@ public final class AppModel {
         // Opening it is what raises the system's Bluetooth dialog, and an
         // install with no watch yet would be asked for permission before it had
         // asked for anything.
-        if !savedWatches.isEmpty {
+        if !watches.saved.isEmpty {
             scannerClient.startBluetooth()
         }
-        if savedWatches.contains(where: \.automaticallyConnects) {
+        if watches.saved.contains(where: \.automaticallyConnects) {
             await scan()
         }
         observeEventKitChanges()
@@ -343,7 +288,7 @@ public final class AppModel {
             await flushPendingAppMessages()
             await synchronizeTimeline()
         } else if !isScanning, connectingWatchIDs.isEmpty, connections.isEmpty {
-            if savedWatches.contains(where: \.automaticallyConnects) {
+            if watches.saved.contains(where: \.automaticallyConnects) {
                 await scan()
             }
         }
@@ -366,7 +311,7 @@ public final class AppModel {
             scannerClient.startBluetooth()
             var devices = try await scannerClient.scan()
             let connectedIDs = Set(connections.map(\.watch.id))
-            let missingSavedWatches = savedWatches
+            let missingSavedWatches = watches.saved
                 .filter { saved in
                     !connectedIDs.contains(saved.id) && !devices.contains { $0.id == saved.id }
                 }
@@ -380,7 +325,7 @@ public final class AppModel {
             discoveredWatches = devices.filter { !connectedIDs.contains($0.id) }
             refreshConnectionState()
             let automaticTargets = discoveredWatches.filter { discovered in
-                savedWatches.contains { $0.id == discovered.id && $0.automaticallyConnects }
+                watches.saved.contains { $0.id == discovered.id && $0.automaticallyConnects }
             }
             for device in automaticTargets {
                 await connect(to: device)
@@ -444,7 +389,7 @@ public final class AppModel {
                 }
             )
             discoveredWatches.removeAll { $0.id == device.id }
-            unknownBondedWatches.removeAll { $0.id == device.id }
+            watches.unknownBonded.removeAll { $0.id == device.id }
             // Leaving the id here until this function returns would rank the whole
             // post-connect synchronization as "connecting".
             connectingWatchIDs.remove(device.id)
@@ -457,7 +402,7 @@ public final class AppModel {
             lastConnectionError = error
             connectionFailures[device.id] = error
             if !connections.isEmpty {
-                watchManagementFeedback = .failure(error.message)
+                watches.feedback = .failure(error.message)
             }
             await PebbleDiagnostics.shared.record(.error, category: "connection", message: error.logDescription)
         } catch {
@@ -487,8 +432,8 @@ public final class AppModel {
     func clearBusyOperationState(on connection: WatchConnection) {
         connection.cancelApplicationFetch()
         connection.endTransfer()
-        applicationManagementOperation = nil
-        applicationManagementFeedback = nil
+        applications.managementOperation = nil
+        applications.managementFeedback = nil
     }
 
     func handleEvent(_ event: WatchClientEvent, from connection: WatchConnection) {
@@ -524,55 +469,55 @@ public final class AppModel {
             needsApplicationSynchronization = true
             clearBusyOperationState(on: connection)
         case .healthSyncCompleted(let succeeded):
-            healthFeedback = succeeded
+            health.feedback = succeeded
                 ? .success("Health synchronization completed.")
                 : .failure("The watch rejected health synchronization.")
         case .healthSamplesReceived(let samples):
             Task { [weak self] in
                 guard let self else { return }
                 do {
-                    self.healthSamples = try await self.healthStore.merge(samples)
+                    self.health.samples = try await self.healthStore.merge(samples)
                 } catch {
-                    self.healthFeedback = .failure("Watch health data could not be saved.")
+                    self.health.feedback = .failure("Watch health data could not be saved.")
                     return
                 }
-                self.healthFeedback = .success("Received \(samples.count) health update(s) from the watch.")
+                self.health.feedback = .success("Received \(samples.count) health update(s) from the watch.")
                 #if os(iOS)
                 do {
                     // The watch answered on its own account, so this must not raise the
                     // permission sheet.
                     try await self.healthKitBridge.synchronize(
-                        self.healthSamples,
+                        self.health.samples,
                         authorization: .onlyWhatIsAlreadyGranted
                     )
                 } catch HealthKitBridgeError.notGranted, HealthKitBridgeError.unavailable {
                 } catch {
-                    self.healthFeedback = .failure("The watch's health data was saved, but Apple Health did not accept it.")
+                    self.health.feedback = .failure("The watch's health data was saved, but Apple Health did not accept it.")
                 }
                 #endif
             }
         case .appRunStateChanged(let event):
             switch event {
             case .started(let id):
-                if watchfaces.contains(where: { $0.id == id }) {
-                    activeWatchfaceID = id
+                if applications.watchfaces.contains(where: { $0.id == id }) {
+                    applications.activeWatchfaceID = id
                     Defaults[.activeWatchfaceID] = id
                 }
             case .stopped(let id):
-                if activeWatchfaceID == id { activeWatchfaceID = nil }
+                if applications.activeWatchfaceID == id { applications.activeWatchfaceID = nil }
             }
         case .timelineActionInvoked(let invocation):
             Task { [weak self] in
                 guard let self,
-                      let index = self.timelinePins.firstIndex(where: { $0.id == invocation.itemID })
+                      let index = self.timeline.pins.firstIndex(where: { $0.id == invocation.itemID })
                 else { return }
-                self.timelinePins.remove(at: index)
-                try? await self.timelineStore.save(self.timelinePins)
+                self.timeline.pins.remove(at: index)
+                try? await self.timelineStore.save(self.timeline.pins)
                 // Only the watch the action was taken on removed the pin for itself, and
-                // the pin is about to be gone from `timelinePins` for good.
+                // the pin is about to be gone from `timeline.pins` for good.
                 try? await self.queueTimelineOperation(.delete(invocation.itemID))
                 await self.synchronizeTimeline()
-                self.timelineFeedback = .success("Timeline action completed.")
+                self.timeline.feedback = .success("Timeline action completed.")
             }
         case .applicationLogReceived(let applicationID, let line):
             recordApplicationLogLine(line, from: applicationID)
@@ -587,7 +532,7 @@ public final class AppModel {
     // and drops the link a few seconds after connecting.
     func synchronizeEverything(on connection: WatchConnection) async {
         if connection.watch.isRunningRecoveryFirmware {
-            watchManagementFeedback = .failure(
+            watches.feedback = .failure(
                 "This watch started its recovery firmware. It works again once PebbleOS is installed."
             )
             await PebbleDiagnostics.shared.record(

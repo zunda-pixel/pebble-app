@@ -207,8 +207,8 @@ struct PendingWorkTests {
             on: connection
         )
 
-        #expect(model.timelinePins.map(\.id) == [dictated.id])
-        #expect(model.timelinePins.first?.isFromWatch == true)
+        #expect(model.timeline.pins.map(\.id) == [dictated.id])
+        #expect(model.timeline.pins.first?.isFromWatch == true)
         // Every offer is answered, and this one was taken.
         #expect(client.sentFrames.last?.payload == [0x88, 0x0C, 0x00, 0x01])
 
@@ -265,8 +265,8 @@ struct PendingWorkTests {
             on: connection
         )
 
-        #expect(model.reminders.map(\.id) == [dictated.id])
-        #expect(model.reminders.first?.timestamp == postponed.timestamp)
+        #expect(model.timeline.reminders.map(\.id) == [dictated.id])
+        #expect(model.timeline.reminders.first?.timestamp == postponed.timestamp)
     }
 
     @Test
@@ -300,10 +300,10 @@ struct PendingWorkTests {
             offer(dictated, database: TimelineReminderCodec.databaseID),
             on: try #require(model.activeConnections.first)
         )
-        #expect(model.reminders.map(\.id) == [dictated.id])
+        #expect(model.timeline.reminders.map(\.id) == [dictated.id])
 
         await model.disconnect()
-        await model.removeReminders(model.reminders)
+        await model.removeReminders(model.timeline.reminders)
         await model.connect(to: discovered)
 
         // This app never wrote it — the watch made it — so only a record of
@@ -391,7 +391,7 @@ struct PendingWorkTests {
         // every pin the phone holds. A dropped delete never would, and the
         // event would stay on the watch for good.
         #expect(operations.contains(.delete(removedEventID)))
-        #expect(model.timelineFeedback == nil)
+        #expect(model.timeline.feedback == nil)
     }
 
     @Test
@@ -411,7 +411,7 @@ struct PendingWorkTests {
         #expect(operations.count == 210)
         // On the Timeline screen, which is where the reader asked. It used to be
         // written to the property the Health and Catalog screens read (#60).
-        #expect(model.timelineFeedback?.isFailure == true)
+        #expect(model.timeline.feedback?.isFailure == true)
     }
 
     @Test
@@ -466,10 +466,10 @@ struct PendingWorkTests {
         // Version 1 is back, in the library and on disk, which is what the
         // message shown for a refused transfer has always claimed.
         #expect(storedVersions == ["1.0"])
-        #expect(model.watchApplications.map(\.versionLabel) == ["1.0"])
+        #expect(model.applications.apps.map(\.versionLabel) == ["1.0"])
         #expect(storedBytes == firstVersionBytes)
         #expect(model.pendingImportSnapshots.isEmpty)
-        #expect(model.applicationLibraryFeedback != nil)
+        #expect(model.applications.libraryFeedback != nil)
         #expect(client.appFetchResponses.contains(.noData))
     }
 

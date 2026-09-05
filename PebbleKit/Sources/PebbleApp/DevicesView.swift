@@ -6,7 +6,7 @@ struct DevicesView: View {
     @State private var isAddingWatch = false
 
     private var listedWatchIDs: [WatchID] {
-        let savedIDs = model.savedWatches.map(\.id)
+        let savedIDs = model.watches.saved.map(\.id)
         let unsavedConnected = model.connections
             .map(\.watch.id)
             .filter { !savedIDs.contains($0) }
@@ -16,7 +16,7 @@ struct DevicesView: View {
     var body: some View {
         DevicesContent(
             watches: listedWatchIDs.map { WatchSummary(watchID: $0, model: model) },
-            feedback: model.watchManagementFeedback,
+            feedback: model.watches.feedback,
             addWatch: { isAddingWatch = true },
             destination: { watch in
                 WatchDetailView(model: model, watchID: watch.id)
@@ -94,8 +94,8 @@ struct AddWatchSheet: View {
     var body: some View {
         AddWatchContent(
             connectionFeedback: connectionFeedback,
-            managementFeedback: model.watchManagementFeedback,
-            unknownBondedWatches: model.unknownBondedWatches,
+            managementFeedback: model.watches.feedback,
+            unknownBondedWatches: model.watches.unknownBonded,
             discoveredWatches: model.discoveredWatches,
             isConnecting: !model.connectingWatchIDs.isEmpty,
             connectUnknown: { watch in
