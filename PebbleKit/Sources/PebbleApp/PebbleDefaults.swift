@@ -40,8 +40,6 @@ extension Defaults.Keys {
 
     static let activeWatchfaceID = Key<UUID?>("activeWatchfaceID")
 
-    static let favoriteWatchfaceIDs = Key<[UUID]>("favoriteWatchfaceIDs", default: [])
-
     static let healthKitLastExportDate = Key<Date>("healthKitLastExportDate", default: .distantPast)
 }
 

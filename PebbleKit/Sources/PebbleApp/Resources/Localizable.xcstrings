@@ -1975,6 +1975,7 @@
       }
     },
     "Favorite" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -1985,6 +1986,7 @@
       }
     },
     "Favorite Watchface" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -3788,6 +3790,7 @@
       }
     },
     "Remove Favorite" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {

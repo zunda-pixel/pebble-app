@@ -86,13 +86,6 @@ extension AppModel {
         }
     }
 
-    public func toggleFavoriteWatchface(_ application: PebbleApplication) {
-        guard application.kind == .watchface else { return }
-        if favoriteWatchfaceIDs.contains(application.id) { favoriteWatchfaceIDs.remove(application.id) }
-        else { favoriteWatchfaceIDs.insert(application.id) }
-        Defaults[.favoriteWatchfaceIDs] = Array(favoriteWatchfaceIDs)
-    }
-
     public func closeConfiguration(response: String? = nil) async {
         try? await companionRuntime.closeConfiguration(response: response)
         configurationURL = nil

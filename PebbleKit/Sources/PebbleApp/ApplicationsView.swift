@@ -51,7 +51,6 @@ struct ApplicationsView: View {
             watchApplications: model.watchApplications,
             watchfaces: model.watchfaces,
             activeWatchfaceID: model.activeWatchfaceID,
-            favoriteWatchfaceIDs: model.favoriteWatchfaceIDs,
             installedApplicationIDs: displayedWatchID.map { model.installedApplicationIDs(on: $0) },
             isLoading: model.isLoadingApplications,
             errorMessage: model.applicationLibraryErrorMessage,
@@ -77,13 +76,6 @@ struct ApplicationsView: View {
             editGlance: { application in glanceApplication = application },
             activateWatchface: { application in
                 Task { await model.activateWatchface(application) }
-            },
-            toggleFavoriteWatchface: { application in
-                model.toggleFavoriteWatchface(application)
-                undoManager?.registerUndo(withTarget: model) { target in
-                    target.toggleFavoriteWatchface(application)
-                }
-                undoManager?.setActionName("Favorite Watchface")
             },
             detail: { application in
                 ApplicationDetailView(
@@ -157,7 +149,6 @@ struct ApplicationsContent<Detail: View>: View {
     var watchApplications: [PebbleApplication]
     var watchfaces: [PebbleApplication]
     var activeWatchfaceID: UUID?
-    var favoriteWatchfaceIDs: Set<UUID>
     /// Nil when no watch is connected: install state is unknown, not shown.
     var installedApplicationIDs: Set<UUID>?
     var isLoading: Bool
@@ -171,7 +162,6 @@ struct ApplicationsContent<Detail: View>: View {
     var configureApplication: (PebbleApplication) -> Void
     var editGlance: (PebbleApplication) -> Void
     var activateWatchface: (PebbleApplication) -> Void
-    var toggleFavoriteWatchface: (PebbleApplication) -> Void
     @ViewBuilder var detail: (PebbleApplication) -> Detail
 
     @State private var applicationToRemove: PebbleApplication?
@@ -214,14 +204,12 @@ struct ApplicationsContent<Detail: View>: View {
                             title: group.title,
                             applications: group.applications,
                             activeWatchfaceID: activeWatchfaceID,
-                            favoriteWatchfaceIDs: favoriteWatchfaceIDs,
                             installedApplicationIDs: installedApplicationIDs,
                             isOperationInProgress: isOperationInProgress,
                             requestRemoval: { applicationToRemove = $0 },
                             configureApplication: configureApplication,
                             editGlance: editGlance,
                             activateWatchface: activateWatchface,
-                            toggleFavoriteWatchface: toggleFavoriteWatchface,
                             moveApplications: { offsets, destination in
                                 reorderApplications(group.kind, offsets, destination)
                             },
@@ -343,14 +331,12 @@ struct ApplicationSection<Detail: View>: View {
     var title: LocalizedStringKey
     var applications: [PebbleApplication]
     var activeWatchfaceID: UUID?
-    var favoriteWatchfaceIDs: Set<UUID>
     var installedApplicationIDs: Set<UUID>?
     var isOperationInProgress: Bool
     var requestRemoval: (PebbleApplication) -> Void
     var configureApplication: (PebbleApplication) -> Void
     var editGlance: (PebbleApplication) -> Void
     var activateWatchface: (PebbleApplication) -> Void
-    var toggleFavoriteWatchface: (PebbleApplication) -> Void
     var moveApplications: (IndexSet, Int) -> Void
     @ViewBuilder var detail: (PebbleApplication) -> Detail
 
@@ -360,14 +346,12 @@ struct ApplicationSection<Detail: View>: View {
                 ApplicationListRow(
                     application: application,
                     isActive: activeWatchfaceID == application.id,
-                    isFavorite: favoriteWatchfaceIDs.contains(application.id),
                     isInstalled: installedApplicationIDs.map { $0.contains(application.id) },
                     isOperationInProgress: isOperationInProgress,
                     requestRemoval: { requestRemoval(application) },
                     configureApplication: { configureApplication(application) },
                     editGlance: { editGlance(application) },
                     activateWatchface: { activateWatchface(application) },
-                    toggleFavoriteWatchface: { toggleFavoriteWatchface(application) },
                     detail: { detail(application) }
                 )
             }
@@ -380,14 +364,12 @@ struct ApplicationSection<Detail: View>: View {
 struct ApplicationListRow<Detail: View>: View {
     var application: PebbleApplication
     var isActive: Bool
-    var isFavorite: Bool
     var isInstalled: Bool?
     var isOperationInProgress: Bool
     var requestRemoval: () -> Void
     var configureApplication: () -> Void
     var editGlance: () -> Void
     var activateWatchface: () -> Void
-    var toggleFavoriteWatchface: () -> Void
     @ViewBuilder var detail: () -> Detail
 
     var body: some View {
@@ -400,7 +382,6 @@ struct ApplicationListRow<Detail: View>: View {
                 versionLabel: application.versionLabel,
                 kind: application.kind,
                 isActive: isActive,
-                isFavorite: isFavorite,
                 isInstalled: isInstalled
             )
         }
@@ -423,11 +404,6 @@ struct ApplicationListRow<Detail: View>: View {
             if application.kind == .watchface {
                 Button(isActive ? "Active" : "Activate", systemImage: "play.circle", action: activateWatchface)
                     .disabled(isActive)
-                Button(
-                    isFavorite ? "Remove Favorite" : "Favorite",
-                    systemImage: "star",
-                    action: toggleFavoriteWatchface
-                )
             }
             Divider()
             Button("Remove", systemImage: "trash", role: .destructive, action: requestRemoval)
@@ -437,15 +413,14 @@ struct ApplicationListRow<Detail: View>: View {
 }
 
 /// A row that leads to the application rather than acting on it: what used to
-/// be three buttons crowded in beside the name is on the screen the row opens,
-/// where each has room to say what it does.
+/// be buttons crowded in beside the name is on the screen the row opens, where
+/// each has room to say what it does.
 struct ApplicationRow: View {
     var name: String
     var companyName: String
     var versionLabel: String
     var kind: PebbleApplicationKind
     var isActive: Bool
-    var isFavorite: Bool
     /// Nil when no watch is connected.
     var isInstalled: Bool?
 
@@ -477,18 +452,11 @@ struct ApplicationRow: View {
             }
             Spacer()
             // Said rather than offered: tapping the row opens the screen that
-            // can change them.
-            if kind == .watchface {
-                if isFavorite {
-                    Image(systemName: "star.fill")
-                        .foregroundStyle(.yellow)
-                        .accessibilityLabel(Text("Favorite"))
-                }
-                if isActive {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                        .accessibilityLabel(Text("Active"))
-                }
+            // can change it.
+            if kind == .watchface, isActive {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                    .accessibilityLabel(Text("Active"))
             }
             Text(versionLabel)
                 .font(.caption)
@@ -520,7 +488,6 @@ struct ApplicationPlaceholderRow: View {
             watchApplications: PreviewSamples.watchApplications,
             watchfaces: PreviewSamples.watchfaces,
             activeWatchfaceID: PreviewSamples.watchfaces.first?.id,
-            favoriteWatchfaceIDs: Set(PreviewSamples.watchfaces.map(\.id)),
             installedApplicationIDs: Set(PreviewSamples.watchApplications.prefix(1).map(\.id)),
             isLoading: false,
             errorMessage: nil,
@@ -533,7 +500,6 @@ struct ApplicationPlaceholderRow: View {
             configureApplication: { _ in },
             editGlance: { _ in },
             activateWatchface: { _ in },
-            toggleFavoriteWatchface: { _ in },
             detail: { application in Text(verbatim: application.displayName) }
         )
     }
@@ -545,7 +511,6 @@ struct ApplicationPlaceholderRow: View {
             watchApplications: PreviewSamples.watchApplications,
             watchfaces: [],
             activeWatchfaceID: nil,
-            favoriteWatchfaceIDs: [],
             installedApplicationIDs: nil,
             isLoading: false,
             errorMessage: nil,
@@ -558,7 +523,6 @@ struct ApplicationPlaceholderRow: View {
             configureApplication: { _ in },
             editGlance: { _ in },
             activateWatchface: { _ in },
-            toggleFavoriteWatchface: { _ in },
             detail: { application in Text(verbatim: application.displayName) }
         )
     }
@@ -570,7 +534,6 @@ struct ApplicationPlaceholderRow: View {
             watchApplications: [],
             watchfaces: [],
             activeWatchfaceID: nil,
-            favoriteWatchfaceIDs: [],
             installedApplicationIDs: nil,
             isLoading: false,
             errorMessage: nil,
@@ -583,7 +546,6 @@ struct ApplicationPlaceholderRow: View {
             configureApplication: { _ in },
             editGlance: { _ in },
             activateWatchface: { _ in },
-            toggleFavoriteWatchface: { _ in },
             detail: { application in Text(verbatim: application.displayName) }
         )
     }

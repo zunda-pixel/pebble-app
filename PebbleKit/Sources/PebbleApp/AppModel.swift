@@ -41,7 +41,6 @@ public final class AppModel {
     public internal(set) var watchApplications: [PebbleApplication] = []
     public internal(set) var watchfaces: [PebbleApplication] = []
     public internal(set) var activeWatchfaceID: UUID?
-    public internal(set) var favoriteWatchfaceIDs: Set<UUID> = []
     public internal(set) var isLoadingApplications = false
     public internal(set) var isImportingApplication = false
     public internal(set) var applicationLibraryErrorMessage: LocalizedStringKey?
@@ -270,7 +269,6 @@ public final class AppModel {
         self.reminderLibrary = reminderLibrary
         companionNotificationsEnabled = Defaults[.companionNotificationsEnabled]
         activeWatchfaceID = Defaults[.activeWatchfaceID]
-        favoriteWatchfaceIDs = Set(Defaults[.favoriteWatchfaceIDs])
     }
 
     public func start() async {

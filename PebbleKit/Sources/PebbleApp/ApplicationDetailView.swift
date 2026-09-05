@@ -7,14 +7,12 @@ import PebbleProtocol
 struct ApplicationDetailContent: View {
     var application: PebbleApplication
     var isActive: Bool
-    var isFavorite: Bool
     /// Nil when no watch is connected: install state is unknown, not shown.
     var isInstalled: Bool?
     var isOperationInProgress: Bool
     var configureApplication: () -> Void
     var editGlance: () -> Void
     var activateWatchface: () -> Void
-    var toggleFavoriteWatchface: () -> Void
     var removeApplication: () -> Void
 
     @State private var isConfirmingRemoval = false
@@ -54,11 +52,6 @@ struct ApplicationDetailContent: View {
                 Section("Watchface") {
                     Button(isActive ? "Active" : "Activate", systemImage: "play.circle", action: activateWatchface)
                         .disabled(isActive || isOperationInProgress)
-                    Button(
-                        isFavorite ? "Remove Favorite" : "Favorite",
-                        systemImage: isFavorite ? "star.fill" : "star",
-                        action: toggleFavoriteWatchface
-                    )
                 }
             }
 
@@ -154,13 +147,11 @@ struct ApplicationDetailView: View {
                 ApplicationDetailContent(
                     application: current,
                     isActive: model.activeWatchfaceID == current.id,
-                    isFavorite: model.favoriteWatchfaceIDs.contains(current.id),
                     isInstalled: watchID.map { model.installedApplicationIDs(on: $0).contains(current.id) },
                     isOperationInProgress: model.isApplicationManagementBusy,
                     configureApplication: { Task { await model.configureApplication(current) } },
                     editGlance: { editGlance(current) },
                     activateWatchface: { Task { await model.activateWatchface(current) } },
-                    toggleFavoriteWatchface: { model.toggleFavoriteWatchface(current) },
                     removeApplication: {
                         Task {
                             await model.removeApplication(id: current.id)
@@ -185,13 +176,11 @@ struct ApplicationDetailView: View {
         ApplicationDetailContent(
             application: PreviewSamples.watchApplications[0],
             isActive: false,
-            isFavorite: false,
             isInstalled: true,
             isOperationInProgress: false,
             configureApplication: {},
             editGlance: {},
             activateWatchface: {},
-            toggleFavoriteWatchface: {},
             removeApplication: {}
         )
     }
@@ -202,13 +191,11 @@ struct ApplicationDetailView: View {
         ApplicationDetailContent(
             application: PreviewSamples.watchfaces[0],
             isActive: true,
-            isFavorite: true,
             isInstalled: false,
             isOperationInProgress: false,
             configureApplication: {},
             editGlance: {},
             activateWatchface: {},
-            toggleFavoriteWatchface: {},
             removeApplication: {}
         )
     }
@@ -219,13 +206,11 @@ struct ApplicationDetailView: View {
         ApplicationDetailContent(
             application: PreviewSamples.watchApplications[1],
             isActive: false,
-            isFavorite: false,
             isInstalled: nil,
             isOperationInProgress: false,
             configureApplication: {},
             editGlance: {},
             activateWatchface: {},
-            toggleFavoriteWatchface: {},
             removeApplication: {}
         )
     }
