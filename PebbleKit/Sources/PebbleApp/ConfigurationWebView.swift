@@ -61,21 +61,40 @@ struct ConfigurationWebView: View {
         }
         .task(id: url) {
             loadErrorMessage = nil
+            // The kind, and then how it went. Whether a settings page appeared
+            // was the one thing about it that never reached the log, so a page
+            // the app agreed to open and the web view then refused looked from
+            // the outside exactly like one that worked.
+            let inlineHTML = url.inlineHTML
+            await PebbleDiagnostics.shared.record(
+                category: "configuration",
+                message: inlineHTML.map { "loading \($0.utf8.count) byte(s) of page the application built" }
+                    ?? "loading a page over \(url.scheme ?? "no scheme")"
+            )
             do {
                 // A page the application's own JavaScript built is unpacked and
                 // handed over as HTML: WebKit refuses to navigate to a `data:`
                 // URL at the top level, so loading it as one shows nothing.
-                if let html = url.inlineHTML {
-                    for try await _ in page.load(html: html, baseURL: Self.inlineBaseURL) {}
+                if let inlineHTML {
+                    for try await _ in page.load(html: inlineHTML, baseURL: Self.inlineBaseURL) {}
                 } else {
                     for try await _ in page.load(url) {}
                 }
+                await PebbleDiagnostics.shared.record(
+                    category: "configuration",
+                    message: "the settings page is up"
+                )
             } catch {
                 if let urlError = error as? URLError, urlError.code == .cannotFindHost {
                     loadErrorMessage = "The watch app's settings service could not be found."
                 } else {
                     loadErrorMessage = "The watch app's settings page could not be loaded."
                 }
+                await PebbleDiagnostics.shared.record(
+                    .error,
+                    category: "configuration",
+                    message: "the settings page would not load: \(String(reflecting: error))"
+                )
             }
         }
     }

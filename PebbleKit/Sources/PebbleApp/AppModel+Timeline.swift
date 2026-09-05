@@ -64,7 +64,7 @@ extension AppModel {
             // queue is the durable work and goes first, so an index into it
             // keeps its meaning however many pins this watch still needs.
             let derived = await upsertsStillNeeded(besides: queuedUpserts, on: connection)
-            let stopped = await send(queued + derived, to: connection)
+            let stopped = await send(queued + derived, to: connection, queuedCount: queued.count)
             firstUnfinished = min(firstUnfinished, min(stopped, queued.count))
         }
         try? await pendingTimelineOperationStore.save(Array(queued[firstUnfinished...]))
@@ -94,12 +94,20 @@ extension AppModel {
     }
 
     /// Sends the operations to one watch and answers the index it stopped at.
+    ///
+    /// `queuedCount` names the prefix that came from the queue rather than from
+    /// the digests, and is only used to say which in the log. Without it a
+    /// count on its own cannot tell a queue that is not draining from digests
+    /// that are not matching, which is exactly the question a synchronization
+    /// that keeps sending the same number of pins raises.
     private func send(
         _ operations: [PendingTimelineOperation],
-        to connection: WatchConnection
+        to connection: WatchConnection,
+        queuedCount: Int
     ) async -> Int {
         let client = connection.client
         var taken = 0
+        var takenFromQueue = 0
         var dropped = 0
         for (index, operation) in operations.indexed() {
             do {
@@ -107,6 +115,7 @@ extension AppModel {
                 case .upsert(let pin):
                     try await retry(with: .watchWork) { try await client.write(.timelinePin(pin)) }
                     taken += 1
+                    if index < queuedCount { takenFromQueue += 1 }
                 case .delete(let id):
                     try await retry(with: .watchWork) { try await client.remove(.timelinePin(id)) }
                     dropped += 1
@@ -125,11 +134,14 @@ extension AppModel {
             ),
             watchID: connection.watch.id
         )
-        // Nothing to say when the queue was empty: this runs on every connection.
+        // Nothing to say when there was nothing to send: this runs on every
+        // connection.
         if taken + dropped > 0 {
             await PebbleDiagnostics.shared.record(
                 category: "timeline",
-                message: "\(connection.watch.name) took \(taken) pin(s) and dropped \(dropped)"
+                message: "\(connection.watch.name) took \(taken) of \(timeline.pins.count) pin(s)"
+                    + " — \(takenFromQueue) queued, \(taken - takenFromQueue) derived"
+                    + " — and dropped \(dropped)"
             )
         }
         return operations.count
