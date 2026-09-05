@@ -1,4 +1,4 @@
-import PebbleProtocol
+public import PebbleProtocol
 import Defaults
 public import Foundation
 import SwiftUI
@@ -7,13 +7,13 @@ extension AppModel {
     /// Staging matters for a watch running its recovery firmware: it stays
     /// connected for only a few seconds at a time, which is not long enough to
     /// choose a file in.
-    public func installFirmware(from url: URL, deviceID: String? = nil) async {
-        let connection = connection(for: deviceID).flatMap { $0.isConnected ? $0 : nil }
-        let target: (id: String, board: PebbleWatchBoard, firmwareVersion: String?, slot: Int?)
-        if let connection, let board = connection.device.board {
-            let device = connection.device
+    public func installFirmware(from url: URL, watchID: WatchID? = nil) async {
+        let connection = connection(for: watchID).flatMap { $0.isConnected ? $0 : nil }
+        let target: (id: WatchID, board: WatchBoard, firmwareVersion: String?, slot: Int?)
+        if let connection, let board = connection.watch.board {
+            let device = connection.watch
             target = (device.id, board, device.firmwareVersion, device.firmwareUpdateSlot)
-        } else if let saved = savedWatch(for: deviceID), let board = saved.board {
+        } else if let saved = savedWatch(for: watchID), let board = saved.board {
             // The slot is only known while connected; without it any manifest for this
             // board is accepted and the watch has the last word.
             target = (saved.id, board, saved.firmwareVersion, nil)
@@ -32,7 +32,7 @@ extension AppModel {
             }.value
             try package.validateIntegrity()
             let journal = FirmwareUpdateJournal(
-                deviceID: target.id,
+                watchID: target.id,
                 hardwareRevision: target.board.rawValue,
                 previousVersion: target.firmwareVersion,
                 targetVersion: package.manifest.firmware.versionTag,
@@ -56,8 +56,8 @@ extension AppModel {
         }
     }
 
-    public func checkForFirmwareUpdate(deviceID: String? = nil) async {
-        guard let board = board(for: deviceID) else {
+    public func checkForFirmwareUpdate(watchID: WatchID? = nil) async {
+        guard let board = board(for: watchID) else {
             firmwareUpdateStatusMessage =
                 "Connect the target Pebble once so its board is known, then check for firmware."
             return
@@ -75,11 +75,11 @@ extension AppModel {
 
     /// A separate step from installing: the download only needs the network, the
     /// install needs the watch.
-    public func downloadAvailableFirmware(deviceID: String? = nil) async {
+    public func downloadAvailableFirmware(watchID: WatchID? = nil) async {
         guard let release = availableFirmwareRelease else {
-            await checkForFirmwareUpdate(deviceID: deviceID)
+            await checkForFirmwareUpdate(watchID: watchID)
             guard availableFirmwareRelease != nil else { return }
-            await downloadAvailableFirmware(deviceID: deviceID)
+            await downloadAvailableFirmware(watchID: watchID)
             return
         }
         do {
@@ -93,12 +93,12 @@ extension AppModel {
         }
     }
 
-    public func installDownloadedFirmware(deviceID: String? = nil) async {
+    public func installDownloadedFirmware(watchID: WatchID? = nil) async {
         guard let firmware = downloadedFirmware else {
             firmwareUpdateStatusMessage = "Download the firmware first."
             return
         }
-        await installFirmware(from: firmware.url, deviceID: deviceID)
+        await installFirmware(from: firmware.url, watchID: watchID)
     }
 
     func loadDownloadedFirmware() {
@@ -110,25 +110,25 @@ extension AppModel {
         downloadedFirmware = firmware
     }
 
-    func board(for deviceID: String?) -> PebbleWatchBoard? {
-        if let connection = connection(for: deviceID), let board = connection.device.board {
+    func board(for watchID: WatchID?) -> WatchBoard? {
+        if let connection = connection(for: watchID), let board = connection.watch.board {
             return board
         }
-        return savedWatch(for: deviceID)?.board
+        return savedWatch(for: watchID)?.board
     }
 
-    func savedWatch(for deviceID: String?) -> SavedPebbleWatch? {
-        guard let deviceID else {
+    func savedWatch(for watchID: WatchID?) -> SavedWatch? {
+        guard let watchID else {
             return savedWatches.count == 1 ? savedWatches.first : nil
         }
-        return savedWatches.first { $0.id == deviceID }
+        return savedWatches.first { $0.id == watchID }
     }
 
     public func confirmRecoveryFirmwareUpdate() async {
         guard firmwareRequiresConfirmation,
               let package = try? await pendingFirmwareUpdateStore.package(),
               let journal = try? await pendingFirmwareUpdateStore.journal(),
-              let connection = connection(for: journal.deviceID) else { return }
+              let connection = connection(for: journal.watchID) else { return }
         firmwareRequiresConfirmation = false
         do { try await performFirmwareUpdate(package, on: connection) }
         catch { firmwareUpdateStatusMessage = "Recovery update stopped safely: \(error.localizedDescription)" }
@@ -141,9 +141,9 @@ extension AppModel {
         try? await pendingFirmwareUpdateStore.updatePhase(.cancelled)
         firmwareUpdateJournal = try? await pendingFirmwareUpdateStore.journal()
         firmwareUpdateStatusMessage = "Firmware update cancelled; recovery data was retained."
-        if let deviceID = firmwareUpdateJournal?.deviceID,
-           let connection = connection(for: deviceID) {
-            await disconnect(deviceID: connection.device.id)
+        if let watchID = firmwareUpdateJournal?.watchID,
+           let connection = connection(for: watchID) {
+            await disconnect(watchID: connection.watch.id)
         }
     }
 
@@ -163,7 +163,7 @@ extension AppModel {
         try package.validateIntegrity()
         guard let journal = try await pendingFirmwareUpdateStore.journal(),
               journal.packageSHA256 == package.sha256,
-              journal.deviceID == connection.device.id else {
+              journal.watchID == connection.watch.id else {
             throw PBZFirmwareError.unsafeManifest
         }
         try await pendingFirmwareUpdateStore.updatePhase(.transferring)
@@ -180,8 +180,8 @@ extension AppModel {
         await PebbleDiagnostics.shared.record(
             category: "firmware",
             message: "sending \(package.manifest.firmware.versionTag ?? "firmware")"
-                + " to \(connection.device.name)"
-                + (connection.device.isRunningRecoveryFirmware ? " (recovery firmware)" : "")
+                + " to \(connection.watch.name)"
+                + (connection.watch.isRunningRecoveryFirmware ? " (recovery firmware)" : "")
         )
         let client = connection.client
         let task = Task { try await client.installFirmware(package) }
@@ -225,8 +225,8 @@ extension AppModel {
     /// transfer finishes, and the copy held here is what the screens read: left
     /// at `awaitingRestart` it offers Stop and Try Again for an update that is
     /// over, and the watch's own row goes on saying an update is waiting.
-    func noteFirmwareUpdateFinished(on device: PebbleDevice) {
-        guard firmwareUpdateJournal?.deviceID == device.id,
+    func noteFirmwareUpdateFinished(on device: ConnectedWatch) {
+        guard firmwareUpdateJournal?.watchID == device.id,
               firmwareUpdateJournal?.phase == .awaitingRestart else { return }
         firmwareUpdateJournal = nil
         firmwareUpdateStatusMessage = nil
@@ -248,10 +248,10 @@ extension AppModel {
 
     // The only case that runs unasked, which is the whole point of staging one.
     func resumePendingFirmwareUpdate(on connection: WatchConnection) async {
-        let device = connection.device
+        let device = connection.watch
         guard let package = try? await pendingFirmwareUpdateStore.package(),
               let journal = try? await pendingFirmwareUpdateStore.journal(),
-              journal.deviceID == device.id,
+              journal.watchID == device.id,
               journal.hardwareRevision == device.board?.rawValue,
               journal.packageSHA256 == package.sha256,
               journal.phase != .cancelled else { return }
@@ -273,10 +273,10 @@ extension AppModel {
         }
     }
 
-    public func resumeFirmwareUpdate(deviceID: String? = nil) async {
+    public func resumeFirmwareUpdate(watchID: WatchID? = nil) async {
         guard let package = try? await pendingFirmwareUpdateStore.package(),
               let journal = try? await pendingFirmwareUpdateStore.journal(),
-              let connection = connection(for: deviceID ?? journal.deviceID),
+              let connection = connection(for: watchID ?? journal.watchID),
               connection.isConnected else {
             firmwareUpdateStatusMessage = "Connect the watch to resume its firmware update."
             return

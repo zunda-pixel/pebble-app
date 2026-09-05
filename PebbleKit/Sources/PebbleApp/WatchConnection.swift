@@ -28,7 +28,7 @@ public enum WatchTransferKind: Equatable, Sendable {
 @Observable
 public final class WatchConnection: Identifiable {
     public let client: any PebbleClient
-    public private(set) var device: PebbleDevice
+    public private(set) var watch: ConnectedWatch
     public private(set) var phase: WatchConnectionPhase = .connected
     /// The watch is the thing doing the work, so the count belongs to it rather
     /// than to whichever kind of transfer is running somewhere.
@@ -49,11 +49,11 @@ public final class WatchConnection: Identifiable {
     @ObservationIgnored private var eventsTask: Task<Void, Never>?
     @ObservationIgnored private var framesTask: Task<Void, Never>?
 
-    public nonisolated var id: String {
-        deviceID
+    public nonisolated var id: WatchID {
+        watchID
     }
 
-    private nonisolated let deviceID: String
+    private nonisolated let watchID: WatchID
 
     public var isConnected: Bool {
         phase == .connected
@@ -75,12 +75,12 @@ public final class WatchConnection: Identifiable {
 
     init(
         client: any PebbleClient,
-        device: PebbleDevice,
+        watch: ConnectedWatch,
         voiceProvider: (any PebbleVoiceTranscriptionProvider)? = nil
     ) {
         self.client = client
-        self.device = device
-        self.deviceID = device.id
+        self.watch = watch
+        self.watchID = watch.id
         voiceCoordinator = VoiceSessionCoordinator(provider: voiceProvider) { [client] frame in
             try await client.send(frame)
         }
@@ -113,8 +113,8 @@ public final class WatchConnection: Identifiable {
 
     private func apply(_ event: PebbleClientEvent) {
         switch event {
-        case .deviceUpdated(let device):
-            self.device = device
+        case .watchUpdated(let watch):
+            self.watch = watch
             phase = .connected
         case .transferProgress(let progress):
             transferProgress = progress
@@ -166,6 +166,6 @@ public final class WatchConnection: Identifiable {
         cancelApplicationFetch()
         endTransfer()
         voiceCoordinator.reset()
-        await client.disconnect(from: device)
+        await client.disconnect(from: watch)
     }
 }

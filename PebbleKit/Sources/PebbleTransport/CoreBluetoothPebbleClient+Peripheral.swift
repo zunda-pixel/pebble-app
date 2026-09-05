@@ -9,7 +9,7 @@ extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
         _ peripheral: CBPeripheral,
         didModifyServices invalidatedServices: [CBService]
     ) {
-        guard pendingDevice?.id == peripheral.identifier.uuidString
+        guard pendingDevice?.id == peripheral.watchID
             || connectedPeripheral?.identifier == peripheral.identifier else {
             return
         }

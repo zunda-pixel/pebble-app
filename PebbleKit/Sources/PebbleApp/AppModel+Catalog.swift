@@ -23,7 +23,7 @@ extension AppModel {
         isUpdatingCatalog = true
         defer { isUpdatingCatalog = false }
         do {
-            let snapshot = try await appCatalog.update(from: url, model: connectedDevice?.model)
+            let snapshot = try await appCatalog.update(from: url, model: connectedWatch?.model)
             catalogApplications = snapshot.applications
             catalogLastUpdated = snapshot.fetchedAt
             Defaults[.catalogSource] = source
@@ -41,8 +41,8 @@ extension AppModel {
     }
 
     public func catalogInstallationState(for application: PebbleCatalogApplication) -> CatalogInstallationState {
-        if !connectedDevices.isEmpty,
-           !connectedDevices.contains(where: { application.supports($0.model) }) {
+        if !connectedWatches.isEmpty,
+           !connectedWatches.contains(where: { application.supports($0.model) }) {
             return .incompatible
         }
         guard let installed = (watchApplications + watchfaces).first(where: { $0.id == application.id }) else {

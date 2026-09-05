@@ -7,8 +7,8 @@ struct WeatherView: View {
     /// A watch only stores weather if its firmware has the weather app.
     private var watchesWithoutWeather: [String] {
         model.connections
-            .filter { $0.isConnected && !$0.device.supportsWeatherApp }
-            .map(\.device.name)
+            .filter { $0.isConnected && !$0.watch.supportsWeatherApp }
+            .map(\.watch.name)
     }
 
     var body: some View {

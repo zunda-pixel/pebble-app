@@ -31,8 +31,8 @@ public final class QEMUPebbleClient: PebbleClient {
     private var pendingInstallCookie: UInt32?
     private var nextAppMessageTransactionID: UInt8 = 0
     private var pendingAppMessageTransactionID: UInt8?
-    private var reconnectDevice: DiscoveredPebble?
-    private var connectedDevice: PebbleDevice?
+    private var reconnectWatch: DiscoveredWatch?
+    private var connectedWatch: ConnectedWatch?
     private var reconnectTask: Task<Void, Never>?
     private var isManualDisconnect = false
     private var healthDataLoggingProcessor = HealthDataLoggingProcessor()
@@ -42,22 +42,22 @@ public final class QEMUPebbleClient: PebbleClient {
         self.port = NWEndpoint.Port(rawValue: port) ?? 12_344
     }
 
-    public func scan() async throws -> [DiscoveredPebble] {
-        [DiscoveredPebble(
-            id: "qemu-emery",
+    public func scan() async throws -> [DiscoveredWatch] {
+        [DiscoveredWatch(
+            id: WatchID("qemu-emery"),
             name: "Pebble QEMU",
             model: .pebbleTime2,
             signalStrength: 0
         )]
     }
 
-    public func connect(to device: DiscoveredPebble) async throws -> PebbleDevice {
-        reconnectDevice = device
+    public func connect(to device: DiscoveredWatch) async throws -> ConnectedWatch {
+        reconnectWatch = device
         isManualDisconnect = false
         return try await establishConnection(to: device)
     }
 
-    private func establishConnection(to device: DiscoveredPebble) async throws -> PebbleDevice {
+    private func establishConnection(to device: DiscoveredWatch) async throws -> ConnectedWatch {
         guard connection == nil else { throw PebbleConnectionError.connectionAlreadyInProgress }
         // Half a message and half a frame belong to the link that dropped, and a
         // data-logging session id means only what the emulator said on that link.
@@ -92,25 +92,25 @@ public final class QEMUPebbleClient: PebbleClient {
             }
         }
         try await synchronizeTime()
-        let device = PebbleDevice(
+        let device = ConnectedWatch(
             id: device.id,
             name: device.name,
-            model: PebbleWatchModel(hardwarePlatform: information.hardwarePlatform) ?? device.model,
+            model: WatchModel(hardwarePlatform: information.hardwarePlatform) ?? device.model,
             firmwareVersion: information.firmwareVersion,
             batteryLevel: nil,
             serialNumber: information.serialNumber
         )
-        connectedDevice = device
+        connectedWatch = device
         return device
     }
 
-    public func disconnect(from device: PebbleDevice) async {
+    public func disconnect(from device: ConnectedWatch) async {
         isManualDisconnect = true
         reconnectTask?.cancel()
         reconnectTask = nil
         discardConnection()
-        connectedDevice = nil
-        reconnectDevice = nil
+        connectedWatch = nil
+        reconnectWatch = nil
         failOperation(PebbleConnectionError.disconnected)
     }
 
@@ -304,13 +304,13 @@ public final class QEMUPebbleClient: PebbleClient {
             openContinuation?.resume()
             openContinuation = nil
         case .failed(let error):
-            let shouldReconnect = (connectedDevice != nil || reconnectTask != nil) && !isManualDisconnect
+            let shouldReconnect = (connectedWatch != nil || reconnectTask != nil) && !isManualDisconnect
             openContinuation?.resume(throwing: error)
             openContinuation = nil
             finishVersion(throwing: error)
             failOperation(error)
             discardConnection()
-            connectedDevice = nil
+            connectedWatch = nil
             if shouldReconnect {
                 scheduleReconnect()
             } else {
@@ -333,17 +333,17 @@ public final class QEMUPebbleClient: PebbleClient {
     }
 
     private func scheduleReconnect() {
-        guard reconnectTask == nil, let reconnectDevice else { return }
-        eventContinuation?.yield(.reconnecting(deviceID: reconnectDevice.id))
+        guard reconnectTask == nil, let reconnectWatch else { return }
+        eventContinuation?.yield(.reconnecting(watchID: reconnectWatch.id))
         reconnectTask = Task { [weak self] in
             guard let self else { return }
             for delay in [1, 2, 4] {
                 try? await Task.sleep(for: .seconds(delay))
                 guard !Task.isCancelled, !self.isManualDisconnect else { return }
                 do {
-                    let device = try await self.establishConnection(to: reconnectDevice)
+                    let device = try await self.establishConnection(to: reconnectWatch)
                     self.reconnectTask = nil
-                    self.eventContinuation?.yield(.deviceUpdated(device))
+                    self.eventContinuation?.yield(.watchUpdated(device))
                     return
                 } catch {
                     self.discardConnection()

@@ -23,14 +23,14 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
             failScan(.bluetoothUnavailable)
             if connectionContinuation != nil {
                 failConnection(.bluetoothUnavailable)
-            } else if connectedDevice != nil || reconnects.isAutomatic {
+            } else if connectedWatch != nil || reconnects.isAutomatic {
                 reconnects.cancelSchedule()
                 connectionTimeoutTask?.cancel()
                 connectionTimeoutTask = nil
                 pendingDevice = nil
                 clearTransportState()
-                if let device = reconnects.device {
-                    eventContinuation?.yield(.reconnecting(deviceID: device.id))
+                if let device = reconnects.watch {
+                    eventContinuation?.yield(.reconnecting(watchID: device.id))
                 }
             }
         case .unknown:
@@ -50,10 +50,10 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
             return
         }
 
-        let id = peripheral.identifier.uuidString
+        let id = peripheral.watchID
         let advertisedName = advertisementData[CBAdvertisementDataLocalNameKey] as? String
         discoveredPeripherals[id] = peripheral
-        scanResults[id] = DiscoveredPebble(
+        scanResults[id] = DiscoveredWatch(
             id: id,
             name: advertisedName ?? peripheral.name ?? model.displayName,
             model: model,
@@ -62,7 +62,7 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
     }
 
     public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        guard pendingDevice?.id == peripheral.identifier.uuidString else {
+        guard pendingDevice?.id == peripheral.watchID else {
             // A connect request that already timed out or was abandoned; do
             // not let it become a session the app does not know about.
             cancelLink(peripheral, reason: "no connect request was waiting for this link")
@@ -101,7 +101,7 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
         if retryWithoutNotificationAccess(peripheral) {
             return
         }
-        if reconnects.isAutomatic, let device = reconnects.device {
+        if reconnects.isAutomatic, let device = reconnects.watch {
             pendingDevice = nil
             scheduleReconnect(to: device, using: peripheral)
             return
@@ -137,12 +137,12 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
             )
         }
 
-        let identifier = peripheral.identifier.uuidString
-        let wasConnected = connectedDevice != nil
+        let identifier = peripheral.watchID
+        let wasConnected = connectedWatch != nil
         let wasIntentional = reconnects.wasExpected(identifier)
-        let deviceToReconnect = reconnects.device
+        let deviceToReconnect = reconnects.watch
         let wasAutomatic = reconnects.isAutomatic
-        if pendingDevice?.id == peripheral.identifier.uuidString, !wasAutomatic {
+        if pendingDevice?.id == peripheral.watchID, !wasAutomatic {
             failConnection(.disconnected)
         }
         pendingDevice = nil
@@ -192,7 +192,7 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
         let peripherals = dict[CBCentralManagerRestoredStatePeripheralsKey] as? [CBPeripheral] ?? []
         for peripheral in peripherals {
             peripheral.delegate = self
-            discoveredPeripherals[peripheral.identifier.uuidString] = peripheral
+            discoveredPeripherals[peripheral.watchID] = peripheral
         }
     }
 }

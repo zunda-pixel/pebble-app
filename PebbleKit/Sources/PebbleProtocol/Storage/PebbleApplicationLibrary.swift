@@ -158,13 +158,13 @@ public actor PebbleApplicationLibrary {
         return ordered
     }
 
-    public func synchronizedApplicationIDs(deviceID: String) throws -> [UUID] {
-        try synchronizationStates()[deviceID] ?? []
+    public func synchronizedApplicationIDs(watchID: WatchID) throws -> [UUID] {
+        try synchronizationStates()[watchID] ?? []
     }
 
-    public func setSynchronizedApplicationIDs(_ applicationIDs: [UUID], deviceID: String) throws {
+    public func setSynchronizedApplicationIDs(_ applicationIDs: [UUID], watchID: WatchID) throws {
         var states = try synchronizationStates()
-        states[deviceID] = applicationIDs
+        states[watchID] = applicationIDs
         try PersistentJSON.save(states, to: synchronizationStateURL)
     }
 
@@ -186,8 +186,8 @@ public actor PebbleApplicationLibrary {
     /// Which applications each watch was last given. Nothing rebuilds this —
     /// only the watch knows — so a file that cannot be read is moved aside and
     /// every watch is synchronized again, which is work rather than a fault.
-    private func synchronizationStates() throws -> [String: [UUID]] {
-        try PersistentJSON.loadRecovering([String: [UUID]].self, from: synchronizationStateURL) ?? [:]
+    private func synchronizationStates() throws -> [WatchID: [UUID]] {
+        try PersistentJSON.loadRecovering([WatchID: [UUID]].self, from: synchronizationStateURL) ?? [:]
     }
 
     private var synchronizationStateURL: URL {

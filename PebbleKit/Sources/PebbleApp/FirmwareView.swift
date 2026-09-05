@@ -3,18 +3,18 @@ import PebbleProtocol
 
 struct FirmwareView: View {
     var model: AppModel
-    var watchID: String
+    var watchID: WatchID
 
     private var connection: WatchConnection? {
-        model.connections.first { $0.device.id == watchID }
+        model.connections.first { $0.watch.id == watchID }
     }
 
-    private var savedWatch: SavedPebbleWatch? {
+    private var savedWatch: SavedWatch? {
         model.savedWatches.first { $0.id == watchID }
     }
 
     private var journal: FirmwareUpdateJournal? {
-        guard let journal = model.firmwareUpdateJournal, journal.deviceID == watchID else {
+        guard let journal = model.firmwareUpdateJournal, journal.watchID == watchID else {
             return nil
         }
         return journal
@@ -22,23 +22,23 @@ struct FirmwareView: View {
 
     var body: some View {
         FirmwareContent(
-            installedVersion: connection?.device.firmwareVersion ?? savedWatch?.firmwareVersion,
-            board: connection?.device.board ?? savedWatch?.board,
-            runningSlot: connection?.device.runningFirmwareSlot,
+            installedVersion: connection?.watch.firmwareVersion ?? savedWatch?.firmwareVersion,
+            board: connection?.watch.board ?? savedWatch?.board,
+            runningSlot: connection?.watch.runningFirmwareSlot,
             isConnected: connection?.isConnected == true,
-            isRunningRecoveryFirmware: connection?.device.isRunningRecoveryFirmware == true,
+            isRunningRecoveryFirmware: connection?.watch.isRunningRecoveryFirmware == true,
             availableRelease: model.availableFirmwareRelease,
             downloadedFirmware: model.downloadedFirmware,
             journal: journal,
             progress: journal == nil ? nil : model.firmwareTransferProgress(on: watchID),
             statusMessage: model.firmwareUpdateStatusMessage,
             requiresConfirmation: model.firmwareRequiresConfirmation,
-            checkForUpdates: { Task { await model.checkForFirmwareUpdate(deviceID: watchID) } },
-            download: { Task { await model.downloadAvailableFirmware(deviceID: watchID) } },
-            installDownloaded: { Task { await model.installDownloadedFirmware(deviceID: watchID) } },
-            installFile: { url in Task { await model.installFirmware(from: url, deviceID: watchID) } },
+            checkForUpdates: { Task { await model.checkForFirmwareUpdate(watchID: watchID) } },
+            download: { Task { await model.downloadAvailableFirmware(watchID: watchID) } },
+            installDownloaded: { Task { await model.installDownloadedFirmware(watchID: watchID) } },
+            installFile: { url in Task { await model.installFirmware(from: url, watchID: watchID) } },
             confirmRecovery: { Task { await model.confirmRecoveryFirmwareUpdate() } },
-            resume: { Task { await model.resumeFirmwareUpdate(deviceID: watchID) } },
+            resume: { Task { await model.resumeFirmwareUpdate(watchID: watchID) } },
             cancel: { Task { await model.cancelFirmwareUpdate() } },
             discard: { Task { await model.discardPendingFirmwareUpdate() } }
         )
@@ -47,7 +47,7 @@ struct FirmwareView: View {
 
 struct FirmwareContent: View {
     var installedVersion: String?
-    var board: PebbleWatchBoard?
+    var board: WatchBoard?
     var runningSlot: Int?
     var isConnected: Bool
     var isRunningRecoveryFirmware: Bool

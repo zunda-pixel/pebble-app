@@ -45,8 +45,8 @@ struct CorruptStoreTests {
 
         // The point of moving it aside: a watch can be saved again afterwards.
         let saved = try await store.record(
-            PebbleDevice(
-                id: "mock-flint",
+            ConnectedWatch(
+                id: WatchID("mock-flint"),
                 name: "Pebble 2 Duo",
                 model: .pebble2Duo,
                 firmwareVersion: "v5.0.0",
@@ -147,11 +147,11 @@ struct CorruptStoreTests {
         try writeTruncatedJSON(to: syncURL)
 
         let library = PebbleApplicationLibrary(fileURL: fileURL)
-        #expect(try await library.synchronizedApplicationIDs(deviceID: "mock-flint").isEmpty)
+        #expect(try await library.synchronizedApplicationIDs(watchID: WatchID("mock-flint")).isEmpty)
 
         let applicationID = UUID()
-        try await library.setSynchronizedApplicationIDs([applicationID], deviceID: "mock-flint")
-        #expect(try await library.synchronizedApplicationIDs(deviceID: "mock-flint") == [applicationID])
+        try await library.setSynchronizedApplicationIDs([applicationID], watchID: WatchID("mock-flint"))
+        #expect(try await library.synchronizedApplicationIDs(watchID: WatchID("mock-flint")) == [applicationID])
     }
 
     /// A `.pbw` holding one application built for the Pebble Time 2.

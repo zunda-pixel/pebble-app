@@ -167,7 +167,7 @@ struct PackageImportTests {
               "firmware": {
                 "name": "firmware.bin",
                 "type": "normal",
-                "hwrev": "\(PebbleWatchBoard.obelixPVT.rawValue)",
+                "hwrev": "\(WatchBoard.obelixPVT.rawValue)",
                 "size": \(firmware.count),
                 "crc": \(crc),
                 "slot": \(slot)
@@ -208,28 +208,28 @@ struct PackageImportTests {
     }
 
     @Test(arguments: [
-        (UInt8(15), PebbleWatchBoard?.some(.asterix)),
-        (UInt8(18), PebbleWatchBoard?.some(.obelixPVT)),
-        (UInt8(21), PebbleWatchBoard?.some(.getafixDVT2)),
-        (UInt8(243), PebbleWatchBoard?.some(.obelixBigboard2)),
-        (UInt8(200), PebbleWatchBoard?.none),
+        (UInt8(15), WatchBoard?.some(.asterix)),
+        (UInt8(18), WatchBoard?.some(.obelixPVT)),
+        (UInt8(21), WatchBoard?.some(.getafixDVT2)),
+        (UInt8(243), WatchBoard?.some(.obelixBigboard2)),
+        (UInt8(200), WatchBoard?.none),
     ])
-    func boardIsReadFromTheHardwarePlatform(platform: UInt8, board: PebbleWatchBoard?) {
-        #expect(PebbleWatchBoard(hardwarePlatform: platform) == board)
+    func boardIsReadFromTheHardwarePlatform(platform: UInt8, board: WatchBoard?) {
+        #expect(WatchBoard(hardwarePlatform: platform) == board)
     }
 
     @Test
     func firmwareUpdateTargetsTheSlotThatIsNotRunning() {
-        let slot0 = PebbleDevice(
-            id: "a", name: "P", model: .pebbleTime2, firmwareVersion: nil, batteryLevel: nil,
+        let slot0 = ConnectedWatch(
+            id: WatchID("a"), name: "P", model: .pebbleTime2, firmwareVersion: nil, batteryLevel: nil,
             runningFirmwareSlot: 0
         )
-        let slot1 = PebbleDevice(
-            id: "b", name: "P", model: .pebbleTime2, firmwareVersion: nil, batteryLevel: nil,
+        let slot1 = ConnectedWatch(
+            id: WatchID("b"), name: "P", model: .pebbleTime2, firmwareVersion: nil, batteryLevel: nil,
             runningFirmwareSlot: 1
         )
-        let single = PebbleDevice(
-            id: "c", name: "P", model: .pebbleTime2, firmwareVersion: nil, batteryLevel: nil
+        let single = ConnectedWatch(
+            id: WatchID("c"), name: "P", model: .pebbleTime2, firmwareVersion: nil, batteryLevel: nil
         )
 
         #expect(slot0.firmwareUpdateSlot == 1)
@@ -275,7 +275,7 @@ struct PackageImportTests {
             journalURL: directory.appending(path: "journal.json")
         )
         let journal = FirmwareUpdateJournal(
-            deviceID: "watch", hardwareRevision: "EMERY", previousVersion: nil,
+            watchID: WatchID("watch"), hardwareRevision: "EMERY", previousVersion: nil,
             targetVersion: nil, packageSHA256: package.sha256
         )
         try await library.save(package, journal: journal)

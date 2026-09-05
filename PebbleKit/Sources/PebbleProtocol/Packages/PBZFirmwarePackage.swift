@@ -57,7 +57,7 @@ public enum PBZFirmwareImporter {
     /// slot it is running from.
     public static func load(
         from url: URL,
-        board: PebbleWatchBoard,
+        board: WatchBoard,
         targetSlot: Int? = nil
     ) throws -> PBZFirmwarePackage {
         let archive = try Archive(url: url, accessMode: .read)

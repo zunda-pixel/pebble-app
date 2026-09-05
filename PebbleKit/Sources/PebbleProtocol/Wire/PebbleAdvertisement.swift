@@ -7,7 +7,7 @@ public enum PebbleAdvertisement {
         advertisesPebbleService: Bool,
         localName: String?,
         manufacturerData: [UInt8]
-    ) -> PebbleWatchModel? {
+    ) -> WatchModel? {
         let containsCompanyIdentifier = manufacturerData.count >= 2
             && vendorIdentifiers.contains(
                 UInt16(manufacturerData[0]) | UInt16(manufacturerData[1]) << 8
@@ -24,12 +24,12 @@ public enum PebbleAdvertisement {
            manufacturerData[hardwarePlatformOffset] != 0 {
             // A watch that names its platform is trusted, even when that means rejecting
             // a model this app cannot drive.
-            return PebbleWatchModel(hardwarePlatform: manufacturerData[hardwarePlatformOffset])
+            return WatchModel(hardwarePlatform: manufacturerData[hardwarePlatformOffset])
         }
         return model(fromName: localName) ?? .pebbleTime2
     }
 
-    static func model(fromName name: String?) -> PebbleWatchModel? {
+    static func model(fromName name: String?) -> WatchModel? {
         guard let normalizedName = name?.lowercased() else {
             return nil
         }

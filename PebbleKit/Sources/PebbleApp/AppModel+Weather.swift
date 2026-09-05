@@ -70,7 +70,7 @@ extension AppModel {
         saveWeatherPlaces()
         weatherReports.removeAll { $0.id == id }
         // The watch keeps what it was given until it is told otherwise.
-        for connection in activeConnections where connection.device.supportsWeatherApp {
+        for connection in activeConnections where connection.watch.supportsWeatherApp {
             try? await connection.client.remove(.weather(id))
             try? await connection.client.write(.weatherOrder(weatherReports.map(\.id)))
         }
@@ -132,7 +132,7 @@ extension AppModel {
         guard connection.isConnected, !weatherReports.isEmpty else { return }
         // A watch without the weather app refuses the write, and one in recovery
         // firmware refuses everything.
-        guard connection.device.supportsWeatherApp, !connection.device.isRunningRecoveryFirmware else {
+        guard connection.watch.supportsWeatherApp, !connection.watch.isRunningRecoveryFirmware else {
             return
         }
         // Before the forecasts: the watch skips a forecast whose key it has no
@@ -141,11 +141,11 @@ extension AppModel {
             try await connection.client.write(.weatherOrder(weatherReports.map(\.id)))
         } catch {
             weatherStatusMessage =
-                "\(connection.device.name) did not accept the list of places. \(Text(refusalReason(for: error)))"
+                "\(connection.watch.name) did not accept the list of places. \(Text(refusalReason(for: error)))"
             await PebbleDiagnostics.shared.record(
                 .error,
                 category: "weather",
-                message: "\(connection.device.name) rejected the location order: \(String(reflecting: error))"
+                message: "\(connection.watch.name) rejected the location order: \(String(reflecting: error))"
             )
             return
         }
@@ -156,11 +156,11 @@ extension AppModel {
                 try await connection.client.write(.weather(report))
             } catch {
                 weatherStatusMessage =
-                    "\(connection.device.name) did not accept the forecast. \(Text(refusalReason(for: error)))"
+                    "\(connection.watch.name) did not accept the forecast. \(Text(refusalReason(for: error)))"
                 await PebbleDiagnostics.shared.record(
                     .error,
                     category: "weather",
-                    message: "\(connection.device.name) rejected \(report.locationName): \(String(reflecting: error))"
+                    message: "\(connection.watch.name) rejected \(report.locationName): \(String(reflecting: error))"
                 )
                 return
             }

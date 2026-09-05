@@ -83,7 +83,7 @@ struct RemindersAppTests {
         )
         model.remindersAppStore = remindersApp
         await model.scan()
-        await model.connect(to: try #require(model.discoveredDevices.first))
+        await model.connect(to: try #require(model.discoveredWatches.first))
         return model
     }
 

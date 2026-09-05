@@ -34,7 +34,7 @@ public struct PebbleLanguagePackCatalog: Sendable {
 
     /// Only Arabic is built for the current boards; every other language comes
     /// from a pack built for any board or from the Pebble 2's.
-    public static func packs(for board: PebbleWatchBoard) -> [PebbleLanguagePack] {
+    public static func packs(for board: WatchBoard) -> [PebbleLanguagePack] {
         let exact = all.filter { $0.boardName == board.rawValue }
         let exactLocales = Set(exact.map(\.locale))
         let fallback = all.filter { pack in
@@ -73,7 +73,7 @@ public struct PebbleLanguagePackCatalog: Sendable {
         // The one language built for the current boards, and the same package covers
         // all of them.
         let arabic = URL(string: "https://github.com/kaluaim/PebbleOS/releases/download/ar_SA-v1/ar_SA.pbl")!
-        let arabicBoards: [PebbleWatchBoard] = [
+        let arabicBoards: [WatchBoard] = [
             .asterix, .obelixEVT, .obelixDVT, .obelixPVT, .getafixEVT, .getafixDVT, .getafixDVT2,
         ]
         // Japanese has two font weights, so it appears twice on purpose.

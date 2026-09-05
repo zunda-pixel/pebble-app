@@ -10,9 +10,9 @@ import MemberwiseInit
 @MemberwiseInit(.public)
 public struct PendingDelivery<Work: Codable & Equatable & Sendable>: Codable, Equatable, Sendable {
     public var work: Work
-    public var deliveredTo: Set<String> = []
+    public var deliveredTo: Set<WatchID> = []
 
-    public func isOwed(by watchID: String) -> Bool {
+    public func isOwed(by watchID: WatchID) -> Bool {
         !deliveredTo.contains(watchID)
     }
 }

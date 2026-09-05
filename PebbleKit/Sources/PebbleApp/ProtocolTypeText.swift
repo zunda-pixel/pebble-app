@@ -15,7 +15,7 @@ public extension PebbleConnectionError {
             "Bluetooth access is not allowed. Enable it in System Settings."
         case .scanAlreadyInProgress:
             "A watch scan is already in progress."
-        case .deviceNotFound:
+        case .watchNotFound:
             "The selected watch is no longer available. Scan again."
         case .connectionAlreadyInProgress:
             "Another watch connection is already in progress."

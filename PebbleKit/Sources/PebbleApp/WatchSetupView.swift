@@ -1,3 +1,4 @@
+import PebbleProtocol
 import SwiftUI
 
 /// One screen of a watch's first setup.
@@ -286,10 +287,10 @@ private struct WatchSetupPage<Actions: View>: View {
 /// The watch and the permissions this flow is about, taken at the moment it
 /// opens so that the steps do not depend on which task ran first.
 struct WatchSetupContext: Identifiable, Equatable {
-    var watchID: String
+    var watchID: WatchID
     var permissions: PhonePermissions
 
-    var id: String { watchID }
+    var id: WatchID { watchID }
 }
 
 struct WatchSetupSheet: View {

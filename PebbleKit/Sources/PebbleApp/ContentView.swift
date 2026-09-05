@@ -20,9 +20,9 @@ public func makeDefaultPebbleClient() -> any PebbleClient {
 // The restoration identifier has to be stable and unique per watch, or iOS
 // hands one client another's restored state.
 @MainActor
-public func makeDefaultPebbleClientFactory() -> @MainActor (String) -> any PebbleClient {
-    { deviceID in
-        CoreBluetoothPebbleClient(restoreIdentifier: "dev.pebble.central.watch.\(deviceID)")
+public func makeDefaultPebbleClientFactory() -> @MainActor (WatchID) -> any PebbleClient {
+    { watchID in
+        CoreBluetoothPebbleClient(restoreIdentifier: "dev.pebble.central.watch.\(watchID)")
     }
 }
 
@@ -131,7 +131,7 @@ struct AppRootView: View {
         }
         // The permissions are read here rather than in the sheet, so that the
         // steps cannot be decided before the answers are known.
-        .onChange(of: model.connections.filter(\.isConnected).map(\.device.id)) { _, connectedIDs in
+        .onChange(of: model.connections.filter(\.isConnected).map(\.watch.id)) { _, connectedIDs in
             guard !hasCompletedWatchSetup, setup == nil, let watchID = connectedIDs.first else {
                 return
             }
@@ -275,7 +275,7 @@ struct SectionContent: View {
 }
 
 #Preview("Reconnecting") {
-    ConnectionStatusBanner(state: .reconnecting(deviceID: PreviewSamples.watch.id)) {}
+    ConnectionStatusBanner(state: .reconnecting(watchID: PreviewSamples.watch.id)) {}
 }
 
 #Preview("Connected") {

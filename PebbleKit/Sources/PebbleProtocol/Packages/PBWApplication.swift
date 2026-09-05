@@ -51,7 +51,7 @@ public struct PebbleApplication: Identifiable, Codable, Equatable, Sendable {
         ) ?? false
     }
 
-    public func bestVariant(for model: PebbleWatchModel) -> String? {
+    public func bestVariant(for model: WatchModel) -> String? {
         model.compatibleApplicationVariants.first { targetPlatforms.contains($0) }
     }
 }
@@ -98,7 +98,7 @@ private struct RawWatchapp: Decodable {
     var watchface: Bool?
 }
 
-public extension PebbleWatchModel {
+public extension WatchModel {
     var compatibleApplicationVariants: [String] {
         switch self {
         case .pebble2Duo:

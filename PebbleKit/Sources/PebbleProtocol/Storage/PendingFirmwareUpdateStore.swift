@@ -15,7 +15,7 @@ public enum FirmwareUpdatePhase: String, Codable, Equatable, Sendable {
 
 @MemberwiseInit(.public)
 public struct FirmwareUpdateJournal: Codable, Equatable, Sendable {
-    public var deviceID: String
+    public var watchID: WatchID
     public var hardwareRevision: String
     public var previousVersion: String?
     public var targetVersion: String?

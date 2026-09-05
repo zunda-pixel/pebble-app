@@ -4,15 +4,15 @@ import Retry
 import SwiftUI
 
 extension AppModel {
-    public func languagePacks(deviceID: String? = nil) -> [PebbleLanguagePack] {
-        guard let board = board(for: deviceID) else { return [] }
+    public func languagePacks(watchID: WatchID? = nil) -> [PebbleLanguagePack] {
+        guard let board = board(for: watchID) else { return [] }
         return PebbleLanguagePackCatalog.packs(for: board)
     }
 
     // Fetched before the watch is asked for anything: finding out afterwards that
     // it went away beats holding a transfer open through a download.
-    public func installLanguagePack(_ pack: PebbleLanguagePack, deviceID: String? = nil) async {
-        guard let connection = connection(for: deviceID), connection.isConnected else {
+    public func installLanguagePack(_ pack: PebbleLanguagePack, watchID: WatchID? = nil) async {
+        guard let connection = connection(for: watchID), connection.isConnected else {
             languageStatusMessage = "Connect the watch to change its language."
             return
         }
@@ -29,8 +29,8 @@ extension AppModel {
         await send([UInt8](data), named: pack.localName, on: connection)
     }
 
-    public func installLanguagePack(from url: URL, deviceID: String? = nil) async {
-        guard let connection = connection(for: deviceID), connection.isConnected else {
+    public func installLanguagePack(from url: URL, watchID: WatchID? = nil) async {
+        guard let connection = connection(for: watchID), connection.isConnected else {
             languageStatusMessage = "Connect the watch to change its language."
             return
         }
@@ -53,8 +53,8 @@ extension AppModel {
     private func send(_ bytes: [UInt8], named name: String, on connection: WatchConnection) async {
         // A watch that says it takes no language packs would file the transfer and
         // never read it, and recovery firmware refuses files outright.
-        guard connection.device.supportsLanguagePacks || connection.device.capabilities == 0,
-              !connection.device.isRunningRecoveryFirmware else {
+        guard connection.watch.supportsLanguagePacks || connection.watch.capabilities == 0,
+              !connection.watch.isRunningRecoveryFirmware else {
             languageStatusMessage = "This watch cannot take a language pack."
             return
         }
@@ -84,7 +84,7 @@ extension AppModel {
         for delay in [Duration.seconds(1), .seconds(3)] {
             try? await Task.sleep(for: delay)
             guard connection.isConnected else { return }
-            try? await connection.client.refreshDeviceInformation()
+            try? await connection.client.refreshWatchInformation()
         }
     }
 }

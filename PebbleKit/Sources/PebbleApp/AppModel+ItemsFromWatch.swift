@@ -46,9 +46,9 @@ extension AppModel {
         by connection: WatchConnection,
         in library: TimelinePinStore
     ) async {
-        let deviceID = connection.device.id
-        var held = (try? await library.writtenPinIDs(deviceID: deviceID)) ?? []
+        let watchID = connection.watch.id
+        var held = (try? await library.writtenPinIDs(watchID: watchID)) ?? []
         held.insert(id)
-        try? await library.setWrittenPinIDs(held, deviceID: deviceID)
+        try? await library.setWrittenPinIDs(held, watchID: watchID)
     }
 }

@@ -3,11 +3,11 @@ import SwiftUI
 
 struct WatchDetailView: View {
     var model: AppModel
-    var watchID: String
+    var watchID: WatchID
     @Environment(\.dismiss) private var dismiss
 
     private var journal: FirmwareUpdateJournal? {
-        guard let journal = model.firmwareUpdateJournal, journal.deviceID == watchID else {
+        guard let journal = model.firmwareUpdateJournal, journal.watchID == watchID else {
             return nil
         }
         return journal
@@ -15,11 +15,11 @@ struct WatchDetailView: View {
 
     // A language reads best in itself, so the name is not translated.
     private var languageName: String? {
-        guard let locale = model.connections.first(where: { $0.device.id == watchID })?.device.languageLocale,
+        guard let locale = model.connections.first(where: { $0.watch.id == watchID })?.watch.languageLocale,
               !locale.isEmpty else {
             return nil
         }
-        return model.languagePacks(deviceID: watchID).first { $0.locale == locale }?.localName ?? locale
+        return model.languagePacks(watchID: watchID).first { $0.locale == locale }?.localName ?? locale
     }
 
     var body: some View {
@@ -38,9 +38,9 @@ struct WatchDetailView: View {
             setAutomaticallyConnects: { enabled in
                 Task { await model.setAutomaticallyConnects(enabled, watchID: watchID) }
             },
-            disconnect: { Task { await model.disconnect(deviceID: watchID) } },
-            sendTestNotification: { Task { await model.sendTestNotification(deviceID: watchID) } },
-            reset: { kind in Task { await model.resetWatch(kind, deviceID: watchID) } },
+            disconnect: { Task { await model.disconnect(watchID: watchID) } },
+            sendTestNotification: { Task { await model.sendTestNotification(watchID: watchID) } },
+            reset: { kind in Task { await model.resetWatch(kind, watchID: watchID) } },
             forget: {
                 Task {
                     await model.forgetWatch(id: watchID)

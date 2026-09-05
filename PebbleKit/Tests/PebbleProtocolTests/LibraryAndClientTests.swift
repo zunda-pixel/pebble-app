@@ -80,13 +80,13 @@ struct LibraryAndClientTests {
         let secondID = UUID()
         let library = PebbleApplicationLibrary(fileURL: fileURL)
 
-        try await library.setSynchronizedApplicationIDs([firstID, secondID], deviceID: "watch-a")
-        try await library.setSynchronizedApplicationIDs([secondID], deviceID: "watch-b")
+        try await library.setSynchronizedApplicationIDs([firstID, secondID], watchID: WatchID("watch-a"))
+        try await library.setSynchronizedApplicationIDs([secondID], watchID: WatchID("watch-b"))
         let reloaded = PebbleApplicationLibrary(fileURL: fileURL)
 
-        #expect(try await reloaded.synchronizedApplicationIDs(deviceID: "watch-a") == [firstID, secondID])
-        #expect(try await reloaded.synchronizedApplicationIDs(deviceID: "watch-b") == [secondID])
-        #expect(try await reloaded.synchronizedApplicationIDs(deviceID: "unknown") == [])
+        #expect(try await reloaded.synchronizedApplicationIDs(watchID: WatchID("watch-a")) == [firstID, secondID])
+        #expect(try await reloaded.synchronizedApplicationIDs(watchID: WatchID("watch-b")) == [secondID])
+        #expect(try await reloaded.synchronizedApplicationIDs(watchID: WatchID("unknown")) == [])
     }
 
     @Test
@@ -94,19 +94,19 @@ struct LibraryAndClientTests {
         let client = MockPebbleClient()
         let devices = try await client.scan()
 
-        #expect(devices.count == PebbleWatchModel.allCases.count)
-        #expect(Set(devices.map(\.model)) == Set(PebbleWatchModel.allCases))
+        #expect(devices.count == WatchModel.allCases.count)
+        #expect(Set(devices.map(\.model)) == Set(WatchModel.allCases))
     }
 
     @Test
     func mockClientConnectsToDiscoveredDevice() async throws {
         let client = MockPebbleClient()
         let discoveredDevice = try #require(await client.scan().first)
-        let connectedDevice = try await client.connect(to: discoveredDevice)
+        let connectedWatch = try await client.connect(to: discoveredDevice)
 
-        #expect(connectedDevice.id == discoveredDevice.id)
-        #expect(connectedDevice.model == discoveredDevice.model)
-        #expect(connectedDevice.batteryLevel == 84)
+        #expect(connectedWatch.id == discoveredDevice.id)
+        #expect(connectedWatch.model == discoveredDevice.model)
+        #expect(connectedWatch.batteryLevel == 84)
     }
 
     @Test
@@ -193,8 +193,8 @@ struct SavedWatchStoreTests {
         let fileURL = directory.appending(path: "watches.json")
         defer { try? FileManager.default.removeItem(at: directory) }
         let library = SavedWatchStore(fileURL: fileURL)
-        let device = PebbleDevice(
-            id: "watch-1",
+        let device = ConnectedWatch(
+            id: WatchID("watch-1"),
             name: "Pebble QEMU",
             model: .pebbleTime2,
             firmwareVersion: "v1",
@@ -276,7 +276,7 @@ struct CompanionStorageTests {
         // Arabic is built for this board; everything else is a silk pack.
         let arabic = packs.filter { $0.locale == "ar_SA" }
         #expect(arabic.count == 1)
-        #expect(arabic.first?.boardName == PebbleWatchBoard.obelixPVT.rawValue)
+        #expect(arabic.first?.boardName == WatchBoard.obelixPVT.rawValue)
         #expect(packs.count > 1)
         #expect(packs.filter { $0.locale == "fr_FR" }.allSatisfy { $0.boardName == "silk" })
 

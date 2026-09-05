@@ -1,3 +1,4 @@
+import PebbleProtocol
 import Foundation
 import Valet
 
@@ -34,7 +35,7 @@ struct PebbleTokenStore {
 
     static var accountTokenName: String { "pebbleAccountToken" }
 
-    static func watchTokenName(watchID: String) -> String {
+    static func watchTokenName(watchID: WatchID) -> String {
         "pebbleWatchToken.\(watchID)"
     }
 

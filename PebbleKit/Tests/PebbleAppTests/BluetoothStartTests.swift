@@ -45,8 +45,8 @@ struct BluetoothStartTests {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
-        _ = try await watchStore.record(PebbleDevice(
-            id: "saved-watch",
+        _ = try await watchStore.record(ConnectedWatch(
+            id: WatchID("saved-watch"),
             name: "Pebble Time 2",
             model: .pebbleTime2,
             firmwareVersion: "v5.0.0",

@@ -131,7 +131,7 @@ struct ApplicationDetailContent: View {
 struct ApplicationDetailView: View {
     var model: AppModel
     var application: PebbleApplication
-    var watchID: String?
+    var watchID: WatchID?
     var editGlance: (PebbleApplication) -> Void
     @Environment(\.dismiss) private var dismiss
 

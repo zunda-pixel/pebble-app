@@ -42,7 +42,7 @@ public enum PBWPackageImporter {
         return script
     }
 
-    public static func load(from url: URL, for model: PebbleWatchModel) throws -> PBWPackage {
+    public static func load(from url: URL, for model: WatchModel) throws -> PBWPackage {
         let archive = try Archive(url: url, accessMode: .read)
         let appInfoData = try data(for: "appinfo.json", in: archive)
         let application = try PBWApplicationDecoder.decodeAppInfo(from: appInfoData)

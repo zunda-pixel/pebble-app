@@ -930,8 +930,8 @@ struct NotificationAppsTests {
     @Test func aBuzzIsNotSentToAWatchThatNeverSaidItCouldPlayOne() {
         var app = NotificationSourceApp(bundleID: "com.example.chat", displayName: "Chat")
         app.vibePattern = .sos
-        var watch = PebbleDevice(
-            id: "watch",
+        var watch = ConnectedWatch(
+            id: WatchID("watch"),
             name: "Pebble",
             model: .pebbleTime2,
             firmwareVersion: nil,
@@ -991,8 +991,8 @@ struct NotificationAppsTests {
     @Test func rulesAreNotSentToAWatchThatDoesNotFilter() {
         var app = NotificationSourceApp(bundleID: "com.example.chat", displayName: "Chat")
         app.filterRules = [NotificationFilterRule(pattern: "ad")]
-        var watch = PebbleDevice(
-            id: "watch",
+        var watch = ConnectedWatch(
+            id: WatchID("watch"),
             name: "Pebble",
             model: .pebbleTime2,
             firmwareVersion: nil,

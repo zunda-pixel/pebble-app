@@ -359,8 +359,8 @@ struct TransportTests {
 
     @Test
     func supportedModelsUseProtocolCodenames() {
-        #expect(PebbleWatchModel.pebble2Duo.rawValue == "FLINT")
-        #expect(PebbleWatchModel.pebbleTime2.rawValue == "EMERY")
-        #expect(PebbleWatchModel.pebbleRound2.rawValue == "GABBRO")
+        #expect(WatchModel.pebble2Duo.rawValue == "FLINT")
+        #expect(WatchModel.pebbleTime2.rawValue == "EMERY")
+        #expect(WatchModel.pebbleRound2.rawValue == "GABBRO")
     }
 }

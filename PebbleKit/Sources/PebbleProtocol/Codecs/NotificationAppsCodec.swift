@@ -106,7 +106,7 @@ public struct NotificationSourceApp: Codable, Equatable, Sendable, Identifiable 
     ///
     /// A watch that reports no capabilities at all has not been asked yet;
     /// nothing extra goes to it either.
-    public func asUnderstoodBy(_ device: PebbleDevice) -> NotificationSourceApp {
+    public func asUnderstoodBy(_ device: ConnectedWatch) -> NotificationSourceApp {
         var record = self
         if !device.supportsCustomVibePatterns { record.vibePattern = nil }
         if !device.supportsNotificationFiltering { record.filterRules = [] }

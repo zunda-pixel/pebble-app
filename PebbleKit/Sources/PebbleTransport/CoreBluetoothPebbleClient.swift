@@ -36,12 +36,12 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     static var batteryLevelCharacteristic = CBUUID(string: "2A19")
 
     var centralManager: CBCentralManager!
-    var discoveredPeripherals: [String: CBPeripheral] = [:]
-    var scanResults: [String: DiscoveredPebble] = [:]
+    var discoveredPeripherals: [WatchID: CBPeripheral] = [:]
+    var scanResults: [WatchID: DiscoveredWatch] = [:]
     var bluetoothWaiters: [CheckedContinuation<Void, any Error>] = []
-    private var scanContinuation: CheckedContinuation<[DiscoveredPebble], any Error>?
-    var connectionContinuation: CheckedContinuation<PebbleDevice, any Error>?
-    var pendingDevice: DiscoveredPebble?
+    private var scanContinuation: CheckedContinuation<[DiscoveredWatch], any Error>?
+    var connectionContinuation: CheckedContinuation<ConnectedWatch, any Error>?
+    var pendingDevice: DiscoveredWatch?
     var activeWriteCharacteristic: CBCharacteristic?
     var activeBatteryCharacteristic: CBCharacteristic?
     var activePairingTriggerCharacteristic: CBCharacteristic?
@@ -57,7 +57,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     var subscriptionWatchdog: Task<Void, Never>?
     var hasRepublishedForThisLink = false
     var connectedPeripheral: CBPeripheral?
-    var connectedDevice: PebbleDevice?
+    var connectedWatch: ConnectedWatch?
     private var latestBatteryLevel: Int?
     var ppogSession: PPoGSession?
     var frameDecoder = PebbleProtocolFrameDecoder()
@@ -150,7 +150,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         centralManager.cancelPeripheralConnection(peripheral)
     }
 
-    public func scan() async throws -> [DiscoveredPebble] {
+    public func scan() async throws -> [DiscoveredWatch] {
         try await waitForBluetooth()
 
         guard scanContinuation == nil else {
@@ -178,25 +178,28 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
     }
 
-    public func retrieveKnownDevices(_ hints: [DiscoveredPebble]) async throws -> [DiscoveredPebble] {
+    public func retrieveKnownWatches(_ hints: [DiscoveredWatch]) async throws -> [DiscoveredWatch] {
         try await waitForBluetooth()
 
         // A bonded Pebble stays connected at the system level and stops
         // advertising, so it has to be looked up instead of scanned for.
         let hintsByID = Dictionary(hints.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         var peripherals = centralManager.retrieveConnectedPeripherals(withServices: [Self.ppogService])
+        // A watch this transport found is named by its CoreBluetooth
+        // identifier, so a hint from another transport — the emulator's
+        // "qemu-emery" — has nothing to look up and drops out here.
         peripherals += centralManager.retrievePeripherals(
-            withIdentifiers: hints.compactMap { UUID(uuidString: $0.id) }
+            withIdentifiers: hints.compactMap { UUID(uuidString: $0.id.rawValue) }
         )
 
-        var retrieved: [DiscoveredPebble] = []
+        var retrieved: [DiscoveredWatch] = []
         for peripheral in peripherals {
-            let id = peripheral.identifier.uuidString
+            let id = peripheral.watchID
             guard let hint = hintsByID[id], !retrieved.contains(where: { $0.id == id }) else {
                 continue
             }
             discoveredPeripherals[id] = peripheral
-            let device = DiscoveredPebble(
+            let device = DiscoveredWatch(
                 id: id,
                 name: peripheral.name ?? hint.name,
                 model: hint.model,
@@ -208,30 +211,30 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         return retrieved
     }
 
-    public func connect(to device: DiscoveredPebble) async throws -> PebbleDevice {
+    public func connect(to device: DiscoveredWatch) async throws -> ConnectedWatch {
         try await waitForBluetooth()
 
         guard connectionContinuation == nil else {
             throw PebbleConnectionError.connectionAlreadyInProgress
         }
-        if let connectedDevice, connectedDevice.id == device.id {
-            return connectedDevice
+        if let connectedWatch, connectedWatch.id == device.id {
+            return connectedWatch
         }
         reconnects.stop()
         if let previousPeripheral = connectedPeripheral {
-            reconnects.expectDisconnect(of: previousPeripheral.identifier.uuidString)
+            reconnects.expectDisconnect(of: previousPeripheral.watchID)
             cancelLink(previousPeripheral, reason: "a manual connect superseded it")
             clearTransportState()
         }
         if discoveredPeripherals[device.id] == nil {
-            _ = try await retrieveKnownDevices([device])
+            _ = try await retrieveKnownWatches([device])
         }
         guard let peripheral = discoveredPeripherals[device.id] else {
-            throw PebbleConnectionError.deviceNotFound
+            throw PebbleConnectionError.watchNotFound
         }
 
         centralManager.stopScan()
-        pendingDevice = DiscoveredPebble(
+        pendingDevice = DiscoveredWatch(
             id: device.id,
             name: peripheral.name ?? device.name,
             model: device.model,
@@ -257,14 +260,14 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
     }
 
-    public func disconnect(from device: PebbleDevice) async {
+    public func disconnect(from device: ConnectedWatch) async {
         // Stop the reconnection machinery first: a scheduled retry captured
         // its peripheral by value and would otherwise undo this disconnect.
         if reconnects.isFollowing(device.id) {
             reconnects.stop()
         }
         guard let peripheral = discoveredPeripherals[device.id]
-            ?? (connectedPeripheral?.identifier.uuidString == device.id ? connectedPeripheral : nil) else {
+            ?? (connectedPeripheral?.watchID == device.id ? connectedPeripheral : nil) else {
             return
         }
         if peripheral.state != .disconnected {
@@ -354,7 +357,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         try await transferObject(bytes, objectType: objectType, appBankID: appBankID, filename: nil)
     }
 
-    public func refreshDeviceInformation() async throws {
+    public func refreshWatchInformation() async throws {
         guard let peripheral = connectedPeripheral else { throw PebbleConnectionError.disconnected }
         try sendFrame(WatchVersionCodec.requestFrame(), to: peripheral)
     }
@@ -569,10 +572,10 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
 
         connectionTimeoutTask?.cancel()
         connectionTimeoutTask = nil
-        let connectedDevice = PebbleDevice(
-            id: peripheral.identifier.uuidString,
+        let connectedWatch = ConnectedWatch(
+            id: peripheral.watchID,
             name: device.name,
-            model: PebbleWatchModel(hardwarePlatform: information.hardwarePlatform) ?? device.model,
+            model: WatchModel(hardwarePlatform: information.hardwarePlatform) ?? device.model,
             firmwareVersion: information.firmwareVersion,
             batteryLevel: latestBatteryLevel,
             serialNumber: information.serialNumber,
@@ -583,15 +586,15 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             languageVersion: information.languageVersion,
             capabilities: information.capabilities
         )
-        self.connectedDevice = connectedDevice
+        self.connectedWatch = connectedWatch
         let initialConnectionContinuation = connectionContinuation
-        initialConnectionContinuation?.resume(returning: connectedDevice)
+        initialConnectionContinuation?.resume(returning: connectedWatch)
         connectionContinuation = nil
         pendingDevice = nil
         connectedPeripheral = peripheral
         reconnects.follow(device)
         if initialConnectionContinuation == nil {
-            eventContinuation?.yield(.deviceUpdated(connectedDevice))
+            eventContinuation?.yield(.watchUpdated(connectedWatch))
         }
         startHealthChecks(on: peripheral)
         appMessages.startNextIfPossible()
@@ -640,7 +643,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         activeWriteCharacteristic = nil
         activeBatteryCharacteristic = nil
         connectedPeripheral = nil
-        connectedDevice = nil
+        connectedWatch = nil
         latestBatteryLevel = nil
         ppogSession = nil
         pendingGattWrites.removeAll()
@@ -658,7 +661,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         finishFirmwareControl(throwing: error)
     }
 
-    func model(from advertisementData: [String: Any]) -> PebbleWatchModel? {
+    func model(from advertisementData: [String: Any]) -> WatchModel? {
         let serviceUUIDs = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] ?? []
         return PebbleAdvertisement.model(
             advertisesPebbleService: serviceUUIDs.contains(Self.ppogService)
@@ -891,7 +894,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     ) throws -> Bool {
         // The watch changes what it reports when a language pack is installed,
         // which is how the app finds out.
-        if pendingDevice == nil, let device = connectedDevice {
+        if pendingDevice == nil, let device = connectedWatch {
             clearPendingHealthCheck()
             let information = try WatchVersionCodec.decode(frame)
             var updated = device
@@ -903,12 +906,12 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             updated.languageLocale = information.languageLocale
             updated.languageVersion = information.languageVersion
             updated.capabilities = information.capabilities
-            connectedDevice = updated
+            connectedWatch = updated
             // The health check asks for this once a minute and the answer is
             // almost always the same one; announcing it anyway had the app
             // rewriting its watch library every minute.
             if updated != device {
-                eventContinuation?.yield(.deviceUpdated(updated))
+                eventContinuation?.yield(.watchUpdated(updated))
             }
             return true
         }
@@ -999,7 +1002,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
         // A watch being recovered cannot afford a dropped link, and its own
         // timeouts cover the transfer.
-        guard connectedDevice?.isRunningRecoveryFirmware != true else {
+        guard connectedWatch?.isRunningRecoveryFirmware != true else {
             return
         }
         do {
@@ -1143,7 +1146,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         pairingTimeoutTask?.cancel()
         pairingTimeoutTask = nil
         connectedPeripheral = nil
-        connectedDevice = nil
+        connectedWatch = nil
         latestBatteryLevel = nil
         ppogSession = nil
         frameDecoder = PebbleProtocolFrameDecoder()
@@ -1216,17 +1219,17 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         return true
     }
 
-    func reconnect(to device: DiscoveredPebble, using peripheral: CBPeripheral) {
+    func reconnect(to device: DiscoveredWatch, using peripheral: CBPeripheral) {
         reconnects.cancelSchedule()
         guard centralManager.state == .poweredOn else {
-            eventContinuation?.yield(.reconnecting(deviceID: device.id))
+            eventContinuation?.yield(.reconnecting(watchID: device.id))
             scheduleReconnect(to: device, using: peripheral)
             return
         }
         pendingDevice = device
         reconnects.beginAutomaticAttempt()
         peripheral.delegate = self
-        eventContinuation?.yield(.reconnecting(deviceID: device.id))
+        eventContinuation?.yield(.reconnecting(watchID: device.id))
         centralManager.connect(peripheral, options: connectOptions(for: peripheral))
 
         connectionTimeoutTask?.cancel()
@@ -1241,7 +1244,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
 
     /// Stops chasing a watch whose links keep dying in the handshake, and says
     /// so: the reader was told "Reconnecting…" for as long as they watched.
-    func giveUpReconnecting(to device: DiscoveredPebble) {
+    func giveUpReconnecting(to device: DiscoveredWatch) {
         let attempts = reconnects.failedHandshakes
         reconnects.stop()
         connectionTimeoutTask?.cancel()
@@ -1258,7 +1261,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         eventContinuation?.yield(.disconnected(.handshakeKeptFailing))
     }
 
-    func scheduleReconnect(to device: DiscoveredPebble, using peripheral: CBPeripheral) {
+    func scheduleReconnect(to device: DiscoveredWatch, using peripheral: CBPeripheral) {
         connectionTimeoutTask?.cancel()
         connectionTimeoutTask = nil
         reconnects.schedule { [weak self] in
@@ -1267,17 +1270,17 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     }
 
     func resumeReconnectAfterPowerOn() {
-        guard let device = reconnects.device,
-              connectedDevice == nil,
+        guard let device = reconnects.watch,
+              connectedWatch == nil,
               connectionContinuation == nil else {
             return
         }
         Task { [weak self] in
             guard let self else { return }
             // The pre-power-cycle CBPeripheral may be invalid; look it up again.
-            _ = try? await self.retrieveKnownDevices([device])
-            guard self.reconnects.device?.id == device.id,
-                  self.connectedDevice == nil,
+            _ = try? await self.retrieveKnownWatches([device])
+            guard self.reconnects.watch?.id == device.id,
+                  self.connectedWatch == nil,
                   self.connectionContinuation == nil,
                   let peripheral = self.discoveredPeripherals[device.id] else {
                 return
@@ -1292,12 +1295,12 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
 
         latestBatteryLevel = batteryLevel
-        guard var device = connectedDevice else {
+        guard var device = connectedWatch else {
             return
         }
         device.batteryLevel = batteryLevel
-        connectedDevice = device
-        eventContinuation?.yield(.deviceUpdated(device))
+        connectedWatch = device
+        eventContinuation?.yield(.watchUpdated(device))
     }
 
     private func observeSystemTimeChanges() {

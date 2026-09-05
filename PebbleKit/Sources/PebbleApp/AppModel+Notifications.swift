@@ -27,8 +27,8 @@ extension AppModel {
         try? await notificationPreferenceStore.save(notificationPreferences)
     }
 
-    public func sendTestNotification(deviceID: String? = nil) async {
-        guard let connection = connection(for: deviceID), connection.isConnected else {
+    public func sendTestNotification(watchID: WatchID? = nil) async {
+        guard let connection = connection(for: watchID), connection.isConnected else {
             notificationStatusMessage = "Connect a Pebble before sending a test notification."
             return
         }
@@ -41,7 +41,7 @@ extension AppModel {
         do {
             try await connection.client.write(.notification(notification))
             notificationStatusMessage = "Test notification sent."
-            await record(notification, sentTo: [connection.device.name])
+            await record(notification, sentTo: [connection.watch.name])
             await PebbleDiagnostics.shared.record(
                 category: "notification",
                 message: "Test notification sent"
@@ -101,7 +101,7 @@ extension AppModel {
             await queue(PendingDelivery(work: notification), reason: "no watch is connected")
             return
         }
-        var delivered: Set<String> = []
+        var delivered: Set<WatchID> = []
         var watchNames: [String] = []
         for connection in activeConnections {
             let client = connection.client
@@ -109,8 +109,8 @@ extension AppModel {
                 try await retry(with: .watchWork) {
                     try await client.write(.notification(notification))
                 }
-                delivered.insert(connection.device.id)
-                watchNames.append(connection.device.name)
+                delivered.insert(connection.watch.id)
+                watchNames.append(connection.watch.name)
             } catch {
                 continue
             }
@@ -118,7 +118,7 @@ extension AppModel {
         if !watchNames.isEmpty {
             await record(notification, sentTo: watchNames)
         }
-        guard activeConnections.allSatisfy({ delivered.contains($0.device.id) }) else {
+        guard activeConnections.allSatisfy({ delivered.contains($0.watch.id) }) else {
             // The only caller is a `try?`-ed task in the companion runtime, which has
             // nowhere to put a throw. A watch that would not take it now is in the same
             // position as one that was not there at all — but the watches that did take
@@ -206,7 +206,7 @@ extension AppModel {
                     notificationSourceApps = apps
                     connection.synchronizedNotificationAppRecords[app.bundleID] = NotificationAppsCodec.value(
                         for: (apps.first { $0.bundleID == app.bundleID } ?? app)
-                            .asUnderstoodBy(connection.device)
+                            .asUnderstoodBy(connection.watch)
                     )
                     succeeded = true
                     for other in activeConnections where other !== connection {
@@ -235,7 +235,7 @@ extension AppModel {
         for app in notificationSourceApps {
             // Cut down here rather than in the client, so that what is written
             // down as sent is the record that was sent.
-            let record = app.asUnderstoodBy(connection.device)
+            let record = app.asUnderstoodBy(connection.watch)
             let value = NotificationAppsCodec.value(for: record)
             guard connection.synchronizedNotificationAppRecords[app.bundleID] != value else {
                 continue
@@ -249,7 +249,7 @@ extension AppModel {
                 await PebbleDiagnostics.shared.record(
                     .error,
                     category: "notification",
-                    message: "\(connection.device.name) rejected the setting for \(app.displayName): "
+                    message: "\(connection.watch.name) rejected the setting for \(app.displayName): "
                         + String(reflecting: error)
                 )
                 return
@@ -358,7 +358,7 @@ extension AppModel {
                     await PebbleDiagnostics.shared.record(
                         .error,
                         category: "notification",
-                        message: "\(connection.device.name) kept \(app.displayName): "
+                        message: "\(connection.watch.name) kept \(app.displayName): "
                             + String(reflecting: error)
                     )
                 }
@@ -411,18 +411,18 @@ extension AppModel {
 
     private func deliverPendingNotifications() async {
         while let next = pendingNotifications.first(where: { queued in
-            activeConnections.contains { queued.isOwed(by: $0.device.id) }
+            activeConnections.contains { queued.isOwed(by: $0.watch.id) }
         }) {
             var delivered = next.deliveredTo
             var watchNames: [String] = []
-            for connection in activeConnections where next.isOwed(by: connection.device.id) {
+            for connection in activeConnections where next.isOwed(by: connection.watch.id) {
                 let client = connection.client
                 do {
                     try await retry(with: .watchWork) {
                         try await client.write(.notification(next.work))
                     }
-                    delivered.insert(connection.device.id)
-                    watchNames.append(connection.device.name)
+                    delivered.insert(connection.watch.id)
+                    watchNames.append(connection.watch.name)
                 } catch {
                     continue
                 }
@@ -456,8 +456,8 @@ extension AppModel {
 
     /// Which watches have still not had a piece of queued work: every watch the
     /// app knows of, so an entry is finished only once nobody is waiting for it.
-    private func watchesOwed(_ deliveredTo: Set<String>) -> Set<String> {
-        let known = Set(savedWatches.map(\.id)).union(connections.map(\.device.id))
+    private func watchesOwed(_ deliveredTo: Set<WatchID>) -> Set<WatchID> {
+        let known = Set(savedWatches.map(\.id)).union(connections.map(\.watch.id))
         return known.subtracting(deliveredTo)
     }
 

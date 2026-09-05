@@ -8,8 +8,8 @@ import Foundation
 /// is made of are previewed against the same data, and so that a change to one
 /// of these types is a compile error in one file instead of a dozen.
 enum PreviewSamples {
-    static let watch = PebbleDevice(
-        id: "preview-watch",
+    static let watch = ConnectedWatch(
+        id: WatchID("preview-watch"),
         name: "Pebble 5209",
         model: .pebbleTime2,
         firmwareVersion: "v4.36.2",
@@ -21,7 +21,7 @@ enum PreviewSamples {
         capabilities: .max
     )
 
-    static let savedWatch = SavedPebbleWatch(
+    static let savedWatch = SavedWatch(
         id: watch.id,
         name: watch.name,
         model: watch.model,
@@ -33,8 +33,8 @@ enum PreviewSamples {
         board: watch.board
     )
 
-    static let discovered = DiscoveredPebble(
-        id: "preview-discovered",
+    static let discovered = DiscoveredWatch(
+        id: WatchID("preview-discovered"),
         name: "Pebble ABCD",
         model: .pebbleRound2,
         signalStrength: -62
@@ -55,7 +55,7 @@ enum PreviewSamples {
     )
 
     static let recoverySummary = WatchSummary(
-        id: "recovery-watch",
+        id: WatchID("recovery-watch"),
         name: "Pebble 33EE",
         model: .pebble2Duo,
         batteryLevel: 63,
@@ -68,7 +68,7 @@ enum PreviewSamples {
     )
 
     static let savedSummary = WatchSummary(
-        id: "saved-watch",
+        id: WatchID("saved-watch"),
         name: "Pebble 2 Duo",
         model: .pebble2Duo,
         serialNumber: "Q403P000001B",
@@ -275,7 +275,7 @@ enum PreviewSamples {
 
     static func firmwareJournal(phase: FirmwareUpdatePhase) -> FirmwareUpdateJournal {
         FirmwareUpdateJournal(
-            deviceID: watch.id,
+            watchID: watch.id,
             hardwareRevision: "obelix_pvt",
             previousVersion: watch.firmwareVersion,
             targetVersion: firmwareRelease.versionTag,

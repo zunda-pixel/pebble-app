@@ -37,7 +37,7 @@ public final class MockPebbleClient: PebbleClient {
     public private(set) var deletedTimelineReminderIDs: [UUID] = []
     public private(set) var registeredApplications: [PebbleAppMetadata] = []
     public private(set) var unregisteredApplicationIDs: [UUID] = []
-    public private(set) var disconnectedDevices: [PebbleDevice] = []
+    public private(set) var disconnectedWatches: [ConnectedWatch] = []
     private var nextTransactionID: UInt8 = 0
     private var frameContinuation: AsyncStream<PebbleProtocolFrame>.Continuation?
     private var eventContinuation: AsyncStream<PebbleClientEvent>.Continuation?
@@ -50,24 +50,24 @@ public final class MockPebbleClient: PebbleClient {
         startBluetoothCount += 1
     }
 
-    public func scan() async throws -> [DiscoveredPebble] {
+    public func scan() async throws -> [DiscoveredWatch] {
         try await Task.sleep(for: .milliseconds(400))
 
         return [
-            DiscoveredPebble(
-                id: "mock-flint",
+            DiscoveredWatch(
+                id: WatchID("mock-flint"),
                 name: "Pebble 2 Duo",
                 model: .pebble2Duo,
                 signalStrength: -42
             ),
-            DiscoveredPebble(
-                id: "mock-emery",
+            DiscoveredWatch(
+                id: WatchID("mock-emery"),
                 name: "Pebble Time 2",
                 model: .pebbleTime2,
                 signalStrength: -57
             ),
-            DiscoveredPebble(
-                id: "mock-gabbro",
+            DiscoveredWatch(
+                id: WatchID("mock-gabbro"),
                 name: "Pebble Round 2",
                 model: .pebbleRound2,
                 signalStrength: -68
@@ -75,7 +75,7 @@ public final class MockPebbleClient: PebbleClient {
         ]
     }
 
-    public func retrieveKnownDevices(_ hints: [DiscoveredPebble]) async throws -> [DiscoveredPebble] {
+    public func retrieveKnownWatches(_ hints: [DiscoveredWatch]) async throws -> [DiscoveredWatch] {
         hints
     }
 
@@ -85,13 +85,13 @@ public final class MockPebbleClient: PebbleClient {
     /// protocol service does.
     public var connectionFailure: PebbleConnectionError?
 
-    public func connect(to device: DiscoveredPebble) async throws -> PebbleDevice {
+    public func connect(to device: DiscoveredWatch) async throws -> ConnectedWatch {
         try await Task.sleep(for: .milliseconds(500))
         if let connectionFailure {
             throw connectionFailure
         }
 
-        return PebbleDevice(
+        return ConnectedWatch(
             id: device.id,
             name: device.name,
             model: device.model,
@@ -102,8 +102,8 @@ public final class MockPebbleClient: PebbleClient {
         )
     }
 
-    public func disconnect(from device: PebbleDevice) async {
-        disconnectedDevices.append(device)
+    public func disconnect(from device: ConnectedWatch) async {
+        disconnectedWatches.append(device)
         await Task.yield()
     }
 

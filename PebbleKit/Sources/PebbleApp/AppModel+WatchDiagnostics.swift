@@ -1,10 +1,10 @@
-import PebbleProtocol
+public import PebbleProtocol
 import Foundation
 import SwiftUI
 
 extension AppModel {
-    public func takeScreenshot(deviceID: String? = nil) async {
-        guard let connection = connection(for: deviceID), connection.isConnected else {
+    public func takeScreenshot(watchID: WatchID? = nil) async {
+        guard let connection = connection(for: watchID), connection.isConnected else {
             watchDiagnosticsStatusMessages[.screenshot] = "Connect the watch before taking a screenshot."
             return
         }
@@ -13,22 +13,22 @@ extension AppModel {
         do {
             let screenshot = try await connection.client.takeScreenshot()
             latestScreenshot = screenshot
-            screenshotURL = try writeScreenshot(screenshot, name: connection.device.name)
+            screenshotURL = try writeScreenshot(screenshot, name: connection.watch.name)
             watchDiagnosticsStatusMessages[.screenshot] = nil
         } catch {
             watchDiagnosticsStatusMessages[.screenshot] = "The watch would not send a screenshot."
             await PebbleDiagnostics.shared.record(
                 .error,
                 category: "screenshot",
-                message: "\(connection.device.name): \(String(reflecting: error))"
+                message: "\(connection.watch.name): \(String(reflecting: error))"
             )
         }
     }
 
     /// Generation zero is the run the watch is in now, one the run before that,
     /// and so on until the watch says it has no more.
-    public func gatherWatchLogs(deviceID: String? = nil) async {
-        guard let connection = connection(for: deviceID), connection.isConnected else {
+    public func gatherWatchLogs(watchID: WatchID? = nil) async {
+        guard let connection = connection(for: watchID), connection.isConnected else {
             watchDiagnosticsStatusMessages[.watchLogs] = "Connect the watch before gathering its logs."
             return
         }
@@ -42,16 +42,16 @@ extension AppModel {
                 }
                 watchLogLines += lines
             }
-            watchLogsURL = try writeWatchLogs(name: connection.device.name)
+            watchLogsURL = try writeWatchLogs(name: connection.watch.name)
             watchDiagnosticsStatusMessages[.watchLogs] = nil
         } catch {
             // A log that stops halfway is more use than none.
-            watchLogsURL = try? writeWatchLogs(name: connection.device.name)
+            watchLogsURL = try? writeWatchLogs(name: connection.watch.name)
             watchDiagnosticsStatusMessages[.watchLogs] = "The watch stopped part way through its logs."
             await PebbleDiagnostics.shared.record(
                 .error,
                 category: "watchlog",
-                message: "\(connection.device.name): \(String(reflecting: error))"
+                message: "\(connection.watch.name): \(String(reflecting: error))"
             )
         }
     }
@@ -86,8 +86,8 @@ extension AppModel {
     // The unread dump is asked for first: the watch marks one as read once it has
     // handed it over, so asking for that one leaves a dump already collected
     // alone.
-    public func collectCoredump(deviceID: String? = nil) async {
-        guard let connection = connection(for: deviceID), connection.isConnected else {
+    public func collectCoredump(watchID: WatchID? = nil) async {
+        guard let connection = connection(for: watchID), connection.isConnected else {
             watchDiagnosticsStatusMessages[.coredump] = "Connect the watch before collecting a crash report."
             return
         }
@@ -99,7 +99,7 @@ extension AppModel {
                 watchDiagnosticsStatusMessages[.coredump] = "The watch has no crash report that has not been read."
                 return
             }
-            coredumpURL = try write(bytes, name: "\(connection.device.name)-coredump.bin")
+            coredumpURL = try write(bytes, name: "\(connection.watch.name)-coredump.bin")
             watchDiagnosticsStatusMessages[.coredump] = nil
         } catch GetBytesError.refused(3) {
             watchDiagnosticsStatusMessages[.coredump] = "The watch has no crash report."
@@ -108,7 +108,7 @@ extension AppModel {
             await PebbleDiagnostics.shared.record(
                 .error,
                 category: "coredump",
-                message: "\(connection.device.name): \(String(reflecting: error))"
+                message: "\(connection.watch.name): \(String(reflecting: error))"
             )
         }
     }

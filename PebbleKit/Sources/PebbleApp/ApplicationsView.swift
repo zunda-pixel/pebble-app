@@ -6,27 +6,27 @@ struct ApplicationsView: View {
     @Environment(\.undoManager) private var undoManager
     @State private var isChoosingPackage = false
     @State private var isShowingCatalog = false
-    @State private var selectedWatchID: String?
+    @State private var selectedWatchID: WatchID?
     @State private var glanceApplication: PebbleApplication?
 
     // The picked watch while it stays connected, otherwise the primary one.
-    private var displayedWatchID: String? {
+    private var displayedWatchID: WatchID? {
         if let selectedWatchID,
-           model.connectedDevices.contains(where: { $0.id == selectedWatchID }) {
+           model.connectedWatches.contains(where: { $0.id == selectedWatchID }) {
             return selectedWatchID
         }
-        return model.connectedDevice?.id
+        return model.connectedWatch?.id
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            if model.connectedDevices.count > 1 {
+            if model.connectedWatches.count > 1 {
                 Picker("Watch", selection: Binding(
-                    get: { displayedWatchID ?? "" },
+                    get: { displayedWatchID },
                     set: { selectedWatchID = $0 }
                 )) {
-                    ForEach(model.connectedDevices) { device in
-                        Text(device.name).tag(device.id)
+                    ForEach(model.connectedWatches) { watch in
+                        Text(watch.name).tag(watch.id)
                     }
                 }
                 .pickerStyle(.segmented)

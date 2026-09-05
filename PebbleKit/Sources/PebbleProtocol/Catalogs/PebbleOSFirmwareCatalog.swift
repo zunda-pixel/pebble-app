@@ -7,14 +7,14 @@ import Retry
 @MemberwiseInit(.public)
 public struct DownloadedFirmware: Codable, Equatable, Sendable {
     public var versionTag: String
-    public var board: PebbleWatchBoard
+    public var board: WatchBoard
     public var url: URL
 }
 
 @MemberwiseInit(.public)
 public struct PebbleOSFirmwareRelease: Equatable, Sendable {
     public var versionTag: String
-    public var board: PebbleWatchBoard
+    public var board: WatchBoard
     public var downloadURL: URL
     public var sizeInBytes: Int
     public var releaseNotesURL: URL?
@@ -46,7 +46,7 @@ public struct PebbleOSFirmwareCatalog: Sendable {
         }
     }
 
-    public func latestRelease(for board: PebbleWatchBoard) async throws -> PebbleOSFirmwareRelease {
+    public func latestRelease(for board: WatchBoard) async throws -> PebbleOSFirmwareRelease {
         try await retry(with: .networkFetch) {
             let request = HTTPRequest(
                 method: .get,
@@ -73,7 +73,7 @@ public struct PebbleOSFirmwareCatalog: Sendable {
         }
     }
 
-    static func asset(for board: PebbleWatchBoard, in assets: [GitHubReleaseAsset]) -> GitHubReleaseAsset? {
+    static func asset(for board: WatchBoard, in assets: [GitHubReleaseAsset]) -> GitHubReleaseAsset? {
         assets.first { asset in
             guard asset.name.hasSuffix(".pbz"), asset.name.hasPrefix(assetPrefix) else {
                 return false
@@ -132,7 +132,7 @@ public struct PebbleOSFirmwareCatalog: Sendable {
 
 public enum PebbleOSFirmwareCatalogError: Error, Equatable, Sendable {
     case releasesUnavailable
-    case noFirmwareForBoard(PebbleWatchBoard)
+    case noFirmwareForBoard(WatchBoard)
     case insecureURL
 }
 

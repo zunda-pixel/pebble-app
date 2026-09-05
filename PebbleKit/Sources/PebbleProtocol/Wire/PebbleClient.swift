@@ -3,19 +3,19 @@ public import Foundation
 public enum PebbleConnectionState: Equatable, Sendable {
     case idle
     case scanning
-    case connecting(deviceID: String)
-    case negotiating(deviceID: String)
-    case connected(PebbleDevice)
-    case reconnecting(deviceID: String)
+    case connecting(watchID: WatchID)
+    case negotiating(watchID: WatchID)
+    case connected(ConnectedWatch)
+    case reconnecting(watchID: WatchID)
     case failed(PebbleConnectionError)
 }
 
 public enum PebbleClientEvent: Equatable, Sendable {
-    case deviceUpdated(PebbleDevice)
+    case watchUpdated(ConnectedWatch)
     case appFetchRequested(AppFetchRequest)
     case appMessageReceived(AppMessageData)
     case transferProgress(PutBytesTransferProgress)
-    case reconnecting(deviceID: String)
+    case reconnecting(watchID: WatchID)
     case disconnected(PebbleConnectionError)
     case healthSyncCompleted(Bool)
     case healthSamplesReceived([PebbleHealthSample])
@@ -30,7 +30,7 @@ public enum PebbleConnectionError: Error, Equatable, Sendable {
     case bluetoothUnsupported
     case permissionDenied
     case scanAlreadyInProgress
-    case deviceNotFound
+    case watchNotFound
     case connectionAlreadyInProgress
     case connectionFailed
     case connectionTimedOut
@@ -53,7 +53,7 @@ public enum PebbleConnectionError: Error, Equatable, Sendable {
         case .bluetoothUnavailable, .bluetoothUnsupported, .permissionDenied, .disconnected,
              .handshakeKeptFailing, .pairingRemovedByWatch:
             false
-        case .scanAlreadyInProgress, .deviceNotFound, .connectionAlreadyInProgress,
+        case .scanAlreadyInProgress, .watchNotFound, .connectionAlreadyInProgress,
              .connectionFailed, .connectionTimedOut, .protocolNegotiationFailed:
             true
         }
@@ -70,12 +70,12 @@ public protocol PebbleClient: Sendable {
     /// starts here, because a watch that reconnects on its own has to find the
     /// phone ready.
     func startBluetooth()
-    func scan() async throws -> [DiscoveredPebble]
+    func scan() async throws -> [DiscoveredWatch]
     /// A bonded Pebble usually does not advertise, so scanning alone can never
     /// rediscover it; it has to be looked up by its stored identifier.
-    func retrieveKnownDevices(_ hints: [DiscoveredPebble]) async throws -> [DiscoveredPebble]
-    func connect(to device: DiscoveredPebble) async throws -> PebbleDevice
-    func disconnect(from device: PebbleDevice) async
+    func retrieveKnownWatches(_ hints: [DiscoveredWatch]) async throws -> [DiscoveredWatch]
+    func connect(to device: DiscoveredWatch) async throws -> ConnectedWatch
+    func disconnect(from device: ConnectedWatch) async
     func send(_ frame: PebbleProtocolFrame) async throws
     func frames() -> AsyncStream<PebbleProtocolFrame>
     func events() -> AsyncStream<PebbleClientEvent>
@@ -108,7 +108,7 @@ public protocol PebbleClient: Sendable {
     /// A language pack goes under the name `lang`, which is how the firmware
     /// knows what it is.
     func installFile(_ bytes: [UInt8], filename: String) async throws
-    func refreshDeviceInformation() async throws
+    func refreshWatchInformation() async throws
     /// A nil image says there is none, which is what lets the watch stop
     /// waiting.
     func sendImage(
@@ -124,11 +124,11 @@ public extension PebbleClient {
     /// A transport with no radio to open has nothing to do here.
     func startBluetooth() {}
 
-    func retrieveKnownDevices(_ hints: [DiscoveredPebble]) async throws -> [DiscoveredPebble] {
+    func retrieveKnownWatches(_ hints: [DiscoveredWatch]) async throws -> [DiscoveredWatch] {
         []
     }
 
-    func refreshDeviceInformation() async throws {}
+    func refreshWatchInformation() async throws {}
 
     func takeScreenshot() async throws -> PebbleScreenshot {
         guard case .screenshot(let screenshot) = try await pull(.screenshot) else {

@@ -233,7 +233,7 @@ struct ProtocolCodecTests {
 
         #expect(information.firmwareVersion == "v5.1.0")
         #expect(information.serialNumber == "FLINT1234567")
-        #expect(PebbleWatchModel(hardwarePlatform: information.hardwarePlatform) == .pebble2Duo)
+        #expect(WatchModel(hardwarePlatform: information.hardwarePlatform) == .pebble2Duo)
     }
 
     @Test

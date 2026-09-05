@@ -36,24 +36,24 @@ public actor TimelinePinStore {
         try PersistentJSON.save(identifiers, to: mirroredURL)
     }
 
-    public func writtenPinIDs(deviceID: String) throws -> Set<UUID> {
-        Set(try writtenStates()[deviceID] ?? [])
+    public func writtenPinIDs(watchID: WatchID) throws -> Set<UUID> {
+        Set(try writtenStates()[watchID] ?? [])
     }
 
-    public func setWrittenPinIDs(_ pinIDs: Set<UUID>, deviceID: String) throws {
+    public func setWrittenPinIDs(_ pinIDs: Set<UUID>, watchID: WatchID) throws {
         var states = try writtenStates()
-        states[deviceID] = Array(pinIDs)
+        states[watchID] = Array(pinIDs)
         try PersistentJSON.save(states, to: writtenURL)
     }
 
-    public func forgetWrittenPinIDs(deviceID: String) throws {
+    public func forgetWrittenPinIDs(watchID: WatchID) throws {
         var states = try writtenStates()
-        states[deviceID] = nil
+        states[watchID] = nil
         try PersistentJSON.save(states, to: writtenURL)
     }
 
-    private func writtenStates() throws -> [String: [UUID]] {
-        try PersistentJSON.loadRecovering([String: [UUID]].self, from: writtenURL) ?? [:]
+    private func writtenStates() throws -> [WatchID: [UUID]] {
+        try PersistentJSON.loadRecovering([WatchID: [UUID]].self, from: writtenURL) ?? [:]
     }
 
     /// A file that cannot be decoded is moved aside, the same as the two

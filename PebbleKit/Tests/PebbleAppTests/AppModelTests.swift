@@ -68,10 +68,10 @@ struct AppModelTests {
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
 
         await model.scan()
-        let discovered = try #require(model.discoveredDevices.first)
+        let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
 
-        #expect(model.connectedDevice?.id == discovered.id)
+        #expect(model.connectedWatch?.id == discovered.id)
         #expect(model.applicationManagementOperation == nil)
         #expect(client.reorderedApplicationIDs.last == [])
     }
@@ -81,12 +81,12 @@ struct AppModelTests {
         // A configuration page sees one token for the user and one per watch;
         // mixing them up would leak one watch's identity into another's page.
         #expect(PebbleTokenStore.accountTokenName == "pebbleAccountToken")
-        #expect(PebbleTokenStore.watchTokenName(watchID: "abc") == "pebbleWatchToken.abc")
+        #expect(PebbleTokenStore.watchTokenName(watchID: WatchID("abc")) == "pebbleWatchToken.abc")
         #expect(
-            PebbleTokenStore.watchTokenName(watchID: "abc")
-                != PebbleTokenStore.watchTokenName(watchID: "def")
+            PebbleTokenStore.watchTokenName(watchID: WatchID("abc"))
+                != PebbleTokenStore.watchTokenName(watchID: WatchID("def"))
         )
-        #expect(PebbleTokenStore.watchTokenName(watchID: "abc") != PebbleTokenStore.accountTokenName)
+        #expect(PebbleTokenStore.watchTokenName(watchID: WatchID("abc")) != PebbleTokenStore.accountTokenName)
     }
 
     @Test
@@ -128,10 +128,10 @@ struct AppModelTests {
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
 
         await model.scan()
-        let discovered = try #require(model.discoveredDevices.first)
+        let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
 
-        #expect(model.connectedDevice?.isRunningRecoveryFirmware == true)
+        #expect(model.connectedWatch?.isRunningRecoveryFirmware == true)
         // The recovery firmware rejects these endpoints and drops the link
         // when it is flooded with them.
         #expect(client.reorderedApplicationIDs.isEmpty)
@@ -147,8 +147,8 @@ struct AppModelTests {
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         // A previously paired watch that no longer advertises: it is absent
         // from the mock's scan results and only reachable via retrieval.
-        try await watchStore.record(PebbleDevice(
-            id: "saved-bonded-watch",
+        try await watchStore.record(ConnectedWatch(
+            id: WatchID("saved-bonded-watch"),
             name: "My Pebble",
             model: .pebbleTime2,
             firmwareVersion: "v5.0.0",
@@ -158,9 +158,9 @@ struct AppModelTests {
 
         await model.scan()
 
-        #expect(model.connectedDevice?.id == "saved-bonded-watch")
+        #expect(model.connectedWatch?.id == WatchID("saved-bonded-watch"))
         // Connected watches move out of the Nearby list.
-        #expect(!model.discoveredDevices.contains { $0.id == "saved-bonded-watch" })
+        #expect(!model.discoveredWatches.contains { $0.id == WatchID("saved-bonded-watch") })
     }
 
     @Test
@@ -170,8 +170,8 @@ struct AppModelTests {
         let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
-        try await watchStore.record(PebbleDevice(
-            id: "saved-bonded-watch",
+        try await watchStore.record(ConnectedWatch(
+            id: WatchID("saved-bonded-watch"),
             name: "My Pebble",
             model: .pebbleTime2,
             firmwareVersion: "v5.0.0",
@@ -182,9 +182,9 @@ struct AppModelTests {
 
         // The watch subscribed to the phone's protocol service by itself; no
         // scan ran and nothing else asked for this connection.
-        await model.noteWatchThatReconnectedItself(centralID: "saved-bonded-watch")
+        await model.noteWatchThatReconnectedItself(watchID: WatchID("saved-bonded-watch"))
 
-        #expect(model.connectedDevice?.id == "saved-bonded-watch")
+        #expect(model.connectedWatch?.id == WatchID("saved-bonded-watch"))
     }
 
     @Test
@@ -199,16 +199,16 @@ struct AppModelTests {
 
         // Bonded but never added here: offered rather than connected, because
         // nothing else can surface it and the reader decides.
-        await model.noteWatchThatReconnectedItself(centralID: "mock-emery")
+        await model.noteWatchThatReconnectedItself(watchID: WatchID("mock-emery"))
 
-        #expect(model.connectedDevice == nil)
-        #expect(model.unknownBondedWatches.map(\.id) == ["mock-emery"])
+        #expect(model.connectedWatch == nil)
+        #expect(model.unknownBondedWatches.map(\.id) == [WatchID("mock-emery")])
 
         let offered = try #require(model.unknownBondedWatches.first)
         await model.connect(to: offered)
 
-        #expect(model.connectedDevice?.id == "mock-emery")
-        #expect(model.savedWatches.contains { $0.id == "mock-emery" })
+        #expect(model.connectedWatch?.id == WatchID("mock-emery"))
+        #expect(model.savedWatches.contains { $0.id == WatchID("mock-emery") })
         #expect(model.unknownBondedWatches.isEmpty)
     }
 
@@ -222,20 +222,20 @@ struct AppModelTests {
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
 
         await model.scan()
-        let discovered = try #require(model.discoveredDevices.first)
+        let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
-        #expect(model.connectedDevice?.id == discovered.id)
+        #expect(model.connectedWatch?.id == discovered.id)
 
         await model.scan()
 
-        #expect(model.connectedDevice?.id == discovered.id)
-        #expect(!model.discoveredDevices.contains { $0.id == discovered.id })
+        #expect(model.connectedWatch?.id == discovered.id)
+        #expect(!model.discoveredWatches.contains { $0.id == discovered.id })
     }
 
     @Test
     func connectingToAnotherWatchKeepsBothConnected() async throws {
         let scanner = MockPebbleClient()
-        var connectionClients: [String: MockPebbleClient] = [:]
+        var connectionClients: [WatchID: MockPebbleClient] = [:]
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -244,32 +244,32 @@ struct AppModelTests {
             client: scanner,
             applicationLibrary: library,
             watchStore: watchStore,
-            clientFactory: { deviceID in
+            clientFactory: { watchID in
                 let client = MockPebbleClient()
-                connectionClients[deviceID] = client
+                connectionClients[watchID] = client
                 return client
             }
         )
 
         await model.scan()
-        let devices = model.discoveredDevices
+        let devices = model.discoveredWatches
         let first = try #require(devices.first)
         let second = try #require(devices.dropFirst().first)
         await model.connect(to: first)
         await model.connect(to: second)
 
-        #expect(model.connectedDevices.map(\.id) == [first.id, second.id])
+        #expect(model.connectedWatches.map(\.id) == [first.id, second.id])
         #expect(model.connections.count == 2)
         #expect(connectionClients.count == 2)
 
         // A test notification targeted at the second watch only reaches it.
-        await model.sendTestNotification(deviceID: second.id)
+        await model.sendTestNotification(watchID: second.id)
         #expect(connectionClients[second.id]?.sentNotifications.count == 1)
         #expect(connectionClients[first.id]?.sentNotifications.isEmpty == true)
 
-        await model.disconnect(deviceID: first.id)
-        #expect(model.connectedDevices.map(\.id) == [second.id])
-        #expect(connectionClients[first.id]?.disconnectedDevices.map(\.id) == [first.id])
+        await model.disconnect(watchID: first.id)
+        #expect(model.connectedWatches.map(\.id) == [second.id])
+        #expect(connectionClients[first.id]?.disconnectedWatches.map(\.id) == [first.id])
     }
 
     @Test
@@ -282,14 +282,14 @@ struct AppModelTests {
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
 
         await model.scan()
-        let discovered = try #require(model.discoveredDevices.first)
+        let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
 
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let packURL = directory.appending(path: "fr_FR.pbl")
         try Data([1, 2, 3, 4]).write(to: packURL)
 
-        await model.installLanguagePack(from: packURL, deviceID: discovered.id)
+        await model.installLanguagePack(from: packURL, watchID: discovered.id)
 
         let sent = try #require(client.installedFiles.first)
         #expect(sent.filename == "lang")
@@ -308,7 +308,7 @@ struct AppModelTests {
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
 
         await model.scan()
-        let discovered = try #require(model.discoveredDevices.first)
+        let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
 
         let report = PebbleWeatherReport(
@@ -373,7 +373,7 @@ struct AppModelTests {
             appGlanceStore: AppGlanceStore(fileURL: directory.appending(path: "glances.json"))
         )
         await model.scan()
-        let discovered = try #require(model.discoveredDevices.first)
+        let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
         let connection = try #require(model.connections.first)
 
@@ -386,7 +386,7 @@ struct AppModelTests {
         ))
         #expect(client.writtenAppGlances.isEmpty)
 
-        model.installedApplicationIDsByWatch[connection.device.id] = [absent]
+        model.installedApplicationIDsByWatch[connection.watch.id] = [absent]
         await model.synchronizeAppGlances(on: connection)
 
         #expect(client.writtenAppGlances.map(\.applicationID) == [absent])
@@ -404,28 +404,28 @@ struct AppModelTests {
     @Test
     func oneWatchWaitingForAnAppDoesNotMakeAnotherWatchBusy() async throws {
         let scanner = MockPebbleClient()
-        var connectionClients: [String: MockPebbleClient] = [:]
+        var connectionClients: [WatchID: MockPebbleClient] = [:]
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: scanner,
             applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
-            clientFactory: { deviceID in
+            clientFactory: { watchID in
                 let client = MockPebbleClient()
-                connectionClients[deviceID] = client
+                connectionClients[watchID] = client
                 return client
             }
         )
 
         await model.scan()
-        let devices = model.discoveredDevices
+        let devices = model.discoveredWatches
         let first = try #require(devices.first)
         let second = try #require(devices.dropFirst().first)
         await model.connect(to: first)
         await model.connect(to: second)
-        let firstConnection = try #require(model.connections.first { $0.device.id == first.id })
-        let secondConnection = try #require(model.connections.first { $0.device.id == second.id })
+        let firstConnection = try #require(model.connections.first { $0.watch.id == first.id })
+        let secondConnection = try #require(model.connections.first { $0.watch.id == second.id })
 
         // The first watch launched an app and is being sent it.
         firstConnection.appFetchTask = Task { try? await Task.sleep(for: .seconds(60)) }
@@ -447,7 +447,7 @@ struct AppModelTests {
     @Test
     func transferProgressStaysWithTheWatchItCameFrom() async throws {
         let scanner = MockPebbleClient()
-        var connectionClients: [String: MockPebbleClient] = [:]
+        var connectionClients: [WatchID: MockPebbleClient] = [:]
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -456,23 +456,23 @@ struct AppModelTests {
             client: scanner,
             applicationLibrary: library,
             watchStore: watchStore,
-            clientFactory: { deviceID in
+            clientFactory: { watchID in
                 let client = MockPebbleClient()
-                connectionClients[deviceID] = client
+                connectionClients[watchID] = client
                 return client
             }
         )
 
         await model.scan()
-        let devices = model.discoveredDevices
+        let devices = model.discoveredWatches
         let first = try #require(devices.first)
         let second = try #require(devices.dropFirst().first)
         await model.connect(to: first)
         await model.connect(to: second)
 
         // Firmware going onto one watch while an application goes onto another.
-        let firstConnection = try #require(model.connections.first { $0.device.id == first.id })
-        let secondConnection = try #require(model.connections.first { $0.device.id == second.id })
+        let firstConnection = try #require(model.connections.first { $0.watch.id == first.id })
+        let secondConnection = try #require(model.connections.first { $0.watch.id == second.id })
         let applicationID = UUID()
         firstConnection.beginTransfer(.firmware)
         secondConnection.beginTransfer(.application(applicationID))
@@ -515,12 +515,12 @@ struct AppModelTests {
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
 
         await model.scan()
-        let discovered = try #require(model.discoveredDevices.first)
+        let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
         await model.connect(to: discovered)
 
-        #expect(model.connectedDevice?.id == discovered.id)
-        #expect(client.disconnectedDevices.isEmpty)
+        #expect(model.connectedWatch?.id == discovered.id)
+        #expect(client.disconnectedWatches.isEmpty)
     }
 
     @Test
@@ -533,9 +533,9 @@ struct AppModelTests {
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
 
         await model.scan()
-        let discovered = try #require(model.discoveredDevices.first)
+        let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
-        client.emit(.reconnecting(deviceID: discovered.id))
+        client.emit(.reconnecting(watchID: discovered.id))
         try await Task.sleep(for: .milliseconds(20))
         guard case .reconnecting = model.connectionState else {
             Issue.record("Expected the model to enter the reconnecting state")
@@ -545,7 +545,7 @@ struct AppModelTests {
         await model.disconnect()
 
         #expect(model.connectionState == .idle)
-        #expect(client.disconnectedDevices.map(\.id) == [discovered.id])
+        #expect(client.disconnectedWatches.map(\.id) == [discovered.id])
     }
 
     @Test
@@ -558,14 +558,14 @@ struct AppModelTests {
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
 
         await model.scan()
-        let discovered = try #require(model.discoveredDevices.first)
+        let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
-        client.emit(.reconnecting(deviceID: discovered.id))
+        client.emit(.reconnecting(watchID: discovered.id))
         try await Task.sleep(for: .milliseconds(20))
 
         await model.forgetWatch(id: discovered.id)
 
-        #expect(client.disconnectedDevices.map(\.id) == [discovered.id])
+        #expect(client.disconnectedWatches.map(\.id) == [discovered.id])
         #expect(model.connections.isEmpty)
         #expect(!model.savedWatches.contains { $0.id == discovered.id })
     }
@@ -580,15 +580,15 @@ struct AppModelTests {
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
 
         await model.scan()
-        let discovered = try #require(model.discoveredDevices.first)
+        let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
 
-        await model.resetWatch(.factoryReset, deviceID: discovered.id)
+        await model.resetWatch(.factoryReset, watchID: discovered.id)
 
         #expect(client.sentFrames.contains(ResetCodec.frame(.factoryReset)))
         // The watch reboots without answering, so the link is closed locally.
         #expect(model.connections.isEmpty)
-        #expect(client.disconnectedDevices.map(\.id) == [discovered.id])
+        #expect(client.disconnectedWatches.map(\.id) == [discovered.id])
         #expect(model.installedApplicationIDs(on: discovered.id).isEmpty)
         #expect(model.watchResetStatusMessages[discovered.id] != nil)
     }
@@ -603,16 +603,16 @@ struct AppModelTests {
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
 
         await model.scan()
-        let discovered = try #require(model.discoveredDevices.first)
+        let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
-        await model.resetWatch(.restart, deviceID: discovered.id)
+        await model.resetWatch(.restart, watchID: discovered.id)
         #expect(model.watchResetStatusMessages[discovered.id] != nil)
 
         // The watch says nothing on its way back: the link returning is the
         // whole of the news, and until it was read as news the screen said the
         // watch was restarting for as long as the app was running.
         await model.scan()
-        await model.connect(to: try #require(model.discoveredDevices.first))
+        await model.connect(to: try #require(model.discoveredWatches.first))
 
         #expect(model.watchResetStatusMessages[discovered.id] == nil)
     }
@@ -626,7 +626,7 @@ struct AppModelTests {
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
 
-        await model.resetWatch(.restart, deviceID: "missing-watch")
+        await model.resetWatch(.restart, watchID: WatchID("missing-watch"))
 
         #expect(client.sentFrames.isEmpty)
         #expect(model.watchManagementErrorMessage != nil)
@@ -643,8 +643,8 @@ struct AppModelTests {
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
             reminderStore: TimelinePinStore(fileURL: directory.appending(path: "reminders.json"))
         )
-        await model.connect(to: DiscoveredPebble(
-            id: "mock-emery",
+        await model.connect(to: DiscoveredWatch(
+            id: WatchID("mock-emery"),
             name: "My Pebble",
             model: .pebbleTime2,
             signalStrength: -50
@@ -675,8 +675,8 @@ struct AppModelTests {
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
             reminderStore: TimelinePinStore(fileURL: directory.appending(path: "reminders.json"))
         )
-        let watch = DiscoveredPebble(
-            id: "mock-emery",
+        let watch = DiscoveredWatch(
+            id: WatchID("mock-emery"),
             name: "My Pebble",
             model: .pebbleTime2,
             signalStrength: -50
@@ -717,7 +717,7 @@ struct AppModelTests {
             applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
-        let watch = DiscoveredPebble(id: "mock-emery", name: "My Pebble", model: .pebbleTime2, signalStrength: -50)
+        let watch = DiscoveredWatch(id: WatchID("mock-emery"), name: "My Pebble", model: .pebbleTime2, signalStrength: -50)
         client.connectionFailure = .protocolNegotiationFailed
 
         await model.connect(to: watch)
@@ -743,7 +743,7 @@ struct AppModelTests {
             applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
-        let watch = DiscoveredPebble(id: "mock-emery", name: "My Pebble", model: .pebbleTime2, signalStrength: -50)
+        let watch = DiscoveredWatch(id: WatchID("mock-emery"), name: "My Pebble", model: .pebbleTime2, signalStrength: -50)
         client.connectionFailure = .pairingRemovedByWatch
         model.isScanning = true
 
@@ -765,7 +765,7 @@ struct AppModelTests {
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
         await model.scan()
-        let discovered = try #require(model.discoveredDevices.first)
+        let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
 
         client.emit(.appMessageReceived(AppMessageData(
@@ -792,14 +792,14 @@ struct AppModelTests {
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         await model.scan()
-        let discovered = try #require(model.discoveredDevices.first)
+        let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
 
-        client.emit(.reconnecting(deviceID: discovered.id))
+        client.emit(.reconnecting(watchID: discovered.id))
         await Task.yield()
-        #expect(model.connectionState == .reconnecting(deviceID: discovered.id))
+        #expect(model.connectionState == .reconnecting(watchID: discovered.id))
 
-        var restoredDevice = PebbleDevice(
+        var restoredDevice = ConnectedWatch(
             id: discovered.id,
             name: discovered.name,
             model: discovered.model,
@@ -808,11 +808,11 @@ struct AppModelTests {
             serialNumber: "MOCK00000001"
         )
         restoredDevice.batteryLevel = 63
-        client.emit(.deviceUpdated(restoredDevice))
+        client.emit(.watchUpdated(restoredDevice))
         try await Task.sleep(for: .milliseconds(20))
 
         #expect(model.connectionState == .connected(restoredDevice))
-        #expect(model.connectedDevice?.batteryLevel == 63)
+        #expect(model.connectedWatch?.batteryLevel == 63)
     }
 
     @Test
@@ -826,14 +826,14 @@ struct AppModelTests {
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         await model.scan()
-        let discovered = try #require(model.discoveredDevices.first)
+        let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
 
         client.emit(.disconnected(.connectionTimedOut))
         try await Task.sleep(for: .milliseconds(20))
 
         #expect(model.connectionState == .failed(.connectionTimedOut))
-        #expect(model.connectedDevice == nil)
+        #expect(model.connectedWatch == nil)
         // The watch's own screen has the Connect button, so the reason belongs
         // against that watch and not only in the app-wide state.
         #expect(model.connectionFailures[discovered.id] == .connectionTimedOut)
@@ -850,7 +850,7 @@ struct AppModelTests {
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         await model.scan()
-        let discovered = try #require(model.discoveredDevices.first)
+        let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
 
         // What the transport sends once it has stopped chasing a watch whose
@@ -876,12 +876,12 @@ struct AppModelTests {
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         await model.scan()
-        let discovered = try #require(model.discoveredDevices.first)
+        let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
 
         await model.applicationDidBecomeActive()
 
-        #expect(model.connectedDevice?.id == discovered.id)
+        #expect(model.connectedWatch?.id == discovered.id)
         #expect(client.reorderedApplicationIDs.last == [])
     }
 }

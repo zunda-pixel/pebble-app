@@ -31,13 +31,13 @@ public enum CatalogInstallationState: Equatable, Sendable {
 public final class AppModel {
     public internal(set) var connectionState: PebbleConnectionState = .idle
     public internal(set) var connections: [WatchConnection] = []
-    public internal(set) var connectingDeviceIDs: Set<String> = []
+    public internal(set) var connectingWatchIDs: Set<WatchID> = []
     /// Why the last attempt at each watch ended. A watch has its own screen with
     /// its own Connect button, and a failure that only reached the log left that
     /// button looking like it had done nothing.
-    public internal(set) var connectionFailures: [String: PebbleConnectionError] = [:]
+    public internal(set) var connectionFailures: [WatchID: PebbleConnectionError] = [:]
     public internal(set) var isScanning = false
-    public internal(set) var discoveredDevices: [DiscoveredPebble] = []
+    public internal(set) var discoveredWatches: [DiscoveredWatch] = []
     public internal(set) var watchApplications: [PebbleApplication] = []
     public internal(set) var watchfaces: [PebbleApplication] = []
     public internal(set) var activeWatchfaceID: UUID?
@@ -60,13 +60,13 @@ public final class AppModel {
     /// Newest first. Only the notifications this app sent: another phone app's
     /// go to the watch over ANCS, where no app can see them.
     public internal(set) var sentNotifications: [SentNotification] = []
-    public internal(set) var savedWatches: [SavedPebbleWatch] = []
+    public internal(set) var savedWatches: [SavedWatch] = []
     public internal(set) var unknownBondedWatches: [UnknownBondedWatch] = []
     public internal(set) var watchManagementErrorMessage: LocalizedStringKey?
     /// What each watch was last told to do to itself, until it comes back. A
     /// restart says nothing on its way out and nothing on its way in, so the
     /// only news the reader gets is the link returning.
-    public internal(set) var watchResetStatusMessages: [String: LocalizedStringKey] = [:]
+    public internal(set) var watchResetStatusMessages: [WatchID: LocalizedStringKey] = [:]
     public internal(set) var timelinePins: [PebbleTimelinePin] = []
     public internal(set) var reminders: [PebbleTimelinePin] = []
     public internal(set) var reminderStatusMessage: LocalizedStringKey?
@@ -111,7 +111,7 @@ public final class AppModel {
     public internal(set) var notificationSourceApps: [NotificationSourceApp] = []
     /// The line each watchapp shows in the launcher, for the apps that have one.
     public internal(set) var appGlances: [PebbleAppGlance] = []
-    public internal(set) var installedApplicationIDsByWatch: [String: Set<UUID>] = [:]
+    public internal(set) var installedApplicationIDsByWatch: [WatchID: Set<UUID>] = [:]
 
     public var isScanningOrConnecting: Bool {
         switch connectionState {
@@ -122,12 +122,12 @@ public final class AppModel {
         }
     }
 
-    public var connectedDevices: [PebbleDevice] {
-        activeConnections.map(\.device)
+    public var connectedWatches: [ConnectedWatch] {
+        activeConnections.map(\.watch)
     }
 
-    public var connectedDevice: PebbleDevice? {
-        activeConnections.first?.device
+    public var connectedWatch: ConnectedWatch? {
+        activeConnections.first?.watch
     }
 
     var activeConnections: [WatchConnection] {
@@ -139,8 +139,8 @@ public final class AppModel {
     /// Named rather than found: `connection(for:)` falls back to the first watch
     /// when given nothing, and "whichever watch is first" is not an answer to
     /// "what is this one doing".
-    public func applicationTransfer(on deviceID: String) -> ApplicationTransfer? {
-        guard let connection = connections.first(where: { $0.device.id == deviceID }),
+    public func applicationTransfer(on watchID: WatchID) -> ApplicationTransfer? {
+        guard let connection = connections.first(where: { $0.watch.id == watchID }),
               let applicationID = connection.applicationBeingSent,
               let progress = connection.transferProgress else {
             return nil
@@ -152,12 +152,12 @@ public final class AppModel {
         )
     }
 
-    public func firmwareTransferProgress(on deviceID: String) -> PutBytesTransferProgress? {
-        connections.first { $0.device.id == deviceID }?.transferProgress(for: .firmware)
+    public func firmwareTransferProgress(on watchID: WatchID) -> PutBytesTransferProgress? {
+        connections.first { $0.watch.id == watchID }?.transferProgress(for: .firmware)
     }
 
-    public func languagePackTransferProgress(on deviceID: String) -> PutBytesTransferProgress? {
-        connections.first { $0.device.id == deviceID }?.transferProgress(for: .languagePack)
+    public func languagePackTransferProgress(on watchID: WatchID) -> PutBytesTransferProgress? {
+        connections.first { $0.watch.id == watchID }?.transferProgress(for: .languagePack)
     }
 
     /// Whether any watch is being sent an application it asked for. The library
@@ -167,15 +167,15 @@ public final class AppModel {
         connections.contains { $0.isFetchingApplication }
     }
 
-    func connection(for deviceID: String?) -> WatchConnection? {
-        guard let deviceID else {
+    func connection(for watchID: WatchID?) -> WatchConnection? {
+        guard let watchID else {
             return activeConnections.first
         }
-        return connections.first { $0.device.id == deviceID }
+        return connections.first { $0.watch.id == watchID }
     }
 
     let scannerClient: any PebbleClient
-    let clientFactory: @MainActor (String) -> any PebbleClient
+    let clientFactory: @MainActor (WatchID) -> any PebbleClient
     let applicationLibrary: PebbleApplicationLibrary
     let watchStore: SavedWatchStore
     let timelineStore = TimelinePinStore()
@@ -246,7 +246,7 @@ public final class AppModel {
                 body: body
             )
         },
-        activeWatchHandler: { [weak self] in self?.connectedDevice }
+        activeWatchHandler: { [weak self] in self?.connectedWatch }
     )
 
     public init(
@@ -257,7 +257,7 @@ public final class AppModel {
         reminderStore: TimelinePinStore = TimelinePinStore(
             fileURL: URL.applicationSupportDirectory.appending(path: "Pebble/reminders.json")
         ),
-        clientFactory: (@MainActor (String) -> any PebbleClient)? = nil
+        clientFactory: (@MainActor (WatchID) -> any PebbleClient)? = nil
     ) {
         self.scannerClient = client
         // Without a factory every connection shares the scanning client, which
@@ -317,7 +317,7 @@ public final class AppModel {
             await flushPendingNotifications()
             await flushPendingAppMessages()
             await synchronizeTimeline()
-        } else if !isScanning, connectingDeviceIDs.isEmpty, connections.isEmpty {
+        } else if !isScanning, connectingWatchIDs.isEmpty, connections.isEmpty {
             if savedWatches.contains(where: \.automaticallyConnects) {
                 await scan()
             }
@@ -327,7 +327,7 @@ public final class AppModel {
     public func scan() async {
         guard !isScanning else { return }
         isScanning = true
-        if connections.isEmpty, connectingDeviceIDs.isEmpty {
+        if connections.isEmpty, connectingWatchIDs.isEmpty {
             connectionState = .scanning
         }
         defer {
@@ -340,21 +340,21 @@ public final class AppModel {
             // Asking for a watch is the moment the radio is worth its dialog.
             scannerClient.startBluetooth()
             var devices = try await scannerClient.scan()
-            let connectedIDs = Set(connections.map(\.device.id))
+            let connectedIDs = Set(connections.map(\.watch.id))
             let missingSavedWatches = savedWatches
                 .filter { saved in
                     !connectedIDs.contains(saved.id) && !devices.contains { $0.id == saved.id }
                 }
                 .map { saved in
-                    DiscoveredPebble(id: saved.id, name: saved.name, model: saved.model, signalStrength: 0)
+                    DiscoveredWatch(id: saved.id, name: saved.name, model: saved.model, signalStrength: 0)
                 }
             if !missingSavedWatches.isEmpty,
-               let retrieved = try? await scannerClient.retrieveKnownDevices(missingSavedWatches) {
+               let retrieved = try? await scannerClient.retrieveKnownWatches(missingSavedWatches) {
                 devices.append(contentsOf: retrieved)
             }
-            discoveredDevices = devices.filter { !connectedIDs.contains($0.id) }
+            discoveredWatches = devices.filter { !connectedIDs.contains($0.id) }
             refreshConnectionState()
-            let automaticTargets = discoveredDevices.filter { discovered in
+            let automaticTargets = discoveredWatches.filter { discovered in
                 savedWatches.contains { $0.id == discovered.id && $0.automaticallyConnects }
             }
             for device in automaticTargets {
@@ -371,8 +371,8 @@ public final class AppModel {
         }
     }
 
-    public func connect(to watch: SavedPebbleWatch) async {
-        await connect(to: DiscoveredPebble(
+    public func connect(to watch: SavedWatch) async {
+        await connect(to: DiscoveredWatch(
             id: watch.id,
             name: watch.name,
             model: watch.model,
@@ -380,12 +380,12 @@ public final class AppModel {
         ))
     }
 
-    public func connect(to device: DiscoveredPebble) async {
-        guard !connectingDeviceIDs.contains(device.id),
-              !connections.contains(where: { $0.device.id == device.id }) else {
+    public func connect(to device: DiscoveredWatch) async {
+        guard !connectingWatchIDs.contains(device.id),
+              !connections.contains(where: { $0.watch.id == device.id }) else {
             return
         }
-        connectingDeviceIDs.insert(device.id)
+        connectingWatchIDs.insert(device.id)
         connectionFailures[device.id] = nil
         refreshConnectionState()
         Task { [id = device.id] in
@@ -395,18 +395,18 @@ public final class AppModel {
             )
         }
         defer {
-            connectingDeviceIDs.remove(device.id)
+            connectingWatchIDs.remove(device.id)
             refreshConnectionState()
         }
 
         let connectionClient = clientFactory(device.id)
         do {
-            let connectedDevice = try await connectionClient.connect(to: device)
+            let connectedWatch = try await connectionClient.connect(to: device)
             lastConnectionError = nil
             connectionFailures[device.id] = nil
             let connection = WatchConnection(
                 client: connectionClient,
-                device: connectedDevice,
+                watch: connectedWatch,
                 voiceProvider: speechBridge
             )
             connections.append(connection)
@@ -418,13 +418,13 @@ public final class AppModel {
                     await self?.handleCompanionFrame(frame, from: connection)
                 }
             )
-            discoveredDevices.removeAll { $0.id == device.id }
+            discoveredWatches.removeAll { $0.id == device.id }
             unknownBondedWatches.removeAll { $0.id == device.id }
             // Leaving the id here until this function returns would rank the whole
             // post-connect synchronization as "connecting".
-            connectingDeviceIDs.remove(device.id)
+            connectingWatchIDs.remove(device.id)
             refreshConnectionState()
-            await recordConnectedWatch(connectedDevice)
+            await recordConnectedWatch(connectedWatch)
             await restorePendingNotifications()
             await PebbleDiagnostics.shared.record(category: "connection", message: "Watch connected")
             await synchronizeEverything(on: connection)
@@ -442,12 +442,12 @@ public final class AppModel {
     }
 
     func refreshConnectionState() {
-        if let connectingID = connectingDeviceIDs.first {
-            connectionState = .connecting(deviceID: connectingID)
+        if let connectingID = connectingWatchIDs.first {
+            connectionState = .connecting(watchID: connectingID)
         } else if let primary = activeConnections.first {
-            connectionState = .connected(primary.device)
+            connectionState = .connected(primary.watch)
         } else if let reconnecting = connections.first(where: { $0.phase == .reconnecting }) {
-            connectionState = .reconnecting(deviceID: reconnecting.device.id)
+            connectionState = .reconnecting(watchID: reconnecting.watch.id)
         } else if isScanning {
             connectionState = .scanning
         } else if let error = lastConnectionError {
@@ -468,7 +468,7 @@ public final class AppModel {
 
     func handleEvent(_ event: PebbleClientEvent, from connection: WatchConnection) {
         switch event {
-        case .deviceUpdated(let device):
+        case .watchUpdated(let device):
             let needsResync = connection.consumePostReconnectSync()
             refreshConnectionState()
             Task { [weak self] in
@@ -494,7 +494,7 @@ public final class AppModel {
             connections.removeAll { $0 === connection }
             lastConnectionError = error
             // On the watch's own screen, where its Connect button is.
-            connectionFailures[connection.device.id] = error
+            connectionFailures[connection.watch.id] = error
             refreshConnectionState()
             needsApplicationSynchronization = true
             clearBusyOperationState(on: connection)
@@ -559,7 +559,7 @@ public final class AppModel {
     // A watch running its recovery firmware rejects every endpoint this uses
     // and drops the link a few seconds after connecting.
     func synchronizeEverything(on connection: WatchConnection) async {
-        if connection.device.isRunningRecoveryFirmware {
+        if connection.watch.isRunningRecoveryFirmware {
             watchManagementErrorMessage =
                 "This watch started its recovery firmware. It works again once PebbleOS is installed."
             await PebbleDiagnostics.shared.record(

@@ -30,7 +30,7 @@ struct PendingWorkTests {
         try await model.pendingNotificationStore.save([])
 
         await model.scan()
-        let discovered = try #require(model.discoveredDevices.first)
+        let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
 
         let queued = (0..<3).map { index in
@@ -57,7 +57,7 @@ struct PendingWorkTests {
 
     @Test
     func aNotificationTheSecondWatchRefusesIsNotShownTwiceOnTheFirst() async throws {
-        var clients: [String: SuspendingPebbleClient] = [:]
+        var clients: [WatchID: SuspendingPebbleClient] = [:]
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
@@ -66,15 +66,15 @@ struct PendingWorkTests {
                 fileURL: directory.appending(path: "applications.json")
             ),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
-            clientFactory: { deviceID in
+            clientFactory: { watchID in
                 let client = SuspendingPebbleClient()
-                clients[deviceID] = client
+                clients[watchID] = client
                 return client
             }
         )
         try await model.pendingNotificationStore.save([])
         await model.scan()
-        let devices = model.discoveredDevices
+        let devices = model.discoveredWatches
         let first = try #require(devices.first)
         let second = try #require(devices.dropFirst().first)
         await model.connect(to: first)
@@ -110,7 +110,7 @@ struct PendingWorkTests {
         try await model.pendingAppMessageStore.save([])
 
         await model.scan()
-        let discovered = try #require(model.discoveredDevices.first)
+        let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
 
         let queued = [
@@ -151,7 +151,7 @@ struct PendingWorkTests {
         )
         try await model.timelineStore.save([pin])
         await model.scan()
-        let discovered = try #require(model.discoveredDevices.first)
+        let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
         await model.synchronizeTimeline()
         #expect(client.timelinePins.map(\.id) == [pin.id])
@@ -165,9 +165,9 @@ struct PendingWorkTests {
         // Nothing else can name it: BlobDB has no listing, and no delete was
         // ever queued for it.
         #expect(client.timelinePins.isEmpty)
-        #expect(try await model.timelineStore.writtenPinIDs(deviceID: discovered.id).isEmpty)
+        #expect(try await model.timelineStore.writtenPinIDs(watchID: discovered.id).isEmpty)
 
-        try await model.timelineStore.forgetWrittenPinIDs(deviceID: discovered.id)
+        try await model.timelineStore.forgetWrittenPinIDs(watchID: discovered.id)
     }
 
     @Test
@@ -184,7 +184,7 @@ struct PendingWorkTests {
             clientFactory: { _ in client }
         )
         await model.scan()
-        let discovered = try #require(model.discoveredDevices.first)
+        let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
 
         // What the watch hands over after someone dictates a reminder to it: a
@@ -214,7 +214,7 @@ struct PendingWorkTests {
         // so writing this back would replace it with less than it already has.
         #expect(client.timelinePins.isEmpty)
 
-        try await model.timelineStore.forgetWrittenPinIDs(deviceID: discovered.id)
+        try await model.timelineStore.forgetWrittenPinIDs(watchID: discovered.id)
     }
 
     /// The frame a watch sends to hand over a record of a database of its own.
@@ -233,7 +233,7 @@ struct PendingWorkTests {
             clientFactory: { _ in client }
         )
         await model.scan()
-        await model.connect(to: try #require(model.discoveredDevices.first))
+        await model.connect(to: try #require(model.discoveredWatches.first))
         let connection = try #require(model.activeConnections.first)
         // Whole seconds: the wire carries a `time_t`, so a date with a
         // fraction in it does not come back the same.
@@ -279,7 +279,7 @@ struct PendingWorkTests {
             clientFactory: { _ in client }
         )
         await model.scan()
-        let discovered = try #require(model.discoveredDevices.first)
+        let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
         let dictated = PebbleTimelinePin(
             parentApplicationID: UUID(),
@@ -341,10 +341,10 @@ struct PendingWorkTests {
         try await model.timelineStore.save([pin])
         try await model.pendingTimelineOperationStore.save([])
         await model.scan()
-        let discovered = try #require(model.discoveredDevices.first)
+        let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
 
-        await model.clearWatchTimeline(deviceID: discovered.id)
+        await model.clearWatchTimeline(watchID: discovered.id)
 
         // The reader asked for this because the watch held pins nothing could
         // name; their own are not collateral.
@@ -352,7 +352,7 @@ struct PendingWorkTests {
         #expect(client.timelinePins.map(\.id) == [pin.id])
 
         try await model.timelineStore.save([])
-        try await model.timelineStore.forgetWrittenPinIDs(deviceID: discovered.id)
+        try await model.timelineStore.forgetWrittenPinIDs(watchID: discovered.id)
     }
 
     @Test
@@ -420,7 +420,7 @@ struct PendingWorkTests {
         )
 
         await model.scan()
-        let discovered = try #require(model.discoveredDevices.first)
+        let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
         let connection = try #require(model.connections.first)
 

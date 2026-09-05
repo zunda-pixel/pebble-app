@@ -11,7 +11,7 @@ struct HealthView: View {
             samples: model.healthSamples,
             exportURL: model.healthExportURL,
             statusMessage: model.dataSyncStatusMessage,
-            isWatchConnected: model.connectedDevice != nil,
+            isWatchConnected: model.connectedWatch != nil,
             requestWatchSync: { Task { await model.requestHealthSync() } },
             synchronizeWithHealthKit: synchronizeWithHealthKit,
             importFromHealthKit: importFromHealthKit,

@@ -3,26 +3,26 @@ import PebbleProtocol
 
 struct LanguageView: View {
     var model: AppModel
-    var watchID: String
+    var watchID: WatchID
 
     private var connection: WatchConnection? {
-        model.connections.first { $0.device.id == watchID }
+        model.connections.first { $0.watch.id == watchID }
     }
 
     var body: some View {
         LanguageContent(
-            packs: model.languagePacks(deviceID: watchID),
-            installedLocale: connection?.device.languageLocale,
-            installedVersion: connection?.device.languageVersion,
+            packs: model.languagePacks(watchID: watchID),
+            installedLocale: connection?.watch.languageLocale,
+            installedVersion: connection?.watch.languageVersion,
             isConnected: connection?.isConnected == true,
             isInstalling: model.isInstallingLanguagePack,
             progress: model.languagePackTransferProgress(on: watchID),
             statusMessage: model.languageStatusMessage,
             install: { pack in
-                Task { await model.installLanguagePack(pack, deviceID: watchID) }
+                Task { await model.installLanguagePack(pack, watchID: watchID) }
             },
             installFile: { url in
-                Task { await model.installLanguagePack(from: url, deviceID: watchID) }
+                Task { await model.installLanguagePack(from: url, watchID: watchID) }
             }
         )
     }

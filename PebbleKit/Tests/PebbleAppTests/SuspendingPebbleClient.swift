@@ -27,7 +27,7 @@ final class SuspendingPebbleClient: PebbleClient {
     private(set) var deletedPinIDs: [UUID] = []
     private(set) var clearedTimelineCount = 0
     private(set) var sentFrames: [PebbleProtocolFrame] = []
-    private(set) var disconnectedDevices: [PebbleDevice] = []
+    private(set) var disconnectedWatches: [ConnectedWatch] = []
     private var frameContinuation: AsyncStream<PebbleProtocolFrame>.Continuation?
     private var eventContinuation: AsyncStream<PebbleClientEvent>.Continuation?
 
@@ -37,12 +37,12 @@ final class SuspendingPebbleClient: PebbleClient {
         try? await Task.sleep(for: answerDelay)
     }
 
-    func scan() async throws -> [DiscoveredPebble] {
-        [DiscoveredPebble(id: "suspending-emery", name: "Pebble Time 2", model: .pebbleTime2, signalStrength: -50)]
+    func scan() async throws -> [DiscoveredWatch] {
+        [DiscoveredWatch(id: WatchID("suspending-emery"), name: "Pebble Time 2", model: .pebbleTime2, signalStrength: -50)]
     }
 
-    func connect(to device: DiscoveredPebble) async throws -> PebbleDevice {
-        PebbleDevice(
+    func connect(to device: DiscoveredWatch) async throws -> ConnectedWatch {
+        ConnectedWatch(
             id: device.id,
             name: device.name,
             model: device.model,
@@ -52,8 +52,8 @@ final class SuspendingPebbleClient: PebbleClient {
         )
     }
 
-    func disconnect(from device: PebbleDevice) async {
-        disconnectedDevices.append(device)
+    func disconnect(from device: ConnectedWatch) async {
+        disconnectedWatches.append(device)
     }
 
     func send(_ frame: PebbleProtocolFrame) async throws {

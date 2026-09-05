@@ -148,7 +148,7 @@ extension AppModel {
                 try await synchronizeAllWatches()
                 // The watch only asks for the binary when it tries to run the app.
                 for connection in activeConnections
-                where compatibleApplications([application], with: connection.device.model).isEmpty == false {
+                where compatibleApplications([application], with: connection.watch.model).isEmpty == false {
                     try? await connection.client.launchApplication(id: application.id)
                 }
                 expirePendingSnapshot(applicationID: application.id)
@@ -275,9 +275,9 @@ extension AppModel {
     }
 
     func performApplicationSynchronization(on connection: WatchConnection) async throws {
-        let device = connection.device
+        let device = connection.watch
         let applications = try await applicationLibrary.applications()
-        let synchronizedIDs = try await applicationLibrary.synchronizedApplicationIDs(deviceID: device.id)
+        let synchronizedIDs = try await applicationLibrary.synchronizedApplicationIDs(watchID: device.id)
         let compatibleApplications = compatibleApplications(applications, with: device.model)
         let localIDs = Set(compatibleApplications.map(\.id))
         for applicationID in synchronizedIDs where !localIDs.contains(applicationID) {
@@ -302,30 +302,30 @@ extension AppModel {
         updateApplications(applications)
     }
 
-    public func installedApplicationIDs(on deviceID: String) -> Set<UUID> {
-        installedApplicationIDsByWatch[deviceID] ?? []
+    public func installedApplicationIDs(on watchID: WatchID) -> Set<UUID> {
+        installedApplicationIDsByWatch[watchID] ?? []
     }
 
     func recordSynchronizedApplications(
         _ applications: [PebbleApplication],
-        device: PebbleDevice
+        device: ConnectedWatch
     ) async throws {
         let synchronizedIDs = compatibleApplications(applications, with: device.model).map(\.id)
         try await applicationLibrary.setSynchronizedApplicationIDs(
             synchronizedIDs,
-            deviceID: device.id
+            watchID: device.id
         )
         installedApplicationIDsByWatch[device.id] = Set(synchronizedIDs)
     }
 
     func compatibleApplications(
         _ applications: [PebbleApplication],
-        with model: PebbleWatchModel
+        with model: WatchModel
     ) -> [PebbleApplication] {
         applications.filter { $0.bestVariant(for: model) != nil }
     }
 
-    func loadPackage(from url: URL, for model: PebbleWatchModel) async throws -> PBWPackage {
+    func loadPackage(from url: URL, for model: WatchModel) async throws -> PBWPackage {
         try await Task.detached(priority: .userInitiated) {
             try PBWPackageImporter.load(from: url, for: model)
         }.value
@@ -461,7 +461,7 @@ extension AppModel {
         defer { connection.endTransfer() }
 
         do {
-            let model = connection.device.model
+            let model = connection.watch.model
             let package = try await Task.detached(priority: .userInitiated) {
                 try PBWPackageImporter.load(from: packageURL, for: model)
             }.value
@@ -481,7 +481,7 @@ extension AppModel {
             // The watch installs the binary itself once the transfer commits;
             // re-registering or reordering here only risks undoing it.
             let applications = try await applicationLibrary.applications()
-            try await recordSynchronizedApplications(applications, device: connection.device)
+            try await recordSynchronizedApplications(applications, device: connection.watch)
             pendingImportSnapshots[request.applicationID] = nil
             applicationLibraryErrorMessage = nil
         } catch {

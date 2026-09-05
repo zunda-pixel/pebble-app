@@ -13,7 +13,7 @@ struct NotificationRulesView: View {
         NotificationRulesContent(
             appName: current.displayName,
             rules: current.filterRules,
-            isSupported: model.connections.contains { $0.device.supportsNotificationFiltering },
+            isSupported: model.connections.contains { $0.watch.supportsNotificationFiltering },
             setRules: { rules in
                 Task {
                     await model.setNotificationSourceAppFilterRules(

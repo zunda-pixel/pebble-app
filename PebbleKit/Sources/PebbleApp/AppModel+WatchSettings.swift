@@ -62,7 +62,7 @@ extension AppModel {
     // A watch too old to have the settings database refuses those writes and
     // keeps the rest, so each group is sent on its own.
     func synchronizeWatchSettings(on connection: WatchConnection) async {
-        guard connection.isConnected, !connection.device.isRunningRecoveryFirmware else { return }
+        guard connection.isConnected, !connection.watch.isRunningRecoveryFirmware else { return }
         for setting in WatchSetting.allCases {
             try? await connection.client.write(.watchSetting(setting, isOn: isWatchSettingOn(setting)))
         }
@@ -84,7 +84,7 @@ extension AppModel {
                 await PebbleDiagnostics.shared.record(
                     .error,
                     category: "health",
-                    message: "\(connection.device.name) rejected a day: \(String(reflecting: error))"
+                    message: "\(connection.watch.name) rejected a day: \(String(reflecting: error))"
                 )
                 return
             }
@@ -102,7 +102,7 @@ extension AppModel {
         ].compactMap { $0 }
         await PebbleDiagnostics.shared.record(
             category: "health",
-            message: "\(connection.device.name) took \(days.count) day(s) of "
+            message: "\(connection.watch.name) took \(days.count) day(s) of "
                 + (measured.isEmpty ? "nothing but zeroes" : measured.joined(separator: ", "))
         )
     }
@@ -154,6 +154,6 @@ extension AppModel {
         _ connection: WatchConnection,
         _ error: any Error
     ) -> LocalizedStringKey {
-        "\(connection.device.name) did not accept the setting. \(error.localizedDescription)"
+        "\(connection.watch.name) did not accept the setting. \(error.localizedDescription)"
     }
 }

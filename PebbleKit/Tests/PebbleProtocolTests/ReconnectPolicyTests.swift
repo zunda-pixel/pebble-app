@@ -7,8 +7,8 @@ import Testing
 @Suite
 @MainActor
 struct ReconnectPolicyTests {
-    private var watch: DiscoveredPebble {
-        DiscoveredPebble(id: "watch", name: "Pebble 5209", model: .pebbleTime2, signalStrength: -60)
+    private var watch: DiscoveredWatch {
+        DiscoveredWatch(id: WatchID("watch"), name: "Pebble 5209", model: .pebbleTime2, signalStrength: -60)
     }
 
     @Test
@@ -40,18 +40,18 @@ struct ReconnectPolicyTests {
         try await Task.sleep(for: .milliseconds(80))
 
         #expect(attempts == 0)
-        #expect(policy.device == nil)
+        #expect(policy.watch == nil)
         #expect(!policy.isAutomatic)
     }
 
     @Test
     func aDisconnectThatWasAskedForIsOnlyForgivenOnce() {
         let policy = ReconnectPolicy()
-        policy.expectDisconnect(of: "watch")
+        policy.expectDisconnect(of: WatchID("watch"))
 
-        #expect(policy.wasExpected("watch"))
+        #expect(policy.wasExpected(WatchID("watch")))
         // The watch dropping again later is the watch's doing, and worth chasing.
-        #expect(!policy.wasExpected("watch"))
+        #expect(!policy.wasExpected(WatchID("watch")))
     }
 
     @Test
@@ -88,10 +88,10 @@ struct ReconnectPolicyTests {
     func nothingIsFollowedUntilAWatchIsConnected() {
         let policy = ReconnectPolicy()
         // With no watch to chase, any disconnect is this one's to act on.
-        #expect(policy.isFollowing("anything"))
+        #expect(policy.isFollowing(WatchID("anything")))
 
         policy.follow(watch)
-        #expect(policy.isFollowing("watch"))
-        #expect(!policy.isFollowing("another-watch"))
+        #expect(policy.isFollowing(WatchID("watch")))
+        #expect(!policy.isFollowing(WatchID("another-watch")))
     }
 }

@@ -27,8 +27,8 @@ public struct WatchVersionInformation: Equatable, Sendable {
         WatchCapability.weatherApp.isSet(in: capabilities)
     }
 
-    public var board: PebbleWatchBoard? {
-        PebbleWatchBoard(hardwarePlatform: hardwarePlatform)
+    public var board: WatchBoard? {
+        WatchBoard(hardwarePlatform: hardwarePlatform)
     }
 }
 
@@ -130,7 +130,7 @@ public enum WatchVersionCodecError: Error, Equatable, Sendable {
     case truncatedResponse
 }
 
-public extension PebbleWatchModel {
+public extension WatchModel {
     init?(hardwarePlatform: UInt8) {
         switch hardwarePlatform {
         case 15:

@@ -47,7 +47,7 @@ public struct PebbleCatalogApplication: Codable, Equatable, Identifiable, Sendab
         sha256 = try container.decodeIfPresent(String.self, forKey: .sha256)
     }
 
-    public func supports(_ model: PebbleWatchModel) -> Bool {
+    public func supports(_ model: WatchModel) -> Bool {
         !Set(supportedPlatforms).isDisjoint(with: model.compatibleApplicationVariants)
     }
 
@@ -97,7 +97,7 @@ public actor PebbleAppCatalog {
 
     public func cachedApplications() throws -> [PebbleCatalogApplication] { try cachedSnapshot()?.applications ?? [] }
 
-    public func update(from sourceURL: URL, model: PebbleWatchModel?) async throws -> PebbleCatalogSnapshot {
+    public func update(from sourceURL: URL, model: WatchModel?) async throws -> PebbleCatalogSnapshot {
         let applications: [PebbleCatalogApplication]
         if sourceURL.pathExtension.lowercased() == "json" {
             applications = try await fetchLegacyFeed(sourceURL)
@@ -152,7 +152,7 @@ public actor PebbleAppCatalog {
     private func fetchOfficialHome(
         _ baseURL: URL,
         kind: PebbleApplicationKind,
-        model: PebbleWatchModel?
+        model: WatchModel?
     ) async throws -> [PebbleCatalogApplication] {
         var url = baseURL.appending(path: "v1/home").appending(path: kind == .watchapp ? "watchapps" : "watchfaces")
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)

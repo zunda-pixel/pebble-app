@@ -80,7 +80,7 @@ public actor PebbleDiagnostics {
     }
 
     public func exportReport(
-        device: PebbleDevice?,
+        device: ConnectedWatch?,
         applications: [PebbleApplication],
         directory: URL = .temporaryDirectory
     ) throws -> URL {

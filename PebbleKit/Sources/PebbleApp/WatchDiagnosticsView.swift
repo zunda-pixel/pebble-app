@@ -3,10 +3,10 @@ import SwiftUI
 
 struct WatchDiagnosticsView: View {
     var model: AppModel
-    var watchID: String
+    var watchID: WatchID
 
     private var isConnected: Bool {
-        model.connections.first { $0.device.id == watchID }?.isConnected == true
+        model.connections.first { $0.watch.id == watchID }?.isConnected == true
     }
 
     var body: some View {
@@ -23,11 +23,11 @@ struct WatchDiagnosticsView: View {
             coredumpURL: model.coredumpURL,
             isCollectingCoredump: model.isCollectingCoredump,
             statusMessages: model.watchDiagnosticsStatusMessages,
-            takeScreenshot: { Task { await model.takeScreenshot(deviceID: watchID) } },
-            gatherWatchLogs: { Task { await model.gatherWatchLogs(deviceID: watchID) } },
+            takeScreenshot: { Task { await model.takeScreenshot(watchID: watchID) } },
+            gatherWatchLogs: { Task { await model.gatherWatchLogs(watchID: watchID) } },
             setApplicationLogging: { isOn in Task { await model.setApplicationLoggingEnabled(isOn) } },
-            collectCoredump: { Task { await model.collectCoredump(deviceID: watchID) } },
-            clearTimeline: { Task { await model.clearWatchTimeline(deviceID: watchID) } }
+            collectCoredump: { Task { await model.collectCoredump(watchID: watchID) } },
+            clearTimeline: { Task { await model.clearWatchTimeline(watchID: watchID) } }
         )
     }
 }

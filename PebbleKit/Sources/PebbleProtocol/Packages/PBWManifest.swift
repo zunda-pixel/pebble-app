@@ -61,7 +61,7 @@ public enum PBWManifestDecoder {
     }
 
     public static func installationPlan(
-        for model: PebbleWatchModel,
+        for model: WatchModel,
         manifestsByVariant: [String: Data]
     ) throws -> PBWInstallationPlan {
         for variant in model.compatibleApplicationVariants {

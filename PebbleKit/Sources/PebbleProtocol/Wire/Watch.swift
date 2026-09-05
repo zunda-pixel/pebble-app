@@ -2,7 +2,7 @@ import MemberwiseInit
 
 /// Several revisions share a watch model — a Pebble Time 2 can be any of the
 /// obelix boards — and firmware is built per board.
-public enum PebbleWatchBoard: String, CaseIterable, Codable, Sendable {
+public enum WatchBoard: String, CaseIterable, Codable, Sendable {
     case asterix
     case obelixEVT = "obelix_evt"
     case obelixDVT = "obelix_dvt"
@@ -35,7 +35,7 @@ public enum PebbleWatchBoard: String, CaseIterable, Codable, Sendable {
     }
 }
 
-public enum PebbleWatchModel: String, CaseIterable, Codable, Sendable {
+public enum WatchModel: String, CaseIterable, Codable, Sendable {
     case pebble2Duo = "FLINT"
     case pebbleTime2 = "EMERY"
     case pebbleRound2 = "GABBRO"
@@ -53,18 +53,18 @@ public enum PebbleWatchModel: String, CaseIterable, Codable, Sendable {
 }
 
 @MemberwiseInit(.public)
-public struct DiscoveredPebble: Identifiable, Hashable, Sendable {
-    public var id: String
+public struct DiscoveredWatch: Identifiable, Hashable, Sendable {
+    public var id: WatchID
     public var name: String
-    public var model: PebbleWatchModel
+    public var model: WatchModel
     public var signalStrength: Int
 }
 
 @MemberwiseInit(.public)
-public struct PebbleDevice: Identifiable, Hashable, Sendable {
-    public var id: String
+public struct ConnectedWatch: Identifiable, Hashable, Sendable {
+    public var id: WatchID
     public var name: String
-    public var model: PebbleWatchModel
+    public var model: WatchModel
     public var firmwareVersion: String?
     public var batteryLevel: Int?
     public var serialNumber: String? = nil
@@ -73,7 +73,7 @@ public struct PebbleDevice: Identifiable, Hashable, Sendable {
     public var isRunningRecoveryFirmware: Bool = false
     /// Nil when the watch has only one. Firmware is installed into the other.
     public var runningFirmwareSlot: Int? = nil
-    public var board: PebbleWatchBoard? = nil
+    public var board: WatchBoard? = nil
     /// Empty when the watch runs the firmware's built-in English.
     public var languageLocale: String = ""
     public var languageVersion: UInt16 = 0

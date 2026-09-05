@@ -9,7 +9,7 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
     private var openURLHandler: (URL) -> Void
     private var appMessageHandler: (UUID, [AppMessageTuple]) async throws -> Void
     private var notificationHandler: (PebbleApplication, String, String) async throws -> Void
-    private var activeWatchHandler: () -> PebbleDevice?
+    private var activeWatchHandler: () -> ConnectedWatch?
     private var loadContinuation: CheckedContinuation<Void, any Error>?
     private var loadedApplicationID: UUID?
     private let tokenStore = PebbleTokenStore()
@@ -18,7 +18,7 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
         openURLHandler: @escaping (URL) -> Void,
         appMessageHandler: @escaping (UUID, [AppMessageTuple]) async throws -> Void,
         notificationHandler: @escaping (PebbleApplication, String, String) async throws -> Void,
-        activeWatchHandler: @escaping () -> PebbleDevice?
+        activeWatchHandler: @escaping () -> ConnectedWatch?
     ) {
         self.openURLHandler = openURLHandler
         self.appMessageHandler = appMessageHandler
@@ -45,7 +45,7 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
             tokenStore.token(named: PebbleTokenStore.accountTokenName)
         )
         let watchTokenLiteral = try javaScriptLiteral(
-            tokenStore.token(named: PebbleTokenStore.watchTokenName(watchID: watch?.id ?? "unknown"))
+            tokenStore.token(named: PebbleTokenStore.watchTokenName(watchID: watch?.id ?? WatchID("unknown")))
         )
         let html = """
         <!doctype html><meta charset="utf-8"><script>
@@ -216,7 +216,7 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
 
 }
 
-private extension PebbleWatchModel {
+private extension WatchModel {
     var platformName: String {
         switch self {
         case .pebble2Duo: "flint"

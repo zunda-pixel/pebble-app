@@ -8,9 +8,9 @@ import Foundation
 /// connected? saved? which of the two is newer? — before it could draw a row.
 /// This answers them once, where the model is at hand, so the layout has values.
 struct WatchSummary: Identifiable, Equatable {
-    var id: String
+    var id: WatchID
     var name: String
-    var model: PebbleWatchModel?
+    var model: WatchModel?
     var serialNumber: String?
     var batteryLevel: Int?
     var firmwareVersion: String?
@@ -27,22 +27,22 @@ struct WatchSummary: Identifiable, Equatable {
 
 extension WatchSummary {
     @MainActor
-    init(watchID: String, model appModel: AppModel) {
-        let connection = appModel.connections.first { $0.device.id == watchID }
+    init(watchID: WatchID, model appModel: AppModel) {
+        let connection = appModel.connections.first { $0.watch.id == watchID }
         let saved = appModel.savedWatches.first { $0.id == watchID }
         self.init(
             id: watchID,
-            name: connection?.device.name ?? saved?.name ?? watchID,
-            model: connection?.device.model ?? saved?.model,
-            serialNumber: connection?.device.serialNumber ?? saved?.serialNumber,
-            batteryLevel: connection?.device.batteryLevel ?? saved?.lastBatteryLevel,
-            firmwareVersion: connection?.device.firmwareVersion ?? saved?.firmwareVersion,
-            languageLocale: connection?.device.languageLocale,
-            isRunningRecoveryFirmware: connection?.device.isRunningRecoveryFirmware == true,
+            name: connection?.watch.name ?? saved?.name ?? watchID.rawValue,
+            model: connection?.watch.model ?? saved?.model,
+            serialNumber: connection?.watch.serialNumber ?? saved?.serialNumber,
+            batteryLevel: connection?.watch.batteryLevel ?? saved?.lastBatteryLevel,
+            firmwareVersion: connection?.watch.firmwareVersion ?? saved?.firmwareVersion,
+            languageLocale: connection?.watch.languageLocale,
+            isRunningRecoveryFirmware: connection?.watch.isRunningRecoveryFirmware == true,
             phase: connection?.phase,
             isSaved: saved != nil,
             automaticallyConnects: saved?.automaticallyConnects ?? false,
-            isConnecting: appModel.connectingDeviceIDs.contains(watchID),
+            isConnecting: appModel.connectingWatchIDs.contains(watchID),
             lastConnectedAt: saved?.lastConnectedAt
         )
     }

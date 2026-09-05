@@ -1,5 +1,19 @@
 import PebbleProtocol
+import CoreBluetooth
 import Foundation
+
+extension CBPeripheral {
+    /// How this phone names the watch behind this peripheral.
+    ///
+    /// CoreBluetooth's identifier is per host rather than the watch's own, which
+    /// is exactly what a `WatchID` is — so this is the one place the conversion
+    /// happens, rather than `identifier.uuidString` at thirty call sites.
+    /// `PebbleGattServer` keys by the same string under its own name, because
+    /// there a watch is a central.
+    var watchID: WatchID {
+        WatchID(identifier.uuidString)
+    }
+}
 
 struct PebbleReconnectBackoff: Equatable, Sendable {
     var attempt: Int = 0
@@ -34,7 +48,7 @@ final class ReconnectPolicy {
     /// covers a watch that is merely restarting.
     static let maximumFailedHandshakes = 5
 
-    private(set) var device: DiscoveredPebble?
+    private(set) var watch: DiscoveredWatch?
     /// Whether the attempt in flight is the policy's own rather than a connect
     /// the reader asked for. The handshake takes a different path for each.
     private(set) var isAutomatic = false
@@ -42,11 +56,11 @@ final class ReconnectPolicy {
 
     private var backoff = PebbleReconnectBackoff()
     private var scheduled: Task<Void, Never>?
-    private var expectedDisconnects: Set<String> = []
+    private var expectedDisconnects: Set<WatchID> = []
 
     /// The watch to chase from now on, with the wait back at its shortest.
-    func follow(_ device: DiscoveredPebble) {
-        self.device = device
+    func follow(_ watch: DiscoveredWatch) {
+        self.watch = watch
         isAutomatic = false
         backoff.reset()
         failedHandshakes = 0
@@ -56,7 +70,7 @@ final class ReconnectPolicy {
     /// The schedule goes with it, or the attempt it had queued would undo this.
     func stop() {
         cancelSchedule()
-        device = nil
+        watch = nil
         isAutomatic = false
         backoff.reset()
         failedHandshakes = 0
@@ -74,8 +88,8 @@ final class ReconnectPolicy {
         return failedHandshakes < Self.maximumFailedHandshakes
     }
 
-    func isFollowing(_ deviceID: String) -> Bool {
-        device == nil || device?.id == deviceID
+    func isFollowing(_ watchID: WatchID) -> Bool {
+        watch == nil || watch?.id == watchID
     }
 
     func beginAutomaticAttempt() {
@@ -105,13 +119,13 @@ final class ReconnectPolicy {
     /// disconnect it produces is not chased. A locally cancelled link arrives
     /// back as a disconnect with no error, which is otherwise indistinguishable
     /// from the watch walking away.
-    func expectDisconnect(of identifier: String) {
+    func expectDisconnect(of identifier: WatchID) {
         expectedDisconnects.insert(identifier)
     }
 
     /// Whether this disconnect was asked for. Consumed: a later drop of the same
     /// watch is the watch's doing, not the app's.
-    func wasExpected(_ identifier: String) -> Bool {
+    func wasExpected(_ identifier: WatchID) -> Bool {
         expectedDisconnects.remove(identifier) != nil
     }
 }

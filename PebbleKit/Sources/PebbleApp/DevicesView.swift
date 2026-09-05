@@ -5,10 +5,10 @@ struct DevicesView: View {
     var model: AppModel
     @State private var isAddingWatch = false
 
-    private var listedWatchIDs: [String] {
+    private var listedWatchIDs: [WatchID] {
         let savedIDs = model.savedWatches.map(\.id)
         let unsavedConnected = model.connections
-            .map(\.device.id)
+            .map(\.watch.id)
             .filter { !savedIDs.contains($0) }
         return unsavedConnected + savedIDs
     }
@@ -80,7 +80,7 @@ struct AddWatchSheet: View {
     @Environment(\.dismiss) private var dismiss
     // So the sheet can close the moment that watch is connected, rather than when
     // everything the app then sends it has been sent.
-    @State private var watchBeingAdded: String?
+    @State private var watchBeingAdded: WatchID?
 
     /// Asked of the watch that was tapped rather than of `connectionState`: this
     /// sheet scans in a loop the whole time it is open, and a scan in progress
@@ -99,8 +99,8 @@ struct AddWatchSheet: View {
             connectionErrorMessage: connectionErrorMessage,
             managementErrorMessage: model.watchManagementErrorMessage,
             unknownBondedWatches: model.unknownBondedWatches,
-            discoveredDevices: model.discoveredDevices,
-            isConnecting: !model.connectingDeviceIDs.isEmpty,
+            discoveredWatches: model.discoveredWatches,
+            isConnecting: !model.connectingWatchIDs.isEmpty,
             connectUnknown: { watch in
                 watchBeingAdded = watch.id
                 Task { await model.connect(to: watch) }
@@ -111,7 +111,7 @@ struct AddWatchSheet: View {
             },
             close: { dismiss() }
         )
-        .onChange(of: model.connections.map(\.device.id)) { _, connectedIDs in
+        .onChange(of: model.connections.map(\.watch.id)) { _, connectedIDs in
             guard let watchBeingAdded, connectedIDs.contains(watchBeingAdded) else { return }
             dismiss()
         }
@@ -134,10 +134,10 @@ struct AddWatchContent: View {
     var connectionErrorMessage: LocalizedStringKey?
     var managementErrorMessage: LocalizedStringKey?
     var unknownBondedWatches: [UnknownBondedWatch]
-    var discoveredDevices: [DiscoveredPebble]
+    var discoveredWatches: [DiscoveredWatch]
     var isConnecting: Bool
     var connectUnknown: (UnknownBondedWatch) -> Void
-    var connectDiscovered: (DiscoveredPebble) -> Void
+    var connectDiscovered: (DiscoveredWatch) -> Void
     var close: () -> Void
 
     var body: some View {
@@ -171,7 +171,7 @@ struct AddWatchContent: View {
                 }
 
                 Section {
-                    ForEach(discoveredDevices) { device in
+                    ForEach(discoveredWatches) { device in
                         DiscoveredDeviceRow(device: device) {
                             connectDiscovered(device)
                         }
@@ -254,7 +254,7 @@ struct WatchListRow: View {
 }
 
 struct DiscoveredDeviceRow: View {
-    var device: DiscoveredPebble
+    var device: DiscoveredWatch
     var connect: () -> Void
 
     var body: some View {
@@ -311,9 +311,9 @@ struct DiscoveredDeviceRow: View {
         connectionErrorMessage: nil,
         managementErrorMessage: nil,
         unknownBondedWatches: [
-            UnknownBondedWatch(id: "bonded-watch", name: "Pebble 33EE"),
+            UnknownBondedWatch(id: WatchID("bonded-watch"), name: "Pebble 33EE"),
         ],
-        discoveredDevices: [PreviewSamples.discovered],
+        discoveredWatches: [PreviewSamples.discovered],
         isConnecting: false,
         connectUnknown: { _ in },
         connectDiscovered: { _ in },

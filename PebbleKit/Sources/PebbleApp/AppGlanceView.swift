@@ -12,7 +12,7 @@ struct AppGlanceView: View {
             glance: model.glance(for: application.id)
                 ?? PebbleAppGlance(applicationID: application.id),
             isInstalled: model.connections.contains {
-                model.installedApplicationIDs(on: $0.device.id).contains(application.id)
+                model.installedApplicationIDs(on: $0.watch.id).contains(application.id)
             },
             save: { glance in
                 Task {

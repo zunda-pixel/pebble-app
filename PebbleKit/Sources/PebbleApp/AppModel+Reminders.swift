@@ -34,17 +34,17 @@ extension AppModel {
                 // Written down before it can be deleted: a reminder added,
                 // then deleted while the watch is away, is one only this record
                 // can name when the watch comes back.
-                let deviceID = connection.device.id
-                var written = (try? await reminderStore.writtenPinIDs(deviceID: deviceID)) ?? []
+                let watchID = connection.watch.id
+                var written = (try? await reminderStore.writtenPinIDs(watchID: watchID)) ?? []
                 written.insert(reminder.id)
-                try? await reminderStore.setWrittenPinIDs(written, deviceID: deviceID)
+                try? await reminderStore.setWrittenPinIDs(written, watchID: watchID)
             } catch {
                 reminderStatusMessage =
-                    "\(connection.device.name) did not accept the reminder. \(Text(refusalReason(for: error)))"
+                    "\(connection.watch.name) did not accept the reminder. \(Text(refusalReason(for: error)))"
                 await PebbleDiagnostics.shared.record(
                     .error,
                     category: "timeline",
-                    message: "\(connection.device.name) refused a reminder: \(String(reflecting: error))"
+                    message: "\(connection.watch.name) refused a reminder: \(String(reflecting: error))"
                 )
             }
         }
@@ -79,8 +79,8 @@ extension AppModel {
         on connection: WatchConnection,
         alsoRemoving extra: Set<UUID> = []
     ) async {
-        let deviceID = connection.device.id
-        let written = (try? await reminderStore.writtenPinIDs(deviceID: deviceID)) ?? []
+        let watchID = connection.watch.id
+        let written = (try? await reminderStore.writtenPinIDs(watchID: watchID)) ?? []
         let forgotten = written.union(extra).subtracting(reminders.map(\.id))
         guard !forgotten.isEmpty else { return }
         var removed: Set<UUID> = []
@@ -94,13 +94,13 @@ extension AppModel {
                 await PebbleDiagnostics.shared.record(
                     .error,
                     category: "timeline",
-                    message: "\(connection.device.name) kept a reminder that is gone here: "
+                    message: "\(connection.watch.name) kept a reminder that is gone here: "
                         + String(reflecting: error)
                 )
                 break
             }
         }
-        try? await reminderStore.setWrittenPinIDs(written.subtracting(removed), deviceID: deviceID)
+        try? await reminderStore.setWrittenPinIDs(written.subtracting(removed), watchID: watchID)
     }
 
     // One in the past has already been shown, or missed, and sending it would
@@ -109,8 +109,8 @@ extension AppModel {
         guard connection.isConnected else { return }
         await loadReminders()
         await removeRemindersTheWatchStillHas(on: connection)
-        let deviceID = connection.device.id
-        var written = (try? await reminderStore.writtenPinIDs(deviceID: deviceID)) ?? []
+        let watchID = connection.watch.id
+        var written = (try? await reminderStore.writtenPinIDs(watchID: watchID)) ?? []
         for reminder in reminders where reminder.timestamp > .now && !reminder.isFromWatch {
             do {
                 try await connection.client.write(.timelineReminder(reminder))
@@ -119,13 +119,13 @@ extension AppModel {
                 await PebbleDiagnostics.shared.record(
                     .error,
                     category: "timeline",
-                    message: "\(connection.device.name) rejected a reminder: \(String(reflecting: error))"
+                    message: "\(connection.watch.name) rejected a reminder: \(String(reflecting: error))"
                 )
                 break
             }
         }
         // Whatever got through, so that a reminder deleted before the next
         // connection can still be named.
-        try? await reminderStore.setWrittenPinIDs(written, deviceID: deviceID)
+        try? await reminderStore.setWrittenPinIDs(written, watchID: watchID)
     }
 }

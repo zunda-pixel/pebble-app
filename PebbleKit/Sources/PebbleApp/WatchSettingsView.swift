@@ -3,10 +3,10 @@ import SwiftUI
 
 struct WatchSettingsView: View {
     var model: AppModel
-    var watchID: String
+    var watchID: WatchID
 
     private var connection: WatchConnection? {
-        model.connections.first { $0.device.id == watchID }
+        model.connections.first { $0.watch.id == watchID }
     }
 
     var body: some View {

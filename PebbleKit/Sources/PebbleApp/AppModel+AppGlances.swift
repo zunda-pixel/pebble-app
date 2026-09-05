@@ -30,7 +30,7 @@ extension AppModel {
             // A glance for an app the watch does not have is refused, and
             // asking is how this app finds out — but a watch that has not
             // finished telling us what it holds would refuse everything.
-            guard installedApplicationIDsByWatch[connection.device.id]?.contains(glance.applicationID) != false else {
+            guard installedApplicationIDsByWatch[connection.watch.id]?.contains(glance.applicationID) != false else {
                 continue
             }
             let value = AppGlanceCodec.value(for: glance)
@@ -42,7 +42,7 @@ extension AppModel {
                 await PebbleDiagnostics.shared.record(
                     .error,
                     category: "glance",
-                    message: "\(connection.device.name) would not take a glance: \(String(reflecting: error))"
+                    message: "\(connection.watch.name) would not take a glance: \(String(reflecting: error))"
                 )
                 return
             }
@@ -57,7 +57,7 @@ extension AppModel {
                 await PebbleDiagnostics.shared.record(
                     .error,
                     category: "glance",
-                    message: "\(connection.device.name) kept a glance that is gone here: \(String(reflecting: error))"
+                    message: "\(connection.watch.name) kept a glance that is gone here: \(String(reflecting: error))"
                 )
                 return
             }

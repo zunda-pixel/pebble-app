@@ -27,7 +27,7 @@ extension AppModel {
         // `synchronizeTimeline` derives an upsert for every pin it holds, so a queue
         // write that fails is not lost work.
         try? await queueTimelineOperation(.upsert(pin))
-        if connectedDevice != nil {
+        if connectedWatch != nil {
             await synchronizeTimeline()
             dataSyncStatusMessage = "Timeline pin saved."
         } else {
@@ -43,7 +43,7 @@ extension AppModel {
         timelinePins.removeAll { identifiers.contains($0.id) }
         try? await timelineStore.save(timelinePins)
         for pin in removed { try? await queueTimelineOperation(.delete(pin.id)) }
-        if connectedDevice != nil { await synchronizeTimeline() }
+        if connectedWatch != nil { await synchronizeTimeline() }
     }
 
     public func synchronizeTimeline() async {
@@ -92,7 +92,7 @@ extension AppModel {
         // the reconciliation above possible next time.
         try? await timelineStore.setWrittenPinIDs(
             Set(timelinePins.map(\.id)),
-            deviceID: connection.device.id
+            watchID: connection.watch.id
         )
         return operations.count
     }
@@ -104,8 +104,8 @@ extension AppModel {
     /// queued — the queue was full, the app was reinstalled, the moment was
     /// missed — stays on the watch's timeline and is never mentioned again.
     private func removePinsTheAppHasForgotten(on connection: WatchConnection) async {
-        let deviceID = connection.device.id
-        let written = (try? await timelineStore.writtenPinIDs(deviceID: deviceID)) ?? []
+        let watchID = connection.watch.id
+        let written = (try? await timelineStore.writtenPinIDs(watchID: watchID)) ?? []
         let forgotten = written.subtracting(timelinePins.map(\.id))
         guard !forgotten.isEmpty else { return }
         var removed: Set<UUID> = []
@@ -118,10 +118,10 @@ extension AppModel {
                 break
             }
         }
-        try? await timelineStore.setWrittenPinIDs(written.subtracting(removed), deviceID: deviceID)
+        try? await timelineStore.setWrittenPinIDs(written.subtracting(removed), watchID: watchID)
         await PebbleDiagnostics.shared.record(
             category: "timeline",
-            message: "\(connection.device.name): removed \(removed.count)"
+            message: "\(connection.watch.name): removed \(removed.count)"
                 + " of \(forgotten.count) pin(s) the app no longer has"
         )
     }
@@ -132,8 +132,8 @@ extension AppModel {
     /// After a reinstall it remembers nothing, and this is the only way to reach
     /// what is left — at the cost of removing pins from any other source too,
     /// which is why it is asked for rather than done.
-    public func clearWatchTimeline(deviceID: String? = nil) async {
-        guard let connection = connection(for: deviceID), connection.isConnected else {
+    public func clearWatchTimeline(watchID: WatchID? = nil) async {
+        guard let connection = connection(for: watchID), connection.isConnected else {
             watchDiagnosticsStatusMessages[.timeline] = "Connect the watch before clearing its timeline."
             return
         }
@@ -141,14 +141,14 @@ extension AppModel {
             try await connection.client.remove(.allTimelinePins)
         } catch {
             watchDiagnosticsStatusMessages[.timeline] =
-                "\(connection.device.name) did not clear its timeline. \(Text(refusalReason(for: error)))"
+                "\(connection.watch.name) did not clear its timeline. \(Text(refusalReason(for: error)))"
             return
         }
-        try? await timelineStore.forgetWrittenPinIDs(deviceID: connection.device.id)
+        try? await timelineStore.forgetWrittenPinIDs(watchID: connection.watch.id)
         await PebbleDiagnostics.shared.record(
             .warning,
             category: "timeline",
-            message: "\(connection.device.name): cleared the pin database"
+            message: "\(connection.watch.name): cleared the pin database"
         )
         watchDiagnosticsStatusMessages[.timeline] = "The watch's timeline was cleared. Sending what the app has…"
         await synchronizeTimeline()
@@ -203,7 +203,7 @@ extension AppModel {
                 try await queueTimelineOperation(.delete(pin.id))
             }
             for pin in calendarPins { try await queueTimelineOperation(.upsert(pin)) }
-            if connectedDevice != nil { await synchronizeTimeline() }
+            if connectedWatch != nil { await synchronizeTimeline() }
             dataSyncStatusMessage = "Calendar synchronized with Timeline."
         } catch { dataSyncStatusMessage = "Calendar access or synchronization failed." }
     }
