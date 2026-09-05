@@ -8,7 +8,7 @@ import Retry
 
 /// The remote catalog of installable applications.
 @MemberwiseInit(.public)
-public struct PebbleCatalogApplication: Codable, Equatable, Identifiable, Sendable {
+public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
     public var id: UUID
     public var storeID: String = ""
     public var name: String
@@ -16,7 +16,7 @@ public struct PebbleCatalogApplication: Codable, Equatable, Identifiable, Sendab
     public var version: String
     public var downloadURL: URL
     public var supportedPlatforms: [String]
-    public var kind: PebbleApplicationKind = .watchapp
+    public var kind: WatchApplicationKind = .watchapp
     public var category: String = "Other"
     public var summary: String = ""
     public var releaseNotes: String? = nil
@@ -38,7 +38,7 @@ public struct PebbleCatalogApplication: Codable, Equatable, Identifiable, Sendab
         version = try container.decode(String.self, forKey: .version)
         downloadURL = try container.decode(URL.self, forKey: .downloadURL)
         supportedPlatforms = try container.decode([String].self, forKey: .supportedPlatforms)
-        kind = try container.decodeIfPresent(PebbleApplicationKind.self, forKey: .kind) ?? .watchapp
+        kind = try container.decodeIfPresent(WatchApplicationKind.self, forKey: .kind) ?? .watchapp
         category = try container.decodeIfPresent(String.self, forKey: .category) ?? "Other"
         summary = try container.decodeIfPresent(String.self, forKey: .summary) ?? ""
         releaseNotes = try container.decodeIfPresent(String.self, forKey: .releaseNotes)
@@ -58,13 +58,13 @@ public struct PebbleCatalogApplication: Codable, Equatable, Identifiable, Sendab
 }
 
 @MemberwiseInit(.public)
-public struct PebbleCatalogSnapshot: Codable, Equatable, Sendable {
+public struct CatalogSnapshot: Codable, Equatable, Sendable {
     public var sourceURL: URL
     public var fetchedAt: Date = Date()
-    public var applications: [PebbleCatalogApplication]
+    public var applications: [CatalogApplication]
 }
 
-public actor PebbleAppCatalog {
+public actor AppCatalog {
     /// Where applications are fetched from unless the user points elsewhere.
     public static var defaultSourceURL: URL {
         URL(string: "https://appstore-api.repebble.com/api")!
@@ -84,21 +84,21 @@ public actor PebbleAppCatalog {
         }
     }
 
-    public func cachedSnapshot() throws -> PebbleCatalogSnapshot? {
+    public func cachedSnapshot() throws -> CatalogSnapshot? {
         guard FileManager.default.fileExists(atPath: cacheURL.path) else { return nil }
         let data = try Data(contentsOf: cacheURL)
-        if let snapshot = try? JSONDecoder().decode(PebbleCatalogSnapshot.self, from: data) { return snapshot }
-        if let applications = try? JSONDecoder().decode([PebbleCatalogApplication].self, from: data) {
-            return PebbleCatalogSnapshot(sourceURL: Self.defaultSourceURL, applications: applications)
+        if let snapshot = try? JSONDecoder().decode(CatalogSnapshot.self, from: data) { return snapshot }
+        if let applications = try? JSONDecoder().decode([CatalogApplication].self, from: data) {
+            return CatalogSnapshot(sourceURL: Self.defaultSourceURL, applications: applications)
         }
         try PersistentJSON.quarantine(cacheURL)
         return nil
     }
 
-    public func cachedApplications() throws -> [PebbleCatalogApplication] { try cachedSnapshot()?.applications ?? [] }
+    public func cachedApplications() throws -> [CatalogApplication] { try cachedSnapshot()?.applications ?? [] }
 
-    public func update(from sourceURL: URL, model: WatchModel?) async throws -> PebbleCatalogSnapshot {
-        let applications: [PebbleCatalogApplication]
+    public func update(from sourceURL: URL, model: WatchModel?) async throws -> CatalogSnapshot {
+        let applications: [CatalogApplication]
         if sourceURL.pathExtension.lowercased() == "json" {
             applications = try await fetchLegacyFeed(sourceURL)
         } else {
@@ -110,12 +110,12 @@ public actor PebbleAppCatalog {
         // the one kept.
         let unique = applications.reversed().uniqued(on: \.id)
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-        let snapshot = PebbleCatalogSnapshot(sourceURL: sourceURL, applications: unique)
+        let snapshot = CatalogSnapshot(sourceURL: sourceURL, applications: unique)
         try PersistentJSON.save(snapshot, to: cacheURL)
         return snapshot
     }
 
-    public func download(_ application: PebbleCatalogApplication) async throws -> URL {
+    public func download(_ application: CatalogApplication) async throws -> URL {
         let temporaryURL = try await retry(with: .networkFetch) {
             do {
                 return try await downloadFile(from: application.downloadURL, using: session)
@@ -144,16 +144,16 @@ public actor PebbleAppCatalog {
         return output
     }
 
-    private func fetchLegacyFeed(_ url: URL) async throws -> [PebbleCatalogApplication] {
+    private func fetchLegacyFeed(_ url: URL) async throws -> [CatalogApplication] {
         let data = try await responseData(from: url)
-        return try JSONDecoder().decode([PebbleCatalogApplication].self, from: data)
+        return try JSONDecoder().decode([CatalogApplication].self, from: data)
     }
 
     private func fetchOfficialHome(
         _ baseURL: URL,
-        kind: PebbleApplicationKind,
+        kind: WatchApplicationKind,
         model: WatchModel?
-    ) async throws -> [PebbleCatalogApplication] {
+    ) async throws -> [CatalogApplication] {
         var url = baseURL.appending(path: "v1/home").appending(path: kind == .watchapp ? "watchapps" : "watchfaces")
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
         var queryItems = [URLQueryItem(name: "platform", value: "ios"), URLQueryItem(name: "filter_hardware", value: "true")]
@@ -206,12 +206,12 @@ struct OfficialCatalogApplication: Decodable {
         case latestRelease = "latest_release"
     }
 
-    func application(kind: PebbleApplicationKind) -> PebbleCatalogApplication? {
+    func application(kind: WatchApplicationKind) -> CatalogApplication? {
         guard let uuid, let applicationID = UUID(uuidString: uuid),
               uuid.lowercased() != "00000000-0000-0000-0000-000000000000", let release = latestRelease,
               let downloadURL = URL(string: release.pbwFile),
               ["https", "http"].contains(downloadURL.scheme?.lowercased()) else { return nil }
-        return PebbleCatalogApplication(
+        return CatalogApplication(
             id: applicationID,
             storeID: id,
             name: title,

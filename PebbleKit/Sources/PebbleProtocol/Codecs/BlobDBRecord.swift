@@ -28,18 +28,18 @@ public struct BlobDBWrite: Sendable {
 public enum BlobDBRecord: Equatable, Sendable {
     case application(PebbleAppMetadata)
     case notification(PebbleTimelineNotification)
-    case timelinePin(PebbleTimelinePin)
-    case timelineReminder(PebbleTimelinePin)
+    case timelinePin(TimelinePin)
+    case timelineReminder(TimelinePin)
     case notificationSourceApp(NotificationSourceApp)
-    case appGlance(PebbleAppGlance)
-    case weather(PebbleWeatherReport)
+    case appGlance(AppGlance)
+    case weather(WeatherReport)
     /// A forecast the watch holds but this list does not name is not shown.
     case weatherOrder([UUID])
     /// Only the settings the firmware lists as syncable are accepted.
     case watchSetting(WatchSetting, isOn: Bool)
-    case activitySettings(PebbleActivitySettings)
-    case heartRateSettings(PebbleHeartRateSettings)
-    case healthDay(PebbleHealthDay)
+    case activitySettings(ActivitySettings)
+    case heartRateSettings(HeartRateSettings)
+    case healthDay(WatchHealthDay)
     case reminderAppState(PebbleReminderAppState)
 
     /// The frames this record turns into, in the order they must be sent.

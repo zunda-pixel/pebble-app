@@ -53,7 +53,7 @@ import PebbleProtocol
         let write = try Self.offeredWrite()
         #expect(write.databaseID == TimelinePinCodec.databaseID)
 
-        let item = try PebbleTimelinePin(decoding: write.value)
+        let item = try TimelinePin(decoding: write.value)
 
         #expect(item.id.uuidString == "D0147D20-ABEB-4E88-B1AC-F4415613477F")
         #expect(item.parentApplicationID.uuidString == "42A07217-5491-4267-904A-D02A156752B6")
@@ -75,23 +75,23 @@ import PebbleProtocol
         var headerOnly = Array(try Self.offeredWrite().value.prefix(46))
         headerOnly[44] = 0
         #expect(throws: TimelinePinError.malformedItem) {
-            try PebbleTimelinePin(decoding: headerOnly)
+            try TimelinePin(decoding: headerOnly)
         }
     }
 
     @Test func anItemCutShortIsRefusedRatherThanGuessedAt() throws {
         let value = try Self.offeredWrite().value
         #expect(throws: TimelinePinError.malformedItem) {
-            try PebbleTimelinePin(decoding: Array(value.prefix(40)))
+            try TimelinePin(decoding: Array(value.prefix(40)))
         }
         // The header promises three attributes and the bytes hold one.
         #expect(throws: TimelinePinError.malformedItem) {
-            try PebbleTimelinePin(decoding: Array(value.prefix(56)))
+            try TimelinePin(decoding: Array(value.prefix(56)))
         }
     }
 
     @Test func whatTheAppWritesAndWhatItReadsAreTheSameItem() throws {
-        let pin = PebbleTimelinePin(
+        let pin = TimelinePin(
             parentApplicationID: UUID(),
             timestamp: Date(timeIntervalSince1970: 1_800_000_000),
             durationMinutes: 30,
@@ -102,6 +102,6 @@ import PebbleProtocol
             kind: .reminder
         )
 
-        #expect(try PebbleTimelinePin(decoding: pin.encoded()) == pin)
+        #expect(try TimelinePin(decoding: pin.encoded()) == pin)
     }
 }

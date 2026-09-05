@@ -85,9 +85,9 @@ struct BlobDBQueueTests {
         let second = Task { try await queue.begin() }
         while queue.numberWaiting == 0 { await Task.yield() }
 
-        queue.failAll(PebbleConnectionError.disconnected)
+        queue.failAll(WatchConnectionError.disconnected)
 
-        await #expect(throws: PebbleConnectionError.disconnected) {
+        await #expect(throws: WatchConnectionError.disconnected) {
             try await second.value
         }
         #expect(!queue.isEngaged)

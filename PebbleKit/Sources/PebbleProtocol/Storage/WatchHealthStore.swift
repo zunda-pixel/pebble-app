@@ -3,7 +3,7 @@ import MemberwiseInit
 
 /// Health samples the watch reports, and the file they are kept in.
 @MemberwiseInit(.public)
-public struct PebbleHealthSample: Codable, Equatable, Identifiable, Sendable {
+public struct WatchHealthSample: Codable, Equatable, Identifiable, Sendable {
     public var id: UUID = UUID()
     public var date: Date
     public var steps: Int
@@ -13,7 +13,7 @@ public struct PebbleHealthSample: Codable, Equatable, Identifiable, Sendable {
     public var deepSleepMinutes: Int = 0
     /// The night, and any nap, as the watch recorded them. Empty for a day that
     /// came from HealthKit or an older file, which knew only the total.
-    public var sleepSessions: [PebbleSleepSession] = []
+    public var sleepSessions: [SleepSession] = []
     /// What moving cost, over and above staying still.
     public var activeKilocalories: Int = 0
     /// What staying alive cost. Apple Health calls it basal energy.
@@ -23,7 +23,7 @@ public struct PebbleHealthSample: Codable, Equatable, Identifiable, Sendable {
     /// effort, which is what the watch means by active time.
     public var activeMinutes: Int = 0
     public var timeZoneIdentifier: String = TimeZone.current.identifier
-    public var source: PebbleHealthDataSource = .watch
+    public var source: WatchHealthDataSource = .watch
     public var updatedAt: Date = Date()
 
     private enum CodingKeys: String, CodingKey {
@@ -39,29 +39,29 @@ public struct PebbleHealthSample: Codable, Equatable, Identifiable, Sendable {
         steps = try container.decode(Int.self, forKey: .steps)
         sleepMinutes = try container.decode(Int.self, forKey: .sleepMinutes)
         deepSleepMinutes = try container.decodeIfPresent(Int.self, forKey: .deepSleepMinutes) ?? 0
-        sleepSessions = try container.decodeIfPresent([PebbleSleepSession].self, forKey: .sleepSessions) ?? []
+        sleepSessions = try container.decodeIfPresent([SleepSession].self, forKey: .sleepSessions) ?? []
         activeKilocalories = try container.decodeIfPresent(Int.self, forKey: .activeKilocalories) ?? 0
         restingKilocalories = try container.decodeIfPresent(Int.self, forKey: .restingKilocalories) ?? 0
         distanceMetres = try container.decodeIfPresent(Int.self, forKey: .distanceMetres) ?? 0
         activeMinutes = try container.decodeIfPresent(Int.self, forKey: .activeMinutes) ?? 0
         timeZoneIdentifier = try container.decodeIfPresent(String.self, forKey: .timeZoneIdentifier)
             ?? TimeZone.current.identifier
-        source = try container.decodeIfPresent(PebbleHealthDataSource.self, forKey: .source) ?? .watch
+        source = try container.decodeIfPresent(WatchHealthDataSource.self, forKey: .source) ?? .watch
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? date
     }
 }
 
-public enum PebbleHealthDataSource: String, Codable, Equatable, Sendable {
+public enum WatchHealthDataSource: String, Codable, Equatable, Sendable {
     case watch
     case healthKit
     case imported
 }
 
 @MemberwiseInit(.public)
-public struct PebbleHealthArchive: Codable, Equatable, Sendable {
+public struct WatchHealthArchive: Codable, Equatable, Sendable {
     public var schemaVersion: Int = 1
     public var exportedAt: Date = Date()
-    public var samples: [PebbleHealthSample]
+    public var samples: [WatchHealthSample]
 }
 
 public actor WatchHealthStore {
@@ -71,10 +71,10 @@ public actor WatchHealthStore {
         self.fileURL = fileURL ?? applicationSupportURL("health.json")
     }
 
-    public func samples() throws -> [PebbleHealthSample] { try PersistentJSON.loadRecovering([PebbleHealthSample].self, from: fileURL) ?? [] }
-    public func save(_ samples: [PebbleHealthSample]) throws { try PersistentJSON.save(samples, to: fileURL) }
-    public func merge(_ incoming: [PebbleHealthSample]) throws -> [PebbleHealthSample] {
-        var merged: [String: PebbleHealthSample] = [:]
+    public func samples() throws -> [WatchHealthSample] { try PersistentJSON.loadRecovering([WatchHealthSample].self, from: fileURL) ?? [] }
+    public func save(_ samples: [WatchHealthSample]) throws { try PersistentJSON.save(samples, to: fileURL) }
+    public func merge(_ incoming: [WatchHealthSample]) throws -> [WatchHealthSample] {
+        var merged: [String: WatchHealthSample] = [:]
         for sample in try samples() + incoming {
             let normalized = normalized(sample)
             let key = dayKey(for: normalized)
@@ -114,7 +114,7 @@ public actor WatchHealthStore {
     public func deleteAll() throws { try? FileManager.default.removeItem(at: fileURL) }
     public func export() throws -> URL {
         let output = FileManager.default.temporaryDirectory.appending(path: "pebble-health.json")
-        let archive = PebbleHealthArchive(samples: try samples())
+        let archive = WatchHealthArchive(samples: try samples())
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
@@ -122,12 +122,12 @@ public actor WatchHealthStore {
         return output
     }
 
-    public func importArchive(from url: URL) throws -> [PebbleHealthSample] {
+    public func importArchive(from url: URL) throws -> [WatchHealthSample] {
         let data = try Data(contentsOf: url)
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        if let archive = try? decoder.decode(PebbleHealthArchive.self, from: data) {
-            guard archive.schemaVersion == 1 else { throw PebbleHealthArchiveError.unsupportedVersion }
+        if let archive = try? decoder.decode(WatchHealthArchive.self, from: data) {
+            guard archive.schemaVersion == 1 else { throw WatchHealthArchiveError.unsupportedVersion }
             return try merge(archive.samples.map { sample in
                 var value = sample
                 value.source = .imported
@@ -135,7 +135,7 @@ public actor WatchHealthStore {
             })
         }
         let legacyDecoder = JSONDecoder()
-        let legacy = try legacyDecoder.decode([PebbleHealthSample].self, from: data)
+        let legacy = try legacyDecoder.decode([WatchHealthSample].self, from: data)
         return try merge(legacy.map { sample in
             var value = sample
             value.source = .imported
@@ -143,7 +143,7 @@ public actor WatchHealthStore {
         })
     }
 
-    private func normalized(_ sample: PebbleHealthSample) -> PebbleHealthSample {
+    private func normalized(_ sample: WatchHealthSample) -> WatchHealthSample {
         var value = sample
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: sample.timeZoneIdentifier) ?? .current
@@ -158,7 +158,7 @@ public actor WatchHealthStore {
         return value
     }
 
-    private func dayKey(for sample: PebbleHealthSample) -> String {
+    private func dayKey(for sample: WatchHealthSample) -> String {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: sample.timeZoneIdentifier) ?? .current
         let components = calendar.dateComponents([.year, .month, .day], from: sample.date)
@@ -171,7 +171,7 @@ public actor WatchHealthStore {
     }
 }
 
-public enum PebbleHealthArchiveError: Error, Equatable, Sendable { case unsupportedVersion }
+public enum WatchHealthArchiveError: Error, Equatable, Sendable { case unsupportedVersion }
 
 public enum HealthAnalysisPeriod: String, CaseIterable, Identifiable, Sendable {
     case week, month, quarter

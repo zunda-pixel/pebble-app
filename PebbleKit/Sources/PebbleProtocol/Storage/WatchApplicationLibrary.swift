@@ -2,25 +2,25 @@ public import Foundation
 import MemberwiseInit
 
 @MemberwiseInit(.public)
-public struct PebbleApplicationLibrarySnapshot: Sendable {
+public struct WatchApplicationLibrarySnapshot: Sendable {
     public var applicationID: UUID
-    public var applications: [PebbleApplication]
+    public var applications: [WatchApplication]
     public var packageData: Data?
 }
 
-public actor PebbleApplicationLibrary {
+public actor WatchApplicationLibrary {
     private var fileURL: URL
-    private var cachedApplications: [PebbleApplication]?
+    private var cachedApplications: [WatchApplication]?
 
     public init(fileURL: URL? = nil) {
         self.fileURL = fileURL ?? Self.defaultFileURL
     }
 
-    public func applications() throws -> [PebbleApplication] {
+    public func applications() throws -> [WatchApplication] {
         if let cachedApplications {
             return cachedApplications
         }
-        if let stored = try PersistentJSON.loadRecovering([PebbleApplication].self, from: fileURL) {
+        if let stored = try PersistentJSON.loadRecovering([WatchApplication].self, from: fileURL) {
             cachedApplications = stored
             return stored
         }
@@ -46,7 +46,7 @@ public actor PebbleApplicationLibrary {
     /// A package that cannot be read is skipped rather than failing the
     /// rebuild: one unreadable file must not cost the reader the rest of their
     /// library, which is exactly the trap the corrupt index was.
-    private func rebuiltFromPackages() -> [PebbleApplication] {
+    private func rebuiltFromPackages() -> [WatchApplication] {
         let contents = try? FileManager.default.contentsOfDirectory(
             at: packagesDirectoryURL,
             includingPropertiesForKeys: [.creationDateKey]
@@ -62,7 +62,7 @@ public actor PebbleApplicationLibrary {
     }
 
     @discardableResult
-    public func upsert(_ application: PebbleApplication) throws -> [PebbleApplication] {
+    public func upsert(_ application: WatchApplication) throws -> [WatchApplication] {
         var current = try applications()
         if let index = current.firstIndex(where: { $0.id == application.id }) {
             current[index] = application
@@ -74,7 +74,7 @@ public actor PebbleApplicationLibrary {
     }
 
     @discardableResult
-    public func importPackage(from sourceURL: URL) throws -> [PebbleApplication] {
+    public func importPackage(from sourceURL: URL) throws -> [WatchApplication] {
         let application = try PBWPackageImporter.application(from: sourceURL)
         let snapshot = try snapshot(applicationID: application.id)
         let packageURL = packageURL(applicationID: application.id)
@@ -97,12 +97,12 @@ public actor PebbleApplicationLibrary {
         }
     }
 
-    public func snapshot(applicationID: UUID) throws -> PebbleApplicationLibrarySnapshot {
+    public func snapshot(applicationID: UUID) throws -> WatchApplicationLibrarySnapshot {
         let storedPackageURL = packageURL(applicationID: applicationID)
         let packageData = FileManager.default.fileExists(atPath: storedPackageURL.path)
             ? try Data(contentsOf: storedPackageURL)
             : nil
-        return PebbleApplicationLibrarySnapshot(
+        return WatchApplicationLibrarySnapshot(
             applicationID: applicationID,
             applications: try applications(),
             packageData: packageData
@@ -110,7 +110,7 @@ public actor PebbleApplicationLibrary {
     }
 
     @discardableResult
-    public func restore(_ snapshot: PebbleApplicationLibrarySnapshot) throws -> [PebbleApplication] {
+    public func restore(_ snapshot: WatchApplicationLibrarySnapshot) throws -> [WatchApplication] {
         let storedPackageURL = packageURL(applicationID: snapshot.applicationID)
         if let packageData = snapshot.packageData {
             try FileManager.default.createDirectory(
@@ -136,7 +136,7 @@ public actor PebbleApplicationLibrary {
     }
 
     @discardableResult
-    public func remove(applicationID: UUID) throws -> [PebbleApplication] {
+    public func remove(applicationID: UUID) throws -> [WatchApplication] {
         var current = try applications()
         current.removeAll { $0.id == applicationID }
         try persist(current)
@@ -148,7 +148,7 @@ public actor PebbleApplicationLibrary {
     }
 
     @discardableResult
-    public func reorder(applicationIDs: [UUID]) throws -> [PebbleApplication] {
+    public func reorder(applicationIDs: [UUID]) throws -> [WatchApplication] {
         let current = try applications()
         let applicationsByID = Dictionary(uniqueKeysWithValues: current.map { ($0.id, $0) })
         var ordered = applicationIDs.compactMap { applicationsByID[$0] }
@@ -168,7 +168,7 @@ public actor PebbleApplicationLibrary {
         try PersistentJSON.save(states, to: synchronizationStateURL)
     }
 
-    private func persist(_ applications: [PebbleApplication]) throws {
+    private func persist(_ applications: [WatchApplication]) throws {
         try PersistentJSON.save(applications, to: fileURL)
         cachedApplications = applications
     }

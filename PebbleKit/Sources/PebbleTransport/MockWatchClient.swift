@@ -2,45 +2,45 @@ public import PebbleProtocol
 public import Foundation
 
 @MainActor
-public final class MockPebbleClient: PebbleClient {
+public final class MockWatchClient: WatchClient {
     public private(set) var sentFrames: [PebbleProtocolFrame] = []
     public private(set) var sentAppMessages: [AppMessageData] = []
     public private(set) var appMessageResponses: [(transactionID: UInt8, acknowledged: Bool)] = []
     public private(set) var appFetchResponses: [AppFetchResponseStatus] = []
     public private(set) var reorderedApplicationIDs: [[UUID]] = []
     public private(set) var sentNotifications: [PebbleTimelineNotification] = []
-    public private(set) var timelinePins: [PebbleTimelinePin] = []
+    public private(set) var timelinePins: [TimelinePin] = []
     public private(set) var clearedTimelineCount = 0
     public private(set) var installedObjects: [(bytes: [UInt8], objectType: PutBytesObjectType, appBankID: UInt32)] = []
     public private(set) var installedFirmwarePackages: [PBZFirmwarePackage] = []
     public private(set) var installedFiles: [(bytes: [UInt8], filename: String)] = []
-    public private(set) var writtenWeather: [PebbleWeatherReport] = []
-    public private(set) var timelineReminders: [PebbleTimelinePin] = []
+    public private(set) var writtenWeather: [WeatherReport] = []
+    public private(set) var timelineReminders: [TimelinePin] = []
     public private(set) var writtenWeatherLocationOrder: [UUID] = []
     public private(set) var writtenWatchSettings: [WatchSetting: Bool] = [:]
-    public private(set) var writtenActivitySettings: PebbleActivitySettings?
-    public private(set) var writtenHeartRateSettings: PebbleHeartRateSettings?
-    public private(set) var writtenHealthDays: [PebbleHealthDay] = []
+    public private(set) var writtenActivitySettings: ActivitySettings?
+    public private(set) var writtenHeartRateSettings: HeartRateSettings?
+    public private(set) var writtenHealthDays: [WatchHealthDay] = []
     public private(set) var writtenReminderAppState: PebbleReminderAppState?
-    public private(set) var sentImages: [(token: UInt8, kindValue: UInt8, image: PebbleEncodedImage?)] = []
+    public private(set) var sentImages: [(token: UInt8, kindValue: UInt8, image: EncodedImage?)] = []
     public private(set) var declinedImageKinds: [UInt8] = []
     public private(set) var screenshotRequestCount = 0
     public private(set) var requestedLogGenerations: [UInt8] = []
     public private(set) var isApplicationLoggingEnabled = false
     public private(set) var getBytesRequests: [GetBytesRequest] = []
     /// What a test wants the watch to answer with.
-    public var screenshotToReturn = PebbleScreenshot(width: 1, height: 1, pixels: [0xFF00_0000])
+    public var screenshotToReturn = WatchScreenshot(width: 1, height: 1, pixels: [0xFF00_0000])
     public var logGenerations: [[WatchLogLine]] = []
     public var bytesToReturn: [UInt8] = []
     public private(set) var writtenNotificationSourceApps: [NotificationSourceApp] = []
-    public private(set) var writtenAppGlances: [PebbleAppGlance] = []
+    public private(set) var writtenAppGlances: [AppGlance] = []
     public private(set) var deletedTimelineReminderIDs: [UUID] = []
     public private(set) var registeredApplications: [PebbleAppMetadata] = []
     public private(set) var unregisteredApplicationIDs: [UUID] = []
     public private(set) var disconnectedWatches: [ConnectedWatch] = []
     private var nextTransactionID: UInt8 = 0
     private var frameContinuation: AsyncStream<PebbleProtocolFrame>.Continuation?
-    private var eventContinuation: AsyncStream<PebbleClientEvent>.Continuation?
+    private var eventContinuation: AsyncStream<WatchClientEvent>.Continuation?
 
     public private(set) var startBluetoothCount = 0
 
@@ -83,7 +83,7 @@ public final class MockPebbleClient: PebbleClient {
     public var connectsAsRecoveryFirmware = false
     /// Makes connecting fail the way a watch out of range or with an unusable
     /// protocol service does.
-    public var connectionFailure: PebbleConnectionError?
+    public var connectionFailure: WatchConnectionError?
 
     public func connect(to device: DiscoveredWatch) async throws -> ConnectedWatch {
         try await Task.sleep(for: .milliseconds(500))
@@ -117,7 +117,7 @@ public final class MockPebbleClient: PebbleClient {
         }
     }
 
-    public func events() -> AsyncStream<PebbleClientEvent> {
+    public func events() -> AsyncStream<WatchClientEvent> {
         AsyncStream { continuation in
             eventContinuation = continuation
         }
@@ -234,7 +234,7 @@ public final class MockPebbleClient: PebbleClient {
         frameContinuation?.yield(frame)
     }
 
-    public func emit(_ event: PebbleClientEvent) {
+    public func emit(_ event: WatchClientEvent) {
         eventContinuation?.yield(event)
     }
 
@@ -254,7 +254,7 @@ public final class MockPebbleClient: PebbleClient {
         installedFiles.append((bytes, filename))
     }
 
-    public func sendImage(token: UInt8, kindValue: UInt8, image: PebbleEncodedImage?) async throws {
+    public func sendImage(token: UInt8, kindValue: UInt8, image: EncodedImage?) async throws {
         sentImages.append((token: token, kindValue: kindValue, image: image))
     }
 

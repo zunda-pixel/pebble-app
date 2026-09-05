@@ -47,7 +47,7 @@ struct WeatherView: View {
 /// The places the watch shows weather for.
 struct WeatherContent: View {
     var places: [WeatherPlace]
-    var reports: [PebbleWeatherReport]
+    var reports: [WeatherReport]
     var updated: Date?
     var usesFahrenheit: Bool
     var isRefreshing: Bool

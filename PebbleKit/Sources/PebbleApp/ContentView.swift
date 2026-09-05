@@ -13,23 +13,23 @@ import UIKit
 #endif
 
 @MainActor
-public func makeDefaultPebbleClient() -> any PebbleClient {
-    CoreBluetoothPebbleClient()
+public func makeDefaultPebbleClient() -> any WatchClient {
+    CoreBluetoothWatchClient()
 }
 
 // The restoration identifier has to be stable and unique per watch, or iOS
 // hands one client another's restored state.
 @MainActor
-public func makeDefaultPebbleClientFactory() -> @MainActor (WatchID) -> any PebbleClient {
+public func makeDefaultWatchClientFactory() -> @MainActor (WatchID) -> any WatchClient {
     { watchID in
-        CoreBluetoothPebbleClient(restoreIdentifier: "dev.pebble.central.watch.\(watchID)")
+        CoreBluetoothWatchClient(restoreIdentifier: "dev.pebble.central.watch.\(watchID)")
     }
 }
 
 #if os(macOS)
 @MainActor
-public func makeQEMUPebbleClient() -> any PebbleClient {
-    QEMUPebbleClient()
+public func makeQEMUWatchClient() -> any WatchClient {
+    QEMUWatchClient()
 }
 #endif
 
@@ -39,12 +39,12 @@ public struct ContentView: View {
 
     public init() {
         _model = State(initialValue: AppModel(
-            client: CoreBluetoothPebbleClient(),
-            clientFactory: makeDefaultPebbleClientFactory()
+            client: CoreBluetoothWatchClient(),
+            clientFactory: makeDefaultWatchClientFactory()
         ))
     }
 
-    public init(client: any PebbleClient) {
+    public init(client: any WatchClient) {
         _model = State(initialValue: AppModel(client: client))
     }
 
@@ -209,7 +209,7 @@ struct IOSRootView: View {
 #endif
 
 struct ConnectionStatusBanner: View {
-    var state: PebbleConnectionState
+    var state: WatchConnectionState
     var cancelReconnect: (() -> Void)? = nil
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 

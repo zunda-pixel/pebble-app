@@ -1,7 +1,7 @@
 public import Foundation
 
 public enum PendingTimelineOperation: Codable, Equatable, Sendable {
-    case upsert(PebbleTimelinePin)
+    case upsert(TimelinePin)
     case delete(UUID)
 }
 

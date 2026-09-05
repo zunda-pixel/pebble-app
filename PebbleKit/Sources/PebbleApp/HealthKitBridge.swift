@@ -37,7 +37,7 @@ final class HealthKitBridge {
     }
 
     func synchronize(
-        _ samples: [PebbleHealthSample],
+        _ samples: [WatchHealthSample],
         authorization: Authorization = .mayAsk
     ) async throws {
         guard HKHealthStore.isHealthDataAvailable(),
@@ -117,7 +117,7 @@ final class HealthKitBridge {
         }
     }
 
-    func readRecentSamples(days: Int = 90) async throws -> [PebbleHealthSample] {
+    func readRecentSamples(days: Int = 90) async throws -> [WatchHealthSample] {
         guard HKHealthStore.isHealthDataAvailable(),
               let stepsType = HKQuantityType.quantityType(forIdentifier: .stepCount),
               let sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) else {
@@ -181,7 +181,7 @@ final class HealthKitBridge {
             func effort(_ measure: EffortMeasure) -> Int {
                 effortBySource[measure]?[day]?.values.max() ?? 0
             }
-            return PebbleHealthSample(
+            return WatchHealthSample(
                 date: day,
                 steps: stepsBySource[day]?.values.max() ?? 0,
                 sleepMinutes: min(24 * 60, sleepBySource[day]?.values.max() ?? 0),

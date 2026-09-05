@@ -17,19 +17,19 @@ struct TimelinePinsView: View {
 /// The list is as long as the reader's diary — one calendar sync brings a
 /// month of events — so it is grouped and searchable.
 struct TimelinePinsContent: View {
-    var pins: [PebbleTimelinePin]
+    var pins: [TimelinePin]
     var statusMessage: LocalizedStringKey?
-    var remove: ([PebbleTimelinePin]) -> Void
+    var remove: ([TimelinePin]) -> Void
 
     @State private var search = ""
 
-    private var matches: [PebbleTimelinePin] {
+    private var matches: [TimelinePin] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return pins }
         return pins.filter { $0.title.localizedCaseInsensitiveContains(query) }
     }
 
-    private var days: [(date: Date, pins: [PebbleTimelinePin])] {
+    private var days: [(date: Date, pins: [TimelinePin])] {
         let calendar = Calendar.current
         return Dictionary(grouping: matches) { calendar.startOfDay(for: $0.timestamp) }
             .sorted { $0.key < $1.key }

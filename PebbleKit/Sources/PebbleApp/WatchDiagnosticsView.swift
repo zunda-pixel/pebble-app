@@ -35,7 +35,7 @@ struct WatchDiagnosticsView: View {
 /// What the watch can be asked about itself.
 struct WatchDiagnosticsContent: View {
     var isConnected: Bool
-    var screenshot: PebbleScreenshot?
+    var screenshot: WatchScreenshot?
     var screenshotURL: URL?
     var isTakingScreenshot: Bool
     var watchLogLineCount: Int
@@ -161,7 +161,7 @@ private struct DiagnosticResult: View {
 
 /// A picture the watch sent, ready to show.
 struct WatchScreenshotImage {
-    var screenshot: PebbleScreenshot
+    var screenshot: WatchScreenshot
 
     var image: Image? {
         guard let cgImage = WatchImageRenderer.makeImage(screenshot) else { return nil }

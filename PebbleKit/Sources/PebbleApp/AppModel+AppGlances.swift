@@ -6,12 +6,12 @@ extension AppModel {
         appGlances = (try? await appGlanceStore.glances()) ?? []
     }
 
-    public func glance(for applicationID: UUID) -> PebbleAppGlance? {
+    public func glance(for applicationID: UUID) -> AppGlance? {
         appGlances.first { $0.applicationID == applicationID }
     }
 
     /// Writes the line, or takes it away when nothing is left of it.
-    public func setAppGlance(_ glance: PebbleAppGlance) async {
+    public func setAppGlance(_ glance: AppGlance) async {
         var written = glance
         written.slices.removeAll { $0.subtitleTemplate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         // The watch refuses a glance that is not newer than the one it holds,

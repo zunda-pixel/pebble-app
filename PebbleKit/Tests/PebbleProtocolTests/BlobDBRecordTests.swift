@@ -5,7 +5,7 @@ import Testing
 /// The frames and the accepted statuses that used to be written out in each
 /// transport, asserted against what the record now produces.
 ///
-/// Every expectation here was read off `CoreBluetoothPebbleClient` before its
+/// Every expectation here was read off `CoreBluetoothWatchClient` before its
 /// twenty typed methods were deleted: that client is the one verified against a
 /// real watch, so where the emulator disagreed with it the emulator was wrong.
 @Suite
@@ -27,8 +27,8 @@ struct BlobDBRecordTests {
         )
     }
 
-    private var pin: PebbleTimelinePin {
-        PebbleTimelinePin(
+    private var pin: TimelinePin {
+        TimelinePin(
             id: itemID,
             parentApplicationID: applicationID,
             timestamp: timestamp,
@@ -53,16 +53,16 @@ struct BlobDBRecordTests {
         NotificationSourceApp(bundleID: "com.example.chat", displayName: "Chat")
     }
 
-    private var glance: PebbleAppGlance {
-        PebbleAppGlance(
+    private var glance: AppGlance {
+        AppGlance(
             applicationID: applicationID,
-            slices: [PebbleAppGlanceSlice(subtitleTemplate: "In a moment")],
+            slices: [AppGlanceSlice(subtitleTemplate: "In a moment")],
             updatedAt: timestamp
         )
     }
 
-    private var report: PebbleWeatherReport {
-        PebbleWeatherReport(
+    private var report: WeatherReport {
+        WeatherReport(
             id: itemID,
             locationName: "Tokyo",
             isCurrentLocation: true,
@@ -78,8 +78,8 @@ struct BlobDBRecordTests {
         )
     }
 
-    private var day: PebbleHealthDay {
-        PebbleHealthDay(
+    private var day: WatchHealthDay {
+        WatchHealthDay(
             weekday: 3,
             lastProcessed: timestamp,
             steps: 8_000,
@@ -203,8 +203,8 @@ struct BlobDBRecordTests {
     }
 
     @Test func activityAndHeartRateSettingsShareADatabaseAndNotAKey() throws {
-        let activity = PebbleActivitySettings()
-        let heartRate = PebbleHeartRateSettings()
+        let activity = ActivitySettings()
+        let heartRate = HeartRateSettings()
         try expect(
             .activitySettings(activity),
             [HealthSettingsCodec.insertFrame(activity, token: token)],

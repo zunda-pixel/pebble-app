@@ -10,11 +10,11 @@ import Testing
 @MainActor
 struct WatchPullTests {
     /// `pull(_:)` answers with a sum type, and the three typed readers on
-    /// `PebbleClient` unwrap it by case: a transport that answered with the
+    /// `WatchClient` unwrap it by case: a transport that answered with the
     /// wrong one would have them all throwing rather than one of them lying.
     @Test
     func eachPullComesBackAsItsOwnKindOfAnswer() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         client.logGenerations = [[
             WatchLogLine(date: Date(timeIntervalSince1970: 0), level: 100, file: "a.c", line: 1, message: "up"),
         ]]
@@ -88,9 +88,9 @@ struct WatchPullTests {
         while !pull.isInProgress { await Task.yield() }
         _ = pull.take(piece([1]))
 
-        pull.finish(.failure(PebbleConnectionError.disconnected))
+        pull.finish(.failure(WatchConnectionError.disconnected))
 
-        await #expect(throws: PebbleConnectionError.disconnected) { try await waiting.value }
+        await #expect(throws: WatchConnectionError.disconnected) { try await waiting.value }
         #expect(!pull.isInProgress)
     }
 

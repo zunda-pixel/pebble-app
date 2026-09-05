@@ -11,7 +11,7 @@ import Testing
 struct AppModelTests {
     @Test
     func mockTransportCompletesCompanionLifecycle() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let applicationID = UUID()
         let metadata = PebbleAppMetadata(
             applicationID: applicationID,
@@ -23,7 +23,7 @@ struct AppModelTests {
             sdkVersionMinor: 0,
             name: "E2E"
         )
-        let pin = PebbleTimelinePin(
+        let pin = TimelinePin(
             id: UUID(),
             parentApplicationID: applicationID,
             timestamp: Date(),
@@ -50,7 +50,7 @@ struct AppModelTests {
     @Test
     func qemuTransportSmokeTestWhenEnabled() async throws {
         guard ProcessInfo.processInfo.environment["PEBBLE_QEMU_E2E"] == "1" else { return }
-        let client = QEMUPebbleClient()
+        let client = QEMUWatchClient()
         let discovered = try #require(try await client.scan().first)
         let device = try await client.connect(to: discovered)
         try await client.synchronizeTime()
@@ -60,9 +60,9 @@ struct AppModelTests {
 
     @Test
     func appModelScansConnectsAndSynchronizesEmptyLibrary() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
@@ -111,18 +111,18 @@ struct AppModelTests {
         #expect(policy.maxAttempts == 3)
         // Sleeping before reporting a link that is already gone only delays
         // the queue the work belongs in.
-        #expect(isThrownStraightAway(PebbleConnectionError.disconnected))
-        #expect(isThrownStraightAway(PebbleConnectionError.bluetoothUnavailable))
-        #expect(!isThrownStraightAway(PebbleConnectionError.connectionTimedOut))
+        #expect(isThrownStraightAway(WatchConnectionError.disconnected))
+        #expect(isThrownStraightAway(WatchConnectionError.bluetoothUnavailable))
+        #expect(!isThrownStraightAway(WatchConnectionError.connectionTimedOut))
         #expect(!isThrownStraightAway(PutBytesTransferError.invalidConfiguration))
     }
 
     @Test
     func connectingToRecoveryFirmwareSkipsSynchronization() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         client.connectsAsRecoveryFirmware = true
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
@@ -140,9 +140,9 @@ struct AppModelTests {
 
     @Test
     func scanReconnectsToSavedWatchThatDoesNotAdvertise() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         // A previously paired watch that no longer advertises: it is absent
@@ -165,9 +165,9 @@ struct AppModelTests {
 
     @Test
     func aWatchThatReconnectsOnItsOwnIsGivenALink() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         try await watchStore.record(ConnectedWatch(
@@ -189,9 +189,9 @@ struct AppModelTests {
 
     @Test
     func anUnknownBondedWatchIsOfferedRatherThanConnected() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
@@ -214,9 +214,9 @@ struct AppModelTests {
 
     @Test
     func scanWhileConnectedPreservesConnection() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
@@ -234,10 +234,10 @@ struct AppModelTests {
 
     @Test
     func connectingToAnotherWatchKeepsBothConnected() async throws {
-        let scanner = MockPebbleClient()
-        var connectionClients: [WatchID: MockPebbleClient] = [:]
+        let scanner = MockWatchClient()
+        var connectionClients: [WatchID: MockWatchClient] = [:]
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         let model = AppModel(
@@ -245,7 +245,7 @@ struct AppModelTests {
             applicationLibrary: library,
             watchStore: watchStore,
             clientFactory: { watchID in
-                let client = MockPebbleClient()
+                let client = MockWatchClient()
                 connectionClients[watchID] = client
                 return client
             }
@@ -274,9 +274,9 @@ struct AppModelTests {
 
     @Test
     func aLanguagePackChosenFromAFileIsSentUnderTheNameTheWatchReads() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
@@ -300,9 +300,9 @@ struct AppModelTests {
 
     @Test
     func aForecastIsWrittenToTheWatchAndTakenBackWhenThePlaceGoes() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
@@ -311,7 +311,7 @@ struct AppModelTests {
         let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
 
-        let report = PebbleWeatherReport(
+        let report = WeatherReport(
             id: UUID(),
             locationName: "Kyoto",
             isCurrentLocation: false,
@@ -338,7 +338,7 @@ struct AppModelTests {
 
     @Test
     func aNotificationSettingIsOnlyRememberedOnceTheWatchTakesIt() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let app = NotificationSourceApp(
             bundleID: "com.example.chat",
             displayName: "Chat",
@@ -363,12 +363,12 @@ struct AppModelTests {
 
     @Test
     func aLauncherLineGoesOnlyToAWatchThatHasTheApp() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
             appGlanceStore: AppGlanceStore(fileURL: directory.appending(path: "glances.json"))
         )
@@ -380,9 +380,9 @@ struct AppModelTests {
         // The watch refuses a glance for an app it does not have, so asking is
         // pointless and the refusal would stop the rest of the pass.
         let absent = UUID()
-        await model.setAppGlance(PebbleAppGlance(
+        await model.setAppGlance(AppGlance(
             applicationID: absent,
-            slices: [PebbleAppGlanceSlice(subtitleTemplate: "Kyoto 18°")]
+            slices: [AppGlanceSlice(subtitleTemplate: "Kyoto 18°")]
         ))
         #expect(client.writtenAppGlances.isEmpty)
 
@@ -392,9 +392,9 @@ struct AppModelTests {
         #expect(client.writtenAppGlances.map(\.applicationID) == [absent])
 
         // A line the reader emptied is one the watch is still showing.
-        await model.setAppGlance(PebbleAppGlance(
+        await model.setAppGlance(AppGlance(
             applicationID: absent,
-            slices: [PebbleAppGlanceSlice(subtitleTemplate: "   ")]
+            slices: [AppGlanceSlice(subtitleTemplate: "   ")]
         ))
 
         #expect(model.appGlances.isEmpty)
@@ -403,16 +403,16 @@ struct AppModelTests {
 
     @Test
     func oneWatchWaitingForAnAppDoesNotMakeAnotherWatchBusy() async throws {
-        let scanner = MockPebbleClient()
-        var connectionClients: [WatchID: MockPebbleClient] = [:]
+        let scanner = MockWatchClient()
+        var connectionClients: [WatchID: MockWatchClient] = [:]
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: scanner,
-            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
             clientFactory: { watchID in
-                let client = MockPebbleClient()
+                let client = MockWatchClient()
                 connectionClients[watchID] = client
                 return client
             }
@@ -446,10 +446,10 @@ struct AppModelTests {
 
     @Test
     func transferProgressStaysWithTheWatchItCameFrom() async throws {
-        let scanner = MockPebbleClient()
-        var connectionClients: [WatchID: MockPebbleClient] = [:]
+        let scanner = MockWatchClient()
+        var connectionClients: [WatchID: MockWatchClient] = [:]
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         let model = AppModel(
@@ -457,7 +457,7 @@ struct AppModelTests {
             applicationLibrary: library,
             watchStore: watchStore,
             clientFactory: { watchID in
-                let client = MockPebbleClient()
+                let client = MockWatchClient()
                 connectionClients[watchID] = client
                 return client
             }
@@ -507,9 +507,9 @@ struct AppModelTests {
 
     @Test
     func connectingToTheConnectedWatchIsANoOp() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
@@ -525,9 +525,9 @@ struct AppModelTests {
 
     @Test
     func disconnectCancelsAnOngoingReconnect() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
@@ -550,9 +550,9 @@ struct AppModelTests {
 
     @Test
     func forgettingAWatchStopsItsReconnectLoop() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
@@ -572,9 +572,9 @@ struct AppModelTests {
 
     @Test
     func resettingAWatchSendsTheCommandAndClosesTheConnection() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
@@ -595,9 +595,9 @@ struct AppModelTests {
 
     @Test
     func aWatchThatHasFinishedRestartingStopsSayingItIsRestarting() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
@@ -619,9 +619,9 @@ struct AppModelTests {
 
     @Test
     func resettingWithoutAConnectionReportsAnError() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
@@ -634,12 +634,12 @@ struct AppModelTests {
 
     @Test
     func aReminderWhoseTimeHasPassedIsKeptRatherThanSent() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
             reminderStore: TimelinePinStore(fileURL: directory.appending(path: "reminders.json"))
         )
@@ -666,12 +666,12 @@ struct AppModelTests {
 
     @Test
     func aReminderDeletedWhileTheWatchWasAwayIsTakenOffItWhenItReturns() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
             reminderStore: TimelinePinStore(fileURL: directory.appending(path: "reminders.json"))
         )
@@ -698,7 +698,7 @@ struct AppModelTests {
         // disk to be taken back.
         let afterRelaunch = AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
             reminderStore: TimelinePinStore(fileURL: directory.appending(path: "reminders.json"))
         )
@@ -709,12 +709,12 @@ struct AppModelTests {
 
     @Test
     func aConnectThatFailsIsRememberedAgainstThatWatch() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         let watch = DiscoveredWatch(id: WatchID("mock-emery"), name: "My Pebble", model: .pebbleTime2, signalStrength: -50)
@@ -735,12 +735,12 @@ struct AppModelTests {
 
     @Test
     func aFailureIsKeptAgainstTheWatchWhileAScanIsStillRunning() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         let watch = DiscoveredWatch(id: WatchID("mock-emery"), name: "My Pebble", model: .pebbleTime2, signalStrength: -50)
@@ -758,9 +758,9 @@ struct AppModelTests {
 
     @Test
     func appModelRejectsAppMessageForUnknownApplication() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         let model = AppModel(client: client, applicationLibrary: library, watchStore: watchStore)
@@ -783,12 +783,12 @@ struct AppModelTests {
 
     @Test
     func appModelReflectsReconnectAndRestoredDeviceEvents() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         await model.scan()
@@ -817,12 +817,12 @@ struct AppModelTests {
 
     @Test
     func appModelMarksUnexpectedDisconnectAsFailure() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         await model.scan()
@@ -841,12 +841,12 @@ struct AppModelTests {
 
     @Test
     func aWatchThatKeepsFailingItsHandshakeSaysSoOnItsOwnScreen() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         await model.scan()
@@ -867,12 +867,12 @@ struct AppModelTests {
 
     @Test
     func foregroundRecoveryKeepsConnectedSessionHealthy() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         await model.scan()

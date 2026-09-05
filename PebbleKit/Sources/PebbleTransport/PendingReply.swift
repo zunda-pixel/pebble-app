@@ -36,7 +36,7 @@ final class PendingReply<Value: Sendable> {
     /// this same actor.
     func wait(
         timeout: Duration,
-        timedOut: any Error = PebbleConnectionError.connectionTimedOut,
+        timedOut: any Error = WatchConnectionError.connectionTimedOut,
         send: () throws -> Void
     ) async throws -> Value {
         try await withCheckedThrowingContinuation { continuation in
@@ -56,7 +56,7 @@ final class PendingReply<Value: Sendable> {
     /// keeps a large but healthy one from being cut off.
     func extendDeadline(
         _ timeout: Duration,
-        timedOut: any Error = PebbleConnectionError.connectionTimedOut
+        timedOut: any Error = WatchConnectionError.connectionTimedOut
     ) {
         deadline?.cancel()
         deadline = Task { [weak self, sleep] in

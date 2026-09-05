@@ -29,17 +29,17 @@ public enum CatalogInstallationState: Equatable, Sendable {
 @MainActor
 @Observable
 public final class AppModel {
-    public internal(set) var connectionState: PebbleConnectionState = .idle
+    public internal(set) var connectionState: WatchConnectionState = .idle
     public internal(set) var connections: [WatchConnection] = []
     public internal(set) var connectingWatchIDs: Set<WatchID> = []
     /// Why the last attempt at each watch ended. A watch has its own screen with
     /// its own Connect button, and a failure that only reached the log left that
     /// button looking like it had done nothing.
-    public internal(set) var connectionFailures: [WatchID: PebbleConnectionError] = [:]
+    public internal(set) var connectionFailures: [WatchID: WatchConnectionError] = [:]
     public internal(set) var isScanning = false
     public internal(set) var discoveredWatches: [DiscoveredWatch] = []
-    public internal(set) var watchApplications: [PebbleApplication] = []
-    public internal(set) var watchfaces: [PebbleApplication] = []
+    public internal(set) var watchApplications: [WatchApplication] = []
+    public internal(set) var watchfaces: [WatchApplication] = []
     public internal(set) var activeWatchfaceID: UUID?
     public internal(set) var isLoadingApplications = false
     public internal(set) var isImportingApplication = false
@@ -51,7 +51,7 @@ public final class AppModel {
     /// on `WatchConnection`.
     public internal(set) var applicationManagementOperation: ApplicationManagementOperation?
     public internal(set) var applicationManagementStatusMessage: LocalizedStringKey?
-    public internal(set) var configurationApplication: PebbleApplication?
+    public internal(set) var configurationApplication: WatchApplication?
     public internal(set) var configurationURL: URL?
     public internal(set) var diagnosticReportURL: URL?
     public internal(set) var companionNotificationsEnabled = true
@@ -67,15 +67,15 @@ public final class AppModel {
     /// restart says nothing on its way out and nothing on its way in, so the
     /// only news the reader gets is the link returning.
     public internal(set) var watchResetStatusMessages: [WatchID: LocalizedStringKey] = [:]
-    public internal(set) var timelinePins: [PebbleTimelinePin] = []
-    public internal(set) var reminders: [PebbleTimelinePin] = []
+    public internal(set) var timelinePins: [TimelinePin] = []
+    public internal(set) var reminders: [TimelinePin] = []
     public internal(set) var reminderStatusMessage: LocalizedStringKey?
     public internal(set) var watchSettings: [String: Bool] = [:]
-    public internal(set) var activitySettings = PebbleActivitySettings()
-    public internal(set) var heartRateSettings = PebbleHeartRateSettings()
+    public internal(set) var activitySettings = ActivitySettings()
+    public internal(set) var heartRateSettings = HeartRateSettings()
     public internal(set) var isReminderAppEnabled = true
     public internal(set) var watchSettingsStatusMessage: LocalizedStringKey?
-    public internal(set) var latestScreenshot: PebbleScreenshot?
+    public internal(set) var latestScreenshot: WatchScreenshot?
     public internal(set) var screenshotURL: URL?
     public internal(set) var watchLogLines: [WatchLogLine] = []
     public internal(set) var watchLogsURL: URL?
@@ -86,8 +86,8 @@ public final class AppModel {
     public internal(set) var isGatheringWatchLogs = false
     public internal(set) var isCollectingCoredump = false
     public internal(set) var watchDiagnosticsStatusMessages: [WatchDiagnostic: LocalizedStringKey] = [:]
-    public internal(set) var healthSamples: [PebbleHealthSample] = []
-    public internal(set) var catalogApplications: [PebbleCatalogApplication] = []
+    public internal(set) var healthSamples: [WatchHealthSample] = []
+    public internal(set) var catalogApplications: [CatalogApplication] = []
     public internal(set) var catalogLastUpdated: Date?
     public internal(set) var isUpdatingCatalog = false
     public internal(set) var installingCatalogApplicationID: UUID?
@@ -99,7 +99,7 @@ public final class AppModel {
     public internal(set) var languageStatusMessage: LocalizedStringKey?
     public internal(set) var isInstallingLanguagePack = false
     public internal(set) var weatherPlaces: [WeatherPlace] = []
-    public internal(set) var weatherReports: [PebbleWeatherReport] = []
+    public internal(set) var weatherReports: [WeatherReport] = []
     public internal(set) var weatherCredit: WeatherCredit?
     public internal(set) var weatherUpdated: Date?
     public internal(set) var weatherUsesFahrenheit = false
@@ -110,7 +110,7 @@ public final class AppModel {
     public internal(set) var healthExportURL: URL?
     public internal(set) var notificationSourceApps: [NotificationSourceApp] = []
     /// The line each watchapp shows in the launcher, for the apps that have one.
-    public internal(set) var appGlances: [PebbleAppGlance] = []
+    public internal(set) var appGlances: [AppGlance] = []
     public internal(set) var installedApplicationIDsByWatch: [WatchID: Set<UUID>] = [:]
 
     public var isScanningOrConnecting: Bool {
@@ -174,20 +174,20 @@ public final class AppModel {
         return connections.first { $0.watch.id == watchID }
     }
 
-    let scannerClient: any PebbleClient
-    let clientFactory: @MainActor (WatchID) -> any PebbleClient
-    let applicationLibrary: PebbleApplicationLibrary
+    let scannerClient: any WatchClient
+    let clientFactory: @MainActor (WatchID) -> any WatchClient
+    let applicationLibrary: WatchApplicationLibrary
     let watchStore: SavedWatchStore
     let timelineStore = TimelinePinStore()
     let reminderStore: TimelinePinStore
     let healthStore = WatchHealthStore()
-    let appCatalog = PebbleAppCatalog()
+    let appCatalog = AppCatalog()
     let languagePackCatalog = PebbleLanguagePackCatalog()
     let weatherBridge = WeatherBridge()
     // Held as a function so a test can answer for some places and refuse for
     // others, which WeatherKit itself cannot be asked to produce.
     @ObservationIgnored
-    var fetchWeatherReport: (WeatherPlace, Bool) async throws -> PebbleWeatherReport = {
+    var fetchWeatherReport: (WeatherPlace, Bool) async throws -> WeatherReport = {
         place, usesFahrenheit in
         try await WeatherBridge().report(for: place, inFahrenheit: usesFahrenheit)
     }
@@ -220,10 +220,10 @@ public final class AppModel {
         source: makeSystemCallSource(),
         send: { [weak self] frame in try await self?.broadcast(frame) }
     )
-    @ObservationIgnored var lastConnectionError: PebbleConnectionError?
+    @ObservationIgnored var lastConnectionError: WatchConnectionError?
     @ObservationIgnored var firmwareUpdateTask: Task<Void, any Error>?
     @ObservationIgnored var hasLoadedApplications = false
-    @ObservationIgnored var pendingImportSnapshots: [UUID: PebbleApplicationLibrarySnapshot] = [:]
+    @ObservationIgnored var pendingImportSnapshots: [UUID: WatchApplicationLibrarySnapshot] = [:]
     @ObservationIgnored var needsApplicationSynchronization = false
     @ObservationIgnored var hasStarted = false
     @ObservationIgnored var recentNotificationFingerprints: [String: Date] = [:]
@@ -235,11 +235,11 @@ public final class AppModel {
     @ObservationIgnored lazy var companionRuntime = PebbleCompanionRuntime(
         openURLHandler: { [weak self] url in self?.openConfigurationURL(url) },
         appMessageHandler: { [weak self] applicationID, tuples in
-            guard let self else { throw PebbleConnectionError.disconnected }
+            guard let self else { throw WatchConnectionError.disconnected }
             try await self.sendOrQueueAppMessage(applicationID: applicationID, tuples: tuples)
         },
         notificationHandler: { [weak self] application, title, body in
-            guard let self else { throw PebbleConnectionError.disconnected }
+            guard let self else { throw WatchConnectionError.disconnected }
             try await self.sendCompanionNotification(
                 application: application,
                 title: title,
@@ -250,14 +250,14 @@ public final class AppModel {
     )
 
     public init(
-        client: any PebbleClient,
-        applicationLibrary: PebbleApplicationLibrary = PebbleApplicationLibrary(),
+        client: any WatchClient,
+        applicationLibrary: WatchApplicationLibrary = WatchApplicationLibrary(),
         watchStore: SavedWatchStore = SavedWatchStore(),
         appGlanceStore: AppGlanceStore = AppGlanceStore(),
         reminderStore: TimelinePinStore = TimelinePinStore(
             fileURL: URL.applicationSupportDirectory.appending(path: "Pebble/reminders.json")
         ),
-        clientFactory: (@MainActor (WatchID) -> any PebbleClient)? = nil
+        clientFactory: (@MainActor (WatchID) -> any WatchClient)? = nil
     ) {
         self.scannerClient = client
         // Without a factory every connection shares the scanning client, which
@@ -360,7 +360,7 @@ public final class AppModel {
             for device in automaticTargets {
                 await connect(to: device)
             }
-        } catch let error as PebbleConnectionError {
+        } catch let error as WatchConnectionError {
             if connections.isEmpty {
                 lastConnectionError = error
             }
@@ -428,7 +428,7 @@ public final class AppModel {
             await restorePendingNotifications()
             await PebbleDiagnostics.shared.record(category: "connection", message: "Watch connected")
             await synchronizeEverything(on: connection)
-        } catch let error as PebbleConnectionError {
+        } catch let error as WatchConnectionError {
             lastConnectionError = error
             connectionFailures[device.id] = error
             if !connections.isEmpty {
@@ -466,7 +466,7 @@ public final class AppModel {
         applicationManagementStatusMessage = nil
     }
 
-    func handleEvent(_ event: PebbleClientEvent, from connection: WatchConnection) {
+    func handleEvent(_ event: WatchClientEvent, from connection: WatchConnection) {
         switch event {
         case .watchUpdated(let device):
             let needsResync = connection.consumePostReconnectSync()

@@ -1,13 +1,13 @@
 public import Foundation
 import MemberwiseInit
 
-public enum PebbleApplicationKind: String, Codable, Equatable, Sendable {
+public enum WatchApplicationKind: String, Codable, Equatable, Sendable {
     case watchapp
     case watchface
 }
 
 @MemberwiseInit(.public)
-public struct PebbleApplication: Identifiable, Codable, Equatable, Sendable {
+public struct WatchApplication: Identifiable, Codable, Equatable, Sendable {
     public var id: UUID
     public var shortName: String
     public var longName: String
@@ -16,7 +16,7 @@ public struct PebbleApplication: Identifiable, Codable, Equatable, Sendable {
     public var versionLabel: String
     public var capabilities: [String]
     public var targetPlatforms: [String]
-    public var kind: PebbleApplicationKind
+    public var kind: WatchApplicationKind
     public var appKeys: [String: UInt32] = [:]
     public var hasCompanionJavaScript: Bool = false
 
@@ -43,7 +43,7 @@ public struct PebbleApplication: Identifiable, Codable, Equatable, Sendable {
         versionLabel = try container.decode(String.self, forKey: .versionLabel)
         capabilities = try container.decode([String].self, forKey: .capabilities)
         targetPlatforms = try container.decode([String].self, forKey: .targetPlatforms)
-        kind = try container.decode(PebbleApplicationKind.self, forKey: .kind)
+        kind = try container.decode(WatchApplicationKind.self, forKey: .kind)
         appKeys = try container.decodeIfPresent([String: UInt32].self, forKey: .appKeys) ?? [:]
         hasCompanionJavaScript = try container.decodeIfPresent(
             Bool.self,
@@ -57,12 +57,12 @@ public struct PebbleApplication: Identifiable, Codable, Equatable, Sendable {
 }
 
 public enum PBWApplicationDecoder {
-    public static func decodeAppInfo(from data: Data) throws -> PebbleApplication {
+    public static func decodeAppInfo(from data: Data) throws -> WatchApplication {
         let raw = try JSONDecoder().decode(RawAppInfo.self, from: data)
         guard let id = UUID(uuidString: raw.uuid) else {
             throw PBWApplicationError.invalidUUID
         }
-        return PebbleApplication(
+        return WatchApplication(
             id: id,
             shortName: raw.shortName,
             longName: raw.longName ?? "",

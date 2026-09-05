@@ -13,7 +13,7 @@ extension AppModel {
     }
 
     public func addTimelinePin(title: String, date: Date) async {
-        let pin = PebbleTimelinePin(
+        let pin = TimelinePin(
             parentApplicationID: UUID(), timestamp: date, title: title, subtitle: nil, body: nil
         )
         timelinePins.append(pin)
@@ -37,7 +37,7 @@ extension AppModel {
 
     // Named rather than numbered: the list they were picked from may be grouped
     // or narrowed by a search.
-    public func removeTimelinePins(_ removed: [PebbleTimelinePin]) async {
+    public func removeTimelinePins(_ removed: [TimelinePin]) async {
         guard !removed.isEmpty else { return }
         let identifiers = Set(removed.map(\.id))
         timelinePins.removeAll { identifiers.contains($0.id) }

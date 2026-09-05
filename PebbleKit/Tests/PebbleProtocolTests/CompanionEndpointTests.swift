@@ -274,7 +274,7 @@ struct ImagingTests {
         let request = try ImagingCodec.decode(frame)
 
         #expect(request == .albumArt(
-            PebbleImageRequestHeader(token: 7, kindValue: 0, format: 2, width: 80, height: 60),
+            WatchImageRequestHeader(token: 7, kindValue: 0, format: 2, width: 80, height: 60),
             title: "A",
             artist: "B"
         ))
@@ -287,7 +287,7 @@ struct ImagingTests {
         ))
 
         #expect(request == .unsupported(
-            PebbleImageRequestHeader(token: 9, kindValue: 0x7F, format: 2, width: 16, height: 16)
+            WatchImageRequestHeader(token: 9, kindValue: 0x7F, format: 2, width: 16, height: 16)
         ))
         // The kind rides in the top nibble of the flags byte, and only four
         // bits of it fit.
@@ -296,7 +296,7 @@ struct ImagingTests {
     }
 
     @Test func aPictureIsSentAsChunksWithTheHeaderOnTheFirst() {
-        let image = PebbleEncodedImage(
+        let image = EncodedImage(
             width: 4,
             height: 4,
             palette: [0xC0, 0xFF],
@@ -315,7 +315,7 @@ struct ImagingTests {
     }
 
     @Test func aPictureTooLargeForOneFrameIsSplitAndTheLastSaysSo() {
-        let image = PebbleEncodedImage(
+        let image = EncodedImage(
             width: 100,
             height: 30,
             palette: [0xC0],
@@ -341,7 +341,7 @@ struct ImagingTests {
             argb += [UInt32](repeating: 0xFF00_00FF, count: 4)
         }
 
-        let image = try #require(PebbleImageEncoder.encode(argb: argb, width: 8, height: 8))
+        let image = try #require(WatchImageEncoder.encode(argb: argb, width: 8, height: 8))
 
         #expect(image.palette.count == 2)
         #expect(image.palette.allSatisfy { $0 & 0b1100_0000 == 0b1100_0000 })
@@ -589,7 +589,7 @@ struct WatchSettingsTests {
     @Test func theActivityRecordMatchesTheFirmwareStruct() {
         // `ActivitySettings`, packed: two little-endian int16s, three flags,
         // then age and gender as signed bytes.
-        let settings = PebbleActivitySettings(
+        let settings = ActivitySettings(
             heightMillimetres: 1_750,
             weightDecagrams: 7_250,
             isTrackingEnabled: true,
@@ -604,7 +604,7 @@ struct WatchSettingsTests {
     }
 
     @Test func theHeartRateRecordIsThreeBytes() {
-        let settings = PebbleHeartRateSettings(
+        let settings = HeartRateSettings(
             isEnabled: true,
             interval: .everyHour,
             isEnabledDuringActivity: false
@@ -617,13 +617,13 @@ struct WatchSettingsTests {
         // `HRMonitoringInterval`: 10Min = 0, 30Min = 1, 1Hour = 2,
         // Disabled = 3, written straight into
         // `ActivityHRMSettings.measurement_interval`.
-        #expect(PebbleHeartRateInterval.everyTenMinutes.rawValue == 0)
-        #expect(PebbleHeartRateInterval.everyThirtyMinutes.rawValue == 1)
-        #expect(PebbleHeartRateInterval.everyHour.rawValue == 2)
-        #expect(PebbleHeartRateInterval.off.rawValue == 3)
-        #expect(PebbleHeartRateInterval.allCases.count == 4)
+        #expect(HeartRateInterval.everyTenMinutes.rawValue == 0)
+        #expect(HeartRateInterval.everyThirtyMinutes.rawValue == 1)
+        #expect(HeartRateInterval.everyHour.rawValue == 2)
+        #expect(HeartRateInterval.off.rawValue == 3)
+        #expect(HeartRateInterval.allCases.count == 4)
 
-        let off = PebbleHeartRateSettings(
+        let off = HeartRateSettings(
             isEnabled: false,
             interval: .off,
             isEnabledDuringActivity: false
@@ -635,7 +635,7 @@ struct WatchSettingsTests {
         // `enabled`, then the interval, then activity tracking. The watch's
         // sampling loop (`activity.c`) consults the interval alone; `enabled`
         // gates only the health service's readings (`health_service.c`).
-        let settings = PebbleHeartRateSettings(
+        let settings = HeartRateSettings(
             isEnabled: false,
             interval: .everyTenMinutes,
             isEnabledDuringActivity: true
@@ -647,14 +647,14 @@ struct WatchSettingsTests {
     @Test func aHeartRateSettingSavedUnderOtherNumbersStillOpens() throws {
         let stored = Data(#"{"isEnabled":true,"interval":9,"isEnabledDuringActivity":true}"#.utf8)
 
-        let settings = try JSONDecoder().decode(PebbleHeartRateSettings.self, from: stored)
+        let settings = try JSONDecoder().decode(HeartRateSettings.self, from: stored)
 
         #expect(settings.interval == .everyTenMinutes)
         #expect(settings.isEnabled)
     }
 
     @Test func aHealthDayIsKeyedByItsWeekdayAndMeasuredInWords() {
-        let day = PebbleHealthDay(
+        let day = WatchHealthDay(
             weekday: 1,
             lastProcessed: Date(timeIntervalSince1970: 0x66000000),
             steps: 8_000,
@@ -691,7 +691,7 @@ struct WatchSettingsTests {
 @Suite
 @MainActor
 struct WeatherTests {
-    private let report = PebbleWeatherReport(
+    private let report = WeatherReport(
         id: UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF")!,
         locationName: "Kyoto",
         isCurrentLocation: true,
@@ -778,9 +778,9 @@ struct WeatherTests {
 @MainActor
 struct AppGlanceTests {
     @Test func aGlanceIsAVersionATimeAndItsSlices() {
-        let glance = PebbleAppGlance(
+        let glance = AppGlance(
             applicationID: UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF")!,
-            slices: [PebbleAppGlanceSlice(
+            slices: [AppGlanceSlice(
                 subtitleTemplate: "Hi",
                 icon: .sms,
                 expires: Date(timeIntervalSince1970: 0x6a98b880)
@@ -802,9 +802,9 @@ struct AppGlanceTests {
     }
 
     @Test func aLineThatNeverStopsBeingTrueStillCarriesTheAttribute() {
-        let glance = PebbleAppGlance(
+        let glance = AppGlance(
             applicationID: UUID(),
-            slices: [PebbleAppGlanceSlice(subtitleTemplate: "Kyoto 18°")],
+            slices: [AppGlanceSlice(subtitleTemplate: "Kyoto 18°")],
             updatedAt: Date(timeIntervalSince1970: 0)
         )
 
@@ -819,9 +819,9 @@ struct AppGlanceTests {
     }
 
     @Test func moreSlicesThanTheWatchKeepsAreNotSent() {
-        let glance = PebbleAppGlance(
+        let glance = AppGlance(
             applicationID: UUID(),
-            slices: (0..<12).map { PebbleAppGlanceSlice(subtitleTemplate: "line \($0)") }
+            slices: (0..<12).map { AppGlanceSlice(subtitleTemplate: "line \($0)") }
         )
 
         // The firmware trims what it is given past eight, saying in a comment
@@ -835,9 +835,9 @@ struct AppGlanceTests {
     @Test func aLineIsCutOnACharacterAndNotInsideOne() {
         // Fifty three-byte characters is 150 bytes, which is all the firmware
         // keeps; the fifty-first would be cut in half by a byte count.
-        let glance = PebbleAppGlance(
+        let glance = AppGlance(
             applicationID: UUID(),
-            slices: [PebbleAppGlanceSlice(subtitleTemplate: String(repeating: "石", count: 60))]
+            slices: [AppGlanceSlice(subtitleTemplate: String(repeating: "石", count: 60))]
         )
 
         let value = AppGlanceCodec.value(for: glance)
@@ -849,7 +849,7 @@ struct AppGlanceTests {
 
     @Test func insertAndDeleteTargetTheGlanceDatabase() {
         let id = UUID()
-        let insert = AppGlanceCodec.insertFrame(PebbleAppGlance(applicationID: id), token: 0x0102)
+        let insert = AppGlanceCodec.insertFrame(AppGlance(applicationID: id), token: 0x0102)
         let delete = AppGlanceCodec.deleteFrame(applicationID: id, token: 0x0102)
 
         #expect(insert.endpoint == 0xB1DB)

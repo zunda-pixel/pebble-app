@@ -92,7 +92,7 @@ extension AppModel {
         if weatherCredit == nil {
             weatherCredit = try? await weatherBridge.credit()
         }
-        var reports: [PebbleWeatherReport] = []
+        var reports: [WeatherReport] = []
         var placeFailed = false
         for place in weatherPlaces {
             var place = place

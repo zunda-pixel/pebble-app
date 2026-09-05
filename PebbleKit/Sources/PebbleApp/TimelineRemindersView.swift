@@ -17,15 +17,15 @@ struct TimelineRemindersView: View {
 /// Split at now: what is still coming is what the reader is looking for, and
 /// the watch is told about that half only.
 struct TimelineRemindersContent: View {
-    var reminders: [PebbleTimelinePin]
+    var reminders: [TimelinePin]
     var statusMessage: LocalizedStringKey?
-    var remove: ([PebbleTimelinePin]) -> Void
+    var remove: ([TimelinePin]) -> Void
 
-    private var upcoming: [PebbleTimelinePin] {
+    private var upcoming: [TimelinePin] {
         reminders.filter { $0.timestamp > .now }.sorted { $0.timestamp < $1.timestamp }
     }
 
-    private var past: [PebbleTimelinePin] {
+    private var past: [TimelinePin] {
         reminders.filter { $0.timestamp <= .now }.sorted { $0.timestamp > $1.timestamp }
     }
 
@@ -66,7 +66,7 @@ struct TimelineRemindersContent: View {
         }
     }
 
-    private func rows(_ reminders: [PebbleTimelinePin]) -> some View {
+    private func rows(_ reminders: [TimelinePin]) -> some View {
         ForEach(reminders) { reminder in
             LabeledContent(reminder.title) {
                 Text(reminder.timestamp, format: .dateTime.month().day().hour().minute())

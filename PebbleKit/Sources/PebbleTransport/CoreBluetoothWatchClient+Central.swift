@@ -1,7 +1,7 @@
 import PebbleProtocol
 public import CoreBluetooth
 
-extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
+extension CoreBluetoothWatchClient: CBCentralManagerDelegate {
     public func centralManagerDidUpdateState(_ central: CBCentralManager) {
         let waiters = bluetoothWaiters
         bluetoothWaiters.removeAll()
@@ -11,15 +11,15 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
             waiters.forEach { $0.resume() }
             resumeReconnectAfterPowerOn()
         case .unauthorized:
-            waiters.forEach { $0.resume(throwing: PebbleConnectionError.permissionDenied) }
+            waiters.forEach { $0.resume(throwing: WatchConnectionError.permissionDenied) }
             failScan(.permissionDenied)
             failConnection(.permissionDenied)
         case .unsupported:
-            waiters.forEach { $0.resume(throwing: PebbleConnectionError.bluetoothUnsupported) }
+            waiters.forEach { $0.resume(throwing: WatchConnectionError.bluetoothUnsupported) }
             failScan(.bluetoothUnsupported)
             failConnection(.bluetoothUnsupported)
         case .poweredOff, .resetting:
-            waiters.forEach { $0.resume(throwing: PebbleConnectionError.bluetoothUnavailable) }
+            waiters.forEach { $0.resume(throwing: WatchConnectionError.bluetoothUnavailable) }
             failScan(.bluetoothUnavailable)
             if connectionContinuation != nil {
                 failConnection(.bluetoothUnavailable)
@@ -36,7 +36,7 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
         case .unknown:
             bluetoothWaiters.append(contentsOf: waiters)
         @unknown default:
-            waiters.forEach { $0.resume(throwing: PebbleConnectionError.bluetoothUnavailable) }
+            waiters.forEach { $0.resume(throwing: WatchConnectionError.bluetoothUnavailable) }
         }
     }
 
@@ -111,7 +111,7 @@ extension CoreBluetoothPebbleClient: CBCentralManagerDelegate {
 
     /// What CoreBluetooth refused a connect for, where it says something the
     /// reader can act on.
-    private static func connectionError(from error: (any Error)?) -> PebbleConnectionError {
+    private static func connectionError(from error: (any Error)?) -> WatchConnectionError {
         guard let error = error as? NSError, error.domain == CBErrorDomain else {
             return .connectionFailed
         }

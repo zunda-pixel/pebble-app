@@ -5,10 +5,10 @@ import WebKit
 @MainActor
 final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
     private var webView: WKWebView
-    private var application: PebbleApplication?
+    private var application: WatchApplication?
     private var openURLHandler: (URL) -> Void
     private var appMessageHandler: (UUID, [AppMessageTuple]) async throws -> Void
-    private var notificationHandler: (PebbleApplication, String, String) async throws -> Void
+    private var notificationHandler: (WatchApplication, String, String) async throws -> Void
     private var activeWatchHandler: () -> ConnectedWatch?
     private var loadContinuation: CheckedContinuation<Void, any Error>?
     private var loadedApplicationID: UUID?
@@ -17,7 +17,7 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
     init(
         openURLHandler: @escaping (URL) -> Void,
         appMessageHandler: @escaping (UUID, [AppMessageTuple]) async throws -> Void,
-        notificationHandler: @escaping (PebbleApplication, String, String) async throws -> Void,
+        notificationHandler: @escaping (WatchApplication, String, String) async throws -> Void,
         activeWatchHandler: @escaping () -> ConnectedWatch?
     ) {
         self.openURLHandler = openURLHandler
@@ -32,7 +32,7 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
         webView.navigationDelegate = self
     }
 
-    func load(source: String, application: PebbleApplication) async throws {
+    func load(source: String, application: WatchApplication) async throws {
         if loadedApplicationID == application.id { return }
         self.application = application
         let watch = activeWatchHandler()

@@ -15,7 +15,7 @@ extension CBPeripheral {
     }
 }
 
-struct PebbleReconnectBackoff: Equatable, Sendable {
+struct ReconnectBackoff: Equatable, Sendable {
     var attempt: Int = 0
     var initialDelay: Duration = .seconds(2)
     var maximumDelay: Duration = .seconds(30)
@@ -54,7 +54,7 @@ final class ReconnectPolicy {
     private(set) var isAutomatic = false
     private(set) var failedHandshakes = 0
 
-    private var backoff = PebbleReconnectBackoff()
+    private var backoff = ReconnectBackoff()
     private var scheduled: Task<Void, Never>?
     private var expectedDisconnects: Set<WatchID> = []
 

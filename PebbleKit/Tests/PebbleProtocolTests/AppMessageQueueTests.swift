@@ -60,7 +60,7 @@ struct AppMessageQueueTests {
         let queue = AppMessageQueue(timeout: .milliseconds(20))
         queue.send = { _ in }
 
-        await #expect(throws: PebbleConnectionError.connectionTimedOut) {
+        await #expect(throws: WatchConnectionError.connectionTimedOut) {
             try await queue.enqueue(applicationID: UUID(), tuples: tuples(1))
         }
         #expect(queue.isEmpty)
@@ -76,13 +76,13 @@ struct AppMessageQueueTests {
         let waiting = Task { try await queue.enqueue(applicationID: UUID(), tuples: tuples(2)) }
         while sent.isEmpty { await Task.yield() }
 
-        queue.failAll(PebbleConnectionError.disconnected)
+        queue.failAll(WatchConnectionError.disconnected)
 
         // Both callers hear about it: one whose message was in flight and one
         // whose turn never came. Leaving either suspended is what left a caller
         // waiting for a link that never came back.
-        await #expect(throws: PebbleConnectionError.disconnected) { try await inFlight.value }
-        await #expect(throws: PebbleConnectionError.disconnected) { try await waiting.value }
+        await #expect(throws: WatchConnectionError.disconnected) { try await inFlight.value }
+        await #expect(throws: WatchConnectionError.disconnected) { try await waiting.value }
         #expect(queue.isEmpty)
     }
 

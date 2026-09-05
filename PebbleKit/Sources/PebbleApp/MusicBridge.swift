@@ -61,7 +61,7 @@ final class MusicCoordinator {
         schedulePush(force: true)
     }
 
-    func artwork(width: Int, height: Int) -> PebbleEncodedImage? {
+    func artwork(width: Int, height: Int) -> EncodedImage? {
         guard let image = source.artwork(width: width, height: height) else { return nil }
         return WatchImageRenderer.encode(image, width: width, height: height)
     }

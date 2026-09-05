@@ -67,12 +67,12 @@ extension AppModel {
             }
         }
         guard delivered else {
-            throw PebbleConnectionError.disconnected
+            throw WatchConnectionError.disconnected
         }
     }
 
     func sendCompanionNotification(
-        application: PebbleApplication,
+        application: WatchApplication,
         title: String,
         body: String
     ) async throws {
@@ -214,7 +214,7 @@ extension AppModel {
                     }
                 }
             case TimelinePinCodec.databaseID, TimelineReminderCodec.databaseID:
-                if var item = try? PebbleTimelinePin(decoding: write.value) {
+                if var item = try? TimelinePin(decoding: write.value) {
                     // Whatever the item's own flag says. It arrived on the
                     // endpoint the watch starts, so the watch already has it,
                     // and writing it back is never the right thing to do.

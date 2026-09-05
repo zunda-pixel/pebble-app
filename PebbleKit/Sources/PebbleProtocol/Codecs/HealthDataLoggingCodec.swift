@@ -4,7 +4,7 @@ import MemberwiseInit
 @MemberwiseInit(.public)
 public struct HealthDataLoggingResult: Equatable, Sendable {
     public var response: PebbleProtocolFrame? = nil
-    public var samples: [PebbleHealthSample] = []
+    public var samples: [WatchHealthSample] = []
 }
 
 public struct HealthDataLoggingProcessor: Sendable {
@@ -45,7 +45,7 @@ public struct HealthDataLoggingProcessor: Sendable {
         }
     }
 
-    private func samples(from bytes: [UInt8], session: Session) throws -> [PebbleHealthSample] {
+    private func samples(from bytes: [UInt8], session: Session) throws -> [WatchHealthSample] {
         guard session.itemSize > 0 else { throw HealthDataLoggingError.invalidItemSize }
         switch session.tag {
         case 81, 85:
@@ -57,7 +57,7 @@ public struct HealthDataLoggingProcessor: Sendable {
         }
     }
 
-    private func stepSamples(from bytes: [UInt8], itemSize: Int) throws -> [PebbleHealthSample] {
+    private func stepSamples(from bytes: [UInt8], itemSize: Int) throws -> [WatchHealthSample] {
         var daily: [Date: Int] = [:]
         for itemStart in stride(from: 0, to: bytes.count - (bytes.count % itemSize), by: itemSize) {
             let itemEnd = itemStart + itemSize
@@ -78,7 +78,7 @@ public struct HealthDataLoggingProcessor: Sendable {
             }
         }
         return daily.map {
-            PebbleHealthSample(date: $0.key, steps: $0.value, sleepMinutes: 0, source: .watch)
+            WatchHealthSample(date: $0.key, steps: $0.value, sleepMinutes: 0, source: .watch)
         }
     }
 
@@ -90,8 +90,8 @@ public struct HealthDataLoggingProcessor: Sendable {
     /// end are always within the containing session. Adding all four types
     /// together, which this used to do, made a night with two hours of deep
     /// sleep ten hours long.
-    private func sleepSamples(from bytes: [UInt8], itemSize: Int) throws -> [PebbleHealthSample] {
-        var daily: [Date: (intervals: [PebbleSleepInterval], timeZoneIdentifier: String)] = [:]
+    private func sleepSamples(from bytes: [UInt8], itemSize: Int) throws -> [WatchHealthSample] {
+        var daily: [Date: (intervals: [SleepInterval], timeZoneIdentifier: String)] = [:]
         for itemStart in stride(from: 0, to: bytes.count - (bytes.count % itemSize), by: itemSize) {
             let itemEnd = itemStart + itemSize
             guard itemEnd <= bytes.count, itemSize >= 18 else { continue }
@@ -106,7 +106,7 @@ public struct HealthDataLoggingProcessor: Sendable {
             let endDate = Date(timeIntervalSince1970: TimeInterval(start + duration))
             let day = calendar.startOfDay(for: endDate)
             var value = daily[day, default: ([], timeZone.identifier)]
-            value.intervals.append(PebbleSleepInterval(
+            value.intervals.append(SleepInterval(
                 start: Date(timeIntervalSince1970: TimeInterval(start)),
                 duration: TimeInterval(duration),
                 // Restful sleep, and restful nap.
@@ -115,8 +115,8 @@ public struct HealthDataLoggingProcessor: Sendable {
             daily[day] = value
         }
         return daily.map { day, value in
-            let sessions = PebbleSleepSessions.grouped(value.intervals)
-            return PebbleHealthSample(
+            let sessions = SleepSessions.grouped(value.intervals)
+            return WatchHealthSample(
                 date: day,
                 steps: 0,
                 sleepMinutes: min(24 * 60, sessions.reduce(0) { $0 + $1.asleepMinutes }),

@@ -42,7 +42,7 @@ struct HealthView: View {
 }
 
 struct HealthContent: View {
-    var samples: [PebbleHealthSample]
+    var samples: [WatchHealthSample]
     var exportURL: URL?
     var statusMessage: LocalizedStringKey?
     var isWatchConnected: Bool
@@ -161,7 +161,7 @@ struct HealthContent: View {
         }
     }
 
-    var newestSample: PebbleHealthSample? {
+    var newestSample: WatchHealthSample? {
         samples.max { $0.date < $1.date }
     }
 
@@ -174,7 +174,7 @@ struct HealthContent: View {
         return date
     }
 
-    private var filteredSamples: [PebbleHealthSample] {
+    private var filteredSamples: [WatchHealthSample] {
         let start = Calendar.current.date(byAdding: .day, value: -period.days, to: Date()) ?? .distantPast
         return samples.filter { $0.date >= start }
     }
@@ -182,7 +182,7 @@ struct HealthContent: View {
     /// Divided by the days that had something to say rather than by the days in
     /// the period: a watch that was off the wrist on Sunday should not read as
     /// a Sunday spent asleep for no minutes.
-    private var averages: PebbleHealthAverages { samples.averages(over: period.days) }
+    private var averages: WatchHealthAverages { samples.averages(over: period.days) }
 
     private var totalSteps: Int { filteredSamples.map(\.steps).reduce(0, +) }
 

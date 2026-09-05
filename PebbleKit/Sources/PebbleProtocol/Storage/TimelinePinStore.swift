@@ -61,11 +61,11 @@ public actor TimelinePinStore {
     /// calendar and the phone's reminders put them back on the next
     /// synchronization — but handing the `DecodingError` back on every read
     /// would have meant no pin could be shown or saved again.
-    public func pins() throws -> [PebbleTimelinePin] {
-        try PersistentJSON.loadRecovering([PebbleTimelinePin].self, from: fileURL) ?? []
+    public func pins() throws -> [TimelinePin] {
+        try PersistentJSON.loadRecovering([TimelinePin].self, from: fileURL) ?? []
     }
 
-    public func save(_ pins: [PebbleTimelinePin]) throws {
+    public func save(_ pins: [TimelinePin]) throws {
         try PersistentJSON.save(pins, to: fileURL)
     }
 }

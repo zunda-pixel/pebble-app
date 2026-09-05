@@ -22,7 +22,7 @@ public struct PebbleDiagnosticReport: Encodable, Sendable {
     public var generatedAt: Date
     public var operatingSystem: String
     public var deviceDescription: String?
-    public var applications: [PebbleApplication]
+    public var applications: [WatchApplication]
     public var entries: [PebbleDiagnosticEntry]
 }
 
@@ -81,7 +81,7 @@ public actor PebbleDiagnostics {
 
     public func exportReport(
         device: ConnectedWatch?,
-        applications: [PebbleApplication],
+        applications: [WatchApplication],
         directory: URL = .temporaryDirectory
     ) throws -> URL {
         let report = PebbleDiagnosticReport(

@@ -3,7 +3,7 @@ import MemberwiseInit
 
 /// The firmware has one icon per case and nothing else, so anything outside
 /// this list has to be mapped onto it.
-public enum PebbleWeatherType: UInt8, Equatable, Sendable, CaseIterable {
+public enum WeatherType: UInt8, Equatable, Sendable, CaseIterable {
     case partlyCloudy = 0
     case cloudyDay = 1
     case lightSnow = 2
@@ -19,17 +19,17 @@ public enum PebbleWeatherType: UInt8, Equatable, Sendable, CaseIterable {
 /// Temperatures are whole degrees in whatever unit the reader chose: the
 /// record carries no unit, so the watch shows the number as it is given.
 @MemberwiseInit(.public)
-public struct PebbleWeatherReport: Equatable, Identifiable, Sendable {
+public struct WeatherReport: Equatable, Identifiable, Sendable {
     /// Has to stay the same across updates or the watch collects a new location
     /// every refresh.
     public var id: UUID
     public var locationName: String
     public var isCurrentLocation: Bool
     public var currentTemperature: Int16
-    public var currentType: PebbleWeatherType
+    public var currentType: WeatherType
     public var todayHigh: Int16
     public var todayLow: Int16
-    public var tomorrowType: PebbleWeatherType
+    public var tomorrowType: WeatherType
     public var tomorrowHigh: Int16
     public var tomorrowLow: Int16
     public var shortPhrase: String
@@ -46,13 +46,13 @@ public enum WeatherCodec {
     static let maximumLocationNameBytes = 63
     static let maximumShortPhraseBytes = 31
 
-    public static func key(for report: PebbleWeatherReport) -> [UInt8] {
+    public static func key(for report: WeatherReport) -> [UInt8] {
         BlobDBCodec.uuidBytes(report.id)
     }
 
     /// `WeatherDBEntry` is a packed struct: every number little-endian, nothing
     /// aligned.
-    public static func value(for report: PebbleWeatherReport) -> [UInt8] {
+    public static func value(for report: WeatherReport) -> [UInt8] {
         let name = truncated(report.locationName, toBytes: maximumLocationNameBytes)
         let phrase = truncated(report.shortPhrase, toBytes: maximumShortPhraseBytes)
 
@@ -74,7 +74,7 @@ public enum WeatherCodec {
         return value
     }
 
-    public static func insertFrame(report: PebbleWeatherReport, token: UInt16) -> PebbleProtocolFrame {
+    public static func insertFrame(report: WeatherReport, token: UInt16) -> PebbleProtocolFrame {
         BlobDBCodec.insertFrame(
             databaseID: databaseID,
             key: key(for: report),

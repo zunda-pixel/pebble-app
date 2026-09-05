@@ -27,7 +27,7 @@ extension AppModel {
         }
     }
 
-    public func setActivitySettings(_ settings: PebbleActivitySettings) async {
+    public func setActivitySettings(_ settings: ActivitySettings) async {
         activitySettings = settings
         Defaults[.activitySettings] = settings
         for connection in activeConnections {
@@ -39,7 +39,7 @@ extension AppModel {
         }
     }
 
-    public func setHeartRateSettings(_ settings: PebbleHeartRateSettings) async {
+    public func setHeartRateSettings(_ settings: HeartRateSettings) async {
         heartRateSettings = settings
         Defaults[.heartRateSettings] = settings
         for connection in activeConnections {
@@ -110,7 +110,7 @@ extension AppModel {
     // The firmware writes a day's record straight over its own metrics for that
     // day, so today is never sent — it is still being counted — and a day the
     // phone knows nothing about is left alone.
-    func healthDays(now: Date = .now) -> [PebbleHealthDay] {
+    func healthDays(now: Date = .now) -> [WatchHealthDay] {
         let calendar = Calendar.current
         let startOfToday = calendar.startOfDay(for: now)
         guard let oldest = calendar.date(byAdding: .day, value: -6, to: startOfToday) else {
@@ -131,7 +131,7 @@ extension AppModel {
             guard let weekday = calendar.dateComponents([.weekday], from: day).weekday else {
                 return nil
             }
-            return PebbleHealthDay(
+            return WatchHealthDay(
                 // `weekday` counts from 1 for Sunday; the firmware counts from 0.
                 weekday: weekday - 1,
                 lastProcessed: day,

@@ -9,7 +9,7 @@ extension AppModel {
     }
 
     public func addReminder(title: String, date: Date) async {
-        let reminder = PebbleTimelinePin(
+        let reminder = TimelinePin(
             parentApplicationID: UUID(),
             timestamp: date,
             title: title,
@@ -52,7 +52,7 @@ extension AppModel {
 
     // Named rather than numbered: the list they were picked from is sorted and
     // split for reading.
-    public func removeReminders(_ removed: [PebbleTimelinePin]) async {
+    public func removeReminders(_ removed: [TimelinePin]) async {
         guard !removed.isEmpty else { return }
         let identifiers = Set(removed.map(\.id))
         reminders.removeAll { identifiers.contains($0.id) }

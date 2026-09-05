@@ -4,7 +4,7 @@ import Foundation
 /// The watch pulls: when it has somewhere to show a picture it says how big
 /// that space is and waits for an answer on that token.
 extension AppModel {
-    func answerImageRequest(_ request: PebbleImageRequest, on connection: WatchConnection) async {
+    func answerImageRequest(_ request: WatchImageRequest, on connection: WatchConnection) async {
         let header = request.header
         guard header.width > 0, header.height > 0,
               header.width <= ImagingCodec.maximumDimension,

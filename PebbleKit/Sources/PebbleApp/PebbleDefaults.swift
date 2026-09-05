@@ -18,13 +18,13 @@ extension Defaults.Keys {
     )
 
     static let watchSettings = Key<[String: Bool]>("watchSettings", default: [:])
-    static let activitySettings = Key<PebbleActivitySettings>(
+    static let activitySettings = Key<ActivitySettings>(
         "activitySettings",
-        default: PebbleActivitySettings()
+        default: ActivitySettings()
     )
-    static let heartRateSettings = Key<PebbleHeartRateSettings>(
+    static let heartRateSettings = Key<HeartRateSettings>(
         "heartRateSettings",
-        default: PebbleHeartRateSettings()
+        default: HeartRateSettings()
     )
     static let reminderAppEnabled = Key<Bool>("reminderAppEnabled", default: true)
 
@@ -45,5 +45,5 @@ extension Defaults.Keys {
 
 extension DownloadedFirmware: Defaults.Serializable {}
 extension WeatherPlace: Defaults.Serializable {}
-extension PebbleActivitySettings: Defaults.Serializable {}
-extension PebbleHeartRateSettings: Defaults.Serializable {}
+extension ActivitySettings: Defaults.Serializable {}
+extension HeartRateSettings: Defaults.Serializable {}

@@ -1,10 +1,10 @@
 /// The watch's screen has two bits per channel — sixty-four colours — and
 /// reads no more than sixteen of them per picture, from a palette sent with it.
-public enum PebbleImageEncoder {
+public enum WatchImageEncoder {
     static let maximumColours = 16
 
     /// - Parameter argb: one pixel per entry, row by row, as `0xAARRGGBB`.
-    public static func encode(argb: [UInt32], width: Int, height: Int) -> PebbleEncodedImage? {
+    public static func encode(argb: [UInt32], width: Int, height: Int) -> EncodedImage? {
         guard width > 0, height > 0, argb.count >= width * height else { return nil }
 
         let palette = choosePalette(argb: argb)
@@ -57,7 +57,7 @@ public enum PebbleImageEncoder {
             for index in nextError.indices { nextError[index] = 0 }
         }
 
-        return PebbleEncodedImage(
+        return EncodedImage(
             width: width,
             height: height,
             palette: palette.map { colour(($0 >> 4) & 0x3, ($0 >> 2) & 0x3, $0 & 0x3) },

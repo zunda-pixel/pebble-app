@@ -12,8 +12,8 @@ import Testing
 struct ReportedStateTests {
     private func makeModel(directory: URL) -> AppModel {
         AppModel(
-            client: MockPebbleClient(),
-            applicationLibrary: PebbleApplicationLibrary(
+            client: MockWatchClient(),
+            applicationLibrary: WatchApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
@@ -50,7 +50,7 @@ struct ReportedStateTests {
         model.weatherPlaces = [kyoto, refused]
         model.fetchWeatherReport = { place, _ in
             guard place.id == kyoto.id else { throw WeatherSourceError.placeNotFound }
-            return PebbleWeatherReport(
+            return WeatherReport(
                 id: place.id,
                 locationName: place.name,
                 isCurrentLocation: false,
@@ -107,7 +107,7 @@ struct ReportedStateTests {
         #expect(await log.count == 4)
     }
 
-    private func healthContent(samples: [PebbleHealthSample]) -> HealthContent {
+    private func healthContent(samples: [WatchHealthSample]) -> HealthContent {
         HealthContent(
             samples: samples,
             exportURL: nil,
@@ -128,7 +128,7 @@ struct ReportedStateTests {
             Calendar.current.date(byAdding: .day, value: -3, to: Date())
         )
         let stale = healthContent(samples: [
-            PebbleHealthSample(date: threeDaysAgo, steps: 11_240, sleepMinutes: 420),
+            WatchHealthSample(date: threeDaysAgo, steps: 11_240, sleepMinutes: 420),
         ])
 
         // A watch last worn on Friday reports Friday, and Monday must not read
@@ -137,8 +137,8 @@ struct ReportedStateTests {
         #expect(stale.newestSample?.steps == 11_240)
 
         let today = healthContent(samples: [
-            PebbleHealthSample(date: threeDaysAgo, steps: 11_240, sleepMinutes: 420),
-            PebbleHealthSample(date: Date(), steps: 900, sleepMinutes: 0),
+            WatchHealthSample(date: threeDaysAgo, steps: 11_240, sleepMinutes: 420),
+            WatchHealthSample(date: Date(), steps: 900, sleepMinutes: 0),
         ])
 
         #expect(today.summaryDate == nil)
@@ -147,18 +147,18 @@ struct ReportedStateTests {
 
     @Test
     func aDayTheWatchDidNotCountIsSentTheFiguresApplyHealthHas() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         let now = try #require(Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 2, hour: 12)))
         let yesterday = try #require(Calendar.current.date(byAdding: .day, value: -1, to: now))
         model.healthSamples = [
-            PebbleHealthSample(
+            WatchHealthSample(
                 date: yesterday,
                 steps: 9_400,
                 sleepMinutes: 430,
@@ -186,12 +186,12 @@ struct ReportedStateTests {
 
     @Test
     func aDayTheWatchSyncedLastStillCarriesWhatOnlyThePhoneKnows() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         let now = try #require(Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 2, hour: 12)))
@@ -200,7 +200,7 @@ struct ReportedStateTests {
         // was read: one record marked `watch`, carrying figures the watch has
         // no way of counting.
         model.healthSamples = [
-            PebbleHealthSample(
+            WatchHealthSample(
                 date: yesterday,
                 steps: 9_400,
                 sleepMinutes: 430,
@@ -209,7 +209,7 @@ struct ReportedStateTests {
             ),
             // A day the watch counted and nothing else touched stays with the
             // watch, which already has it.
-            PebbleHealthSample(
+            WatchHealthSample(
                 date: try #require(Calendar.current.date(byAdding: .day, value: -2, to: now)),
                 steps: 8_000,
                 sleepMinutes: 400,

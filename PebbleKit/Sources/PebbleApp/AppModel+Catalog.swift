@@ -36,11 +36,11 @@ extension AppModel {
     }
 
     public func refreshCatalog() async {
-        let source = Defaults[.catalogSource] ?? PebbleAppCatalog.defaultSourceURL.absoluteString
+        let source = Defaults[.catalogSource] ?? AppCatalog.defaultSourceURL.absoluteString
         await updateCatalog(source: source)
     }
 
-    public func catalogInstallationState(for application: PebbleCatalogApplication) -> CatalogInstallationState {
+    public func catalogInstallationState(for application: CatalogApplication) -> CatalogInstallationState {
         if !connectedWatches.isEmpty,
            !connectedWatches.contains(where: { application.supports($0.model) }) {
             return .incompatible
@@ -51,7 +51,7 @@ extension AppModel {
         return application.isNewer(than: installed.versionLabel) ? .updateAvailable : .installed
     }
 
-    public func installCatalogApplication(_ application: PebbleCatalogApplication) async {
+    public func installCatalogApplication(_ application: CatalogApplication) async {
         guard application.downloadURL.scheme?.lowercased() == "https" else {
             dataSyncStatusMessage = "The catalog provided an unsafe download URL."
             return

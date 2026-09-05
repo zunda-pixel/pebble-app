@@ -70,7 +70,7 @@ final class AppMessageQueue {
             deadline = Task { [weak self, timeout] in
                 try? await Task.sleep(for: timeout)
                 guard !Task.isCancelled else { return }
-                self?.finishActive(throwing: PebbleConnectionError.connectionTimedOut)
+                self?.finishActive(throwing: WatchConnectionError.connectionTimedOut)
             }
         } catch {
             finishActive(throwing: error)

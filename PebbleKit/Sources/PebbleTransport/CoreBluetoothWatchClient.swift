@@ -23,7 +23,7 @@ private final class NotificationObserverStorage: @unchecked Sendable {
 /// dispatch — stayed private, and `internal` reaches no further than this
 /// module.
 @MainActor
-public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
+public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     static var ppogService = CBUUID(string: "40000000-328E-0FBB-C642-1AA6699BDADA")
     /// Advertised by watches that are not bonded yet, including after a reset.
     static var pairingService = CBUUID(string: "0000FED9-0000-1000-8000-00805F9B34FB")
@@ -62,7 +62,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     var ppogSession: PPoGSession?
     var frameDecoder = PebbleProtocolFrameDecoder()
     private var frameContinuation: AsyncStream<PebbleProtocolFrame>.Continuation?
-    var eventContinuation: AsyncStream<PebbleClientEvent>.Continuation?
+    var eventContinuation: AsyncStream<WatchClientEvent>.Continuation?
     private var pendingGattWrites: Deque<Data> = []
     private var timeChangeObservers = NotificationObserverStorage()
     private var scanTimeoutTask: Task<Void, Never>?
@@ -102,7 +102,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         clientTag = String(restoreIdentifier.split(separator: ".").last ?? "central")
         super.init()
         appMessages.send = { [weak self] data in
-            guard let self else { throw PebbleConnectionError.disconnected }
+            guard let self else { throw WatchConnectionError.disconnected }
             try sendFrame(AppMessageCodec.pushFrame(data), to: try linkedPeripheral())
         }
         observeSystemTimeChanges()
@@ -133,7 +133,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     /// queued.
     private func linkedPeripheral() throws -> CBPeripheral {
         guard let peripheral = connectedPeripheral, ppogSession != nil else {
-            throw PebbleConnectionError.disconnected
+            throw WatchConnectionError.disconnected
         }
         return peripheral
     }
@@ -154,7 +154,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         try await waitForBluetooth()
 
         guard scanContinuation == nil else {
-            throw PebbleConnectionError.scanAlreadyInProgress
+            throw WatchConnectionError.scanAlreadyInProgress
         }
 
         scanResults.removeAll()
@@ -215,7 +215,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         try await waitForBluetooth()
 
         guard connectionContinuation == nil else {
-            throw PebbleConnectionError.connectionAlreadyInProgress
+            throw WatchConnectionError.connectionAlreadyInProgress
         }
         if let connectedWatch, connectedWatch.id == device.id {
             return connectedWatch
@@ -230,7 +230,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
             _ = try await retrieveKnownWatches([device])
         }
         guard let peripheral = discoveredPeripherals[device.id] else {
-            throw PebbleConnectionError.watchNotFound
+            throw WatchConnectionError.watchNotFound
         }
 
         centralManager.stopScan()
@@ -293,7 +293,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         }
     }
 
-    public func events() -> AsyncStream<PebbleClientEvent> {
+    public func events() -> AsyncStream<WatchClientEvent> {
         AsyncStream { continuation in
             eventContinuation?.finish()
             eventContinuation = continuation
@@ -358,7 +358,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     }
 
     public func refreshWatchInformation() async throws {
-        guard let peripheral = connectedPeripheral else { throw PebbleConnectionError.disconnected }
+        guard let peripheral = connectedPeripheral else { throw WatchConnectionError.disconnected }
         try sendFrame(WatchVersionCodec.requestFrame(), to: peripheral)
     }
 
@@ -426,7 +426,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     }
 
     private func sendFirmwareControl(_ frame: PebbleProtocolFrame, waitingForStart: Bool) async throws {
-        guard let peripheral = connectedPeripheral else { throw PebbleConnectionError.disconnected }
+        guard let peripheral = connectedPeripheral else { throw WatchConnectionError.disconnected }
         guard !firmwareReply.isWaiting else {
             throw PutBytesClientError.firmwareUpdateAlreadyInProgress
         }
@@ -439,7 +439,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     public func sendImage(
         token: UInt8,
         kindValue: UInt8,
-        image: PebbleEncodedImage?
+        image: EncodedImage?
     ) async throws {
         // The chunks are one transfer as far as the watch is concerned: another
         // response arriving between them abandons it, so they go out together.
@@ -527,17 +527,17 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         case .poweredOn:
             return
         case .unauthorized:
-            throw PebbleConnectionError.permissionDenied
+            throw WatchConnectionError.permissionDenied
         case .unsupported:
-            throw PebbleConnectionError.bluetoothUnsupported
+            throw WatchConnectionError.bluetoothUnsupported
         case .poweredOff, .resetting:
-            throw PebbleConnectionError.bluetoothUnavailable
+            throw WatchConnectionError.bluetoothUnavailable
         case .unknown:
             try await withCheckedThrowingContinuation { continuation in
                 bluetoothWaiters.append(continuation)
             }
         @unknown default:
-            throw PebbleConnectionError.bluetoothUnavailable
+            throw WatchConnectionError.bluetoothUnavailable
         }
     }
 
@@ -553,7 +553,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         scanContinuation = nil
     }
 
-    func failScan(_ error: PebbleConnectionError) {
+    func failScan(_ error: WatchConnectionError) {
         centralManager.stopScan()
         scanTimeoutTask?.cancel()
         scanTimeoutTask = nil
@@ -605,7 +605,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
     /// nothing about which of them a watch stopped at.
     func abortLink(
         _ peripheral: CBPeripheral,
-        error: PebbleConnectionError,
+        error: WatchConnectionError,
         step: String
     ) {
         Task { [tag = clientTag] in
@@ -622,7 +622,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         cancelLink(peripheral, reason: "transport failure: \(error.logDescription)")
     }
 
-    func failConnection(_ error: PebbleConnectionError) {
+    func failConnection(_ error: WatchConnectionError) {
         connectionTimeoutTask?.cancel()
         connectionTimeoutTask = nil
         pairingTimeoutTask?.cancel()
@@ -678,12 +678,12 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         let bytes = try packet.encoded(for: .one)
         if setup.transport == .forward {
             guard PebbleGattServer.shared.send(bytes, to: peripheral.identifier.uuidString) else {
-                throw PebbleConnectionError.protocolNegotiationFailed
+                throw WatchConnectionError.protocolNegotiationFailed
             }
             return
         }
         guard let characteristic = activeWriteCharacteristic else {
-            throw PebbleConnectionError.protocolNegotiationFailed
+            throw WatchConnectionError.protocolNegotiationFailed
         }
         pendingGattWrites.append(Data(bytes))
         flushWrites(to: peripheral, characteristic: characteristic)
@@ -726,7 +726,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
                     frameContinuation?.yield(frame)
                 }
             case .resetRequired:
-                throw PebbleConnectionError.protocolNegotiationFailed
+                throw WatchConnectionError.protocolNegotiationFailed
             }
         }
         if let firstFailure {
@@ -739,7 +739,7 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         to peripheral: CBPeripheral
     ) throws {
         guard var session = ppogSession else {
-            throw PebbleConnectionError.disconnected
+            throw WatchConnectionError.disconnected
         }
 
         Task { await PebbleDiagnostics.shared.recordFrame(direction: "out", frame: frame) }
@@ -1160,18 +1160,18 @@ public final class CoreBluetoothPebbleClient: NSObject, PebbleClient {
         healthDataLoggingProcessor = HealthDataLoggingProcessor()
         completedTransferCookie = nil
         stopHealthChecks()
-        failTransfer(PebbleConnectionError.disconnected)
-        failBlobDBOperation(PebbleConnectionError.disconnected)
-        blobDBQueue.failAll(PebbleConnectionError.disconnected)
-        failPulls(PebbleConnectionError.disconnected)
-        failAppReorder(PebbleConnectionError.disconnected)
+        failTransfer(WatchConnectionError.disconnected)
+        failBlobDBOperation(WatchConnectionError.disconnected)
+        blobDBQueue.failAll(WatchConnectionError.disconnected)
+        failPulls(WatchConnectionError.disconnected)
+        failAppReorder(WatchConnectionError.disconnected)
         // A firmware control exchange is waiting on a reply that the watch can
         // no longer send; saying so now beats a timeout ten seconds later that
         // blames the deadline instead of the dropped link.
-        finishFirmwareControl(throwing: PebbleConnectionError.disconnected)
+        finishFirmwareControl(throwing: WatchConnectionError.disconnected)
         // `AppModel` keeps its own list of undelivered messages and flushes it
         // on the next connection, so a copy held here would be sent twice.
-        appMessages.failAll(PebbleConnectionError.disconnected)
+        appMessages.failAll(WatchConnectionError.disconnected)
     }
 
     /// Asks iOS for the notification-sharing decision as part of connecting.

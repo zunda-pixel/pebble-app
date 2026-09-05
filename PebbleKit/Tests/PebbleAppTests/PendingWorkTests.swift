@@ -11,10 +11,10 @@ import ZIPFoundation
 @Suite(.serialized)
 @MainActor
 struct PendingWorkTests {
-    private func makeModel(client: any PebbleClient, directory: URL) -> AppModel {
+    private func makeModel(client: any WatchClient, directory: URL) -> AppModel {
         AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(
+            applicationLibrary: WatchApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
@@ -23,7 +23,7 @@ struct PendingWorkTests {
 
     @Test
     func twoOverlappingFlushesDeliverEachQueuedNotificationOnce() async throws {
-        let client = SuspendingPebbleClient()
+        let client = SuspendingWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = makeModel(client: client, directory: directory)
@@ -57,17 +57,17 @@ struct PendingWorkTests {
 
     @Test
     func aNotificationTheSecondWatchRefusesIsNotShownTwiceOnTheFirst() async throws {
-        var clients: [WatchID: SuspendingPebbleClient] = [:]
+        var clients: [WatchID: SuspendingWatchClient] = [:]
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
-            client: MockPebbleClient(),
-            applicationLibrary: PebbleApplicationLibrary(
+            client: MockWatchClient(),
+            applicationLibrary: WatchApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
             clientFactory: { watchID in
-                let client = SuspendingPebbleClient()
+                let client = SuspendingWatchClient()
                 clients[watchID] = client
                 return client
             }
@@ -80,7 +80,7 @@ struct PendingWorkTests {
         await model.connect(to: first)
         await model.connect(to: second)
         let refusing = try #require(clients[second.id])
-        refusing.notificationFailure = PebbleConnectionError.disconnected
+        refusing.notificationFailure = WatchConnectionError.disconnected
 
         let notification = PebbleTimelineNotification(
             parentApplicationID: UUID(),
@@ -103,7 +103,7 @@ struct PendingWorkTests {
 
     @Test
     func twoOverlappingFlushesSendEveryQueuedAppMessage() async throws {
-        let client = SuspendingPebbleClient()
+        let client = SuspendingWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = makeModel(client: client, directory: directory)
@@ -131,18 +131,18 @@ struct PendingWorkTests {
 
     @Test
     func aPinTheAppNoLongerHasIsTakenOffTheWatch() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(
+            applicationLibrary: WatchApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
             clientFactory: { _ in client }
         )
-        let pin = PebbleTimelinePin(
+        let pin = TimelinePin(
             parentApplicationID: UUID(),
             timestamp: .now.addingTimeInterval(3600),
             title: "Dentist",
@@ -172,12 +172,12 @@ struct PendingWorkTests {
 
     @Test
     func aPinTheWatchMadeIsKeptAndNotSentBackToIt() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(
+            applicationLibrary: WatchApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
@@ -189,7 +189,7 @@ struct PendingWorkTests {
 
         // What the watch hands over after someone dictates a reminder to it: a
         // record of its own pin database, on the endpoint it starts itself.
-        let dictated = PebbleTimelinePin(
+        let dictated = TimelinePin(
             parentApplicationID: UUID(),
             timestamp: .now.addingTimeInterval(3600),
             title: "牛乳を買う",
@@ -220,12 +220,12 @@ struct PendingWorkTests {
     /// The frame a watch sends to hand over a record of a database of its own.
     @Test
     func aReminderTheWatchPostponedReplacesTheOneItSentBefore() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(
+            applicationLibrary: WatchApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
@@ -237,7 +237,7 @@ struct PendingWorkTests {
         let connection = try #require(model.activeConnections.first)
         // Whole seconds: the wire carries a `time_t`, so a date with a
         // fraction in it does not come back the same.
-        let dictated = PebbleTimelinePin(
+        let dictated = TimelinePin(
             parentApplicationID: UUID(),
             timestamp: Date(timeIntervalSince1970: (Date().timeIntervalSince1970 + 3600).rounded()),
             title: "会議",
@@ -266,12 +266,12 @@ struct PendingWorkTests {
 
     @Test
     func aDictatedReminderDeletedWhileTheWatchWasAwayIsTakenOffIt() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(
+            applicationLibrary: WatchApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
@@ -281,7 +281,7 @@ struct PendingWorkTests {
         await model.scan()
         let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
-        let dictated = PebbleTimelinePin(
+        let dictated = TimelinePin(
             parentApplicationID: UUID(),
             timestamp: .now.addingTimeInterval(3600),
             title: "会議",
@@ -306,7 +306,7 @@ struct PendingWorkTests {
     }
 
     private func offer(
-        _ item: PebbleTimelinePin,
+        _ item: TimelinePin,
         database: UInt8,
         token: [UInt8] = [0x0C, 0x00]
     ) -> PebbleProtocolFrame {
@@ -320,18 +320,18 @@ struct PendingWorkTests {
 
     @Test
     func clearingTheWatchsTimelineWritesBackWhatTheAppHas() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(
+            applicationLibrary: WatchApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
             clientFactory: { _ in client }
         )
-        let pin = PebbleTimelinePin(
+        let pin = TimelinePin(
             parentApplicationID: UUID(),
             timestamp: .now.addingTimeInterval(3600),
             title: "Kept",
@@ -357,7 +357,7 @@ struct PendingWorkTests {
 
     @Test
     func aFullTimelineQueueGivesUpUpsertsRatherThanDeletes() async throws {
-        let client = SuspendingPebbleClient()
+        let client = SuspendingWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = makeModel(client: client, directory: directory)
@@ -368,7 +368,7 @@ struct PendingWorkTests {
         let removedEventID = UUID()
         var operations: [PendingTimelineOperation] = [.delete(removedEventID)]
         operations += (0..<205).map { index -> PendingTimelineOperation in
-            .upsert(PebbleTimelinePin(
+            .upsert(TimelinePin(
                 parentApplicationID: UUID(),
                 timestamp: Date(),
                 title: "Event \(index)",
@@ -389,7 +389,7 @@ struct PendingWorkTests {
 
     @Test
     func deletesAreKeptPastTheCapAndSaidOutLoud() async throws {
-        let client = SuspendingPebbleClient()
+        let client = SuspendingWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = makeModel(client: client, directory: directory)
@@ -407,12 +407,12 @@ struct PendingWorkTests {
 
     @Test
     func aTransferTheWatchRefusesPutsTheEarlierVersionBack() async throws {
-        let client = SuspendingPebbleClient()
+        let client = SuspendingWatchClient()
         client.transferFailure = PutBytesTransferError.negativeAcknowledgement
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         let model = AppModel(
             client: client,
             applicationLibrary: library,

@@ -10,13 +10,13 @@ struct MainApp: App {
     let useQEMU = ProcessInfo.processInfo.environment["PEBBLE_QEMU"] == "1"
       || CommandLine.arguments.contains("--qemu")
     _model = State(initialValue: AppModel(
-      client: useQEMU ? makeQEMUPebbleClient() : makeDefaultPebbleClient(),
-      clientFactory: useQEMU ? nil : makeDefaultPebbleClientFactory()
+      client: useQEMU ? makeQEMUWatchClient() : makeDefaultPebbleClient(),
+      clientFactory: useQEMU ? nil : makeDefaultWatchClientFactory()
     ))
 #else
     _model = State(initialValue: AppModel(
       client: makeDefaultPebbleClient(),
-      clientFactory: makeDefaultPebbleClientFactory()
+      clientFactory: makeDefaultWatchClientFactory()
     ))
 #endif
   }

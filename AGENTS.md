@@ -108,6 +108,26 @@ For shared mutable state, use an `actor`, or `Mutex` from `Synchronization` when
 the call site is synchronous (a delegate callback, a `URLProtocol` override).
 Not `NSLock`, and not `nonisolated(unsafe)`.
 
+## Naming
+
+**Drop `Pebble` where the module or the enclosing type already says it and the
+bare name is unambiguous.** Every type in this package is about a Pebble, so
+the prefix carried no information on sixty-odd of them: `PebbleWeatherReport`
+in a file called `WeatherCodec.swift` in a target called `PebbleProtocol`.
+
+Keep it where **"Pebble" is part of a proper noun** — `PebbleOSFirmwareCatalog`
+(PebbleOS is the firmware's name), `PebbleProtocolFrame` (Pebble Protocol is
+the protocol's), `PPoGSession`, `PBWPackage`, `PBZFirmwarePackage`,
+`PebbleColor` (the watch's own palette), `PebbleCRC32` (the firmware's variant,
+not the standard one), `PebbleCompanionRuntime` and `PebbleTokenStore` (PebbleKit
+JS names them) — or where **the bare word would collide** with Foundation or
+SwiftUI.
+
+The rest still carry it, and lose it as they are next touched rather than in
+one sweep. "Watch" is the word for the thing on the reader's wrist:
+`ConnectedWatch`, `DiscoveredWatch`, `SavedWatch`, `WatchModel`, `WatchID`.
+Never "device".
+
 ## Style
 
 - PascalCase types, camelCase members. `let` unless mutation is needed.

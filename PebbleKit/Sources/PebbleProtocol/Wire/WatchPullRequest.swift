@@ -13,7 +13,7 @@ public enum WatchPullRequest: Equatable, Sendable {
 /// What came back. One case per request, so a transport that answers with the
 /// wrong one is caught at this boundary rather than by whoever asked.
 public enum WatchPullAnswer: Equatable, Sendable {
-    case screenshot(PebbleScreenshot)
+    case screenshot(WatchScreenshot)
     /// Nil once asked for further back than the watch goes.
     case logLines([WatchLogLine]?)
     case bytes([UInt8])

@@ -38,7 +38,7 @@ struct WatchIDTests {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
-        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         let applicationID = UUID()
 
         try await library.setSynchronizedApplicationIDs([applicationID], watchID: WatchID("mock-flint"))

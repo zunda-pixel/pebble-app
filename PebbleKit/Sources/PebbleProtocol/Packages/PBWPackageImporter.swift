@@ -10,7 +10,7 @@ public struct PBWPackageObject: Equatable, Sendable {
 
 @MemberwiseInit(.public)
 public struct PBWPackage: Equatable, Sendable {
-    public var application: PebbleApplication
+    public var application: WatchApplication
     public var variant: String
     public var binaryHeader: PBWBinaryHeader
     public var objects: [PBWPackageObject]
@@ -23,7 +23,7 @@ public struct PBWPackage: Equatable, Sendable {
 public enum PBWPackageImporter {
     private static var maximumEntrySize: UInt64 { 32 * 1_024 * 1_024 }
 
-    public static func application(from url: URL) throws -> PebbleApplication {
+    public static func application(from url: URL) throws -> WatchApplication {
         let archive = try Archive(url: url, accessMode: .read)
         var application = try PBWApplicationDecoder.decodeAppInfo(
             from: data(for: "appinfo.json", in: archive)

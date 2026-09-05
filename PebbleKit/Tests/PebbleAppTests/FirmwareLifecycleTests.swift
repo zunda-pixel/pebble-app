@@ -17,9 +17,9 @@ import ZIPFoundation
 struct FirmwareLifecycleTests {
     @Test
     func firmwareChosenWhileDisconnectedWaitsForTheWatch() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let library = PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         // A watch running recovery firmware stays connected for only a few
@@ -52,12 +52,12 @@ struct FirmwareLifecycleTests {
         // same breath. The second used to take over the task and the transfer
         // flags, leaving the first waiting on a reply nobody held — and with it
         // the keepalive suppressed for the rest of the link.
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         let device = ConnectedWatch(
@@ -96,13 +96,13 @@ struct FirmwareLifecycleTests {
 
     @Test
     func aFinishedInstallTakesTheDownloadedPackageWithIt() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         let device = ConnectedWatch(
@@ -139,13 +139,13 @@ struct FirmwareLifecycleTests {
 
     @Test
     func aDownloadForAnotherVersionSurvivesAnInstall() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         let device = ConnectedWatch(
@@ -182,13 +182,13 @@ struct FirmwareLifecycleTests {
 
     @Test
     func aWatchBackFromItsUpdateIsNoLongerWaitingForARestart() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
         let device = ConnectedWatch(

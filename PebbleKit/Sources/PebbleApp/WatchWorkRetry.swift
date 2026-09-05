@@ -10,7 +10,7 @@ extension RetryConfiguration where ClockType == ContinuousClock {
             maxAttempts: 3,
             backoff: .default(baseDelay: .milliseconds(250), maxDelay: .seconds(2)),
             recoverFromFailure: { error in
-                if let error = error as? PebbleConnectionError, !error.isWorthAnotherAttempt {
+                if let error = error as? WatchConnectionError, !error.isWorthAnotherAttempt {
                     return .throw
                 }
                 return .retry

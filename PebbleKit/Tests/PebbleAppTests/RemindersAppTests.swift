@@ -12,14 +12,14 @@ import Testing
 @MainActor
 final class FakeRemindersApp: RemindersAppStore {
     var items: [RemindersAppItem] = []
-    var added: [PebbleTimelinePin] = []
-    var updated: [PebbleTimelinePin] = []
+    var added: [TimelinePin] = []
+    var updated: [TimelinePin] = []
     var removed: [String] = []
     private var written = 0
 
     func reminders() async throws -> [RemindersAppItem] { items }
 
-    func add(_ reminder: PebbleTimelinePin) async throws -> String {
+    func add(_ reminder: TimelinePin) async throws -> String {
         written += 1
         let identifier = "reminders-app-\(written)"
         added.append(reminder)
@@ -31,7 +31,7 @@ final class FakeRemindersApp: RemindersAppStore {
         return identifier
     }
 
-    func update(_ reminder: PebbleTimelinePin, identifier: String) async throws {
+    func update(_ reminder: TimelinePin, identifier: String) async throws {
         guard let index = items.firstIndex(where: { $0.identifier == identifier }) else {
             throw RemindersBridgeError.gone
         }
@@ -56,7 +56,7 @@ struct RemindersAppTests {
     ) -> RemindersAppItem {
         RemindersAppItem(
             identifier: identifier,
-            reminder: PebbleTimelinePin(
+            reminder: TimelinePin(
                 parentApplicationID: RemindersBridge.applicationID,
                 timestamp: Date(timeIntervalSince1970: (Date().timeIntervalSince1970 + hours * 3600).rounded()),
                 title: title,
@@ -69,12 +69,12 @@ struct RemindersAppTests {
 
     private func connectedModel(
         in directory: URL,
-        client: MockPebbleClient,
+        client: MockWatchClient,
         remindersApp: FakeRemindersApp
     ) async throws -> AppModel {
         let model = AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(
+            applicationLibrary: WatchApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
@@ -89,7 +89,7 @@ struct RemindersAppTests {
 
     @Test
     func aReminderInThePhonesAppIsSentToTheWatchAsAReminder() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let remindersApp = FakeRemindersApp()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -106,7 +106,7 @@ struct RemindersAppTests {
 
     @Test
     func aReminderTheWatchMadeIsWrittenIntoThePhonesApp() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let remindersApp = FakeRemindersApp()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -123,7 +123,7 @@ struct RemindersAppTests {
 
     @Test
     func aReminderTheWatchMadeIsWrittenThereOnceHoweverOftenTheAppIsRead() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let remindersApp = FakeRemindersApp()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -146,7 +146,7 @@ struct RemindersAppTests {
 
     @Test
     func aReminderDeletedInThePhonesAppIsTakenOffTheWatch() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let remindersApp = FakeRemindersApp()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -165,7 +165,7 @@ struct RemindersAppTests {
 
     @Test
     func aReminderTheWatchMadeAndTheReaderFinishedThereIsLetGoOfHere() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let remindersApp = FakeRemindersApp()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -188,7 +188,7 @@ struct RemindersAppTests {
 
     @Test
     func lettingGoOfAReminderHereTakesItOutOfThePhonesApp() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let remindersApp = FakeRemindersApp()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -208,7 +208,7 @@ struct RemindersAppTests {
     @Test
     func aCopyWhoseTimeHasPassedIsNotTakenForFinished() {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
-        var yesterday = PebbleTimelinePin(
+        var yesterday = TimelinePin(
             parentApplicationID: UUID(),
             timestamp: now.addingTimeInterval(-3600),
             title: "昨日の用事",

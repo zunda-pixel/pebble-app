@@ -4,13 +4,13 @@ import Foundation
 
 /// A watch that takes a moment to answer.
 ///
-/// `MockPebbleClient` returns from every call without ever suspending, so two
+/// `MockWatchClient` returns from every call without ever suspending, so two
 /// pieces of work that read the same queue can never interleave in a test the
 /// way they do against a real watch. This one suspends inside the calls the
 /// queues use, and can be told to refuse them, which is what makes the races
 /// and the rollbacks observable.
 @MainActor
-final class SuspendingPebbleClient: PebbleClient {
+final class SuspendingWatchClient: WatchClient {
     /// How long each answer takes. Long enough for a second task to reach the
     /// same queue, short enough not to slow the suite down.
     var answerDelay: Duration = .milliseconds(20)
@@ -23,13 +23,13 @@ final class SuspendingPebbleClient: PebbleClient {
     private(set) var sentAppMessages: [(applicationID: UUID, tuples: [AppMessageTuple])] = []
     private(set) var installedObjects: [(objectType: PutBytesObjectType, appBankID: UInt32)] = []
     private(set) var appFetchResponses: [AppFetchResponseStatus] = []
-    private(set) var upsertedPins: [PebbleTimelinePin] = []
+    private(set) var upsertedPins: [TimelinePin] = []
     private(set) var deletedPinIDs: [UUID] = []
     private(set) var clearedTimelineCount = 0
     private(set) var sentFrames: [PebbleProtocolFrame] = []
     private(set) var disconnectedWatches: [ConnectedWatch] = []
     private var frameContinuation: AsyncStream<PebbleProtocolFrame>.Continuation?
-    private var eventContinuation: AsyncStream<PebbleClientEvent>.Continuation?
+    private var eventContinuation: AsyncStream<WatchClientEvent>.Continuation?
 
     init() {}
 
@@ -64,11 +64,11 @@ final class SuspendingPebbleClient: PebbleClient {
         AsyncStream { continuation in frameContinuation = continuation }
     }
 
-    func events() -> AsyncStream<PebbleClientEvent> {
+    func events() -> AsyncStream<WatchClientEvent> {
         AsyncStream { continuation in eventContinuation = continuation }
     }
 
-    func emit(_ event: PebbleClientEvent) {
+    func emit(_ event: WatchClientEvent) {
         eventContinuation?.yield(event)
     }
 
@@ -137,7 +137,7 @@ final class SuspendingPebbleClient: PebbleClient {
     func launchApplication(id: UUID) async throws {}
     func installFirmware(_ package: PBZFirmwarePackage) async throws {}
     func installFile(_ bytes: [UInt8], filename: String) async throws {}
-    func sendImage(token: UInt8, kindValue: UInt8, image: PebbleEncodedImage?) async throws {}
+    func sendImage(token: UInt8, kindValue: UInt8, image: EncodedImage?) async throws {}
     func declineImageKind(token: UInt8, kindValue: UInt8) async throws {}
     func setApplicationLoggingEnabled(_ isEnabled: Bool) async throws {}
 }

@@ -78,24 +78,24 @@ enum PreviewSamples {
         lastConnectedAt: .now.addingTimeInterval(-86_400)
     )
 
-    static let pins: [PebbleTimelinePin] = {
+    static let pins: [TimelinePin] = {
         let day = Calendar.current.startOfDay(for: .now)
         return [
-            PebbleTimelinePin(
+            TimelinePin(
                 parentApplicationID: UUID(),
                 timestamp: day.addingTimeInterval(9 * 3_600),
                 title: "スタンドアップ",
                 subtitle: "Room 3",
                 body: nil
             ),
-            PebbleTimelinePin(
+            TimelinePin(
                 parentApplicationID: UUID(),
                 timestamp: day.addingTimeInterval(13 * 3_600),
                 title: "Lunch with Ann",
                 subtitle: nil,
                 body: nil
             ),
-            PebbleTimelinePin(
+            TimelinePin(
                 parentApplicationID: UUID(),
                 timestamp: day.addingTimeInterval(26 * 3_600),
                 title: "Dentist",
@@ -106,8 +106,8 @@ enum PreviewSamples {
         ]
     }()
 
-    static let reminders: [PebbleTimelinePin] = [
-        PebbleTimelinePin(
+    static let reminders: [TimelinePin] = [
+        TimelinePin(
             parentApplicationID: UUID(),
             timestamp: .now.addingTimeInterval(3_600),
             title: "Take the bins out",
@@ -115,7 +115,7 @@ enum PreviewSamples {
             body: nil,
             kind: .reminder
         ),
-        PebbleTimelinePin(
+        TimelinePin(
             parentApplicationID: UUID(),
             timestamp: .now.addingTimeInterval(-7_200),
             title: "薬を飲む",
@@ -155,16 +155,16 @@ enum PreviewSamples {
         ),
     ]
 
-    static let healthSamples: [PebbleHealthSample] = (0..<14).reversed().map { day in
+    static let healthSamples: [WatchHealthSample] = (0..<14).reversed().map { day in
         let date = Calendar.current.date(byAdding: .day, value: -day, to: .now) ?? .now
         let asleep = TimeInterval(360 + day * 17 % 120) * 60
         let bedtime = Calendar.current.startOfDay(for: date).addingTimeInterval(-3600)
-        return PebbleHealthSample(
+        return WatchHealthSample(
             date: date,
             steps: 6_000 + day * 431 % 5_000,
             sleepMinutes: Int(asleep / 60),
             deepSleepMinutes: Int(asleep / 60 / 4),
-            sleepSessions: [PebbleSleepSession(
+            sleepSessions: [SleepSession(
                 start: bedtime,
                 end: bedtime.addingTimeInterval(asleep),
                 asleep: asleep,
@@ -177,8 +177,8 @@ enum PreviewSamples {
         )
     }
 
-    static let watchApplications: [PebbleApplication] = [
-        PebbleApplication(
+    static let watchApplications: [WatchApplication] = [
+        WatchApplication(
             id: UUID(),
             shortName: "Timeline",
             longName: "Timeline Weather",
@@ -190,7 +190,7 @@ enum PreviewSamples {
             kind: .watchapp,
             hasCompanionJavaScript: true
         ),
-        PebbleApplication(
+        WatchApplication(
             id: UUID(),
             shortName: "Steps",
             longName: "",
@@ -203,8 +203,8 @@ enum PreviewSamples {
         ),
     ]
 
-    static let watchfaces: [PebbleApplication] = [
-        PebbleApplication(
+    static let watchfaces: [WatchApplication] = [
+        WatchApplication(
             id: UUID(),
             shortName: "Tick",
             longName: "Tick Tock",
@@ -217,7 +217,7 @@ enum PreviewSamples {
         ),
     ]
 
-    static let catalogApplication = PebbleCatalogApplication(
+    static let catalogApplication = CatalogApplication(
         id: UUID(),
         storeID: "5262d3e2b3d4d2c9a1000000",
         name: "Simply Light",
@@ -235,8 +235,8 @@ enum PreviewSamples {
         WeatherPlace(id: UUID(), name: "Kyoto", latitude: 35.01, longitude: 135.76, followsPhone: false),
     ]
 
-    static let weatherReports: [PebbleWeatherReport] = weatherPlaces.enumerated().map { index, place in
-        PebbleWeatherReport(
+    static let weatherReports: [WeatherReport] = weatherPlaces.enumerated().map { index, place in
+        WeatherReport(
             id: place.id,
             locationName: place.name,
             isCurrentLocation: place.followsPhone,
@@ -298,7 +298,7 @@ enum PreviewSamples {
     /// overwrite anything set here.
     @MainActor
     static func appModel() -> AppModel {
-        let model = AppModel(client: MockPebbleClient())
+        let model = AppModel(client: MockWatchClient())
         model.savedWatches = [savedWatch]
         model.watchApplications = watchApplications
         model.watchfaces = watchfaces

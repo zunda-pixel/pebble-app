@@ -12,10 +12,10 @@ import Testing
 @MainActor
 @Suite
 struct BluetoothStartTests {
-    private func model(in directory: URL, client: MockPebbleClient) -> AppModel {
+    private func model(in directory: URL, client: MockWatchClient) -> AppModel {
         AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(
+            applicationLibrary: WatchApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
@@ -26,7 +26,7 @@ struct BluetoothStartTests {
 
     @Test
     func anInstallWithNoWatchDoesNotOpenTheRadioWhileStarting() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = model(in: directory, client: client)
@@ -41,7 +41,7 @@ struct BluetoothStartTests {
     /// the phone's service already published.
     @Test
     func anInstallWithAWatchOpensTheRadioWhileStarting() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
@@ -55,7 +55,7 @@ struct BluetoothStartTests {
         ))
         let model = AppModel(
             client: client,
-            applicationLibrary: PebbleApplicationLibrary(
+            applicationLibrary: WatchApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
             watchStore: watchStore,
@@ -75,7 +75,7 @@ struct BluetoothStartTests {
     /// anything opened it at launch.
     @Test
     func askingForAWatchOpensTheRadio() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = model(in: directory, client: client)

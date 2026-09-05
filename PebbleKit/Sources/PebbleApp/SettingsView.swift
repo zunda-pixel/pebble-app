@@ -55,7 +55,7 @@ struct SettingsContent<WeatherDestination: View, NotificationAppsDestination: Vi
     var notificationSourceAppCount: Int
     var companionNotificationsEnabled: Bool
     var notificationPreferences: NotificationDeliveryPreferences
-    var applications: [PebbleApplication]
+    var applications: [WatchApplication]
     var diagnosticReportURL: URL?
     var voiceTranscription: VoiceTranscriptionReadiness
     var setVoiceTranscriptionEnabled: (Bool) -> Void
@@ -68,7 +68,7 @@ struct SettingsContent<WeatherDestination: View, NotificationAppsDestination: Vi
     @ViewBuilder var notificationAppsDestination: () -> NotificationAppsDestination
 
     @State private var catalogSource = Defaults[.catalogSource]
-        ?? PebbleAppCatalog.defaultSourceURL.absoluteString
+        ?? AppCatalog.defaultSourceURL.absoluteString
     @State private var permissions = PhonePermissions()
     @Environment(\.scenePhase) private var scenePhase
 

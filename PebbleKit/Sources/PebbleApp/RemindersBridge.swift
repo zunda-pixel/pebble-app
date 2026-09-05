@@ -11,7 +11,7 @@ import Foundation
 /// same reminder there rather than making a second one.
 struct RemindersAppItem: Equatable, Sendable {
     var identifier: String
-    var reminder: PebbleTimelinePin
+    var reminder: TimelinePin
 }
 
 /// As much of the phone's Reminders app as the watch has a place for.
@@ -21,8 +21,8 @@ struct RemindersAppItem: Equatable, Sendable {
 @MainActor
 protocol RemindersAppStore {
     func reminders() async throws -> [RemindersAppItem]
-    func add(_ reminder: PebbleTimelinePin) async throws -> String
-    func update(_ reminder: PebbleTimelinePin, identifier: String) async throws
+    func add(_ reminder: TimelinePin) async throws -> String
+    func update(_ reminder: TimelinePin, identifier: String) async throws
     func remove(identifier: String) async throws
     /// Asks without reading anything, for the setup flow.
     func requestAccess() async throws
@@ -65,7 +65,7 @@ final class RemindersBridge: RemindersAppStore {
         }
     }
 
-    func add(_ reminder: PebbleTimelinePin) async throws -> String {
+    func add(_ reminder: TimelinePin) async throws -> String {
         guard try await store.requestFullAccessToReminders() else {
             throw RemindersBridgeError.accessDenied
         }
@@ -79,7 +79,7 @@ final class RemindersBridge: RemindersAppStore {
         return item.calendarItemIdentifier
     }
 
-    func update(_ reminder: PebbleTimelinePin, identifier: String) async throws {
+    func update(_ reminder: TimelinePin, identifier: String) async throws {
         guard try await store.requestFullAccessToReminders() else {
             throw RemindersBridgeError.accessDenied
         }
@@ -100,7 +100,7 @@ final class RemindersBridge: RemindersAppStore {
         try store.remove(item, commit: true)
     }
 
-    private func apply(_ reminder: PebbleTimelinePin, to item: EKReminder) {
+    private func apply(_ reminder: TimelinePin, to item: EKReminder) {
         item.title = reminder.title
         item.notes = reminder.body
         item.dueDateComponents = Calendar.current.dateComponents(
@@ -119,7 +119,7 @@ final class RemindersBridge: RemindersAppStore {
         let identifier = reminder.calendarItemIdentifier
         return RemindersAppItem(
             identifier: identifier,
-            reminder: PebbleTimelinePin(
+            reminder: TimelinePin(
                 id: stableID(identifier),
                 parentApplicationID: applicationID,
                 timestamp: due,
@@ -164,15 +164,15 @@ enum RemindersBridgeError: Error, Equatable, Sendable {
 /// finished here too.
 enum RemindersAppSync {
     struct Outcome: Equatable {
-        var reminders: [PebbleTimelinePin]
+        var reminders: [TimelinePin]
         /// Reminders the watch made whose copy in the Reminders app has been
         /// completed or deleted, which is the only word this app gets that the
         /// reader is done with them.
-        var finished: [PebbleTimelinePin]
+        var finished: [TimelinePin]
     }
 
     static func merged(
-        kept: [PebbleTimelinePin],
+        kept: [TimelinePin],
         fromApp: [RemindersAppItem],
         mirrored: [UUID: String],
         now: Date

@@ -24,7 +24,7 @@ struct PendingReplyTests {
     func aRequestThatIsNeverAnsweredGivesUpOnItsDeadline() async throws {
         let reply = PendingReply<Int>()
 
-        await #expect(throws: PebbleConnectionError.connectionTimedOut) {
+        await #expect(throws: WatchConnectionError.connectionTimedOut) {
             try await reply.wait(timeout: .milliseconds(20)) {}
         }
         #expect(!reply.isWaiting)
@@ -34,9 +34,9 @@ struct PendingReplyTests {
     func aRequestThatCannotBeSentFailsWithoutWaiting() async {
         let reply = PendingReply<Int>()
 
-        await #expect(throws: PebbleConnectionError.disconnected) {
+        await #expect(throws: WatchConnectionError.disconnected) {
             try await reply.wait(timeout: .seconds(60)) {
-                throw PebbleConnectionError.disconnected
+                throw WatchConnectionError.disconnected
             }
         }
         // Nothing is left holding the deadline, so a later request is free to
@@ -55,7 +55,7 @@ struct PendingReplyTests {
         // not resume a continuation that has already been used: that is a crash,
         // not an error.
         reply.finish(2)
-        reply.fail(PebbleConnectionError.disconnected)
+        reply.fail(WatchConnectionError.disconnected)
 
         #expect(try await waiting.value == 1)
     }
@@ -96,7 +96,7 @@ struct PendingReplyTests {
         await deadlines.waitUntilHolding(2)
         await deadlines.releaseAll()
 
-        await #expect(throws: PebbleConnectionError.connectionTimedOut) {
+        await #expect(throws: WatchConnectionError.connectionTimedOut) {
             try await waiting.value
         }
     }
@@ -107,9 +107,9 @@ struct PendingReplyTests {
         let waiting = Task { try await reply.wait(timeout: .seconds(5)) {} }
         while !reply.isWaiting { await Task.yield() }
 
-        reply.fail(PebbleConnectionError.disconnected)
+        reply.fail(WatchConnectionError.disconnected)
 
-        await #expect(throws: PebbleConnectionError.disconnected) {
+        await #expect(throws: WatchConnectionError.disconnected) {
             try await waiting.value
         }
     }

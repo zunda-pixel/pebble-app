@@ -5,7 +5,7 @@ import PebbleProtocol
 /// what the package said about itself, and every action that was otherwise only
 /// in a context menu nobody opens.
 struct ApplicationDetailContent: View {
-    var application: PebbleApplication
+    var application: WatchApplication
     var isActive: Bool
     /// Nil when no watch is connected: install state is unknown, not shown.
     var isInstalled: Bool?
@@ -130,14 +130,14 @@ struct ApplicationDetailContent: View {
 
 struct ApplicationDetailView: View {
     var model: AppModel
-    var application: PebbleApplication
+    var application: WatchApplication
     var watchID: WatchID?
-    var editGlance: (PebbleApplication) -> Void
+    var editGlance: (WatchApplication) -> Void
     @Environment(\.dismiss) private var dismiss
 
     /// Read from the library rather than held: a removal elsewhere, or a
     /// reinstall, should show here without going back first.
-    private var current: PebbleApplication? {
+    private var current: WatchApplication? {
         (model.watchApplications + model.watchfaces).first { $0.id == application.id }
     }
 

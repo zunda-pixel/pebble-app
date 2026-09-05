@@ -1,31 +1,31 @@
 public import Foundation
 
-public enum PebbleConnectionState: Equatable, Sendable {
+public enum WatchConnectionState: Equatable, Sendable {
     case idle
     case scanning
     case connecting(watchID: WatchID)
     case negotiating(watchID: WatchID)
     case connected(ConnectedWatch)
     case reconnecting(watchID: WatchID)
-    case failed(PebbleConnectionError)
+    case failed(WatchConnectionError)
 }
 
-public enum PebbleClientEvent: Equatable, Sendable {
+public enum WatchClientEvent: Equatable, Sendable {
     case watchUpdated(ConnectedWatch)
     case appFetchRequested(AppFetchRequest)
     case appMessageReceived(AppMessageData)
     case transferProgress(PutBytesTransferProgress)
     case reconnecting(watchID: WatchID)
-    case disconnected(PebbleConnectionError)
+    case disconnected(WatchConnectionError)
     case healthSyncCompleted(Bool)
-    case healthSamplesReceived([PebbleHealthSample])
+    case healthSamplesReceived([WatchHealthSample])
     case timelineActionInvoked(TimelineActionInvocation)
     case appRunStateChanged(AppRunStateEvent)
-    case imageRequested(PebbleImageRequest)
+    case imageRequested(WatchImageRequest)
     case applicationLogReceived(applicationID: UUID, line: WatchLogLine)
 }
 
-public enum PebbleConnectionError: Error, Equatable, Sendable {
+public enum WatchConnectionError: Error, Equatable, Sendable {
     case bluetoothUnavailable
     case bluetoothUnsupported
     case permissionDenied
@@ -61,7 +61,7 @@ public enum PebbleConnectionError: Error, Equatable, Sendable {
 }
 
 @MainActor
-public protocol PebbleClient: Sendable {
+public protocol WatchClient: Sendable {
     /// Opens the radio before anything is asked of it.
     ///
     /// Doing this costs the reader the system's permission dialog, so it is not
@@ -78,7 +78,7 @@ public protocol PebbleClient: Sendable {
     func disconnect(from device: ConnectedWatch) async
     func send(_ frame: PebbleProtocolFrame) async throws
     func frames() -> AsyncStream<PebbleProtocolFrame>
-    func events() -> AsyncStream<PebbleClientEvent>
+    func events() -> AsyncStream<WatchClientEvent>
     func synchronizeTime() async throws
     func reorderApplications(_ applicationIDs: [UUID]) async throws
     func respondToAppFetch(with status: AppFetchResponseStatus) async throws
@@ -114,13 +114,13 @@ public protocol PebbleClient: Sendable {
     func sendImage(
         token: UInt8,
         kindValue: UInt8,
-        image: PebbleEncodedImage?
+        image: EncodedImage?
     ) async throws
     func declineImageKind(token: UInt8, kindValue: UInt8) async throws
     func setApplicationLoggingEnabled(_ isEnabled: Bool) async throws
 }
 
-public extension PebbleClient {
+public extension WatchClient {
     /// A transport with no radio to open has nothing to do here.
     func startBluetooth() {}
 
@@ -130,7 +130,7 @@ public extension PebbleClient {
 
     func refreshWatchInformation() async throws {}
 
-    func takeScreenshot() async throws -> PebbleScreenshot {
+    func takeScreenshot() async throws -> WatchScreenshot {
         guard case .screenshot(let screenshot) = try await pull(.screenshot) else {
             throw WatchPullError.answeredSomethingElse(.screenshot)
         }
@@ -177,7 +177,7 @@ public enum AppMessageClientError: Error, Equatable, Sendable {
     case negativeAcknowledgement
 }
 
-public extension PebbleConnectionError {
+public extension WatchConnectionError {
     var logDescription: String {
         String(describing: self)
     }

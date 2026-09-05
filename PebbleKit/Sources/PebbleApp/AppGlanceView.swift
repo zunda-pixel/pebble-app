@@ -3,14 +3,14 @@ import SwiftUI
 
 struct AppGlanceView: View {
     var model: AppModel
-    var application: PebbleApplication
+    var application: WatchApplication
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         AppGlanceContent(
             applicationName: application.displayName,
             glance: model.glance(for: application.id)
-                ?? PebbleAppGlance(applicationID: application.id),
+                ?? AppGlance(applicationID: application.id),
             isInstalled: model.connections.contains {
                 model.installedApplicationIDs(on: $0.watch.id).contains(application.id)
             },
@@ -28,9 +28,9 @@ struct AppGlanceView: View {
 /// The line the launcher shows under one watchapp.
 struct AppGlanceContent: View {
     var applicationName: String
-    var glance: PebbleAppGlance
+    var glance: AppGlance
     var isInstalled: Bool = true
-    var save: (PebbleAppGlance) -> Void
+    var save: (AppGlance) -> Void
     var cancel: () -> Void
 
     @State private var subtitle = ""
@@ -38,9 +38,9 @@ struct AppGlanceContent: View {
     @State private var expires = false
     @State private var expiry = Date()
 
-    private var edited: PebbleAppGlance {
+    private var edited: AppGlance {
         var written = glance
-        written.slices = [PebbleAppGlanceSlice(
+        written.slices = [AppGlanceSlice(
             subtitleTemplate: subtitle.trimmingCharacters(in: .whitespacesAndNewlines),
             icon: icon,
             expires: expires ? expiry : nil
@@ -118,7 +118,7 @@ struct AppGlanceContent: View {
 #Preview("Empty") {
     AppGlanceContent(
         applicationName: "Timeline Weather",
-        glance: PebbleAppGlance(applicationID: UUID()),
+        glance: AppGlance(applicationID: UUID()),
         save: { _ in },
         cancel: {}
     )
@@ -127,9 +127,9 @@ struct AppGlanceContent: View {
 #Preview("Written") {
     AppGlanceContent(
         applicationName: "Timeline Weather",
-        glance: PebbleAppGlance(
+        glance: AppGlance(
             applicationID: UUID(),
-            slices: [PebbleAppGlanceSlice(
+            slices: [AppGlanceSlice(
                 subtitleTemplate: "Kyoto 18°",
                 icon: .generic,
                 expires: Date(timeIntervalSince1970: 1_788_393_600)
@@ -143,7 +143,7 @@ struct AppGlanceContent: View {
 #Preview("App not on this watch") {
     AppGlanceContent(
         applicationName: "Timeline Weather",
-        glance: PebbleAppGlance(applicationID: UUID()),
+        glance: AppGlance(applicationID: UUID()),
         isInstalled: false,
         save: { _ in },
         cancel: {}

@@ -3,7 +3,7 @@ public import PebbleProtocol
 
 /// The protocol layer has no string catalog of its own: it names its cases for
 /// the logs and leaves the sentence to this layer.
-public extension PebbleConnectionError {
+public extension WatchConnectionError {
     /// See above: the case is named for the logs, the sentence belongs here.
     var message: LocalizedStringKey {
         switch self {
@@ -85,7 +85,7 @@ func refusalReason(for error: any Error) -> LocalizedStringKey {
     if let error = error as? BlobDBClientError {
         return error.message
     }
-    if let error = error as? PebbleConnectionError {
+    if let error = error as? WatchConnectionError {
         return error.message
     }
     return "The watch did not accept it."
@@ -170,7 +170,7 @@ public extension PebbleTimelineIcon {
     }
 }
 
-public extension PebbleHeartRateInterval {
+public extension HeartRateInterval {
     var title: LocalizedStringKey {
         switch self {
         case .everyTenMinutes: "Every 10 Minutes"

@@ -4,7 +4,7 @@ public import Foundation
 import Network
 
 @MainActor
-public final class QEMUPebbleClient: PebbleClient {
+public final class QEMUWatchClient: WatchClient {
     private var host: NWEndpoint.Host
     private var port: NWEndpoint.Port
     private var connection: NWConnection?
@@ -15,7 +15,7 @@ public final class QEMUPebbleClient: PebbleClient {
     private var receiveBuffer: [UInt8] = []
     private var frameDecoder = PebbleProtocolFrameDecoder()
     private var frameContinuation: AsyncStream<PebbleProtocolFrame>.Continuation?
-    private var eventContinuation: AsyncStream<PebbleClientEvent>.Continuation?
+    private var eventContinuation: AsyncStream<WatchClientEvent>.Continuation?
     private var openContinuation: CheckedContinuation<Void, any Error>?
     private var versionContinuation: CheckedContinuation<WatchVersionInformation, any Error>?
     private var operationContinuation: CheckedContinuation<Void, any Error>?
@@ -58,7 +58,7 @@ public final class QEMUPebbleClient: PebbleClient {
     }
 
     private func establishConnection(to device: DiscoveredWatch) async throws -> ConnectedWatch {
-        guard connection == nil else { throw PebbleConnectionError.connectionAlreadyInProgress }
+        guard connection == nil else { throw WatchConnectionError.connectionAlreadyInProgress }
         // Half a message and half a frame belong to the link that dropped, and a
         // data-logging session id means only what the emulator said on that link.
         receiveBuffer.removeAll()
@@ -88,7 +88,7 @@ public final class QEMUPebbleClient: PebbleClient {
             operationTimeoutTask = Task { [weak self] in
                 try? await Task.sleep(for: .seconds(10))
                 guard !Task.isCancelled else { return }
-                self?.finishVersion(throwing: PebbleConnectionError.connectionTimedOut)
+                self?.finishVersion(throwing: WatchConnectionError.connectionTimedOut)
             }
         }
         try await synchronizeTime()
@@ -111,11 +111,11 @@ public final class QEMUPebbleClient: PebbleClient {
         discardConnection()
         connectedWatch = nil
         reconnectWatch = nil
-        failOperation(PebbleConnectionError.disconnected)
+        failOperation(WatchConnectionError.disconnected)
     }
 
     public func send(_ frame: PebbleProtocolFrame) async throws {
-        guard let connection else { throw PebbleConnectionError.disconnected }
+        guard let connection else { throw WatchConnectionError.disconnected }
         await PebbleDiagnostics.shared.recordFrame(direction: "out", frame: frame)
         let frameBytes = try frame.encoded()
         guard frameBytes.count <= 2_048 else { throw QEMUTransportError.messageTooLarge }
@@ -139,7 +139,7 @@ public final class QEMUPebbleClient: PebbleClient {
         AsyncStream { continuation in frameContinuation = continuation }
     }
 
-    public func events() -> AsyncStream<PebbleClientEvent> {
+    public func events() -> AsyncStream<WatchClientEvent> {
         AsyncStream { continuation in eventContinuation = continuation }
     }
 
@@ -192,7 +192,7 @@ public final class QEMUPebbleClient: PebbleClient {
         try await send(AppRunStateCodec.startFrame(applicationID: id))
     }
 
-    public func sendImage(token: UInt8, kindValue: UInt8, image: PebbleEncodedImage?) async throws {
+    public func sendImage(token: UInt8, kindValue: UInt8, image: EncodedImage?) async throws {
         for frame in ImagingCodec.responseFrames(token: token, kindValue: kindValue, image: image) {
             try await send(frame)
         }
@@ -290,7 +290,7 @@ public final class QEMUPebbleClient: PebbleClient {
             operationTimeoutTask = Task { [weak self] in
                 try? await Task.sleep(for: timeout)
                 guard !Task.isCancelled else { return }
-                self?.failOperation(PebbleConnectionError.connectionTimedOut)
+                self?.failOperation(WatchConnectionError.connectionTimedOut)
             }
         }
     }
@@ -317,7 +317,7 @@ public final class QEMUPebbleClient: PebbleClient {
                 eventContinuation?.yield(.disconnected(.disconnected))
             }
         case .cancelled:
-            openContinuation?.resume(throwing: PebbleConnectionError.disconnected)
+            openContinuation?.resume(throwing: WatchConnectionError.disconnected)
             openContinuation = nil
         default:
             break

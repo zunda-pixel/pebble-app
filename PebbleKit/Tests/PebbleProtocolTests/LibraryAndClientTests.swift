@@ -15,8 +15,8 @@ struct LibraryAndClientTests {
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let fileURL = directory.appending(path: "applications.json")
         defer { try? FileManager.default.removeItem(at: directory) }
-        let library = PebbleApplicationLibrary(fileURL: fileURL)
-        let first = PebbleApplication(
+        let library = WatchApplicationLibrary(fileURL: fileURL)
+        let first = WatchApplication(
             id: try #require(UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF")),
             shortName: "First",
             longName: "",
@@ -35,7 +35,7 @@ struct LibraryAndClientTests {
         _ = try await library.upsert(second)
         _ = try await library.reorder(applicationIDs: [second.id, first.id])
 
-        let reloaded = PebbleApplicationLibrary(fileURL: fileURL)
+        let reloaded = WatchApplicationLibrary(fileURL: fileURL)
         #expect(try await reloaded.applications().map(\.id) == [second.id, first.id])
         _ = try await reloaded.remove(applicationID: second.id)
         #expect(try await reloaded.applications() == [first])
@@ -46,8 +46,8 @@ struct LibraryAndClientTests {
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
         let fileURL = directory.appending(path: "applications.json")
         defer { try? FileManager.default.removeItem(at: directory) }
-        let library = PebbleApplicationLibrary(fileURL: fileURL)
-        let application = PebbleApplication(
+        let library = WatchApplicationLibrary(fileURL: fileURL)
+        let application = WatchApplication(
             id: try #require(UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF")),
             shortName: "Original",
             longName: "",
@@ -78,11 +78,11 @@ struct LibraryAndClientTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let firstID = UUID()
         let secondID = UUID()
-        let library = PebbleApplicationLibrary(fileURL: fileURL)
+        let library = WatchApplicationLibrary(fileURL: fileURL)
 
         try await library.setSynchronizedApplicationIDs([firstID, secondID], watchID: WatchID("watch-a"))
         try await library.setSynchronizedApplicationIDs([secondID], watchID: WatchID("watch-b"))
-        let reloaded = PebbleApplicationLibrary(fileURL: fileURL)
+        let reloaded = WatchApplicationLibrary(fileURL: fileURL)
 
         #expect(try await reloaded.synchronizedApplicationIDs(watchID: WatchID("watch-a")) == [firstID, secondID])
         #expect(try await reloaded.synchronizedApplicationIDs(watchID: WatchID("watch-b")) == [secondID])
@@ -91,7 +91,7 @@ struct LibraryAndClientTests {
 
     @Test
     func mockClientDiscoversOnlySupportedModels() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let devices = try await client.scan()
 
         #expect(devices.count == WatchModel.allCases.count)
@@ -100,7 +100,7 @@ struct LibraryAndClientTests {
 
     @Test
     func mockClientConnectsToDiscoveredDevice() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let discoveredDevice = try #require(await client.scan().first)
         let connectedWatch = try await client.connect(to: discoveredDevice)
 
@@ -111,7 +111,7 @@ struct LibraryAndClientTests {
 
     @Test
     func mockClientRecordsAppMessagesAndResponses() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let applicationID = UUID()
         let tuples = [AppMessageTuple(key: 7, value: .string("value"))]
 
@@ -162,7 +162,7 @@ struct LibraryAndClientTests {
         "versionLabel":"1.0","capabilities":[],"targetPlatforms":["aplite"],"kind":"watchapp"}]
         """.utf8)
 
-        let application = try #require(JSONDecoder().decode([PebbleApplication].self, from: data).first)
+        let application = try #require(JSONDecoder().decode([WatchApplication].self, from: data).first)
 
         #expect(application.appKeys.isEmpty)
         #expect(application.hasCompanionJavaScript == false)
@@ -171,7 +171,7 @@ struct LibraryAndClientTests {
 
     @Test
     func mockClientRecordsTimelineNotifications() async throws {
-        let client = MockPebbleClient()
+        let client = MockWatchClient()
         let notification = PebbleTimelineNotification(
             parentApplicationID: UUID(),
             title: "Title",
@@ -346,8 +346,8 @@ struct CompanionStorageTests {
 
     @Test func aNightBrokenByAWakefulHourIsStillOneNight() {
         let midnight = Date(timeIntervalSince1970: 1_788_303_600)
-        func interval(after hours: Double, lasting minutes: Double, deep: Bool = false) -> PebbleSleepInterval {
-            PebbleSleepInterval(
+        func interval(after hours: Double, lasting minutes: Double, deep: Bool = false) -> SleepInterval {
+            SleepInterval(
                 start: midnight.addingTimeInterval(hours * 3600),
                 duration: minutes * 60,
                 isDeep: deep
@@ -355,7 +355,7 @@ struct CompanionStorageTests {
         }
 
         // Turning over, and then a whole morning: an hour is the line.
-        let sessions = PebbleSleepSessions.grouped([
+        let sessions = SleepSessions.grouped([
             interval(after: 0, lasting: 180),
             interval(after: 1, lasting: 60, deep: true),
             interval(after: 3.5, lasting: 120),
@@ -371,8 +371,8 @@ struct CompanionStorageTests {
     @Test func anAverageIsOverTheDaysThatHadSomethingToSay() throws {
         let calendar = Calendar.current
         let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 9, day: 2, hour: 9)))
-        func day(_ ago: Int, steps: Int, sleep: Int, deep: Int = 0) throws -> PebbleHealthSample {
-            PebbleHealthSample(
+        func day(_ ago: Int, steps: Int, sleep: Int, deep: Int = 0) throws -> WatchHealthSample {
+            WatchHealthSample(
                 date: try #require(calendar.date(byAdding: .day, value: -ago, to: calendar.startOfDay(for: now))),
                 steps: steps,
                 sleepMinutes: sleep,
@@ -415,7 +415,7 @@ struct CompanionStorageTests {
     }
 
     @Test func timelinePinEncodesPinTypeAndGenericLayout() throws {
-        let pin = PebbleTimelinePin(
+        let pin = TimelinePin(
             id: UUID(),
             parentApplicationID: UUID(),
             timestamp: Date(timeIntervalSince1970: 100),
@@ -430,7 +430,7 @@ struct CompanionStorageTests {
     }
 
     @Test func aReminderGoesToItsOwnDatabaseAsItsOwnKindOfItem() throws {
-        let reminder = PebbleTimelinePin(
+        let reminder = TimelinePin(
             parentApplicationID: UUID(),
             timestamp: Date(timeIntervalSince1970: 0x66000000),
             title: "Tea",
@@ -448,13 +448,13 @@ struct CompanionStorageTests {
         // Past the header and the record's own identifiers: key, value length,
         // then the item's id, its app's id, the time and the duration.
         let typeIndex = 5 + 16 + 2 + 16 + 16 + 4 + 2
-        #expect(pin.payload[typeIndex] == PebbleTimelineItemType.pin.rawValue)
-        #expect(alarm.payload[typeIndex] == PebbleTimelineItemType.reminder.rawValue)
+        #expect(pin.payload[typeIndex] == TimelineItemType.pin.rawValue)
+        #expect(alarm.payload[typeIndex] == TimelineItemType.reminder.rawValue)
     }
 
     @Test func aPinsTextIsCutOnACharacterAndNotInsideOne() throws {
         // Twenty-one three-byte characters, which is 63 of the 64 bytes.
-        let pin = PebbleTimelinePin(
+        let pin = TimelinePin(
             parentApplicationID: UUID(),
             timestamp: Date(timeIntervalSince1970: 0),
             title: String(repeating: "石", count: 30),
@@ -475,7 +475,7 @@ struct CompanionStorageTests {
 
     @Test func aPinIsHeldToTheFirmwaresOwnAttributeLengths() throws {
         // `MAX_ATTRIBUTE_LENGTHS`: title 64, subtitle 64, body 512.
-        let pin = PebbleTimelinePin(
+        let pin = TimelinePin(
             parentApplicationID: UUID(),
             timestamp: Date(timeIntervalSince1970: 0),
             title: String(repeating: "t", count: 200),
@@ -510,13 +510,13 @@ struct CompanionStorageTests {
         let url = directory.appending(path: "health.json")
         defer { try? FileManager.default.removeItem(at: directory) }
         let library = WatchHealthStore(fileURL: url)
-        let sample = PebbleHealthSample(
+        let sample = WatchHealthSample(
             date: Date(timeIntervalSince1970: 10), steps: 1234, sleepMinutes: 420,
             timeZoneIdentifier: "UTC", updatedAt: Date(timeIntervalSince1970: 20)
         )
         try await library.save([sample])
         #expect(try await library.samples() == [sample])
-        let replacement = PebbleHealthSample(
+        let replacement = WatchHealthSample(
             date: sample.date, steps: 2000, sleepMinutes: 400,
             timeZoneIdentifier: "UTC", updatedAt: Date(timeIntervalSince1970: 30)
         )
@@ -532,11 +532,11 @@ struct CompanionStorageTests {
         let url = directory.appending(path: "health.json")
         defer { try? FileManager.default.removeItem(at: directory) }
         let library = WatchHealthStore(fileURL: url)
-        let watch = PebbleHealthSample(
+        let watch = WatchHealthSample(
             date: Date(timeIntervalSince1970: 100), steps: 8_000, sleepMinutes: 300,
             timeZoneIdentifier: "UTC", updatedAt: Date(timeIntervalSince1970: 200)
         )
-        let imported = PebbleHealthSample(
+        let imported = WatchHealthSample(
             date: Date(timeIntervalSince1970: 200), steps: 7_000, sleepMinutes: 450,
             timeZoneIdentifier: "UTC", source: .imported, updatedAt: Date(timeIntervalSince1970: 300)
         )
@@ -551,7 +551,7 @@ struct CompanionStorageTests {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
         let library = WatchHealthStore(fileURL: directory.appending(path: "health.json"))
-        let phone = PebbleHealthSample(
+        let phone = WatchHealthSample(
             date: Date(timeIntervalSince1970: 100),
             steps: 7_000,
             sleepMinutes: 400,
@@ -566,7 +566,7 @@ struct CompanionStorageTests {
         // The watch counts steps and sleep and nothing else, so its record for
         // the same day carries zeroes where the phone had readings. Taking the
         // newer record whole would throw them away.
-        let watch = PebbleHealthSample(
+        let watch = WatchHealthSample(
             date: Date(timeIntervalSince1970: 100),
             steps: 8_000,
             sleepMinutes: 300,
@@ -589,7 +589,7 @@ struct CompanionStorageTests {
         let destinationURL = directory.appending(path: "destination.json")
         defer { try? FileManager.default.removeItem(at: directory) }
         let source = WatchHealthStore(fileURL: sourceURL)
-        try await source.save([PebbleHealthSample(date: .now, steps: 123, sleepMinutes: 45)])
+        try await source.save([WatchHealthSample(date: .now, steps: 123, sleepMinutes: 45)])
         let archiveURL = try await source.export()
         let destination = WatchHealthStore(fileURL: destinationURL)
         let imported = try await destination.importArchive(from: archiveURL)
@@ -665,7 +665,7 @@ struct CompanionStorageTests {
     }
 
     @Test func catalogVersionComparisonUsesNumericOrdering() {
-        let application = PebbleCatalogApplication(
+        let application = CatalogApplication(
             id: UUID(), name: "App", developer: "Developer", version: "2.10",
             downloadURL: URL(string: "https://example.com/app.pbw")!, supportedPlatforms: ["emery"]
         )
@@ -678,22 +678,22 @@ struct CompanionStorageTests {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         let url = directory.appending(path: "catalog.json")
         defer { try? FileManager.default.removeItem(at: directory) }
-        let application = PebbleCatalogApplication(
+        let application = CatalogApplication(
             id: UUID(), name: "Cached", developer: "Developer", version: "1.0",
             downloadURL: URL(string: "https://example.com/app.pbw")!, supportedPlatforms: ["emery"]
         )
-        let snapshot = PebbleCatalogSnapshot(
+        let snapshot = CatalogSnapshot(
             sourceURL: URL(string: "https://example.com/api")!, fetchedAt: Date(timeIntervalSince1970: 100),
             applications: [application]
         )
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try JSONEncoder().encode(snapshot).write(to: url, options: .atomic)
-        let catalog = PebbleAppCatalog(cacheURL: url)
+        let catalog = AppCatalog(cacheURL: url)
         #expect(try await catalog.cachedSnapshot() == snapshot)
     }
 
     @Test func reconnectBackoffGrowsExponentiallyAndCaps() {
-        var backoff = PebbleReconnectBackoff(
+        var backoff = ReconnectBackoff(
             attempt: 0,
             initialDelay: .seconds(2),
             maximumDelay: .seconds(10)
@@ -712,16 +712,16 @@ struct CompanionStorageTests {
     @Test func onlySomeConnectionErrorsAreWorthAnotherAttempt() {
         // Nothing the phone does within a retry's few hundred milliseconds
         // brings a lost link or a switched-off radio back.
-        #expect(!PebbleConnectionError.disconnected.isWorthAnotherAttempt)
-        #expect(!PebbleConnectionError.bluetoothUnavailable.isWorthAnotherAttempt)
-        #expect(!PebbleConnectionError.bluetoothUnsupported.isWorthAnotherAttempt)
-        #expect(!PebbleConnectionError.permissionDenied.isWorthAnotherAttempt)
+        #expect(!WatchConnectionError.disconnected.isWorthAnotherAttempt)
+        #expect(!WatchConnectionError.bluetoothUnavailable.isWorthAnotherAttempt)
+        #expect(!WatchConnectionError.bluetoothUnsupported.isWorthAnotherAttempt)
+        #expect(!WatchConnectionError.permissionDenied.isWorthAnotherAttempt)
         // Another attempt is exactly what has been tried.
-        #expect(!PebbleConnectionError.handshakeKeptFailing.isWorthAnotherAttempt)
+        #expect(!WatchConnectionError.handshakeKeptFailing.isWorthAnotherAttempt)
 
-        #expect(PebbleConnectionError.connectionTimedOut.isWorthAnotherAttempt)
-        #expect(PebbleConnectionError.connectionFailed.isWorthAnotherAttempt)
-        #expect(PebbleConnectionError.protocolNegotiationFailed.isWorthAnotherAttempt)
+        #expect(WatchConnectionError.connectionTimedOut.isWorthAnotherAttempt)
+        #expect(WatchConnectionError.connectionFailed.isWorthAnotherAttempt)
+        #expect(WatchConnectionError.protocolNegotiationFailed.isWorthAnotherAttempt)
     }
 
     @Test func corruptPendingOperationsAreQuarantinedAndRecovered() async throws {
@@ -749,7 +749,7 @@ struct CompanionStorageTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try Data([0xFF, 0x00, 0x01]).write(to: url)
-        let catalog = PebbleAppCatalog(cacheURL: url)
+        let catalog = AppCatalog(cacheURL: url)
 
         #expect(try await catalog.cachedSnapshot() == nil)
         #expect(!FileManager.default.fileExists(atPath: url.path))
@@ -764,7 +764,7 @@ struct CompanionStorageTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let start = Date(timeIntervalSince1970: 1_700_000_000)
         let samples = (0..<10_000).map { index in
-            PebbleHealthSample(
+            WatchHealthSample(
                 date: start.addingTimeInterval(Double(index % 365) * 86_400),
                 steps: index,
                 sleepMinutes: index % 480

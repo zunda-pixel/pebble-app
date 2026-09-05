@@ -1,7 +1,7 @@
 import MemberwiseInit
 
 @MemberwiseInit(.public)
-public struct PebbleScreenshot: Equatable, Sendable {
+public struct WatchScreenshot: Equatable, Sendable {
     public var width: Int
     public var height: Int
     /// One pixel per entry, row by row, as `0xAARRGGBB`.
@@ -36,7 +36,7 @@ public struct ScreenshotCollector: WatchPullCollector {
 
     public init() {}
 
-    public mutating func accept(_ frame: PebbleProtocolFrame) throws -> PebbleScreenshot? {
+    public mutating func accept(_ frame: PebbleProtocolFrame) throws -> WatchScreenshot? {
         guard frame.endpoint == ScreenshotCodec.endpoint else {
             throw ScreenshotError.unexpectedEndpoint
         }
@@ -65,7 +65,7 @@ public struct ScreenshotCollector: WatchPullCollector {
         return picture()
     }
 
-    private func picture() -> PebbleScreenshot {
+    private func picture() -> WatchScreenshot {
         var pixels = [UInt32](repeating: 0, count: width * height)
         switch depth {
         case .blackAndWhite:
@@ -85,7 +85,7 @@ public struct ScreenshotCollector: WatchPullCollector {
                 pixels[index] = Self.colour(bytes[index])
             }
         }
-        return PebbleScreenshot(width: width, height: height, pixels: pixels)
+        return WatchScreenshot(width: width, height: height, pixels: pixels)
     }
 
     // Two bits a channel, spread over the whole range.

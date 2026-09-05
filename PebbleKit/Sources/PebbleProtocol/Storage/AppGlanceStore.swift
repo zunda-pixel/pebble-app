@@ -7,15 +7,15 @@ public actor AppGlanceStore {
         self.fileURL = fileURL ?? applicationSupportURL("app-glances.json")
     }
 
-    public func glances() throws -> [PebbleAppGlance] {
-        try PersistentJSON.loadRecovering([PebbleAppGlance].self, from: fileURL) ?? []
+    public func glances() throws -> [AppGlance] {
+        try PersistentJSON.loadRecovering([AppGlance].self, from: fileURL) ?? []
     }
 
-    public func save(_ glances: [PebbleAppGlance]) throws {
+    public func save(_ glances: [AppGlance]) throws {
         try PersistentJSON.save(glances, to: fileURL)
     }
 
-    public func update(_ glance: PebbleAppGlance) throws -> [PebbleAppGlance] {
+    public func update(_ glance: AppGlance) throws -> [AppGlance] {
         var glances = try self.glances()
         glances.removeAll { $0.applicationID == glance.applicationID }
         if !glance.slices.isEmpty {

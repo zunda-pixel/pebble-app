@@ -1,7 +1,7 @@
 import PebbleProtocol
 public import CoreBluetooth
 
-extension CoreBluetoothPebbleClient: CBPeripheralDelegate {
+extension CoreBluetoothWatchClient: CBPeripheralDelegate {
     /// The watch publishes its protocol service once the link is encrypted,
     /// which invalidates iOS's cached service list. This is the signal that a
     /// fresh discovery will actually return it.

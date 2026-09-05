@@ -3,14 +3,14 @@ import MemberwiseInit
 
 /// The number decides how the watch presents the item, and has to agree with
 /// the database it is filed in.
-public enum PebbleTimelineItemType: UInt8, Codable, Equatable, Sendable {
+public enum TimelineItemType: UInt8, Codable, Equatable, Sendable {
     case notification = 1
     case pin = 2
     case reminder = 3
 }
 
 @MemberwiseInit(.public)
-public struct PebbleTimelinePin: Codable, Equatable, Identifiable, Sendable {
+public struct TimelinePin: Codable, Equatable, Identifiable, Sendable {
     public var id: UUID = UUID()
     public var parentApplicationID: UUID
     public var timestamp: Date
@@ -19,7 +19,7 @@ public struct PebbleTimelinePin: Codable, Equatable, Identifiable, Sendable {
     public var subtitle: String?
     public var body: String?
     public var isAllDay: Bool = false
-    public var kind: PebbleTimelineItemType = .pin
+    public var kind: TimelineItemType = .pin
     /// Whether the watch made this one rather than the app.
     ///
     /// Such an item has actions and an icon the watch chose and this app does
@@ -67,7 +67,7 @@ public struct PebbleTimelinePin: Codable, Equatable, Identifiable, Sendable {
         guard bytes.count >= Self.headerLength else {
             throw TimelinePinError.malformedItem
         }
-        guard let kind = PebbleTimelineItemType(rawValue: bytes[38]) else {
+        guard let kind = TimelineItemType(rawValue: bytes[38]) else {
             throw TimelinePinError.malformedItem
         }
         id = try Self.uuid(bytes[0..<16])
@@ -132,7 +132,7 @@ public enum TimelinePinCodec {
     /// The reminder database stores a pin but shows it as something else.
     public static var databaseID: UInt8 { 0x01 }
 
-    public static func insertFrame(_ pin: PebbleTimelinePin, token: UInt16) throws -> PebbleProtocolFrame {
+    public static func insertFrame(_ pin: TimelinePin, token: UInt16) throws -> PebbleProtocolFrame {
         BlobDBCodec.insertFrame(
             databaseID: databaseID,
             key: BlobDBCodec.uuidBytes(pin.id),
@@ -156,7 +156,7 @@ public enum TimelineReminderCodec {
     public static var databaseID: UInt8 { 0x03 }
 
     public static func insertFrame(
-        _ reminder: PebbleTimelinePin,
+        _ reminder: TimelinePin,
         token: UInt16
     ) throws -> PebbleProtocolFrame {
         var reminder = reminder

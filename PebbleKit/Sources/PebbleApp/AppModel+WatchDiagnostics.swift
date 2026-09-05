@@ -120,7 +120,7 @@ extension AppModel {
         return try write(Array(text.utf8), name: "\(name)-logs.txt")
     }
 
-    private func writeScreenshot(_ screenshot: PebbleScreenshot, name: String) throws -> URL {
+    private func writeScreenshot(_ screenshot: WatchScreenshot, name: String) throws -> URL {
         guard let data = WatchImageRenderer.pngData(screenshot) else {
             throw WatchDiagnosticsError.pictureCouldNotBeWritten
         }

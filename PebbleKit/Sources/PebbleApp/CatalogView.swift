@@ -58,8 +58,8 @@ struct CatalogView: View {
 }
 
 struct CatalogContent<Destination: View>: View {
-    var applications: [PebbleCatalogApplication]
-    var state: (PebbleCatalogApplication) -> CatalogInstallationState
+    var applications: [CatalogApplication]
+    var state: (CatalogApplication) -> CatalogInstallationState
     var isImportingApplication: Bool
     var isImportDisabled: Bool
     var isUpdating: Bool
@@ -67,7 +67,7 @@ struct CatalogContent<Destination: View>: View {
     var installUpdates: () -> Void
     var refresh: () -> Void
     var close: () -> Void
-    @ViewBuilder var destination: (PebbleCatalogApplication) -> Destination
+    @ViewBuilder var destination: (CatalogApplication) -> Destination
 
     @State private var query = ""
     @State private var category = "All"
@@ -132,7 +132,7 @@ struct CatalogContent<Destination: View>: View {
         }
     }
 
-    private var filteredApplications: [PebbleCatalogApplication] {
+    private var filteredApplications: [CatalogApplication] {
         let filtered = applications.filter { application in
             let matchesQuery = query.isEmpty
                 || application.name.localizedCaseInsensitiveContains(query)
@@ -159,7 +159,7 @@ struct CatalogContent<Destination: View>: View {
 }
 
 struct CatalogApplicationRow: View {
-    var application: PebbleCatalogApplication
+    var application: CatalogApplication
     var state: CatalogInstallationState
 
     var body: some View {
@@ -197,7 +197,7 @@ struct CatalogStateLabel: View {
 }
 
 struct CatalogApplicationDetailView: View {
-    var application: PebbleCatalogApplication
+    var application: CatalogApplication
     var model: AppModel
 
     var body: some View {
@@ -213,7 +213,7 @@ struct CatalogApplicationDetailView: View {
 }
 
 struct CatalogApplicationDetailContent: View {
-    var application: PebbleCatalogApplication
+    var application: CatalogApplication
     var state: CatalogInstallationState
     var isInstalling: Bool
     var isAnyInstallRunning: Bool

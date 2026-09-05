@@ -63,5 +63,5 @@ struct ConfigurationWebView: View {
 }
 
 #Preview {
-    ContentView(client: MockPebbleClient())
+    ContentView(client: MockWatchClient())
 }

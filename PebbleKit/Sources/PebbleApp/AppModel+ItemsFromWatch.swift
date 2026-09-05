@@ -9,7 +9,7 @@ extension AppModel {
     /// arrives by id, so the same one offered twice replaces itself rather than
     /// appearing twice — which is also how an edit made on the watch, a
     /// postponed reminder, lands here.
-    func keep(_ item: PebbleTimelinePin, from connection: WatchConnection) async {
+    func keep(_ item: TimelinePin, from connection: WatchConnection) async {
         switch item.kind {
         case .reminder:
             reminders.removeAll { $0.id == item.id }

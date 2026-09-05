@@ -67,7 +67,7 @@ struct CorruptStoreTests {
         #expect(try await store.pins().isEmpty)
         #expect(try quarantinedFiles(besides: fileURL).count == 1)
 
-        let pin = PebbleTimelinePin(
+        let pin = TimelinePin(
             parentApplicationID: UUID(),
             timestamp: Date(timeIntervalSince1970: 1_788_393_600),
             title: "Stand up",
@@ -102,13 +102,13 @@ struct CorruptStoreTests {
         }
         try writeTruncatedJSON(to: fileURL)
 
-        let library = PebbleApplicationLibrary(fileURL: fileURL)
+        let library = WatchApplicationLibrary(fileURL: fileURL)
         let rebuilt = try await library.applications()
 
         #expect(Set(rebuilt.map(\.id)) == Set(identifiers))
         #expect(try quarantinedFiles(besides: fileURL).count == 1)
         // Rebuilt and written back, so the next launch does not scan again.
-        #expect(try await PebbleApplicationLibrary(fileURL: fileURL).applications().count == 3)
+        #expect(try await WatchApplicationLibrary(fileURL: fileURL).applications().count == 3)
     }
 
     /// One unreadable package must not cost the reader the other two: the whole
@@ -136,7 +136,7 @@ struct CorruptStoreTests {
             .write(to: packages.appending(path: "\(UUID().uuidString).pbw"))
         try writeTruncatedJSON(to: fileURL)
 
-        #expect(try await PebbleApplicationLibrary(fileURL: fileURL).applications().count == 2)
+        #expect(try await WatchApplicationLibrary(fileURL: fileURL).applications().count == 2)
     }
 
     @Test func aCorruptSynchronizationRecordReadsAsNothingSynchronized() async throws {
@@ -146,7 +146,7 @@ struct CorruptStoreTests {
         let syncURL = directory.appending(path: "application-sync.json")
         try writeTruncatedJSON(to: syncURL)
 
-        let library = PebbleApplicationLibrary(fileURL: fileURL)
+        let library = WatchApplicationLibrary(fileURL: fileURL)
         #expect(try await library.synchronizedApplicationIDs(watchID: WatchID("mock-flint")).isEmpty)
 
         let applicationID = UUID()

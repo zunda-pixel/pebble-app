@@ -44,7 +44,7 @@ extension AppModel {
         }
     }
 
-    public func configureApplication(_ application: PebbleApplication) async {
+    public func configureApplication(_ application: WatchApplication) async {
         guard application.isConfigurable else { return }
         do {
             guard let source = try await applicationLibrary.companionJavaScript(
@@ -63,7 +63,7 @@ extension AppModel {
         }
     }
 
-    public func activateWatchface(_ application: PebbleApplication) async {
+    public func activateWatchface(_ application: WatchApplication) async {
         guard application.kind == .watchface else { return }
         guard !activeConnections.isEmpty else {
             // A watchface becomes active by being launched, and there is nothing to
@@ -166,7 +166,7 @@ extension AppModel {
     }
 
     public func reorderApplications(
-        kind: PebbleApplicationKind,
+        kind: WatchApplicationKind,
         fromOffsets: IndexSet,
         toOffset: Int
     ) async {
@@ -203,7 +203,7 @@ extension AppModel {
     }
 
     func move(
-        _ applications: inout [PebbleApplication],
+        _ applications: inout [WatchApplication],
         fromOffsets: IndexSet,
         toOffset: Int
     ) -> Bool {
@@ -307,7 +307,7 @@ extension AppModel {
     }
 
     func recordSynchronizedApplications(
-        _ applications: [PebbleApplication],
+        _ applications: [WatchApplication],
         device: ConnectedWatch
     ) async throws {
         let synchronizedIDs = compatibleApplications(applications, with: device.model).map(\.id)
@@ -319,9 +319,9 @@ extension AppModel {
     }
 
     func compatibleApplications(
-        _ applications: [PebbleApplication],
+        _ applications: [WatchApplication],
         with model: WatchModel
-    ) -> [PebbleApplication] {
+    ) -> [WatchApplication] {
         applications.filter { $0.bestVariant(for: model) != nil }
     }
 
@@ -372,7 +372,7 @@ extension AppModel {
 
     func applicationErrorMessage(_ error: any Error) -> LocalizedStringKey {
         switch error {
-        case let error as PebbleConnectionError:
+        case let error as WatchConnectionError:
             error.message
         case BlobDBClientError.operationAlreadyInProgress:
             "The watch is already processing another application change. Please try again."
@@ -409,7 +409,7 @@ extension AppModel {
         }
     }
 
-    func updateApplications(_ applications: [PebbleApplication]) {
+    func updateApplications(_ applications: [WatchApplication]) {
         watchApplications = applications.filter { $0.kind == .watchapp }
         watchfaces = applications.filter { $0.kind == .watchface }
     }

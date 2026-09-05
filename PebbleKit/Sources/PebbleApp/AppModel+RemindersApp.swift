@@ -49,7 +49,7 @@ extension AppModel {
     /// A reminder dictated to the watch is only on the watch, and the watch
     /// keeps a window: once its time has passed it is gone from there and there
     /// was nowhere else it was written down.
-    func mirrorInRemindersApp(_ reminder: PebbleTimelinePin) async {
+    func mirrorInRemindersApp(_ reminder: TimelinePin) async {
         var mirrored = (try? await reminderStore.mirroredIdentifiers()) ?? [:]
         do {
             if let identifier = mirrored[reminder.id] {

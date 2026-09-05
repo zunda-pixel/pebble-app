@@ -7,16 +7,16 @@ import UniformTypeIdentifiers
 /// The watch asks for an exact size, so a picture is cropped to that shape
 /// from the middle rather than squashed into it.
 public enum WatchImageRenderer {
-    public static func encode(_ image: CGImage, width: Int, height: Int) -> PebbleEncodedImage? {
+    public static func encode(_ image: CGImage, width: Int, height: Int) -> EncodedImage? {
         guard width > 0, height > 0,
               width <= ImagingCodec.maximumDimension,
               height <= ImagingCodec.maximumDimension,
               let pixels = argbPixels(image, width: width, height: height)
         else { return nil }
-        return PebbleImageEncoder.encode(argb: pixels, width: width, height: height)
+        return WatchImageEncoder.encode(argb: pixels, width: width, height: height)
     }
 
-    public static func pngData(_ screenshot: PebbleScreenshot) -> Data? {
+    public static func pngData(_ screenshot: WatchScreenshot) -> Data? {
         guard screenshot.width > 0, screenshot.height > 0,
               screenshot.pixels.count >= screenshot.width * screenshot.height,
               let image = makeImage(screenshot)
@@ -30,7 +30,7 @@ public enum WatchImageRenderer {
         return data as Data
     }
 
-    static func makeImage(_ screenshot: PebbleScreenshot) -> CGImage? {
+    static func makeImage(_ screenshot: WatchScreenshot) -> CGImage? {
         var pixels = screenshot.pixels
         let bytesPerRow = screenshot.width * 4
         return pixels.withUnsafeMutableBytes { buffer -> CGImage? in

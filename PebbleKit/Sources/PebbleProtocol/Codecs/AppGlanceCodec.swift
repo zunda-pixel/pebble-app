@@ -12,7 +12,7 @@ import MemberwiseInit
 ///
 /// Nothing is required of it, so a plain sentence is also a valid template.
 @MemberwiseInit(.public)
-public struct PebbleAppGlanceSlice: Codable, Equatable, Sendable, Identifiable {
+public struct AppGlanceSlice: Codable, Equatable, Sendable, Identifiable {
     public var id: UUID = UUID()
     public var subtitleTemplate: String = ""
     /// Nil leaves the watch its own icon for the app.
@@ -28,9 +28,9 @@ public struct PebbleAppGlanceSlice: Codable, Equatable, Sendable, Identifiable {
 
 /// Every line one watchapp has to show, and when they were written.
 @MemberwiseInit(.public)
-public struct PebbleAppGlance: Codable, Equatable, Sendable, Identifiable {
+public struct AppGlance: Codable, Equatable, Sendable, Identifiable {
     public var applicationID: UUID
-    public var slices: [PebbleAppGlanceSlice] = []
+    public var slices: [AppGlanceSlice] = []
     /// The watch refuses a glance that is not newer than the one it holds, so
     /// this is the moment the reader wrote it rather than the moment it is sent.
     public var updatedAt: Date = Date()
@@ -59,7 +59,7 @@ public enum AppGlanceCodec {
         BlobDBCodec.uuidBytes(applicationID)
     }
 
-    public static func value(for glance: PebbleAppGlance) -> [UInt8] {
+    public static func value(for glance: AppGlance) -> [UInt8] {
         var value: [UInt8] = [recordVersion]
         value.append(contentsOf: UInt32(clamping: Int(glance.updatedAt.timeIntervalSince1970)).littleEndianBytes)
         for slice in glance.slices.prefix(maximumSlices) {
@@ -68,7 +68,7 @@ public enum AppGlanceCodec {
         return value
     }
 
-    static func slice(_ slice: PebbleAppGlanceSlice) -> [UInt8] {
+    static func slice(_ slice: AppGlanceSlice) -> [UInt8] {
         var attributes: [[UInt8]] = [
             // Always written, even for a line that never expires: a slice with
             // no attributes at all is shorter than the smallest the watch
@@ -94,7 +94,7 @@ public enum AppGlanceCodec {
             + body
     }
 
-    public static func insertFrame(_ glance: PebbleAppGlance, token: UInt16) -> PebbleProtocolFrame {
+    public static func insertFrame(_ glance: AppGlance, token: UInt16) -> PebbleProtocolFrame {
         BlobDBCodec.insertFrame(
             databaseID: databaseID,
             key: key(for: glance.applicationID),

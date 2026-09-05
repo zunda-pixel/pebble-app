@@ -1,21 +1,21 @@
 public import Foundation
 import MemberwiseInit
 
-public enum PebbleImageKind: UInt8, Equatable, Sendable {
+public enum WatchImageKind: UInt8, Equatable, Sendable {
     case albumArt = 0
     case notification = 1
 }
 
 /// The watch pulls rather than the phone pushing: it asks when it has
 /// somewhere to show the picture and knows how big that is.
-public enum PebbleImageRequest: Equatable, Sendable {
-    case albumArt(PebbleImageRequestHeader, title: String, artist: String)
-    case notification(PebbleImageRequestHeader, itemID: UUID)
+public enum WatchImageRequest: Equatable, Sendable {
+    case albumArt(WatchImageRequestHeader, title: String, artist: String)
+    case notification(WatchImageRequestHeader, itemID: UUID)
     /// A kind this app has never heard of still has a token, and the watch waits
     /// on that token until it is told there is nothing coming.
-    case unsupported(PebbleImageRequestHeader)
+    case unsupported(WatchImageRequestHeader)
 
-    public var header: PebbleImageRequestHeader {
+    public var header: WatchImageRequestHeader {
         switch self {
         case .albumArt(let header, _, _), .notification(let header, _), .unsupported(let header):
             header
@@ -24,18 +24,18 @@ public enum PebbleImageRequest: Equatable, Sendable {
 }
 
 @MemberwiseInit(.public)
-public struct PebbleImageRequestHeader: Equatable, Sendable {
+public struct WatchImageRequestHeader: Equatable, Sendable {
     public var token: UInt8
     public var kindValue: UInt8
     public var format: UInt8
     public var width: Int
     public var height: Int
 
-    public var kind: PebbleImageKind? { PebbleImageKind(rawValue: kindValue) }
+    public var kind: WatchImageKind? { WatchImageKind(rawValue: kindValue) }
 }
 
 @MemberwiseInit(.public)
-public struct PebbleEncodedImage: Equatable, Sendable {
+public struct EncodedImage: Equatable, Sendable {
     public var width: Int
     public var height: Int
     public var palette: [UInt8]
@@ -61,12 +61,12 @@ public enum ImagingCodec {
     /// Keeps a chunk near a kilobyte.
     static let pixelsPerChunk = 1_000
 
-    public static func decode(_ frame: PebbleProtocolFrame) throws -> PebbleImageRequest {
+    public static func decode(_ frame: PebbleProtocolFrame) throws -> WatchImageRequest {
         guard frame.endpoint == endpoint else { throw ImagingCodecError.unexpectedEndpoint }
         guard frame.payload.count >= 8, frame.payload[0] == requestCommand else {
             throw ImagingCodecError.invalidPayload
         }
-        let header = PebbleImageRequestHeader(
+        let header = WatchImageRequestHeader(
             token: frame.payload[1],
             kindValue: frame.payload[2],
             format: frame.payload[3],
@@ -93,7 +93,7 @@ public enum ImagingCodec {
     public static func responseFrames(
         token: UInt8,
         kindValue: UInt8,
-        image: PebbleEncodedImage?
+        image: EncodedImage?
     ) -> [PebbleProtocolFrame] {
         guard let image, !image.pixels.isEmpty else {
             return [flagsFrame(token: token, kindValue: kindValue, flags: noImageFlag)]

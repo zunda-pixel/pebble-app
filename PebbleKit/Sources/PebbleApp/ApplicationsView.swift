@@ -7,7 +7,7 @@ struct ApplicationsView: View {
     @State private var isChoosingPackage = false
     @State private var isShowingCatalog = false
     @State private var selectedWatchID: WatchID?
-    @State private var glanceApplication: PebbleApplication?
+    @State private var glanceApplication: WatchApplication?
 
     // The picked watch while it stays connected, otherwise the primary one.
     private var displayedWatchID: WatchID? {
@@ -146,8 +146,8 @@ struct ApplicationsView: View {
 }
 
 struct ApplicationsContent<Detail: View>: View {
-    var watchApplications: [PebbleApplication]
-    var watchfaces: [PebbleApplication]
+    var watchApplications: [WatchApplication]
+    var watchfaces: [WatchApplication]
     var activeWatchfaceID: UUID?
     /// Nil when no watch is connected: install state is unknown, not shown.
     var installedApplicationIDs: Set<UUID>?
@@ -158,13 +158,13 @@ struct ApplicationsContent<Detail: View>: View {
     var installingApplicationName: String?
     var installationProgress: PutBytesTransferProgress?
     var removeApplication: (UUID) -> Void
-    var reorderApplications: (PebbleApplicationKind, IndexSet, Int) -> Void
-    var configureApplication: (PebbleApplication) -> Void
-    var editGlance: (PebbleApplication) -> Void
-    var activateWatchface: (PebbleApplication) -> Void
-    @ViewBuilder var detail: (PebbleApplication) -> Detail
+    var reorderApplications: (WatchApplicationKind, IndexSet, Int) -> Void
+    var configureApplication: (WatchApplication) -> Void
+    var editGlance: (WatchApplication) -> Void
+    var activateWatchface: (WatchApplication) -> Void
+    @ViewBuilder var detail: (WatchApplication) -> Detail
 
-    @State private var applicationToRemove: PebbleApplication?
+    @State private var applicationToRemove: WatchApplication?
 
     var body: some View {
         if isLoading && watchApplications.isEmpty && watchfaces.isEmpty {
@@ -255,11 +255,11 @@ struct ApplicationsContent<Detail: View>: View {
 /// One of the list's sections, as something the list can tell apart from the
 /// other by what it holds rather than by where it sits.
 private struct ApplicationGroup: Identifiable {
-    var kind: PebbleApplicationKind
+    var kind: WatchApplicationKind
     var title: LocalizedStringKey
-    var applications: [PebbleApplication]
+    var applications: [WatchApplication]
 
-    var id: PebbleApplicationKind { kind }
+    var id: WatchApplicationKind { kind }
 }
 
 /// What the library is in the middle of, and what went wrong doing it.
@@ -329,16 +329,16 @@ struct InstallationProgressRow: View {
 
 struct ApplicationSection<Detail: View>: View {
     var title: LocalizedStringKey
-    var applications: [PebbleApplication]
+    var applications: [WatchApplication]
     var activeWatchfaceID: UUID?
     var installedApplicationIDs: Set<UUID>?
     var isOperationInProgress: Bool
-    var requestRemoval: (PebbleApplication) -> Void
-    var configureApplication: (PebbleApplication) -> Void
-    var editGlance: (PebbleApplication) -> Void
-    var activateWatchface: (PebbleApplication) -> Void
+    var requestRemoval: (WatchApplication) -> Void
+    var configureApplication: (WatchApplication) -> Void
+    var editGlance: (WatchApplication) -> Void
+    var activateWatchface: (WatchApplication) -> Void
     var moveApplications: (IndexSet, Int) -> Void
-    @ViewBuilder var detail: (PebbleApplication) -> Detail
+    @ViewBuilder var detail: (WatchApplication) -> Detail
 
     var body: some View {
         Section(title) {
@@ -362,7 +362,7 @@ struct ApplicationSection<Detail: View>: View {
 }
 
 struct ApplicationListRow<Detail: View>: View {
-    var application: PebbleApplication
+    var application: WatchApplication
     var isActive: Bool
     var isInstalled: Bool?
     var isOperationInProgress: Bool
@@ -419,7 +419,7 @@ struct ApplicationRow: View {
     var name: String
     var companyName: String
     var versionLabel: String
-    var kind: PebbleApplicationKind
+    var kind: WatchApplicationKind
     var isActive: Bool
     /// Nil when no watch is connected.
     var isInstalled: Bool?

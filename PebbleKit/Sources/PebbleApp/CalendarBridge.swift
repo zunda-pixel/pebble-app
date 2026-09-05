@@ -13,7 +13,7 @@ final class CalendarBridge {
         guard try await store.requestFullAccessToEvents() else { throw CalendarBridgeError.accessDenied }
     }
 
-    func timelinePins() async throws -> [PebbleTimelinePin] {
+    func timelinePins() async throws -> [TimelinePin] {
         guard try await store.requestFullAccessToEvents() else { throw CalendarBridgeError.accessDenied }
         let start = Date()
         let end = Calendar.current.date(byAdding: .day, value: 30, to: start) ?? start
@@ -22,7 +22,7 @@ final class CalendarBridge {
         // in the database the watch buzzes from rather than on the timeline,
         // where they could only be looked at.
         let pins = events.map { event in
-            PebbleTimelinePin(
+            TimelinePin(
                 id: stableID(event.eventIdentifier ?? "\(event.title ?? "")|\(event.startDate.timeIntervalSince1970)"),
                 parentApplicationID: Self.calendarApplicationID,
                 timestamp: event.startDate,

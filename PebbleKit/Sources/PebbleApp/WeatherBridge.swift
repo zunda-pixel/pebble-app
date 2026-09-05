@@ -31,7 +31,7 @@ struct WeatherBridge {
         for place: WeatherPlace,
         inFahrenheit: Bool,
         now: Date = .now
-    ) async throws -> PebbleWeatherReport {
+    ) async throws -> WeatherReport {
         let weather = try await WeatherService.shared.weather(
             for: place.coordinate,
             including: .current, .daily
@@ -51,7 +51,7 @@ struct WeatherBridge {
             return Int16(clamping: Int(value.rounded()))
         }
 
-        return PebbleWeatherReport(
+        return WeatherReport(
             id: place.id,
             locationName: place.name,
             isCurrentLocation: place.followsPhone,
@@ -79,7 +79,7 @@ struct WeatherBridge {
 
     // The watch has nine icons, so conditions are grouped by what they look like
     // out of a window: how wet, how frozen, how violent.
-    static func watchType(for condition: WeatherCondition, isDaylight: Bool) -> PebbleWeatherType {
+    static func watchType(for condition: WeatherCondition, isDaylight: Bool) -> WeatherType {
         switch condition {
         case .clear, .hot:
             isDaylight ? .sun : .partlyCloudy

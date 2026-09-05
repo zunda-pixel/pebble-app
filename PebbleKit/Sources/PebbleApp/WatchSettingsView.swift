@@ -38,14 +38,14 @@ struct WatchSettingsView: View {
 /// The watch's own settings, and what its health tracking is told.
 struct WatchSettingsContent: View {
     var watchSettings: [WatchSetting: Bool]
-    var activitySettings: PebbleActivitySettings
-    var heartRateSettings: PebbleHeartRateSettings
+    var activitySettings: ActivitySettings
+    var heartRateSettings: HeartRateSettings
     var isReminderAppEnabled: Bool
     var isConnected: Bool
     var statusMessage: LocalizedStringKey?
     var setWatchSetting: (WatchSetting, Bool) -> Void
-    var setActivitySettings: (PebbleActivitySettings) -> Void
-    var setHeartRateSettings: (PebbleHeartRateSettings) -> Void
+    var setActivitySettings: (ActivitySettings) -> Void
+    var setHeartRateSettings: (HeartRateSettings) -> Void
     var setReminderAppEnabled: (Bool) -> Void
 
     var body: some View {
@@ -137,7 +137,7 @@ struct WatchSettingsContent: View {
                             setHeartRateSettings(settings)
                         }
                     )) {
-                        ForEach(PebbleHeartRateInterval.allCases.filter { $0 != .off }, id: \.self) { interval in
+                        ForEach(HeartRateInterval.allCases.filter { $0 != .off }, id: \.self) { interval in
                             Text(interval.title).tag(interval)
                         }
                     }
@@ -180,7 +180,7 @@ struct WatchSettingsContent: View {
         .navigationTitle(Text("Watch Settings"))
     }
 
-    private func activityBinding(_ keyPath: WritableKeyPath<PebbleActivitySettings, Bool>) -> Binding<Bool> {
+    private func activityBinding(_ keyPath: WritableKeyPath<ActivitySettings, Bool>) -> Binding<Bool> {
         Binding(
             get: { activitySettings[keyPath: keyPath] },
             set: { isOn in
@@ -207,8 +207,8 @@ struct WatchSettingsContent: View {
     NavigationStack {
         WatchSettingsContent(
             watchSettings: [.clock24Hour: true, .backlight: true],
-            activitySettings: PebbleActivitySettings(),
-            heartRateSettings: PebbleHeartRateSettings(),
+            activitySettings: ActivitySettings(),
+            heartRateSettings: HeartRateSettings(),
             isReminderAppEnabled: true,
             isConnected: true,
             statusMessage: nil,
@@ -224,8 +224,8 @@ struct WatchSettingsContent: View {
     NavigationStack {
         WatchSettingsContent(
             watchSettings: [:],
-            activitySettings: PebbleActivitySettings(),
-            heartRateSettings: PebbleHeartRateSettings(
+            activitySettings: ActivitySettings(),
+            heartRateSettings: HeartRateSettings(
                 isEnabled: false,
                 interval: .everyThirtyMinutes,
                 isEnabledDuringActivity: false

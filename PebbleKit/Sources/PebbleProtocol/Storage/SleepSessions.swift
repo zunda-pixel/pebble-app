@@ -9,7 +9,7 @@ import MemberwiseInit
 /// The two are the same minutes told twice, which is why only the containers
 /// are added up.
 @MemberwiseInit(.public)
-public struct PebbleSleepInterval: Codable, Equatable, Sendable {
+public struct SleepInterval: Codable, Equatable, Sendable {
     public var start: Date
     public var duration: TimeInterval
     public var isDeep: Bool = false
@@ -19,27 +19,27 @@ public struct PebbleSleepInterval: Codable, Equatable, Sendable {
 
 /// A night, or a nap: the stretches that ran into each other.
 @MemberwiseInit(.public)
-public struct PebbleSleepSession: Codable, Equatable, Sendable {
+public struct SleepSession: Codable, Equatable, Sendable {
     public var start: Date
     public var end: Date
     /// Time asleep, counting each minute once.
     public var asleep: TimeInterval = 0
     public var deep: TimeInterval = 0
-    public var intervals: [PebbleSleepInterval] = []
+    public var intervals: [SleepInterval] = []
 
     public var asleepMinutes: Int { Int(asleep / 60) }
     public var deepMinutes: Int { Int(deep / 60) }
 }
 
-public enum PebbleSleepSessions {
+public enum SleepSessions {
     /// How long a gap can be and still be the same night. Waking to turn over
     /// is not the end of a sleep; going for breakfast is. An hour is where the
     /// official app draws it too.
     public static let sessionGap: TimeInterval = 3600
 
     /// The stretches gathered into sessions, oldest first.
-    public static func grouped(_ intervals: [PebbleSleepInterval]) -> [PebbleSleepSession] {
-        var sessions: [PebbleSleepSession] = []
+    public static func grouped(_ intervals: [SleepInterval]) -> [SleepSession] {
+        var sessions: [SleepSession] = []
         for interval in intervals.sorted(by: { $0.start < $1.start }) {
             if var last = sessions.last, interval.start <= last.end.addingTimeInterval(sessionGap) {
                 last.end = max(last.end, interval.end)
@@ -47,7 +47,7 @@ public enum PebbleSleepSessions {
                 last.intervals.append(interval)
                 sessions[sessions.count - 1] = last
             } else {
-                sessions.append(PebbleSleepSession(
+                sessions.append(SleepSession(
                     start: interval.start,
                     end: interval.end,
                     asleep: interval.isDeep ? 0 : interval.duration,
@@ -62,7 +62,7 @@ public enum PebbleSleepSessions {
 
 /// What a run of days came to on an ordinary one.
 @MemberwiseInit(.public)
-public struct PebbleHealthAverages: Equatable, Sendable {
+public struct WatchHealthAverages: Equatable, Sendable {
     public var steps: Int = 0
     public var sleepMinutes: Int = 0
     public var deepSleepMinutes: Int = 0
@@ -75,19 +75,19 @@ public struct PebbleHealthAverages: Equatable, Sendable {
     public var isEmpty: Bool { stepDays == 0 && sleepDays == 0 }
 }
 
-public extension Sequence<PebbleHealthSample> {
+public extension Sequence<WatchHealthSample> {
     /// The last `days` days, not counting today: today is still happening and
     /// would pull every average down.
     func averages(
         over days: Int,
         endingBefore now: Date = Date(),
         calendar: Calendar = .current
-    ) -> PebbleHealthAverages {
+    ) -> WatchHealthAverages {
         let startOfToday = calendar.startOfDay(for: now)
         guard days > 0, let oldest = calendar.date(byAdding: .day, value: -days, to: startOfToday) else {
-            return PebbleHealthAverages()
+            return WatchHealthAverages()
         }
-        var averages = PebbleHealthAverages()
+        var averages = WatchHealthAverages()
         var steps = 0
         var sleep = 0
         var deep = 0

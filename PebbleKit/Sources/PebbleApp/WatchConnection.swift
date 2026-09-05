@@ -7,7 +7,7 @@ public import Observation
 public enum WatchConnectionPhase: Equatable, Sendable {
     case connected
     case reconnecting
-    case disconnected(PebbleConnectionError)
+    case disconnected(WatchConnectionError)
 }
 
 /// What the bytes going to a watch are for.
@@ -27,7 +27,7 @@ public enum WatchTransferKind: Equatable, Sendable {
 @MainActor
 @Observable
 public final class WatchConnection: Identifiable {
-    public let client: any PebbleClient
+    public let client: any WatchClient
     public private(set) var watch: ConnectedWatch
     public private(set) var phase: WatchConnectionPhase = .connected
     /// The watch is the thing doing the work, so the count belongs to it rather
@@ -74,7 +74,7 @@ public final class WatchConnection: Identifiable {
     }
 
     init(
-        client: any PebbleClient,
+        client: any WatchClient,
         watch: ConnectedWatch,
         voiceProvider: (any PebbleVoiceTranscriptionProvider)? = nil
     ) {
@@ -87,7 +87,7 @@ public final class WatchConnection: Identifiable {
     }
 
     func startObserving(
-        onEvent: @escaping @MainActor (WatchConnection, PebbleClientEvent) -> Void,
+        onEvent: @escaping @MainActor (WatchConnection, WatchClientEvent) -> Void,
         onFrame: @escaping @MainActor (WatchConnection, PebbleProtocolFrame) async -> Void
     ) {
         eventsTask?.cancel()
@@ -111,7 +111,7 @@ public final class WatchConnection: Identifiable {
         }
     }
 
-    private func apply(_ event: PebbleClientEvent) {
+    private func apply(_ event: WatchClientEvent) {
         switch event {
         case .watchUpdated(let watch):
             self.watch = watch

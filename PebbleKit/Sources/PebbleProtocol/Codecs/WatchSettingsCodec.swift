@@ -53,7 +53,7 @@ public enum WatchSettingsCodec {
 /// The firmware keeps this as one packed record and takes it whole: sent
 /// with a height of zero, the watch has a wearer with no height.
 @MemberwiseInit(.public)
-public struct PebbleActivitySettings: Codable, Equatable, Sendable {
+public struct ActivitySettings: Codable, Equatable, Sendable {
     public var heightMillimetres: Int16 = 1_700
     /// Weight in decagrams, which is how the firmware counts it: 70 kg is 7000.
     public var weightDecagrams: Int16 = 7_000
@@ -80,7 +80,7 @@ public struct PebbleActivitySettings: Codable, Equatable, Sendable {
 /// The whole of `HRMonitoringInterval`, numbered as the firmware numbers it.
 /// The raw value is acted on as it stands, so a value the watch has never
 /// heard of is not refused, it is obeyed as something else.
-public enum PebbleHeartRateInterval: UInt8, CaseIterable, Codable, Sendable {
+public enum HeartRateInterval: UInt8, CaseIterable, Codable, Sendable {
     case everyTenMinutes = 0
     case everyThirtyMinutes = 1
     case everyHour = 2
@@ -96,9 +96,9 @@ public enum PebbleHeartRateInterval: UInt8, CaseIterable, Codable, Sendable {
 }
 
 @MemberwiseInit(.public)
-public struct PebbleHeartRateSettings: Codable, Equatable, Sendable {
+public struct HeartRateSettings: Codable, Equatable, Sendable {
     public var isEnabled: Bool = true
-    public var interval: PebbleHeartRateInterval = .everyTenMinutes
+    public var interval: HeartRateInterval = .everyTenMinutes
     public var isEnabledDuringActivity: Bool = true
 
     /// `enabled` gates only what an app may ask for (`health_service.c`); the
@@ -116,7 +116,7 @@ public enum HealthSettingsCodec {
     public static var heartRateKey: String { "hrmPreferences" }
 
     public static func insertFrame(
-        _ settings: PebbleActivitySettings,
+        _ settings: ActivitySettings,
         token: UInt16
     ) -> PebbleProtocolFrame {
         BlobDBCodec.insertFrame(
@@ -128,7 +128,7 @@ public enum HealthSettingsCodec {
     }
 
     public static func insertFrame(
-        _ settings: PebbleHeartRateSettings,
+        _ settings: HeartRateSettings,
         token: UInt16
     ) -> PebbleProtocolFrame {
         BlobDBCodec.insertFrame(
@@ -141,7 +141,7 @@ public enum HealthSettingsCodec {
 }
 
 @MemberwiseInit(.public)
-public struct PebbleHealthDay: Equatable, Sendable {
+public struct WatchHealthDay: Equatable, Sendable {
     /// Sunday is 0, as the firmware's weekday names are ordered.
     public var weekday: Int
     public var lastProcessed: Date
@@ -175,7 +175,7 @@ public enum HealthStatsCodec {
     /// `MovementData`: a version, when the phone last counted, and the day's
     /// totals — all 32-bit and little-endian, and the length has to stay a
     /// multiple of four or the watch refuses it.
-    public static func movementValue(for day: PebbleHealthDay) -> [UInt8] {
+    public static func movementValue(for day: WatchHealthDay) -> [UInt8] {
         recordVersion.littleEndianBytes
             + UInt32(clamping: Int(day.lastProcessed.timeIntervalSince1970)).littleEndianBytes
             + day.steps.littleEndianBytes
@@ -187,7 +187,7 @@ public enum HealthStatsCodec {
 
     /// `SleepData`. The four "typical" values are sent as the day's own, which
     /// is what a phone that keeps one week of history can honestly say.
-    public static func sleepValue(for day: PebbleHealthDay) -> [UInt8] {
+    public static func sleepValue(for day: WatchHealthDay) -> [UInt8] {
         recordVersion.littleEndianBytes
             + UInt32(clamping: Int(day.lastProcessed.timeIntervalSince1970)).littleEndianBytes
             + day.sleepSeconds.littleEndianBytes
@@ -200,7 +200,7 @@ public enum HealthStatsCodec {
             + UInt32(0).littleEndianBytes
     }
 
-    public static func movementFrame(for day: PebbleHealthDay, token: UInt16) -> PebbleProtocolFrame {
+    public static func movementFrame(for day: WatchHealthDay, token: UInt16) -> PebbleProtocolFrame {
         BlobDBCodec.insertFrame(
             databaseID: databaseID,
             key: Array(movementKey(weekday: day.weekday).utf8),
@@ -209,7 +209,7 @@ public enum HealthStatsCodec {
         )
     }
 
-    public static func sleepFrame(for day: PebbleHealthDay, token: UInt16) -> PebbleProtocolFrame {
+    public static func sleepFrame(for day: WatchHealthDay, token: UInt16) -> PebbleProtocolFrame {
         BlobDBCodec.insertFrame(
             databaseID: databaseID,
             key: Array(sleepKey(weekday: day.weekday).utf8),
