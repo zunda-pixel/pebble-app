@@ -235,10 +235,15 @@ struct PhoneVersionTests {
         // `PebbleProtocolCapabilities`, in the firmware's order: run state 0,
         // infinite log dumping 1, extended music 2, 8k app message 5, voice 7,
         // notification filtering 9, unread coredump 10, weather 11, reminders
-        // 12, smooth firmware install progress 14.
+        // 12, smooth firmware install progress 14, settings sync 23.
         let frame = PhoneVersionCodec.responseFrame(operatingSystem: .iOS)
 
-        #expect(Array(frame.payload[17..<25]) == [0xA7, 0x5E, 0, 0, 0, 0, 0, 0])
+        // The third byte is 0x80 for bit 23 alone. It was zero until this app
+        // claimed `settings_sync_support`, which is what makes the watch push
+        // its own settings back — see `WatchSettingsSyncTests`.
+        #expect(Array(frame.payload[17..<25]) == [0xA7, 0x5E, 0x80, 0, 0, 0, 0, 0])
+        #expect(PhoneVersionCodec.capabilityBytes([.settingsSync])
+            == [0, 0, 0x80, 0, 0, 0, 0, 0])
         #expect(PhoneVersionCodec.capabilityBytes([.extendedMusicProtocol])
             == [0x04, 0, 0, 0, 0, 0, 0, 0])
         #expect(PhoneVersionCodec.capabilityBytes([.smoothFirmwareInstallProgress])
@@ -246,7 +251,8 @@ struct PhoneVersionTests {
         #expect(PhoneVersionCodec.capabilityBytes([.remindersApp])
             == [0x00, 0x10, 0, 0, 0, 0, 0, 0])
         // Nothing here sends a text message, teaches the watch a language, or
-        // syncs its settings back, so none of those are claimed.
+        // has a workout app, so none of those are claimed. Settings sync used
+        // to be on this list and is not any more.
         #expect(!PhoneVersionCodec.supportedCapabilities.contains(.sendTextApp))
         #expect(!PhoneVersionCodec.supportedCapabilities.contains(.localization))
         #expect(!PhoneVersionCodec.supportedCapabilities.contains(.workoutApp))

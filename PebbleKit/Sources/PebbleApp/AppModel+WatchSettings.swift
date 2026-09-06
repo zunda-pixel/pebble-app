@@ -27,6 +27,38 @@ extension AppModel {
         }
     }
 
+    /// A switch flicked on the watch, arriving over the settings database.
+    ///
+    /// The watch pushes these only to a phone that claimed `settingsSync`,
+    /// which this app now does — see `PhoneVersionCodec`. Before that the
+    /// toggles here could drift from the watch with nothing to say so.
+    ///
+    /// Not written back to the watch it came from: it already has the value,
+    /// and answering a push with a write is how two devices talk each other
+    /// into a loop. Written to every *other* connected watch, because the app's
+    /// settings are one set written to all of them — the same shape
+    /// `synchronizeNotificationSourceApps` uses for a record from one watch.
+    ///
+    /// No banner. Nobody on this side asked, so there is no question to answer;
+    /// the toggle moving under the reader is the whole of it.
+    ///
+    /// - Returns: Whether it was a setting this app has, which is what the
+    ///   watch is told about its record.
+    @discardableResult
+    func applyWatchSetting(
+        _ setting: WatchSetting,
+        isOn: Bool,
+        from connection: WatchConnection
+    ) async -> Bool {
+        guard watchSettings.values[setting.rawValue] != isOn else { return true }
+        watchSettings.values[setting.rawValue] = isOn
+        Defaults[.watchSettings] = watchSettings.values
+        for other in activeConnections where other !== connection {
+            try? await other.client.write(.watchSetting(setting, isOn: isOn))
+        }
+        return true
+    }
+
     public func setActivitySettings(_ settings: ActivitySettings) async {
         watchSettings.activity = settings
         Defaults[.activitySettings] = settings

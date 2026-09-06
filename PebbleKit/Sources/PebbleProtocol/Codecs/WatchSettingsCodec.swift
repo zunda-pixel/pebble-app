@@ -40,9 +40,10 @@ public enum WatchSettingsCodec {
     /// clears bit 23 in its own version response and takes these writes anyway.
     ///
     /// What the bit does gate is the other direction — `blob_db_sync_db` at
-    /// `settings_blob_db.c:263` — so a setting changed on the watch does not
-    /// come back to the phone. This app does not claim the bit, deliberately;
-    /// see `PhoneVersionCodec.supportedCapabilities`.
+    /// `settings_blob_db.c:263` — which is why this app claims it: without the
+    /// claim the watch never pushes its own settings back, and a switch flicked
+    /// on the wrist stayed on the wrist. See
+    /// `PhoneVersionCodec.supportedCapabilities`.
     public static var databaseID: UInt8 { 0x0C }
 
     /// The key carries its terminator: the firmware accepts the name with or
@@ -62,6 +63,26 @@ public enum WatchSettingsCodec {
             value: [isOn ? 1 : 0],
             token: token
         )
+    }
+
+    /// One record the watch pushed back, where this app has a switch for it.
+    ///
+    /// Nil for a key this app does not model, which is most of them: the
+    /// firmware's `s_syncable_settings` and `s_syncable_notif_prefs` in
+    /// `src/fw/services/blob_db/settings_blob_db.c` list some seventy keys
+    /// between them, and all nine of this app's are in the first list. The rest
+    /// are settings only the watch offers — `lightTimeoutMs`, `language`, the
+    /// quick-launch buttons, the do-not-disturb schedules — and several are not
+    /// booleans at all, so there is nowhere on this side to put them.
+    ///
+    /// Nil too for a value that is not one byte, rather than reading the first
+    /// byte of something that was never a switch.
+    public static func decodeRecord(key: [UInt8], value: [UInt8]) -> (WatchSetting, Bool)? {
+        // The watch may send the name with its terminator or without it, the
+        // same way the firmware accepts both from the phone.
+        let name = String(decoding: key.prefix { $0 != 0 }, as: UTF8.self)
+        guard let setting = WatchSetting(rawValue: name), value.count == 1 else { return nil }
+        return (setting, value[0] != 0)
     }
 }
 

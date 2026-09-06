@@ -216,6 +216,26 @@ extension AppModel {
                         await synchronizeNotificationSourceApps(on: other)
                     }
                 }
+            case WatchSettingsCodec.databaseID:
+                if let (setting, isOn) = WatchSettingsCodec.decodeRecord(
+                    key: write.key,
+                    value: write.value
+                ) {
+                    succeeded = await applyWatchSetting(setting, isOn: isOn, from: connection)
+                } else {
+                    // A key this app has no switch for, which is most of the
+                    // firmware's seventy-odd syncable settings. Taken rather
+                    // than refused: the phone has nowhere to put it and cannot
+                    // acquire one by saying no, and what a refused sync record
+                    // makes the watch do next was not measured. Said out loud
+                    // so it is not simply swallowed.
+                    succeeded = true
+                    await PebbleDiagnostics.shared.record(
+                        category: "settings",
+                        message: "\(connection.watch.name) synced a setting this app does not have: "
+                            + String(decoding: write.key.prefix { $0 != 0 }, as: UTF8.self)
+                    )
+                }
             case TimelinePinCodec.databaseID, TimelineReminderCodec.databaseID:
                 if var item = try? TimelinePin(decoding: write.value) {
                     // Whatever the item's own flag says. It arrived on the

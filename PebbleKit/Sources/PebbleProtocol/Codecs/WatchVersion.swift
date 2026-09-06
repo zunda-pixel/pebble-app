@@ -98,6 +98,10 @@ public enum WatchCapability: UInt64, CaseIterable, Sendable {
     case workoutApp = 13
     case smoothFirmwareInstallProgress = 14
     case customVibePattern = 15
+    /// Bit 23, and the one the watch does not set in its own response: it is
+    /// the phone's claim, read by `settings_blob_db_phone_supports_sync`. Named
+    /// here so the connection log can say whether the phone made it.
+    case settingsSync = 23
 
     public func isSet(in capabilities: UInt64) -> Bool {
         capabilities & (1 << rawValue) != 0
@@ -123,6 +127,7 @@ public enum WatchCapability: UInt64, CaseIterable, Sendable {
         case .workoutApp: "workoutApp"
         case .smoothFirmwareInstallProgress: "smoothFirmwareInstallProgress"
         case .customVibePattern: "customVibePattern"
+        case .settingsSync: "settingsSync"
         }
     }
 }
