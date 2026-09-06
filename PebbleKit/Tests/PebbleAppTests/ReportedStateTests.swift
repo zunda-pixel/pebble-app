@@ -156,20 +156,29 @@ struct ReportedStateTests {
             volumePercent: 60
         )
         let log = SentFrameLog()
-        let coordinator = MusicCoordinator(source: source) { frame in await log.append(frame) }
+        // The debounce returns at once: what is under test is which fields a
+        // push carries, not how long it waits before carrying them.
+        let coordinator = MusicCoordinator(
+            source: source,
+            debounce: { _ in }
+        ) { frame in await log.append(frame) }
         coordinator.start()
 
         // A watch connects: it knows nothing, so it is sent everything.
         coordinator.watchConnected()
-        try await Task.sleep(for: .milliseconds(1200))
+        await log.reached(4)
         #expect(await log.count == 4)
 
         // Nothing has changed since. A track change schedules a push whose
-        // diff would be empty, and a watch connects inside that one second.
+        // diff would be empty, and a watch connects inside that window. The two
+        // calls are next to each other with nothing awaited between them, and
+        // the push runs on this actor, so it cannot have got in between: the
+        // connect lands while the push is pending, which is the case in
+        // question.
         await log.clear()
         source.onChange?()
         coordinator.watchConnected()
-        try await Task.sleep(for: .milliseconds(1200))
+        await log.reached(4)
 
         // The watch that just connected needs all four, not the difference
         // between two states it never saw.
@@ -309,7 +318,28 @@ final class TestMusicSource: SystemMusicSource {
 /// is an ordinary async function with no isolation of its own.
 actor SentFrameLog {
     private var frames: [PebbleProtocolFrame] = []
+    private var waiting: [(target: Int, continuation: CheckedContinuation<Void, Never>)] = []
+
     var count: Int { frames.count }
-    func append(_ frame: PebbleProtocolFrame) { frames.append(frame) }
+
+    func append(_ frame: PebbleProtocolFrame) {
+        frames.append(frame)
+        let ready = waiting.filter { $0.target <= frames.count }
+        waiting.removeAll { $0.target <= frames.count }
+        for entry in ready { entry.continuation.resume() }
+    }
+
     func clear() { frames = [] }
+
+    /// Returns once that many frames have arrived.
+    ///
+    /// Woken by `append` rather than waited out on the clock: the test that
+    /// reads this used to sleep 1200ms for a one-second debounce and assert
+    /// what had turned up by then, which on a loaded machine was a scheduler
+    /// measurement rather than a behaviour one. A push that never comes is
+    /// bounded by the suite's own deadline instead.
+    func reached(_ target: Int) async {
+        guard frames.count < target else { return }
+        await withCheckedContinuation { waiting.append((target, $0)) }
+    }
 }

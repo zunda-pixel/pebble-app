@@ -35,11 +35,20 @@ final class MusicCoordinator {
     private var lastSnapshot: MusicSnapshot?
     private var pushTask: Task<Void, Never>?
 
+    /// How long a push waits for the changes behind it to settle.
+    ///
+    /// Injected the way `WatchPull` and `PendingReply` take theirs, so a test
+    /// can have it return at once instead of waiting out a second of real time
+    /// and hoping the scheduler obliged.
+    private let debounce: @Sendable (Duration) async -> Void
+
     init(
         source: any SystemMusicSource,
+        debounce: @escaping @Sendable (Duration) async -> Void = { try? await Task.sleep(for: $0) },
         send: @escaping (PebbleProtocolFrame) async throws -> Void
     ) {
         self.source = source
+        self.debounce = debounce
         self.send = send
         source.onChange = { [weak self] in
             self?.schedulePush(force: false)
@@ -88,8 +97,8 @@ final class MusicCoordinator {
         guard pushTask == nil else {
             return
         }
-        pushTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(1))
+        pushTask = Task { [weak self, debounce] in
+            await debounce(.seconds(1))
             guard let self, !Task.isCancelled else { return }
             self.pushTask = nil
             await self.pushChanges()

@@ -105,17 +105,19 @@ struct WatchPullTests {
             }
         )
         let waiting = Task { try await pull.run(collecting: CountingCollector(total: 3)) {} }
-        while !pull.isInProgress { await Task.yield() }
-        #expect(await deadlines.reached(1))
+        // Waiting for the first deadline is waiting for the pull to be under
+        // way: `run` has its collector before it asks for one.
+        await deadlines.reached(1)
+        #expect(pull.isInProgress)
 
         // A coredump arrives over a minute. Each piece is proof the watch is
         // still there, so the deadline starts again from it rather than from the
         // request — measuring the whole transfer would cut off a large but
         // healthy one.
         _ = pull.take(piece([1]))
-        #expect(await deadlines.reached(2))
+        await deadlines.reached(2)
         _ = pull.take(piece([2]))
-        #expect(await deadlines.reached(3))
+        await deadlines.reached(3)
 
         _ = pull.take(piece([3]))
         #expect(try await waiting.value == [1, 2, 3])
@@ -153,19 +155,30 @@ private struct CountingCollector: WatchPullCollector {
 /// back without racing a real one.
 private actor DeadlineLog {
     private var count = 0
+    private var waiting: [(target: Int, continuation: CheckedContinuation<Void, Never>)] = []
 
     func note() {
         count += 1
+        let ready = waiting.filter { $0.target <= count }
+        waiting.removeAll { $0.target <= count }
+        for entry in ready { entry.continuation.resume() }
     }
 
-    /// Whether that many deadlines were asked for, given the chance to arrive:
-    /// the task that holds one need not have reached its first suspension when
-    /// the line that started it returns.
-    func reached(_ target: Int) async -> Bool {
-        for _ in 0..<10_000 {
-            if count >= target { return true }
-            await Task.yield()
+    /// Returns once that many deadlines have been asked for.
+    ///
+    /// Woken by `note` rather than counted out in `Task.yield()`s. Yielding a
+    /// fixed number of times only offers the other task a chance to run; it
+    /// does not make it run, and with the suite's tests going at once the
+    /// cooperative pool is busy enough that ten thousand chances were
+    /// occasionally not one. The test then failed having proved nothing.
+    ///
+    /// No timeout of its own either: a pull that never asks for a deadline
+    /// leaves this waiting, and the suite's own deadline is what should say so
+    /// — with the count it was waiting for, rather than a bare false.
+    func reached(_ target: Int) async {
+        guard count < target else { return }
+        await withCheckedContinuation { continuation in
+            waiting.append((target, continuation))
         }
-        return false
     }
 }
