@@ -119,19 +119,18 @@ struct ApplicationsView: View {
             Task { await model.importApplication(from: packageURL) }
             return true
         }
-        .sheet(isPresented: Binding(
-            get: { model.applications.configurationURL != nil },
-            set: { presented in
-                if !presented { Task { await model.closeConfiguration() } }
+        // By the page rather than by whether one is showing: the web view was
+        // built twice for one opening under a `Bool` and an `if let` inside,
+        // because nothing tied the sheet's contents to the page they were for.
+        .sheet(item: Binding(
+            get: { model.applications.configurationPage },
+            set: { page in
+                if page == nil { Task { await model.closeConfiguration() } }
             }
-        )) {
+        )) { page in
             NavigationStack {
-                Group {
-                    if let configurationURL = model.applications.configurationURL {
-                        ConfigurationWebView(url: configurationURL) { response in
-                            Task { await model.closeConfiguration(response: response) }
-                        }
-                    }
+                ConfigurationWebView(url: page.url) { response in
+                    Task { await model.closeConfiguration(response: response) }
                 }
                 .navigationTitle(model.applications.configurationApplication?.displayName ?? "App Settings")
                 .toolbar {

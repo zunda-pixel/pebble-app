@@ -26,4 +26,25 @@ public final class ApplicationsModel {
     public internal(set) var installedIDsByWatch: [WatchID: Set<UUID>] = [:]
 
     public var all: [WatchApplication] { apps + watchfaces }
+
+    /// The settings page that is showing, if one is.
+    ///
+    /// Named by its address so the sheet showing it belongs to one page rather
+    /// than to the fact that a page is showing. Presented on a `Bool` and
+    /// branched on inside, the web view was built twice for one opening — twice
+    /// on the reader's phone, 69 ms apart, and the second load was still going
+    /// 3.35 seconds later while the first had been thrown away.
+    public var configurationPage: ConfigurationPage? {
+        configurationURL.map(ConfigurationPage.init)
+    }
+}
+
+/// A settings page, identified by where it came from.
+public struct ConfigurationPage: Identifiable, Sendable, Equatable {
+    public var url: URL
+    public var id: URL { url }
+
+    public init(url: URL) {
+        self.url = url
+    }
 }

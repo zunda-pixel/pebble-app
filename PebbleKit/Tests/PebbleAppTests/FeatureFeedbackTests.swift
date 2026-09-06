@@ -215,4 +215,39 @@ struct FeatureFeedbackTests {
         model.openConfigurationURL(plain)
         #expect(model.applications.configurationURL == plain)
     }
+
+    /// The page the sheet showing it belongs to.
+    ///
+    /// Presented on whether a page was showing at all, with the page picked out
+    /// by an `if let` inside, the web view was built twice for one opening: the
+    /// contents were tied to nothing, so there was nothing to keep them. On the
+    /// reader's phone that was two loads 69 ms apart, the second still going
+    /// 3.35 seconds later with the first thrown away, against 2.0 seconds for
+    /// the one that ran alone.
+    @Test func theSheetShowingASettingsPageBelongsToThatPage() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = makeModel(directory: directory, client: MockWatchClient())
+
+        #expect(model.applications.configurationPage == nil)
+
+        let first = try #require(URL(string: "http://example.com/settings?token=one"))
+        model.openConfigurationURL(first)
+        #expect(model.applications.configurationPage?.id == first)
+
+        // The same page again is the same sheet, which is what keeps the web
+        // view rather than building a second one.
+        model.openConfigurationURL(first)
+        #expect(model.applications.configurationPage?.id == first)
+        #expect(ConfigurationPage(url: first) == ConfigurationPage(url: first))
+
+        // A different page is a different one, so it is built rather than kept.
+        let second = try #require(URL(string: "http://example.com/settings?token=two"))
+        model.openConfigurationURL(second)
+        #expect(model.applications.configurationPage?.id == second)
+
+        // A page that is refused never becomes a sheet at all.
+        model.openConfigurationURL(try #require(URL(string: "file:///etc/passwd")))
+        #expect(model.applications.configurationPage?.id == second)
+    }
 }
