@@ -148,47 +148,31 @@ struct ApplicationDetailContent: View {
                 }
             }
 
-            if let installed = subject.installed,
-               installed.isConfigurable || (installed.kind == .watchapp && editGlance != nil) {
-                Section("Settings") {
-                    if installed.isConfigurable {
-                        Button("Configure", systemImage: "gearshape", action: configureApplication)
-                            .disabled(isOperationInProgress)
-                    }
-                    if installed.kind == .watchapp, let editGlance {
-                        Button(
-                            "Launcher Line",
-                            systemImage: "text.line.first.and.arrowtriangle.forward",
-                            action: editGlance
-                        )
-                    }
-                }
-            }
-
             Section {
                 if canInstall {
                     Button(installButtonTitle, systemImage: "arrow.down.app", action: install)
                         .disabled(isAnyInstallRunning)
                 }
                 if isInstalling { ProgressView() }
-                // The feed carries a summary and a few screenshots; the store
-                // page has the rest — every screenshot, the whole changelog,
-                // and how many people have hearted it.
-                if let storePageURL = subject.store?.storePageURL {
-                    Link(destination: storePageURL) {
-                        Label("View in Store", systemImage: "safari")
-                    }
-                }
-                if subject.installed != nil {
-                    Button("Remove", systemImage: "trash", role: .destructive) {
-                        isConfirmingRemoval = true
-                    }
-                    .disabled(isOperationInProgress)
-                }
+                #if os(macOS)
+                // Rows here rather than a bottom bar: `bottomBar` is a
+                // placement iOS has and a window does not.
+                actions
+                #endif
                 FeedbackBanner(feedback: feedback)
             }
         }
         .formStyle(.grouped)
+        #if os(iOS)
+        .toolbar {
+            ToolbarItemGroup(placement: .bottomBar) {
+                actions
+            }
+        }
+        // The bottom bar and the tab bar want the same edge, and the actions
+        // belong to what is on screen rather than to moving between tabs.
+        .toolbarVisibility(.hidden, for: .tabBar)
+        #endif
         .navigationTitle(Text(verbatim: subject.name))
         // An alert rather than a confirmation dialog: this one has a row to
         // anchor to, but the two questions should read the same wherever the
@@ -201,6 +185,44 @@ struct ApplicationDetailContent: View {
             Button(role: .cancel) {}
         } message: {
             Text("The application and its settings will be removed. A Pebble that is not connected is told the next time it is.")
+        }
+    }
+
+    /// Everything that can be done to this application, in one place so that
+    /// the bottom bar on iOS and the rows on macOS cannot drift apart.
+    ///
+    /// Each is absent rather than disabled where it does not apply: there is
+    /// nothing to configure in an application that is not installed, and no
+    /// store page for a package the store never listed.
+    @ViewBuilder private var actions: some View {
+        if let installed = subject.installed, installed.isConfigurable {
+            Button("Configure", systemImage: "gearshape", action: configureApplication)
+                .disabled(isOperationInProgress)
+        }
+        if subject.installed?.kind == .watchapp, let editGlance {
+            Button(
+                "Launcher Line",
+                systemImage: "text.line.first.and.arrowtriangle.forward",
+                action: editGlance
+            )
+        }
+        // The feed carries a summary and a few screenshots; the store page has
+        // the rest — every screenshot, the whole changelog, and the hearts.
+        if let storePageURL = subject.store?.storePageURL {
+            Link(destination: storePageURL) {
+                Label("View in Store", systemImage: "safari")
+            }
+        }
+        if subject.installed != nil {
+            #if os(iOS)
+            // Pushed to the far end of the bar, since it is the one that
+            // cannot be undone. In a form it would only be an empty row.
+            Spacer()
+            #endif
+            Button("Remove", systemImage: "trash", role: .destructive) {
+                isConfirmingRemoval = true
+            }
+            .disabled(isOperationInProgress)
         }
     }
 
