@@ -111,4 +111,69 @@ struct LinkSetup: Equatable {
     mutating func forgetResetComplete() {
         hasSentResetComplete = false
     }
+
+    /// What a packet the watch has sent asks of the link, in the order it has to
+    /// happen.
+    ///
+    /// Here rather than in the delegate for the same reason as everything else
+    /// in this type: the delegate needs a `CBPeripheral` to do any of it, and a
+    /// `CBPeripheral` is not something a test can make. The two mid-session
+    /// resets in particular had no other way of being walked through — they are
+    /// what the watch sends when its acknowledgement timeouts have run out,
+    /// which is not a thing to wait around for on a real one.
+    mutating func steps(for packet: PPoGPacket, hasSession: Bool) -> [PPoGStep] {
+        switch packet {
+        case .resetRequest:
+            var steps: [PPoGStep] = []
+            if hasSession {
+                // The watch wants the transport reopened, not the link dropped.
+                steps.append(.startSessionOver(because: "the watch asked for a new one"))
+                // And the handshake that follows owes a ResetComplete again.
+                forgetResetComplete()
+            }
+            _ = claimResetComplete()
+            steps.append(.answerReset)
+            return steps
+
+        case .resetComplete(_, let receiveWindow, let transmitWindow):
+            if hasSession {
+                // A ResetComplete with no request of ours behind it: the watch
+                // has decided the session is new and this one is not, so it goes
+                // and the handshake is opened again from this side.
+                forgetResetComplete()
+                return [
+                    .startSessionOver(because: "the watch answered a reset nobody asked for"),
+                    .askForReset,
+                ]
+            }
+            var steps: [PPoGStep] = []
+            // Only the side that opened the handshake still owes one. A second
+            // reads to the watch as a request to tear the session down again.
+            if claimResetComplete() {
+                steps.append(.answerReset)
+            }
+            steps.append(.openSession(
+                watchReceiveWindow: receiveWindow,
+                watchTransmitWindow: transmitWindow
+            ))
+            return steps
+
+        case .data, .acknowledgement:
+            return [.giveToSession]
+        }
+    }
+}
+
+/// One thing to do about a packet the watch has sent.
+enum PPoGStep: Equatable {
+    /// Give up the session, keep the link that carries it, and say why.
+    case startSessionOver(because: String)
+    /// Answer the watch's reset.
+    case answerReset
+    /// Ask the watch to start a session.
+    case askForReset
+    /// Open the session on the windows the watch offered.
+    case openSession(watchReceiveWindow: UInt8, watchTransmitWindow: UInt8)
+    /// Hand the packet to the session that is open, if one is.
+    case giveToSession
 }

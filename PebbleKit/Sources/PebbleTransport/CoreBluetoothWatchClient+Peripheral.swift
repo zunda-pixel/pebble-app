@@ -449,70 +449,34 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
         do {
             let packet = try PPoGPacket(decoding: bytes)
             recordPPoGPacket(packet, direction: "in")
-            switch packet {
-            case .resetRequest(_, let version):
-                if ppogSession != nil {
-                    abandonSession(on: peripheral, because: "the watch asked for a new one")
-                }
-                try write(
-                    .resetComplete(sequence: 0, receiveWindow: 25, transmitWindow: 25),
-                    to: peripheral
-                )
-                _ = setup.claimResetComplete()
-                if version == .zero {
-                    return
-                }
-            case .resetComplete(_, let receiveWindow, let transmitWindow):
-                if ppogSession != nil {
-                    // A ResetComplete with no request of ours behind it: the
-                    // watch has decided the session is new and this one is not,
-                    // so it goes and the handshake is opened again from here.
-                    abandonSession(on: peripheral, because: "the watch answered a reset nobody asked for")
-                    try write(.resetRequest(sequence: 0, version: .one), to: peripheral)
-                    return
-                }
-                if setup.claimResetComplete() {
-                    // Only the side that opened the handshake still owes one.
+            for step in setup.steps(for: packet, hasSession: ppogSession != nil) {
+                switch step {
+                case .startSessionOver(let reason):
+                    abandonSession(on: peripheral, because: reason)
+
+                case .answerReset:
                     try write(
                         .resetComplete(sequence: 0, receiveWindow: 25, transmitWindow: 25),
                         to: peripheral
                     )
-                }
-                let session = PPoGSession(
-                    receiveWindow: min(Int(transmitWindow), 25),
-                    transmitWindow: min(Int(receiveWindow), 25)
-                )
-                Task { [
-                    tag = clientTag,
-                    watchReceive = receiveWindow,
-                    watchTransmit = transmitWindow,
-                    receive = session.receiveWindow,
-                    transmit = session.transmitWindow,
-                    packetSize = setup.transport == .forward
-                        ? PebbleGattServer.shared.maximumPacketSize(centralID: peripheral.identifier.uuidString)
-                        : peripheral.maximumWriteValueLength(for: .withoutResponse)
-                ] in
-                    await PebbleDiagnostics.shared.record(
-                        category: "ppog",
-                        message: "[\(tag)] session open: watch rx=\(watchReceive) tx=\(watchTransmit),"
-                            + " ours rx=\(receive) tx=\(transmit), packet size=\(packetSize)"
+
+                case .askForReset:
+                    try write(.resetRequest(sequence: 0, version: .one), to: peripheral)
+
+                case .openSession(let watchReceiveWindow, let watchTransmitWindow):
+                    try openSession(
+                        watchReceiveWindow: watchReceiveWindow,
+                        watchTransmitWindow: watchTransmitWindow,
+                        on: peripheral
                     )
+
+                case .giveToSession:
+                    guard var session = ppogSession else { return }
+                    let actions = try session.receive(packet)
+                    ppogSession = session
+                    try handle(actions, peripheral: peripheral)
+                    updateAcknowledgementTimeout(for: peripheral)
                 }
-                ppogSession = session
-                frameDecoder = PebbleProtocolFrameDecoder()
-                connectedPeripheral = peripheral
-                sessionRestartTimeoutTask?.cancel()
-                sessionRestartTimeoutTask = nil
-                handshakePhaseReporter?(.transportOpen)
-                try sendFrame(WatchVersionCodec.requestFrame(), to: peripheral)
-            case .data, .acknowledgement:
-                guard var session = ppogSession else {
-                    return
-                }
-                let actions = try session.receive(packet)
-                ppogSession = session
-                try handle(actions, peripheral: peripheral)
-                updateAcknowledgementTimeout(for: peripheral)
             }
         } catch {
             guard ppogSession == nil else {
@@ -529,6 +493,42 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
             }
             abortLink(peripheral, error: .protocolNegotiationFailed, step: "handling a packet from the watch")
         }
+    }
+
+    /// Opens the transport on the windows the watch offered, and asks it what it
+    /// is: the version answer is what turns a session into a connected watch.
+    private func openSession(
+        watchReceiveWindow: UInt8,
+        watchTransmitWindow: UInt8,
+        on peripheral: CBPeripheral
+    ) throws {
+        let session = PPoGSession(
+            receiveWindow: min(Int(watchTransmitWindow), 25),
+            transmitWindow: min(Int(watchReceiveWindow), 25)
+        )
+        Task { [
+            tag = clientTag,
+            watchReceive = watchReceiveWindow,
+            watchTransmit = watchTransmitWindow,
+            receive = session.receiveWindow,
+            transmit = session.transmitWindow,
+            packetSize = setup.transport == .forward
+                ? PebbleGattServer.shared.maximumPacketSize(centralID: peripheral.identifier.uuidString)
+                : peripheral.maximumWriteValueLength(for: .withoutResponse)
+        ] in
+            await PebbleDiagnostics.shared.record(
+                category: "ppog",
+                message: "[\(tag)] session open: watch rx=\(watchReceive) tx=\(watchTransmit),"
+                    + " ours rx=\(receive) tx=\(transmit), packet size=\(packetSize)"
+            )
+        }
+        ppogSession = session
+        frameDecoder = PebbleProtocolFrameDecoder()
+        connectedPeripheral = peripheral
+        sessionRestartTimeoutTask?.cancel()
+        sessionRestartTimeoutTask = nil
+        handshakePhaseReporter?(.transportOpen)
+        try sendFrame(WatchVersionCodec.requestFrame(), to: peripheral)
     }
 
     // The watch judges a session by this exchange, and data and acknowledgements

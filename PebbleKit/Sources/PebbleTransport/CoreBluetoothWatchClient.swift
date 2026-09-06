@@ -882,8 +882,8 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         }
         ppogSession = nil
         frameDecoder = PebbleProtocolFrameDecoder()
-        // The next handshake owes a ResetComplete again.
-        setup.forgetResetComplete()
+        // What the next handshake owes is `LinkSetup.steps(for:hasSession:)`'s
+        // to say: it decided to come here, and it decides what follows.
         pendingGattWrites.removeAll()
         acknowledgementTimeoutTask?.cancel()
         acknowledgementTimeoutTask = nil
