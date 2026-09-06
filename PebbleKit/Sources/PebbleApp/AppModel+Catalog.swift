@@ -1,6 +1,7 @@
 public import PebbleProtocol
 import Defaults
-import Foundation
+// `storeEntry(for:)` is public and takes a UUID, so Foundation has to be too.
+public import Foundation
 import SwiftUI
 
 /// The remote application catalog.
@@ -40,6 +41,37 @@ extension AppModel {
     public func refreshCatalog() async {
         let source = Defaults[.catalogSource] ?? AppCatalog.defaultSourceURL.absoluteString
         await updateCatalog(source: source)
+    }
+
+    /// What the store knows about something already in the library.
+    ///
+    /// Asked by the package's own UUID, so it works for an application however
+    /// it arrived: installed from the catalogue, or side-loaded from a file and
+    /// listed in the store all the same. Nothing is stamped into the library at
+    /// install time, so applications installed before this existed are covered
+    /// too.
+    ///
+    /// The feed is consulted first, and the loaded catalogue usually has it, so
+    /// most visits cost nothing.
+    public func storeEntry(for applicationID: UUID) async -> CatalogApplication? {
+        if let listed = catalog.applications.first(where: { $0.id == applicationID }) { return listed }
+        guard !catalog.answeredStoreLookups.contains(applicationID) else {
+            return catalog.storeEntries[applicationID]
+        }
+        let source = Defaults[.catalogSource] ?? AppCatalog.defaultSourceURL.absoluteString
+        guard let baseURL = URL(string: source), baseURL.scheme?.lowercased() == "https" else { return nil }
+        do {
+            let entry = try await appCatalog.application(uuid: applicationID, from: baseURL)
+            if let entry { catalog.storeEntries[applicationID] = entry }
+            // Recorded whichever way it went: "the store does not have this"
+            // is an answer, and asking again on every visit will not change it.
+            catalog.answeredStoreLookups.insert(applicationID)
+            return entry
+        } catch {
+            // The network refused rather than the store answering. Left
+            // unrecorded, so a reader who reconnects and comes back gets it.
+            return nil
+        }
     }
 
     public func catalogInstallationState(for application: CatalogApplication) -> CatalogInstallationState {

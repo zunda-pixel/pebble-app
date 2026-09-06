@@ -200,81 +200,6 @@ struct CatalogStateLabel: View {
     }
 }
 
-struct CatalogApplicationDetailView: View {
-    var application: CatalogApplication
-    var model: AppModel
-
-    var body: some View {
-        CatalogApplicationDetailContent(
-            application: application,
-            state: model.catalogInstallationState(for: application),
-            isInstalling: model.catalog.installingApplicationID == application.id,
-            isAnyInstallRunning: model.catalog.installingApplicationID != nil,
-            feedback: model.catalog.feedback,
-            install: { Task { await model.installCatalogApplication(application) } }
-        )
-    }
-}
-
-struct CatalogApplicationDetailContent: View {
-    var application: CatalogApplication
-    var state: CatalogInstallationState
-    var isInstalling: Bool
-    var isAnyInstallRunning: Bool
-    var feedback: FeatureFeedback?
-    var install: () -> Void
-
-    var body: some View {
-        List {
-            Section {
-                CatalogApplicationRow(application: application, state: state)
-                if !application.summary.isEmpty { Text(application.summary) }
-            }
-            if !application.screenshotURLs.isEmpty {
-                Section("Screenshots") {
-                    ScrollView(.horizontal) {
-                        HStack {
-                            ForEach(application.screenshotURLs, id: \.self) { url in
-                                AsyncImage(url: url) { image in
-                                    image.resizable().scaledToFit()
-                                } placeholder: {
-                                    ProgressView()
-                                }
-                                .frame(width: 220, height: 220)
-                                .accessibilityLabel(Text("Screenshot of \(application.name)"))
-                            }
-                        }
-                    }
-                }
-            }
-            Section("Compatibility") {
-                Text(application.supportedPlatforms.sorted().joined(separator: ", "))
-            }
-            if let releaseNotes = application.releaseNotes, !releaseNotes.isEmpty {
-                Section("Release Notes") { Text(releaseNotes) }
-            }
-            Section {
-                Button(installButtonTitle, systemImage: "arrow.down.app", action: install)
-                    .disabled(!canInstall || isAnyInstallRunning)
-                if isInstalling { ProgressView() }
-                // The feed carries a summary and a few screenshots; the store
-                // page has the rest — every screenshot, the whole changelog,
-                // and how many people have hearted it.
-                if let storePageURL = application.storePageURL {
-                    Link(destination: storePageURL) {
-                        Label("View in Store", systemImage: "safari")
-                    }
-                }
-                FeedbackBanner(feedback: feedback)
-            }
-        }
-        .navigationTitle(application.name)
-    }
-
-    private var canInstall: Bool { state == .available || state == .updateAvailable }
-    private var installButtonTitle: LocalizedStringKey { state == .updateAvailable ? "Update" : "Install" }
-}
-
 #Preview("Catalog rows") {
     List {
         CatalogApplicationRow(application: PreviewSamples.catalogApplication, state: .available)
@@ -312,17 +237,4 @@ struct CatalogApplicationDetailContent: View {
         close: {},
         destination: { _ in EmptyView() }
     )
-}
-
-#Preview("Catalog app") {
-    NavigationStack {
-        CatalogApplicationDetailContent(
-            application: PreviewSamples.catalogApplication,
-            state: .available,
-            isInstalling: false,
-            isAnyInstallRunning: false,
-            feedback: nil,
-            install: {}
-        )
-    }
 }

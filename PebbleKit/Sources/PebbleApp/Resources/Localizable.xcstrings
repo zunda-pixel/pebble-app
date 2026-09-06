@@ -1270,6 +1270,7 @@
       }
     },
     "Compatibility" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {

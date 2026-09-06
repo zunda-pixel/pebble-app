@@ -1,17 +1,86 @@
 import SwiftUI
 import PebbleProtocol
 
+/// One application, however it was reached.
+///
+/// The two screens this replaces had a type each: the library's
+/// `WatchApplication`, read out of the package the watch is sent, and the
+/// store's `CatalogApplication`, read off the feed. An application can be in
+/// both, in the library alone, or in the store alone, so neither type could be
+/// the subject on its own.
+///
+/// Where both know a fact the package wins, because it describes the copy the
+/// reader actually has and the store's row may be a version ahead. The store
+/// fills in only what a package cannot say about itself: what it is for, what
+/// it looks like, and where its page is.
+struct ApplicationDetailSubject: Equatable, Sendable {
+    var id: UUID
+    var name: String
+    var developer: String
+    var version: String
+    var kind: WatchApplicationKind
+    var platforms: [String]
+    /// The library's copy. Absent for something only in the store.
+    var installed: WatchApplication?
+    /// The store's copy. Absent for a package the store never listed, and
+    /// absent until the lookup answers.
+    var store: CatalogApplication?
+
+    init(installed: WatchApplication, store: CatalogApplication?) {
+        self.id = installed.id
+        self.name = installed.displayName
+        // The package may leave these out; the store's row then says it
+        // instead, which beats an empty row.
+        self.developer = installed.companyName.isEmpty ? store?.developer ?? "" : installed.companyName
+        self.version = installed.versionLabel
+        self.kind = installed.kind
+        self.platforms = installed.targetPlatforms.isEmpty
+            ? store?.supportedPlatforms ?? []
+            : installed.targetPlatforms
+        self.installed = installed
+        self.store = store
+    }
+
+    init(store: CatalogApplication, installed: WatchApplication?) {
+        // Installed wins wherever it is there, so the two ways in agree.
+        if let installed {
+            self = Self(installed: installed, store: store)
+        } else {
+            self.id = store.id
+            self.name = store.name
+            self.developer = store.developer
+            self.version = store.version
+            self.kind = store.kind
+            self.platforms = store.supportedPlatforms
+            self.installed = nil
+            self.store = store
+        }
+    }
+}
+
 /// One application, as the row that leads here could not show it: the whole of
-/// what the package said about itself, and every action that was otherwise only
-/// in a context menu nobody opens.
+/// what the package said about itself, what the store says about it, and every
+/// action that was otherwise only in a context menu nobody opens.
 struct ApplicationDetailContent: View {
-    var application: WatchApplication
+    var subject: ApplicationDetailSubject
     var isActive: Bool
     /// Nil when no watch is connected: install state is unknown, not shown.
     var isInstalled: Bool?
+    /// Nil while the store has not answered, or has no such application.
+    var installationState: CatalogInstallationState?
+    var isInstalling: Bool
+    var isAnyInstallRunning: Bool
     var isOperationInProgress: Bool
+    var feedback: FeatureFeedback?
+    var install: () -> Void
     var configureApplication: () -> Void
-    var editGlance: () -> Void
+    /// Nil where the launcher line cannot be edited from here.
+    ///
+    /// Its editor is a sheet belonging to the applications screen, and the
+    /// catalogue is a sheet on that same screen — one cannot open over the
+    /// other. So the screen reached from the catalogue leaves this out and the
+    /// row for it does not appear.
+    var editGlance: (() -> Void)?
     var activateWatchface: () -> Void
     var removeApplication: () -> Void
 
@@ -21,47 +90,76 @@ struct ApplicationDetailContent: View {
         Form {
             Section {
                 header
+                if let summary = subject.store?.summary, !summary.isEmpty {
+                    Text(summary)
+                }
             }
 
             Section {
                 LabeledContent("Kind") {
                     kindTitle
                 }
-                LabeledContent("Version", value: application.versionLabel)
-                if !application.companyName.isEmpty {
-                    LabeledContent("Developer", value: application.companyName)
+                LabeledContent("Version", value: subject.version)
+                if !subject.developer.isEmpty {
+                    LabeledContent("Developer", value: subject.developer)
                 }
-                if !application.targetPlatforms.isEmpty {
+                if let category = subject.store?.category, !category.isEmpty {
+                    LabeledContent("Category", value: category)
+                }
+                if !subject.platforms.isEmpty {
                     LabeledContent("Built For") {
-                        Text(verbatim: application.targetPlatforms.joined(separator: ", "))
+                        Text(verbatim: subject.platforms.sorted().joined(separator: ", "))
                     }
                 }
-                if application.hasCompanionJavaScript {
+                if subject.installed?.hasCompanionJavaScript == true {
                     Label("Has companion JavaScript", systemImage: "curlybraces")
                         .foregroundStyle(.secondary)
                 }
             } header: {
                 Text("About")
             } footer: {
-                if let isInstalled, !isInstalled {
+                if let isInstalled, !isInstalled, subject.installed != nil {
                     Text("The watch is told about this application the next time it connects.")
                 }
             }
 
-            if application.kind == .watchface {
+            if let screenshots = subject.store?.screenshotURLs, !screenshots.isEmpty {
+                Section("Screenshots") {
+                    ScrollView(.horizontal) {
+                        HStack {
+                            ForEach(screenshots, id: \.self) { url in
+                                AsyncImage(url: url) { image in
+                                    image.resizable().scaledToFit()
+                                } placeholder: {
+                                    ProgressView()
+                                }
+                                .frame(width: 220, height: 220)
+                                .accessibilityLabel(Text("Screenshot of \(subject.name)"))
+                            }
+                        }
+                    }
+                }
+            }
+
+            if let releaseNotes = subject.store?.releaseNotes, !releaseNotes.isEmpty {
+                Section("Release Notes") { Text(releaseNotes) }
+            }
+
+            if subject.installed != nil, subject.kind == .watchface {
                 Section("Watchface") {
                     Button(isActive ? "Active" : "Activate", systemImage: "play.circle", action: activateWatchface)
                         .disabled(isActive || isOperationInProgress)
                 }
             }
 
-            if application.isConfigurable || application.kind == .watchapp {
+            if let installed = subject.installed,
+               installed.isConfigurable || (installed.kind == .watchapp && editGlance != nil) {
                 Section("Settings") {
-                    if application.isConfigurable {
+                    if installed.isConfigurable {
                         Button("Configure", systemImage: "gearshape", action: configureApplication)
                             .disabled(isOperationInProgress)
                     }
-                    if application.kind == .watchapp {
+                    if installed.kind == .watchapp, let editGlance {
                         Button(
                             "Launcher Line",
                             systemImage: "text.line.first.and.arrowtriangle.forward",
@@ -72,19 +170,35 @@ struct ApplicationDetailContent: View {
             }
 
             Section {
-                Button("Remove", systemImage: "trash", role: .destructive) {
-                    isConfirmingRemoval = true
+                if canInstall {
+                    Button(installButtonTitle, systemImage: "arrow.down.app", action: install)
+                        .disabled(isAnyInstallRunning)
                 }
-                .disabled(isOperationInProgress)
+                if isInstalling { ProgressView() }
+                // The feed carries a summary and a few screenshots; the store
+                // page has the rest — every screenshot, the whole changelog,
+                // and how many people have hearted it.
+                if let storePageURL = subject.store?.storePageURL {
+                    Link(destination: storePageURL) {
+                        Label("View in Store", systemImage: "safari")
+                    }
+                }
+                if subject.installed != nil {
+                    Button("Remove", systemImage: "trash", role: .destructive) {
+                        isConfirmingRemoval = true
+                    }
+                    .disabled(isOperationInProgress)
+                }
+                FeedbackBanner(feedback: feedback)
             }
         }
         .formStyle(.grouped)
-        .navigationTitle(Text(verbatim: application.displayName))
+        .navigationTitle(Text(verbatim: subject.name))
         // An alert rather than a confirmation dialog: this one has a row to
         // anchor to, but the two questions should read the same wherever the
         // removal was asked for.
         .alert(
-            Text("Remove \(application.displayName)?"),
+            Text("Remove \(subject.name)?"),
             isPresented: $isConfirmingRemoval
         ) {
             Button("Remove Application", role: .destructive, action: removeApplication)
@@ -94,23 +208,34 @@ struct ApplicationDetailContent: View {
         }
     }
 
+    /// Only where the store has something to install, and something to gain by
+    /// it. `nil` is a store that has not answered, which is not an offer.
+    private var canInstall: Bool {
+        installationState == .available || installationState == .updateAvailable
+    }
+
     // Hoisted: a conditional cannot stand where a view argument is expected,
     // and the two names have to stay keys to be translated.
     private var kindTitle: Text {
-        application.kind == .watchface ? Text("Watchface") : Text("Watch App")
+        subject.kind == .watchface ? Text("Watchface") : Text("Watch App")
+    }
+
+    private var installButtonTitle: LocalizedStringKey {
+        installationState == .updateAvailable ? "Update" : "Install"
     }
 
     private var header: some View {
         HStack(spacing: 16) {
-            Image(systemName: application.kind == .watchface ? "clock" : "square.grid.2x2")
-                .font(.system(size: 40))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(.tint)
+            icon
+                .frame(width: 48, height: 48)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
-                Text(verbatim: application.displayName)
+                Text(verbatim: subject.name)
                     .font(.title2.bold())
-                if let isInstalled {
+                if subject.installed == nil {
+                    CatalogStateLabel(state: installationState ?? .available)
+                        .font(.subheadline)
+                } else if let isInstalled {
                     if isInstalled {
                         Label("Installed", systemImage: "checkmark.circle.fill")
                             .font(.subheadline)
@@ -126,14 +251,41 @@ struct ApplicationDetailContent: View {
         .padding(.vertical, 8)
         .accessibilityElement(children: .combine)
     }
+
+    @ViewBuilder private var icon: some View {
+        // The store has a real icon; a package installed from a file has only
+        // what its kind suggests.
+        if let iconURL = subject.store?.iconURL {
+            AsyncImage(url: iconURL) { image in
+                image.resizable().scaledToFit()
+            } placeholder: {
+                kindSymbol
+            }
+        } else {
+            kindSymbol
+        }
+    }
+
+    private var kindSymbol: some View {
+        Image(systemName: subject.kind == .watchface ? "clock" : "square.grid.2x2")
+            .font(.system(size: 40))
+            .symbolRenderingMode(.hierarchical)
+            .foregroundStyle(.tint)
+    }
 }
 
+/// The detail screen reached from the library.
 struct ApplicationDetailView: View {
     var model: AppModel
     var application: WatchApplication
     var watchID: WatchID?
     var editGlance: (WatchApplication) -> Void
     @Environment(\.dismiss) private var dismiss
+
+    /// What the store says, asked for once the screen is up. Nil is both "not
+    /// asked yet" and "the store does not have it": neither shows anything, so
+    /// the screen does not have to tell them apart.
+    @State private var storeEntry: CatalogApplication?
 
     /// Read from the library rather than held: a removal elsewhere, or a
     /// reinstall, should show here without going back first.
@@ -145,10 +297,23 @@ struct ApplicationDetailView: View {
         Group {
             if let current {
                 ApplicationDetailContent(
-                    application: current,
+                    subject: ApplicationDetailSubject(installed: current, store: storeEntry),
                     isActive: model.applications.activeWatchfaceID == current.id,
                     isInstalled: watchID.map { model.installedApplicationIDs(on: $0).contains(current.id) },
+                    installationState: storeEntry.map { model.catalogInstallationState(for: $0) },
+                    isInstalling: model.catalog.installingApplicationID == current.id,
+                    isAnyInstallRunning: model.catalog.installingApplicationID != nil,
                     isOperationInProgress: model.isApplicationManagementBusy,
+                    // Only this application's own install, so that a catalogue
+                    // banner about something else does not surface here.
+                    feedback: model.catalog.installingApplicationID == current.id
+                        ? model.catalog.feedback
+                        : nil,
+                    install: {
+                        if let storeEntry {
+                            Task { await model.installCatalogApplication(storeEntry) }
+                        }
+                    },
                     configureApplication: { Task { await model.configureApplication(current) } },
                     editGlance: { editGlance(current) },
                     activateWatchface: { Task { await model.activateWatchface(current) } },
@@ -168,16 +333,71 @@ struct ApplicationDetailView: View {
                 )
             }
         }
+        .task(id: application.id) {
+            storeEntry = await model.storeEntry(for: application.id)
+        }
     }
 }
 
-#Preview("Watch App") {
+/// The same screen, reached from the catalogue.
+///
+/// The store's copy is in hand here and the library is what has to be looked
+/// up, which is the other way round from `ApplicationDetailView` — and needs
+/// no network, because the library is already loaded.
+struct CatalogApplicationDetailView: View {
+    var application: CatalogApplication
+    var model: AppModel
+    @Environment(\.dismiss) private var dismiss
+
+    private var installed: WatchApplication? {
+        (model.applications.apps + model.applications.watchfaces).first { $0.id == application.id }
+    }
+
+    var body: some View {
+        ApplicationDetailContent(
+            subject: ApplicationDetailSubject(store: application, installed: installed),
+            isActive: model.applications.activeWatchfaceID == application.id,
+            isInstalled: nil,
+            installationState: model.catalogInstallationState(for: application),
+            isInstalling: model.catalog.installingApplicationID == application.id,
+            isAnyInstallRunning: model.catalog.installingApplicationID != nil,
+            isOperationInProgress: model.isApplicationManagementBusy,
+            feedback: model.catalog.feedback,
+            install: { Task { await model.installCatalogApplication(application) } },
+            configureApplication: {
+                if let installed { Task { await model.configureApplication(installed) } }
+            },
+            editGlance: nil,
+            activateWatchface: {
+                if let installed { Task { await model.activateWatchface(installed) } }
+            },
+            removeApplication: {
+                if let installed {
+                    Task {
+                        await model.removeApplication(id: installed.id)
+                        dismiss()
+                    }
+                }
+            }
+        )
+    }
+}
+
+#Preview("Installed watch app") {
     NavigationStack {
         ApplicationDetailContent(
-            application: PreviewSamples.watchApplications[0],
+            subject: ApplicationDetailSubject(
+                installed: PreviewSamples.watchApplications[0],
+                store: PreviewSamples.catalogApplication
+            ),
             isActive: false,
             isInstalled: true,
+            installationState: .installed,
+            isInstalling: false,
+            isAnyInstallRunning: false,
             isOperationInProgress: false,
+            feedback: nil,
+            install: {},
             configureApplication: {},
             editGlance: {},
             activateWatchface: {},
@@ -186,28 +406,38 @@ struct ApplicationDetailView: View {
     }
 }
 
-#Preview("Watchface, not installed") {
+#Preview("In the store only") {
     NavigationStack {
         ApplicationDetailContent(
-            application: PreviewSamples.watchfaces[0],
-            isActive: true,
-            isInstalled: false,
-            isOperationInProgress: false,
-            configureApplication: {},
-            editGlance: {},
-            activateWatchface: {},
-            removeApplication: {}
-        )
-    }
-}
-
-#Preview("No watch connected") {
-    NavigationStack {
-        ApplicationDetailContent(
-            application: PreviewSamples.watchApplications[1],
+            subject: ApplicationDetailSubject(store: PreviewSamples.catalogApplication, installed: nil),
             isActive: false,
             isInstalled: nil,
+            installationState: .available,
+            isInstalling: false,
+            isAnyInstallRunning: false,
             isOperationInProgress: false,
+            feedback: nil,
+            install: {},
+            configureApplication: {},
+            editGlance: {},
+            activateWatchface: {},
+            removeApplication: {}
+        )
+    }
+}
+
+#Preview("Installed, the store does not have it") {
+    NavigationStack {
+        ApplicationDetailContent(
+            subject: ApplicationDetailSubject(installed: PreviewSamples.watchfaces[0], store: nil),
+            isActive: true,
+            isInstalled: false,
+            installationState: nil,
+            isInstalling: false,
+            isAnyInstallRunning: false,
+            isOperationInProgress: false,
+            feedback: nil,
+            install: {},
             configureApplication: {},
             editGlance: {},
             activateWatchface: {},

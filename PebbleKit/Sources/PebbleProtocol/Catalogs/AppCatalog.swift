@@ -171,6 +171,28 @@ public actor AppCatalog {
         return output
     }
 
+    /// What the store says about an application, asked for by the identifier
+    /// the package carries.
+    ///
+    /// The way to reach the store for something already installed. A package
+    /// says nothing about which store entry it came from — `appinfo.json` is
+    /// the developer's, written before there was a listing — but the store
+    /// will answer to the UUID inside it, so nothing has to be remembered at
+    /// install time and a side-loaded package is looked up just the same.
+    ///
+    /// Nil where the store does not have it, which is an answer worth keeping:
+    /// plenty of packages were never listed.
+    public func application(uuid: UUID, from baseURL: URL) async throws -> CatalogApplication? {
+        // Only the official store answers this. A legacy feed is a flat file.
+        guard baseURL.pathExtension.lowercased() != "json" else { return nil }
+        let url = baseURL.appending(path: "v1/apps/uuid").appending(path: uuid.uuidString.lowercased())
+        guard let data = try await responseDataAllowingNotFound(from: url) else { return nil }
+        let response = try JSONDecoder().decode(OfficialCatalogLookup.self, from: data)
+        // The kind comes off the entry rather than the endpoint here: this one
+        // is asked by identifier, so it answers with whatever that is.
+        return response.data.lazy.compactMap { $0.application(kind: nil) }.first
+    }
+
     private func fetchLegacyFeed(_ url: URL) async throws -> [CatalogApplication] {
         let data = try await responseData(from: url)
         return try JSONDecoder().decode([CatalogApplication].self, from: data)
@@ -189,6 +211,26 @@ public actor AppCatalog {
         if let value = components?.url { url = value }
         let response = try JSONDecoder().decode(OfficialCatalogHome.self, from: await responseData(from: url))
         return response.applications.compactMap { $0.application(kind: kind) }
+    }
+
+    /// Nil where the store said it has no such application.
+    ///
+    /// Separate from `responseData(from:)` because there a 404 is a broken
+    /// feed, while here it is the answer to the question asked.
+    private func responseDataAllowingNotFound(from url: URL) async throws -> Data? {
+        try await retry(with: .networkFetch) {
+            let request = HTTPRequest(method: .get, url: url, headerFields: [.accept: "application/json"])
+            let (data, response) = try await session.data(for: request)
+            if response.status == .notFound { return nil }
+            guard response.status == .ok else {
+                let error = AppCatalogError.invalidResponse
+                throw response.status.isWorthAnotherAttempt ? error : NotRetryable(error)
+            }
+            guard data.count <= 20 * 1_024 * 1_024 else {
+                throw NotRetryable(AppCatalogError.invalidResponse)
+            }
+            return data
+        }
     }
 
     private func responseData(from url: URL) async throws -> Data {
@@ -212,6 +254,12 @@ struct OfficialCatalogHome: Decodable {
     var applications: [OfficialCatalogApplication]
 }
 
+/// One application asked for by identifier. Answered as a list of one, which
+/// is the shape the store uses for everything it pages.
+struct OfficialCatalogLookup: Decodable {
+    var data: [OfficialCatalogApplication]
+}
+
 struct OfficialCatalogApplication: Decodable {
     var author: String
     var category: String
@@ -233,7 +281,16 @@ struct OfficialCatalogApplication: Decodable {
         case latestRelease = "latest_release"
     }
 
-    func application(kind: WatchApplicationKind) -> CatalogApplication? {
+    /// The kind the entry says it is, for a lookup that was not made against a
+    /// watchapps or watchfaces endpoint and so has nothing else to go on.
+    var declaredKind: WatchApplicationKind? {
+        WatchApplicationKind(rawValue: type)
+    }
+
+    /// - Parameter kind: What the endpoint this came from was asked for, or nil
+    ///   to take the entry's own word for it.
+    func application(kind: WatchApplicationKind?) -> CatalogApplication? {
+        guard let kind = kind ?? declaredKind else { return nil }
         guard let uuid, let applicationID = UUID(uuidString: uuid),
               uuid.lowercased() != "00000000-0000-0000-0000-000000000000", let release = latestRelease,
               let downloadURL = URL(string: release.pbwFile),

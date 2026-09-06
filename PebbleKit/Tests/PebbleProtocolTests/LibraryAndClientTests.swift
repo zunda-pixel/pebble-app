@@ -1004,3 +1004,89 @@ struct FirmwareCatalogNetworkTests {
         #expect(!HTTPFileDownloadError.invalidRequest.isWorthAnotherAttempt)
     }
 }
+
+/// Asking the store about one application by the identifier its package
+/// carries. The way an application already installed reaches its listing,
+/// since a package says nothing about which listing it came from.
+@Suite
+struct StoreLookupByUUIDTests {
+    private static let answer = """
+    {
+      "data": [
+        {
+          "author": "Keynes",
+          "category": "Tools & Utilities",
+          "description": "Five watch utilities in one place.",
+          "id": "1b25cef73e2b471686672d07",
+          "title": "Watch Tools",
+          "type": "watchapp",
+          "uuid": "0b202f95-beab-4889-b7bf-949b2eff5c70",
+          "hardware_platforms": [{"name": "emery"}, {"name": "basalt"}],
+          "latest_release": {
+            "pbw_file": "https://example.invalid/watch-tools.pbw",
+            "release_notes": "Bug fixes",
+            "version": "1.4.0"
+          }
+        }
+      ],
+      "limit": 1,
+      "offset": 0
+    }
+    """
+
+    private func catalog() -> AppCatalog {
+        AppCatalog(
+            cacheURL: FileManager.default.temporaryDirectory.appending(path: "\(UUID().uuidString).json"),
+            session: StubURLProtocol.session()
+        )
+    }
+
+    /// The answer is a list of one, which is the shape the store pages
+    /// everything in, and the kind comes off the entry — this endpoint was not
+    /// asked for watchapps or watchfaces, so there is nothing else to go on.
+    @Test func theStoresAnswerIsUnpackedFromTheListItArrivesIn() async throws {
+        let base = URL(string: "https://store.invalid/found/api")!
+        let uuid = UUID(uuidString: "0B202F95-BEAB-4889-B7BF-949B2EFF5C70")!
+        StubURLProtocol.stub(
+            base.appending(path: "v1/apps/uuid").appending(path: uuid.uuidString.lowercased()),
+            status: 200,
+            body: Data(Self.answer.utf8)
+        )
+
+        let found = try #require(await catalog().application(uuid: uuid, from: base))
+
+        #expect(found.id == uuid)
+        #expect(found.storeID == "1b25cef73e2b471686672d07")
+        #expect(found.name == "Watch Tools")
+        #expect(found.kind == .watchapp)
+        #expect(found.version == "1.4.0")
+        #expect(found.category == "Tools & Utilities")
+        #expect(found.supportedPlatforms.sorted() == ["basalt", "emery"])
+    }
+
+    /// Not an error. Plenty of packages were never listed, and a reader who
+    /// installed one from a file should see the screen without a complaint on
+    /// it.
+    @Test func anApplicationTheStoreDoesNotHaveIsAnAnswerRatherThanAFailure() async throws {
+        let base = URL(string: "https://store.invalid/missing/api")!
+        let uuid = UUID()
+        StubURLProtocol.stub(
+            base.appending(path: "v1/apps/uuid").appending(path: uuid.uuidString.lowercased()),
+            status: 404
+        )
+
+        #expect(try await catalog().application(uuid: uuid, from: base) == nil)
+    }
+
+    /// A legacy feed is a flat file with no endpoints to ask, so it is not
+    /// asked. Nothing is sent, which is what the stub recording no request
+    /// shows.
+    @Test func aLegacyFeedIsNotAskedBecauseItCannotAnswer() async throws {
+        let base = URL(string: "https://feed.invalid/apps.json")!
+        let uuid = UUID()
+        let wouldBe = base.appending(path: "v1/apps/uuid").appending(path: uuid.uuidString.lowercased())
+
+        #expect(try await catalog().application(uuid: uuid, from: base) == nil)
+        #expect(StubURLProtocol.requestCount(for: wouldBe) == 0)
+    }
+}
