@@ -4,7 +4,10 @@ import WebKit
 
 @MainActor
 final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
-    private var webView: WKWebView
+    /// Made per application, because the store it keeps its settings in is
+    /// named after the application and a `WKWebView` takes its store when it is
+    /// built.
+    private var webView: WKWebView?
     private var application: WatchApplication?
     private var openURLHandler: (URL) -> Void
     private var appMessageHandler: (UUID, [AppMessageTuple]) async throws -> Void
@@ -24,12 +27,30 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
         self.appMessageHandler = appMessageHandler
         self.notificationHandler = notificationHandler
         self.activeWatchHandler = activeWatchHandler
-        let configuration = WKWebViewConfiguration()
-        configuration.websiteDataStore = .nonPersistent()
-        webView = WKWebView(frame: .zero, configuration: configuration)
         super.init()
+    }
+
+    /// A web view whose storage is the application's own and survives a launch.
+    ///
+    /// The store used to be `.nonPersistent()`, which is memory and goes with
+    /// the process: a watch app that keeps its settings in `localStorage` — the
+    /// usual place for them — was set up again on every launch. Named after the
+    /// application, so one app's settings are not another's, and so removing
+    /// the app can take its settings with it.
+    private func makeWebView(for application: WatchApplication) -> WKWebView {
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = WKWebsiteDataStore(forIdentifier: application.id)
         configuration.userContentController.add(self, name: "pebble")
+        let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = self
+        return webView
+    }
+
+    /// Lets go of what an application kept, for when the reader lets go of the
+    /// application. Left behind, it would come back as the old settings of a
+    /// watch app installed again under the same identifier.
+    static func forget(applicationID: UUID) async {
+        try? await WKWebsiteDataStore.remove(forIdentifier: applicationID)
     }
 
     func load(source: String, application: WatchApplication) async throws {
@@ -76,10 +97,14 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
         window.__pebbleDispatch('ready', {});
         </script>
         """
+        let webView = makeWebView(for: application)
+        self.webView = webView
         try await withCheckedThrowingContinuation { continuation in
             loadContinuation?.resume(throwing: CancellationError())
             loadContinuation = continuation
         loadedApplicationID = application.id
+        // A real origin rather than `about:blank`, which is what gives the
+        // script `localStorage` at all and lets it fetch across origins.
         webView.loadHTMLString(
             html,
             baseURL: URL(string: "https://\(application.id.uuidString.lowercased()).pebble.local/")
@@ -88,6 +113,7 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
     }
 
     func showConfiguration() async throws {
+        guard let webView else { throw CompanionRuntimeError.noApplicationLoaded }
         _ = try await webView.callAsyncJavaScript(
             "window.__pebbleDispatch('showConfiguration', {});",
             arguments: [:],
@@ -97,6 +123,7 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
     }
 
     func closeConfiguration(response: String?) async throws {
+        guard let webView else { throw CompanionRuntimeError.noApplicationLoaded }
         _ = try await webView.callAsyncJavaScript(
             "window.__pebbleDispatch('webviewclosed', {response: response});",
             arguments: ["response": response as Any],
@@ -109,6 +136,7 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
         let payload = Dictionary(uniqueKeysWithValues: message.tuples.map { tuple in
             (String(tuple.key), javaScriptValue(tuple.value))
         })
+        guard let webView else { throw CompanionRuntimeError.noApplicationLoaded }
         _ = try await webView.callAsyncJavaScript(
             "window.__pebbleDispatch('appmessage', {payload: payload});",
             arguments: ["payload": payload],
@@ -179,6 +207,7 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
     }
 
     private func resolve(callbackID: Int, succeeded: Bool) async throws {
+        guard let webView else { throw CompanionRuntimeError.noApplicationLoaded }
         _ = try await webView.callAsyncJavaScript(
             "window.__pebbleResult(id, ok);",
             arguments: ["id": callbackID, "ok": succeeded],
@@ -224,4 +253,14 @@ private extension WatchModel {
         case .pebbleRound2: "gabbro"
         }
     }
+}
+
+/// Asked of a runtime with no script in it.
+///
+/// Thrown rather than shrugged off: the callers reach these only after
+/// `load(source:application:)`, so a nil web view means the load was never
+/// made or has been replaced, and an empty answer would read as the script
+/// having nothing to say.
+enum CompanionRuntimeError: Error {
+    case noApplicationLoaded
 }

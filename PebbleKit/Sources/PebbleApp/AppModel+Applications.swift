@@ -168,6 +168,10 @@ extension AppModel {
             let library = try await applicationLibrary.remove(applicationID: id)
             updateApplications(library)
             try await synchronizeAllWatches()
+            // What the application's own JavaScript kept goes with it. Left
+            // behind, it would come back as the old settings of the same watch
+            // app installed again.
+            await PebbleCompanionRuntime.forget(applicationID: id)
             applications.libraryFeedback = nil
         } catch {
             applications.libraryFeedback = .failure(applicationErrorMessage(error))
