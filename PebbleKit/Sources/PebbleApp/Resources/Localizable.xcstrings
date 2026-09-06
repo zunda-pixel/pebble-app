@@ -1168,6 +1168,16 @@
         }
       }
     },
+    "Checking for updates…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アップデートを確認中…"
+          }
+        }
+      }
+    },
     "Choose a PBW package from Files" : {
       "localizations" : {
         "ja" : {

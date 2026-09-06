@@ -9,6 +9,9 @@ public import Observation
 @Observable
 public final class CatalogModel {
     public internal(set) var applications: [CatalogApplication] = []
+    /// Where these came from, so that asking the store about one application
+    /// goes to the store the rest of them came from.
+    public internal(set) var sourceURL: URL?
     public internal(set) var lastUpdated: Date?
     public internal(set) var isUpdating = false
     public internal(set) var installingApplicationID: UUID?

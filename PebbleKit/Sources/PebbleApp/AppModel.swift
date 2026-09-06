@@ -224,6 +224,7 @@ public final class AppModel {
         watchStore: SavedWatchStore? = nil,
         appGlanceStore: AppGlanceStore? = nil,
         reminderStore: TimelinePinStore? = nil,
+        appCatalog: AppCatalog? = nil,
         clientFactory: (@MainActor (WatchID) -> any WatchClient)? = nil
     ) {
         scannerClient = client
@@ -241,7 +242,9 @@ public final class AppModel {
             ?? TimelinePinStore(directory: storageDirectory, name: "timeline.reminders")
         timelineStore = TimelinePinStore(directory: storageDirectory, name: "timeline")
         healthStore = WatchHealthStore(directory: storageDirectory)
-        appCatalog = AppCatalog(directory: storageDirectory)
+        // Passed in for the same reason as the stores above: a test that has to
+        // answer for the store needs to hold the catalogue the model holds.
+        self.appCatalog = appCatalog ?? AppCatalog(directory: storageDirectory)
         pendingNotificationStore = PendingNotificationStore(directory: storageDirectory)
         sentNotificationStore = SentNotificationStore(directory: storageDirectory)
         notificationPreferenceStore = NotificationPreferenceStore(directory: storageDirectory)

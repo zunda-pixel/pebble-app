@@ -10,6 +10,7 @@ extension AppModel {
         do {
             let snapshot = try await appCatalog.cachedSnapshot()
             catalog.applications = snapshot?.applications ?? []
+            catalog.sourceURL = snapshot?.sourceURL
             catalog.lastUpdated = snapshot?.fetchedAt
         }
         catch { catalog.feedback = .failure("The app catalog cache could not be loaded.") }
@@ -26,6 +27,7 @@ extension AppModel {
         do {
             let snapshot = try await appCatalog.update(from: url, model: connectedWatch?.model)
             catalog.applications = snapshot.applications
+            catalog.sourceURL = snapshot.sourceURL
             catalog.lastUpdated = snapshot.fetchedAt
             Defaults[.catalogSource] = source
             catalog.feedback = .success("App catalog updated with \(catalog.applications.count) apps.")
@@ -58,8 +60,12 @@ extension AppModel {
         guard !catalog.answeredStoreLookups.contains(applicationID) else {
             return catalog.storeEntries[applicationID]
         }
-        let source = Defaults[.catalogSource] ?? AppCatalog.defaultSourceURL.absoluteString
-        guard let baseURL = URL(string: source), baseURL.scheme?.lowercased() == "https" else { return nil }
+        // The store the loaded catalogue came from, falling back to the one
+        // configured for the next fetch. Asking a different store than the
+        // listing came from would answer about a different application.
+        let source = catalog.sourceURL
+            ?? URL(string: Defaults[.catalogSource] ?? AppCatalog.defaultSourceURL.absoluteString)
+        guard let baseURL = source, baseURL.scheme?.lowercased() == "https" else { return nil }
         do {
             let entry = try await appCatalog.application(uuid: applicationID, from: baseURL)
             if let entry { catalog.storeEntries[applicationID] = entry }
@@ -114,8 +120,29 @@ extension AppModel {
     }
 
     /// Applications the store has a newer version of than the library does.
-    public var catalogUpdates: [CatalogApplication] {
-        catalog.applications.filter { catalogInstallationState(for: $0) == .updateAvailable }
+    ///
+    /// Asked of the library rather than read off the loaded feed. That feed is
+    /// `v1/home`, a page of what the store is featuring — 73 applications the
+    /// day this was written — so anything installed from outside it was never
+    /// offered an update at all, however far behind it had fallen.
+    ///
+    /// Each is looked up by the UUID in its own package, one at a time.
+    /// `v1/apps/bulk` would be the way to ask about many, but measured, it
+    /// answers only to the store's own identifiers: handed a library UUID it
+    /// returns 200 with the UUID under `missing` and nothing in `data`. The
+    /// library has no store identifiers to send it.
+    ///
+    /// Most of these cost nothing: `storeEntry(for:)` reads the loaded feed
+    /// first, and remembers every answer including "no such application".
+    public func catalogUpdates() async -> [CatalogApplication] {
+        var updates: [CatalogApplication] = []
+        for installed in applications.apps + applications.watchfaces {
+            guard let listed = await storeEntry(for: installed.id),
+                  catalogInstallationState(for: listed) == .updateAvailable
+            else { continue }
+            updates.append(listed)
+        }
+        return updates
     }
 
     /// Answers on the applications screen rather than the catalogue's.
@@ -126,7 +153,10 @@ extension AppModel {
     /// `installCatalogApplication` writes still goes there, which is why each
     /// one is named here too.
     public func installCatalogUpdates() async {
-        let updates = catalogUpdates
+        // Said before the asking, because asking the store about a library it
+        // has not been asked about before is a round trip per application.
+        applications.managementFeedback = .progress("Checking for updates…")
+        let updates = await catalogUpdates()
         guard !updates.isEmpty else {
             applications.managementFeedback = .success("Installed apps are up to date.")
             return
