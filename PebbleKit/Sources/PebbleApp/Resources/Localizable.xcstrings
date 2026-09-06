@@ -1825,6 +1825,16 @@
         }
       }
     },
+    "Every day the watch has recorded is written to one JSON file. It stays on this phone until you share it from here." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチが記録した日のデータをすべて1つのJSONファイルに書き出します。ここから共有するまで、ファイルがこのiPhoneの外に出ることはありません。"
+          }
+        }
+      }
+    },
     "Every Hour" : {
       "localizations" : {
         "ja" : {
@@ -1865,12 +1875,42 @@
         }
       }
     },
+    "Export" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "書き出し"
+          }
+        }
+      }
+    },
+    "Export Again" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "もう一度書き出す"
+          }
+        }
+      }
+    },
     "Export Health Data" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ヘルスケアデータを書き出す"
+          }
+        }
+      }
+    },
+    "Exporting…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "書き出し中…"
           }
         }
       }
@@ -1891,6 +1931,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "華氏"
+          }
+        }
+      }
+    },
+    "File" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ファイル"
           }
         }
       }

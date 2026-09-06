@@ -40,9 +40,21 @@ extension AppModel {
     }
     #endif
 
-    public func exportHealthData() async {
-        do { health.exportURL = try await healthStore.export() }
-        catch { health.feedback = .failure("Health data could not be exported.") }
+    /// Writes every recorded day to one file and hands back where it went.
+    ///
+    /// Answers to its caller rather than to the health screen's banner: the
+    /// sheet that asks for this is where the reader is looking, and is what
+    /// shows both the file and a failure. Kept on the model too, so reopening
+    /// that sheet finds the last export still there to share.
+    @discardableResult
+    public func exportHealthData() async -> URL? {
+        do {
+            let url = try await healthStore.export()
+            health.exportURL = url
+            return url
+        } catch {
+            return nil
+        }
     }
 
     public func importHealthData(from url: URL) async {

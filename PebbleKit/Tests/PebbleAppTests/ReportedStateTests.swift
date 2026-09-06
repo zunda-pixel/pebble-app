@@ -194,7 +194,7 @@ struct ReportedStateTests {
             requestWatchSync: {},
             synchronizeWithHealthKit: {},
             importFromHealthKit: {},
-            export: {},
+            export: { nil },
             importArchive: { _ in },
             deleteLocalData: {}
         )

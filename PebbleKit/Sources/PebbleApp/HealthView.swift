@@ -15,7 +15,7 @@ struct HealthView: View {
             requestWatchSync: { Task { await model.requestHealthSync() } },
             synchronizeWithHealthKit: synchronizeWithHealthKit,
             importFromHealthKit: importFromHealthKit,
-            export: { Task { await model.exportHealthData() } },
+            export: { await model.exportHealthData() },
             importArchive: { url in Task { await model.importHealthData(from: url) } },
             deleteLocalData: { Task { await model.deleteHealthData() } }
         )
@@ -49,13 +49,14 @@ struct HealthContent: View {
     var requestWatchSync: () -> Void
     var synchronizeWithHealthKit: () -> Void
     var importFromHealthKit: () -> Void
-    var export: () -> Void
+    var export: @MainActor () async -> URL?
     var importArchive: (URL) -> Void
     var deleteLocalData: () -> Void
 
     @State private var period: HealthAnalysisPeriod = .week
     @State private var isImportingArchive = false
     @State private var isConfirmingDeletion = false
+    @State private var isExporting = false
 
     var body: some View {
         List {
@@ -147,8 +148,12 @@ struct HealthContent: View {
                     Button("Import from Apple Health", systemImage: "square.and.arrow.down", action: importFromHealthKit)
                     #endif
                     Section {
-                        Button("Export Health Data", systemImage: "square.and.arrow.up", action: export)
-                        if let exportURL { ShareLink(item: exportURL) { Text("Share Export") } }
+                        // Opens the sheet rather than writing the file here.
+                        // Sharing what it wrote belongs beside the writing,
+                        // not behind a second trip through this menu.
+                        Button("Export Health Data", systemImage: "square.and.arrow.up") {
+                            isExporting = true
+                        }
                         Button("Import Health Archive", systemImage: "square.and.arrow.down.on.square") {
                             isImportingArchive = true
                         }
@@ -177,6 +182,9 @@ struct HealthContent: View {
             Button(role: .cancel) {}
         } message: {
             Text("This removes locally stored step and sleep history. This action cannot be undone.")
+        }
+        .sheet(isPresented: $isExporting) {
+            HealthExportSheet(existingExport: exportURL, export: export)
         }
         .fileImporter(isPresented: $isImportingArchive, allowedContentTypes: [.json]) { result in
             guard case .success(let url) = result else { return }
@@ -222,7 +230,7 @@ struct HealthContent: View {
             requestWatchSync: {},
             synchronizeWithHealthKit: {},
             importFromHealthKit: {},
-            export: {},
+            export: { nil },
             importArchive: { _ in },
             deleteLocalData: {}
         )
@@ -239,7 +247,7 @@ struct HealthContent: View {
             requestWatchSync: {},
             synchronizeWithHealthKit: {},
             importFromHealthKit: {},
-            export: {},
+            export: { nil },
             importArchive: { _ in },
             deleteLocalData: {}
         )
