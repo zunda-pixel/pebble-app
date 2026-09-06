@@ -5,7 +5,6 @@ struct ApplicationsView: View {
     var model: AppModel
     @Environment(\.undoManager) private var undoManager
     @State private var isChoosingPackage = false
-    @State private var isShowingCatalog = false
     @State private var selectedWatchID: WatchID?
     @State private var glanceApplication: WatchApplication?
 
@@ -89,19 +88,19 @@ struct ApplicationsView: View {
         .navigationTitle(Text("Apps"))
         .task { await model.loadApplications() }
         .toolbar {
-            ToolbarItem {
-                Button("Add App", systemImage: "plus") {
-                    isShowingCatalog = true
+            ToolbarItem(placement: .primaryAction) {
+                NavigationLink {
+                    CatalogView(
+                        model: model,
+                        isImportingApplication: model.applications.isImporting,
+                        isImportDisabled: model.isApplicationManagementBusy,
+                        importApplication: { isChoosingPackage = true },
+                        editGlance: { glanceApplication = $0 }
+                    )
+                } label: {
+                    Label("Add App", systemImage: "plus")
                 }
             }
-        }
-        .sheet(isPresented: $isShowingCatalog) {
-            CatalogView(
-                model: model,
-                isImportingApplication: model.applications.isImporting,
-                isImportDisabled: model.isApplicationManagementBusy,
-                importApplication: { isChoosingPackage = true }
-            )
         }
         .fileImporter(
             isPresented: $isChoosingPackage,

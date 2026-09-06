@@ -74,12 +74,8 @@ struct ApplicationDetailContent: View {
     var feedback: FeatureFeedback?
     var install: () -> Void
     var configureApplication: () -> Void
-    /// Nil where the launcher line cannot be edited from here.
-    ///
-    /// Its editor is a sheet belonging to the applications screen, and the
-    /// catalogue is a sheet on that same screen — one cannot open over the
-    /// other. So the screen reached from the catalogue leaves this out and the
-    /// row for it does not appear.
+    /// Nil where the launcher line cannot be edited from here, which leaves
+    /// the row out rather than showing one that does nothing.
     var editGlance: (() -> Void)?
     var activateWatchface: () -> Void
     var removeApplication: () -> Void
@@ -347,6 +343,7 @@ struct ApplicationDetailView: View {
 struct CatalogApplicationDetailView: View {
     var application: CatalogApplication
     var model: AppModel
+    var editGlance: (WatchApplication) -> Void
     @Environment(\.dismiss) private var dismiss
 
     private var installed: WatchApplication? {
@@ -367,7 +364,7 @@ struct CatalogApplicationDetailView: View {
             configureApplication: {
                 if let installed { Task { await model.configureApplication(installed) } }
             },
-            editGlance: nil,
+            editGlance: installed.map { installed in { editGlance(installed) } },
             activateWatchface: {
                 if let installed { Task { await model.activateWatchface(installed) } }
             },

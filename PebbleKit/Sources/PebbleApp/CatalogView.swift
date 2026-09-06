@@ -27,13 +27,16 @@ enum CatalogSort: String, CaseIterable, Identifiable {
     }
 }
 
-/// The app catalog, presented as a sheet from the Apps tab's plus button.
+/// The app catalog, pushed from the Apps tab's plus button.
 struct CatalogView: View {
     var model: AppModel
     var isImportingApplication: Bool = false
     var isImportDisabled: Bool = false
     var importApplication: (() -> Void)?
-    @Environment(\.dismiss) private var dismiss
+    /// Passed through to the detail screen. Reachable now that this is pushed
+    /// rather than presented: the launcher line's own editor is a sheet on the
+    /// applications screen, which a sheet could not have opened over.
+    var editGlance: (WatchApplication) -> Void = { _ in }
 
     var body: some View {
         CatalogContent(
@@ -45,9 +48,12 @@ struct CatalogView: View {
             importApplication: importApplication,
             installUpdates: { Task { await model.installCatalogUpdates() } },
             refresh: { Task { await model.refreshCatalog() } },
-            close: { dismiss() },
             destination: { application in
-                CatalogApplicationDetailView(application: application, model: model)
+                CatalogApplicationDetailView(
+                    application: application,
+                    model: model,
+                    editGlance: editGlance
+                )
             }
         )
         .task {
@@ -66,7 +72,6 @@ struct CatalogContent<Destination: View>: View {
     var importApplication: (() -> Void)?
     var installUpdates: () -> Void
     var refresh: () -> Void
-    var close: () -> Void
     @ViewBuilder var destination: (CatalogApplication) -> Destination
 
     @State private var query = ""
@@ -74,13 +79,10 @@ struct CatalogContent<Destination: View>: View {
     @State private var kind: CatalogKindFilter = .all
     @State private var sort: CatalogSort = .name
 
+    // Pushed onto the applications screen's stack rather than presented, so
+    // there is no stack of its own to start and no size to ask for.
     var body: some View {
-        NavigationStack {
-            catalogList
-        }
-        #if os(macOS)
-        .frame(minWidth: 520, minHeight: 560)
-        #endif
+        catalogList
     }
 
     private var catalogList: some View {
@@ -110,9 +112,8 @@ struct CatalogContent<Destination: View>: View {
         .searchable(text: $query)
         .navigationTitle(Text("Catalog"))
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button(role: .close, action: close)
-            }
+            // No way out of its own: the back button of the stack it was
+            // pushed onto is the way out.
             ToolbarItemGroup(placement: .primaryAction) {
                 if let importApplication {
                     if isImportingApplication {
@@ -219,7 +220,6 @@ struct CatalogStateLabel: View {
         importApplication: {},
         installUpdates: {},
         refresh: {},
-        close: {},
         destination: { application in Text(verbatim: application.name) }
     )
 }
@@ -234,7 +234,6 @@ struct CatalogStateLabel: View {
         importApplication: {},
         installUpdates: {},
         refresh: {},
-        close: {},
         destination: { _ in EmptyView() }
     )
 }
