@@ -3265,12 +3265,12 @@
         }
       }
     },
-    "Per-App Notifications" : {
+    "Per Watch App" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
-            "value" : "アプリごとの通知"
+            "value" : "ウォッチアプリ別"
           }
         }
       }

@@ -139,7 +139,12 @@ struct SettingsContent<WeatherDestination: View, NotificationAppsDestination: Vi
                     )
                 }
                 if !applications.isEmpty {
-                    DisclosureGroup("Per-App Notifications") {
+                    // Named for whose apps these are. It used to be "Per-App
+                    // Notifications", which says the shape and not the
+                    // subject — and the other notification screen is also per
+                    // app, for the phone's apps, so the two read as the same
+                    // thing twice.
+                    DisclosureGroup("Per Watch App") {
                         ForEach(applications) { application in
                             Toggle(application.displayName, isOn: Binding(
                                 get: { !notificationPreferences.mutedApplicationIDs.contains(application.id) },
