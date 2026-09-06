@@ -28,9 +28,12 @@ struct FirmwareLifecycleTests {
             id: WatchID("recovery-watch"),
             name: "My Pebble",
             model: .pebbleTime2,
-            firmwareVersion: "v4.9.142",
             batteryLevel: nil,
-            board: .obelixPVT
+            version: WatchVersionInformation(
+                firmwareVersion: "v4.9.142",
+                serialNumber: nil,
+                hardwarePlatform: 18
+            )
         ))
         let model = AppModel(
             client: client,
@@ -70,9 +73,12 @@ struct FirmwareLifecycleTests {
             id: WatchID("watch-1"),
             name: "My Pebble",
             model: .pebbleTime2,
-            firmwareVersion: "v4.9.142",
             batteryLevel: nil,
-            board: .obelixPVT
+            version: WatchVersionInformation(
+                firmwareVersion: "v4.9.142",
+                serialNumber: nil,
+                hardwarePlatform: 18
+            )
         )
         let connection = WatchConnection(client: client, watch: device)
         let package = makeFirmwarePackage()
@@ -116,9 +122,12 @@ struct FirmwareLifecycleTests {
             id: WatchID("watch-1"),
             name: "My Pebble",
             model: .pebbleTime2,
-            firmwareVersion: "v4.9.142",
             batteryLevel: nil,
-            board: .obelixPVT
+            version: WatchVersionInformation(
+                firmwareVersion: "v4.9.142",
+                serialNumber: nil,
+                hardwarePlatform: 18
+            )
         )
         let package = makeFirmwarePackage(versionTag: "v4.36.2")
         try await model.pendingFirmwareUpdateStore.save(package, journal: FirmwareUpdateJournal(
@@ -160,9 +169,12 @@ struct FirmwareLifecycleTests {
             id: WatchID("watch-1"),
             name: "My Pebble",
             model: .pebbleTime2,
-            firmwareVersion: "v4.9.142",
             batteryLevel: nil,
-            board: .obelixPVT
+            version: WatchVersionInformation(
+                firmwareVersion: "v4.9.142",
+                serialNumber: nil,
+                hardwarePlatform: 18
+            )
         )
         let package = makeFirmwarePackage(versionTag: "v4.36.2")
         try await model.pendingFirmwareUpdateStore.save(package, journal: FirmwareUpdateJournal(
@@ -204,9 +216,12 @@ struct FirmwareLifecycleTests {
             id: WatchID("watch-1"),
             name: "My Pebble",
             model: .pebbleTime2,
-            firmwareVersion: "v4.9.142",
             batteryLevel: nil,
-            board: .obelixPVT
+            version: WatchVersionInformation(
+                firmwareVersion: "v4.9.142",
+                serialNumber: nil,
+                hardwarePlatform: 18
+            )
         )
         let package = makeFirmwarePackage(versionTag: "v4.36.2")
         try await model.pendingFirmwareUpdateStore.save(package, journal: FirmwareUpdateJournal(

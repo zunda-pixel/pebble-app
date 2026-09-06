@@ -197,9 +197,12 @@ struct SavedWatchStoreTests {
             id: WatchID("watch-1"),
             name: "Pebble QEMU",
             model: .pebbleTime2,
-            firmwareVersion: "v1",
             batteryLevel: 75,
-            serialNumber: "SERIAL"
+            version: WatchVersionInformation(
+                firmwareVersion: "v1",
+                serialNumber: "SERIAL",
+                hardwarePlatform: 18
+            )
         )
 
         var watches = try await library.record(device)
@@ -233,10 +236,13 @@ struct SavedWatchStoreTests {
             id: watchID,
             name: "Pebble 5209",
             model: .pebbleTime2,
-            firmwareVersion: "v1",
             batteryLevel: nil,
-            serialNumber: "SERIAL",
-            hardwareRevision: "V2R2"
+            version: WatchVersionInformation(
+                firmwareVersion: "v1",
+                serialNumber: "SERIAL",
+                hardwareRevision: "V2R2",
+                hardwarePlatform: 18
+            )
         ))
         #expect(watches[0].hardwareRevision == "V2R2")
 
@@ -244,9 +250,12 @@ struct SavedWatchStoreTests {
             id: watchID,
             name: "Pebble 5209",
             model: .pebbleTime2,
-            firmwareVersion: "v1",
             batteryLevel: nil,
-            serialNumber: "SERIAL"
+            version: WatchVersionInformation(
+                firmwareVersion: "v1",
+                serialNumber: "SERIAL",
+                hardwarePlatform: 18
+            )
         ))
         #expect(watches[0].hardwareRevision == "V2R2")
     }

@@ -50,9 +50,12 @@ struct BluetoothStartTests {
             id: WatchID("saved-watch"),
             name: "Pebble Time 2",
             model: .pebbleTime2,
-            firmwareVersion: "v5.0.0",
             batteryLevel: 80,
-            serialNumber: "SERIAL"
+            version: WatchVersionInformation(
+                firmwareVersion: "v5.0.0",
+                serialNumber: "SERIAL",
+                hardwarePlatform: 18
+            )
         ))
         let model = AppModel(
             client: client,

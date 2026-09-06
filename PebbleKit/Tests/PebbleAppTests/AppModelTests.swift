@@ -160,8 +160,12 @@ struct AppModelTests {
             id: WatchID("saved-bonded-watch"),
             name: "My Pebble",
             model: .pebbleTime2,
-            firmwareVersion: "v5.0.0",
-            batteryLevel: 60
+            batteryLevel: 60,
+            version: WatchVersionInformation(
+                firmwareVersion: "v5.0.0",
+                serialNumber: nil,
+                hardwarePlatform: 18
+            )
         ))
         let model = AppModel(
             client: client,
@@ -188,8 +192,12 @@ struct AppModelTests {
             id: WatchID("saved-bonded-watch"),
             name: "My Pebble",
             model: .pebbleTime2,
-            firmwareVersion: "v5.0.0",
-            batteryLevel: 60
+            batteryLevel: 60,
+            version: WatchVersionInformation(
+                firmwareVersion: "v5.0.0",
+                serialNumber: nil,
+                hardwarePlatform: 18
+            )
         ))
         let model = AppModel(
             client: client,
@@ -967,9 +975,12 @@ struct AppModelTests {
             id: discovered.id,
             name: discovered.name,
             model: discovered.model,
-            firmwareVersion: "v5.0.0-mock",
             batteryLevel: 84,
-            serialNumber: "MOCK00000001"
+            version: WatchVersionInformation(
+                firmwareVersion: "v5.0.0-mock",
+                serialNumber: "MOCK00000001",
+                hardwarePlatform: 18
+            )
         )
         restoredDevice.batteryLevel = 63
         client.emit(.watchUpdated(restoredDevice))

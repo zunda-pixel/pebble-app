@@ -2,9 +2,13 @@ import Algorithms
 import MemberwiseInit
 
 @MemberwiseInit(.public)
-public struct WatchVersionInformation: Equatable, Sendable {
-    public var firmwareVersion: String
-    public var serialNumber: String
+public struct WatchVersionInformation: Equatable, Hashable, Sendable {
+    /// Nil where the watch's field was empty. Optional so that `ConnectedWatch`
+    /// can hand this straight out without asking twice.
+    public var firmwareVersion: String?
+    /// Nil where the watch has none written — every watch in the emulator,
+    /// measured: its OTP is unprogrammed and the field arrives as zeroes.
+    public var serialNumber: String?
     /// What was burned into the watch's one-time-programmable memory at the
     /// factory — `V2R2` and the like. `mfg_get_hw_version` in PebbleOS's
     /// `src/fw/mfg/mfg_serials.c` reads it from the newest locked OTP slot.
@@ -62,7 +66,7 @@ public struct WatchVersionInformation: Equatable, Sendable {
     /// one thing the watch definitely did say.
     public var diagnosticSummary: String {
         var parts = [
-            "firmware \(firmwareVersion)",
+            "firmware \(firmwareVersion ?? "unknown")",
             "on \(board?.rawValue ?? "platform \(hardwarePlatform)")",
         ]
         if let hardwareRevision { parts.append("rev \(hardwareRevision)") }
@@ -170,8 +174,8 @@ public enum WatchVersionCodec {
         // for 12, address 120 for 6. That is 126 in all, which is the length
         // the firmware's own `_Static_assert` calls the pre-v1.5 version info.
         return WatchVersionInformation(
-            firmwareVersion: fixedString(frame.payload[5..<37]),
-            serialNumber: fixedString(frame.payload[108..<120]),
+            firmwareVersion: fixedString(frame.payload[5..<37]).nilWhenEmpty,
+            serialNumber: fixedString(frame.payload[108..<120]).nilWhenEmpty,
             hardwareRevision: manufacturingRevision(frame.payload[99..<108]),
             hardwarePlatform: frame.payload[46],
             isRunningRecoveryFirmware: FirmwareFlag.recovery.isSet(in: flags),

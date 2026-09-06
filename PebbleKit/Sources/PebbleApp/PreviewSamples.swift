@@ -12,14 +12,19 @@ enum PreviewSamples {
         id: WatchID("preview-watch"),
         name: "Pebble 5209",
         model: .pebbleTime2,
-        firmwareVersion: "v4.36.2",
         batteryLevel: 72,
-        serialNumber: "Q402P000000A",
-        hardwareRevision: "V2R2",
-        board: .obelixPVT,
-        languageLocale: "ja_JP",
-        languageVersion: 1,
-        capabilities: .max
+        version: WatchVersionInformation(
+            firmwareVersion: "v4.36.2",
+            serialNumber: "Q402P000000A",
+            hardwareRevision: "V2R2",
+            // 18 is obelix_pvt, so `board` comes out as it would on a real
+            // watch rather than being asserted beside a platform that
+            // disagrees with it.
+            hardwarePlatform: 18,
+            languageLocale: "ja_JP",
+            languageVersion: 1,
+            capabilities: .max
+        )
     )
 
     static let savedWatch = SavedWatch(

@@ -122,10 +122,15 @@ public final class MockWatchClient: WatchClient {
             id: device.id,
             name: device.name,
             model: device.model,
-            firmwareVersion: "v5.0.0-mock",
             batteryLevel: 84,
-            serialNumber: "MOCK00000001",
-            isRunningRecoveryFirmware: connectsAsRecoveryFirmware
+            version: WatchVersionInformation(
+                firmwareVersion: "v5.0.0-mock",
+                serialNumber: "MOCK00000001",
+                // The platform this mock's model would report, so the board and
+                // the model agree the way they do on a real watch.
+                hardwarePlatform: device.model == .pebble2Duo ? 15 : 18,
+                isRunningRecoveryFirmware: connectsAsRecoveryFirmware
+            )
         )
     }
 

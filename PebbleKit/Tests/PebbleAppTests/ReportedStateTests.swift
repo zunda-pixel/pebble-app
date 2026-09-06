@@ -65,7 +65,10 @@ struct ReportedStateTests {
         // The weather app is a capability, and the mock's watch answers without
         // one until it says otherwise.
         var capable = try #require(model.connectedWatch)
-        capable.capabilities = 1 << WatchCapability.weatherApp.rawValue
+        // Set on the version response rather than on the watch, because that is
+        // where the watch says it: the capability is read through, so it cannot
+        // be set to something the response disagrees with.
+        capable.version.capabilities = 1 << WatchCapability.weatherApp.rawValue
         client.emit(.watchUpdated(capable))
         try await Task.sleep(for: .milliseconds(50))
         #expect(model.connectedWatch?.supportsWeatherApp == true)

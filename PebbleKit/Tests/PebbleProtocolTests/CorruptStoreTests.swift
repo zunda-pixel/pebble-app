@@ -46,12 +46,16 @@ struct CorruptStoreTests {
         // The point of moving it aside: a watch can be saved again afterwards.
         let saved = try await store.record(
             ConnectedWatch(
-                id: WatchID("mock-flint"),
-                name: "Pebble 2 Duo",
-                model: .pebble2Duo,
+            id: WatchID("mock-flint"),
+            name: "Pebble 2 Duo",
+            model: .pebble2Duo,
+            batteryLevel: 84,
+            version: WatchVersionInformation(
                 firmwareVersion: "v5.0.0",
-                batteryLevel: 84
+                serialNumber: nil,
+                hardwarePlatform: 15
             )
+        )
         )
         #expect(saved.count == 1)
         #expect(try await SavedWatchStore(fileURL: fileURL).allWatches().count == 1)

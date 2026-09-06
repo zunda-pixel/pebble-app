@@ -432,17 +432,11 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         let connectedWatch = ConnectedWatch(
             id: peripheral.watchID,
             name: device.name,
+            // The version's own platform byte wins; the discovered model is
+            // the fallback for a platform this app has no table entry for.
             model: WatchModel(hardwarePlatform: information.hardwarePlatform) ?? device.model,
-            firmwareVersion: information.firmwareVersion,
             batteryLevel: latestBatteryLevel,
-            serialNumber: information.serialNumber,
-            hardwareRevision: information.hardwareRevision,
-            isRunningRecoveryFirmware: information.isRunningRecoveryFirmware,
-            runningFirmwareSlot: information.runningFirmwareSlot,
-            board: information.board,
-            languageLocale: information.languageLocale,
-            languageVersion: information.languageVersion,
-            capabilities: information.capabilities
+            version: information
         )
         self.connectedWatch = connectedWatch
         let initialConnectionContinuation = connectionContinuation
@@ -732,14 +726,16 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
             clearPendingHealthCheck()
             let information = try WatchVersionCodec.decode(frame)
             var updated = device
-            updated.firmwareVersion = information.firmwareVersion
-            updated.serialNumber = information.serialNumber
-            updated.isRunningRecoveryFirmware = information.isRunningRecoveryFirmware
-            updated.runningFirmwareSlot = information.runningFirmwareSlot
-            updated.board = information.board
-            updated.languageLocale = information.languageLocale
-            updated.languageVersion = information.languageVersion
-            updated.capabilities = information.capabilities
+            // The third place that used to copy these across one at a time, and
+            // the one that would have been missed by a reader adding a field:
+            // `hardwareRevision` was added to the other two and not to this, so
+            // a watch that reported one only after a language pack install
+            // would have lost it here.
+            updated.version = information
+            // The platform byte can change under the app — a watch flashed with
+            // firmware for another board reports the new one — so the model is
+            // resolved again rather than left at what the scan guessed.
+            updated.model = WatchModel(hardwarePlatform: information.hardwarePlatform) ?? device.model
             connectedWatch = updated
             // The health check asks for this once a minute and the answer is
             // almost always the same one; announcing it anyway had the app

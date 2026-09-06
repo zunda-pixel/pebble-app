@@ -252,6 +252,49 @@ struct ProtocolCodecTests {
         #expect(WatchModel(hardwarePlatform: platform) == model)
     }
 
+    /// A connected watch cannot disagree with what the watch said.
+    ///
+    /// Eight of `ConnectedWatch`'s fields were copies of this response, written
+    /// across one at a time in three places. `QEMUWatchClient` filled four of
+    /// them and left the rest at their defaults, so a watch in the emulator
+    /// arrived with no board and no capabilities while the response it was built
+    /// from knew both — and nothing could catch it, because a stored field is
+    /// free to say something else. They are read through now.
+    @Test func aConnectedWatchReportsWhatTheVersionResponseSaid() {
+        let information = WatchVersionInformation(
+            firmwareVersion: "v4.36.0",
+            serialNumber: "Q402P000000A",
+            hardwareRevision: "V2R2",
+            hardwarePlatform: 245,
+            isRunningRecoveryFirmware: true,
+            runningFirmwareSlot: 1,
+            languageLocale: "ja_JP",
+            languageVersion: 3,
+            capabilities: 1 << WatchCapability.weatherApp.rawValue
+        )
+        let watch = ConnectedWatch(
+            id: WatchID("watch-1"),
+            name: "Pebble QEMU",
+            model: .pebbleTime2,
+            batteryLevel: nil,
+            version: information
+        )
+
+        #expect(watch.firmwareVersion == "v4.36.0")
+        #expect(watch.serialNumber == "Q402P000000A")
+        #expect(watch.hardwareRevision == "V2R2")
+        #expect(watch.isRunningRecoveryFirmware)
+        #expect(watch.runningFirmwareSlot == 1)
+        #expect(watch.firmwareUpdateSlot == 0)
+        #expect(watch.languageLocale == "ja_JP")
+        #expect(watch.languageVersion == 3)
+        #expect(watch.supportsWeatherApp)
+        #expect(!watch.supportsLanguagePacks)
+        // The one the emulator lost. Platform 245 is `qemu_emery`, and the
+        // board is derived rather than carried, so it arrives with the watch.
+        #expect(watch.board == .qemuEmery)
+    }
+
     /// A board this app has never heard of is nil rather than a guess.
     ///
     /// Nil is honest — the byte is all the watch sent, and the board name is

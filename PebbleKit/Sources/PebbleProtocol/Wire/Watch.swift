@@ -81,27 +81,55 @@ public struct DiscoveredWatch: Identifiable, Hashable, Sendable {
     public var signalStrength: Int
 }
 
+/// A watch the app is talking to.
+///
+/// Three sources meet here and only three: the advertisement gives the name,
+/// the battery service gives the level, and the version response gives
+/// everything else. That last one is held whole rather than unpacked.
+///
+/// It used to be unpacked — eight of these fields were copies of
+/// `WatchVersionInformation`, written across one by one, and `board` was a
+/// ninth derived from it. Two things went wrong because of that.
+/// `QEMUWatchClient` built one of these from four fields and dropped the rest,
+/// so a watch in the emulator arrived with no board and no capabilities and
+/// nothing could catch it. And adding `hardwareRevision` took four edits —
+/// here, the version response, and both transports — because each field had to
+/// be carried by hand.
+///
+/// The version-derived properties below are computed, so they cannot disagree
+/// with the response they came from. That is the point: the emulator's board
+/// was not wrong, it was *stored* as nil while the version knew better.
 @MemberwiseInit(.public)
 public struct ConnectedWatch: Identifiable, Hashable, Sendable {
     public var id: WatchID
+    /// From the advertisement, not the version response.
     public var name: String
+    /// Which watch this is.
+    ///
+    /// Stored rather than computed, because `WatchModel(hardwarePlatform:)`
+    /// answers nil for a platform this app does not know and the discovered
+    /// watch's own model is the better guess then. The transports resolve that.
     public var model: WatchModel
-    public var firmwareVersion: String?
+    /// From the battery service, not the version response.
     public var batteryLevel: Int?
-    public var serialNumber: String? = nil
+    /// What the watch said about itself when it connected.
+    public var version: WatchVersionInformation
+
+    public var firmwareVersion: String? { version.firmwareVersion }
+    public var serialNumber: String? { version.serialNumber }
     /// The revision burned in at the factory, beside the serial it sits beside
     /// in the version response. Nil on a watch that never had one written.
-    public var hardwareRevision: String? = nil
+    public var hardwareRevision: String? { version.hardwareRevision }
     /// A watch in recovery firmware rejects every endpoint except version and
     /// ping, so it can only be offered a firmware install.
-    public var isRunningRecoveryFirmware: Bool = false
+    public var isRunningRecoveryFirmware: Bool { version.isRunningRecoveryFirmware }
     /// Nil when the watch has only one. Firmware is installed into the other.
-    public var runningFirmwareSlot: Int? = nil
-    public var board: WatchBoard? = nil
+    public var runningFirmwareSlot: Int? { version.runningFirmwareSlot }
+    public var board: WatchBoard? { version.board }
     /// Empty when the watch runs the firmware's built-in English.
-    public var languageLocale: String = ""
-    public var languageVersion: UInt16 = 0
-    public var capabilities: UInt64 = 0
+    public var languageLocale: String { version.languageLocale }
+    public var languageVersion: UInt16 { version.languageVersion }
+    public var capabilities: UInt64 { version.capabilities }
 
     public var supportsLanguagePacks: Bool {
         WatchCapability.languagePack.isSet(in: capabilities)

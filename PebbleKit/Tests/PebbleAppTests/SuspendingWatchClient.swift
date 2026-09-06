@@ -51,9 +51,12 @@ final class SuspendingWatchClient: WatchClient {
             id: device.id,
             name: device.name,
             model: device.model,
-            firmwareVersion: "v5.0.0-test",
             batteryLevel: 70,
-            serialNumber: "TEST00000001"
+            version: WatchVersionInformation(
+                firmwareVersion: "v5.0.0-test",
+                serialNumber: "TEST00000001",
+                hardwarePlatform: 18
+            )
         )
     }
 

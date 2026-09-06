@@ -934,8 +934,12 @@ struct NotificationAppsTests {
             id: WatchID("watch"),
             name: "Pebble",
             model: .pebbleTime2,
-            firmwareVersion: nil,
-            batteryLevel: nil
+            batteryLevel: nil,
+            version: WatchVersionInformation(
+                firmwareVersion: nil,
+                serialNumber: nil,
+                hardwarePlatform: 18
+            )
         )
 
         // An attribute the firmware does not know is written into a stack array
@@ -944,7 +948,7 @@ struct NotificationAppsTests {
         #expect(watch.capabilities == 0)
         #expect(app.asUnderstoodBy(watch).vibePattern == nil)
 
-        watch.capabilities = 1 << 15
+        watch.version.capabilities = 1 << 15
         #expect(app.asUnderstoodBy(watch).vibePattern == .sos)
     }
 
@@ -995,13 +999,17 @@ struct NotificationAppsTests {
             id: WatchID("watch"),
             name: "Pebble",
             model: .pebbleTime2,
-            firmwareVersion: nil,
-            batteryLevel: nil
+            batteryLevel: nil,
+            version: WatchVersionInformation(
+                firmwareVersion: nil,
+                serialNumber: nil,
+                hardwarePlatform: 18
+            )
         )
 
         #expect(app.asUnderstoodBy(watch).filterRules.isEmpty)
 
-        watch.capabilities = 1 << 9
+        watch.version.capabilities = 1 << 9
         #expect(app.asUnderstoodBy(watch).filterRules.count == 1)
     }
 

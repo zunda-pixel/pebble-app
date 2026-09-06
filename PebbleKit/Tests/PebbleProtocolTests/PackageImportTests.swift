@@ -221,15 +221,39 @@ struct PackageImportTests {
     @Test
     func firmwareUpdateTargetsTheSlotThatIsNotRunning() {
         let slot0 = ConnectedWatch(
-            id: WatchID("a"), name: "P", model: .pebbleTime2, firmwareVersion: nil, batteryLevel: nil,
-            runningFirmwareSlot: 0
+            id: WatchID("a"),
+            name: "P",
+            model: .pebbleTime2,
+            batteryLevel: nil,
+            version: WatchVersionInformation(
+                firmwareVersion: nil,
+                serialNumber: nil,
+                hardwarePlatform: 18,
+                runningFirmwareSlot: 0
+            )
         )
         let slot1 = ConnectedWatch(
-            id: WatchID("b"), name: "P", model: .pebbleTime2, firmwareVersion: nil, batteryLevel: nil,
-            runningFirmwareSlot: 1
+            id: WatchID("b"),
+            name: "P",
+            model: .pebbleTime2,
+            batteryLevel: nil,
+            version: WatchVersionInformation(
+                firmwareVersion: nil,
+                serialNumber: nil,
+                hardwarePlatform: 18,
+                runningFirmwareSlot: 1
+            )
         )
         let single = ConnectedWatch(
-            id: WatchID("c"), name: "P", model: .pebbleTime2, firmwareVersion: nil, batteryLevel: nil
+            id: WatchID("c"),
+            name: "P",
+            model: .pebbleTime2,
+            batteryLevel: nil,
+            version: WatchVersionInformation(
+                firmwareVersion: nil,
+                serialNumber: nil,
+                hardwarePlatform: 18
+            )
         )
 
         #expect(slot0.firmwareUpdateSlot == 1)
