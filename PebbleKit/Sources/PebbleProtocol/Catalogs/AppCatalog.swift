@@ -10,14 +10,16 @@ import Retry
 @MemberwiseInit(.public)
 public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
     public var id: UUID
-    public var storeID: String = ""
+    /// The store's own identifier, nil for an application it does not know —
+    /// one installed from a file, or a catalogue cached before this was kept.
+    public var storeID: String? = nil
     public var name: String
     public var developer: String
     public var version: String
     public var downloadURL: URL
     public var supportedPlatforms: [String]
     public var kind: WatchApplicationKind = .watchapp
-    /// What the store called it — `Games`, `Tools & Utilities`. Empty when the
+    /// What the store called it — `Games`, `Tools & Utilities`. Nil when the
     /// store did not say.
     ///
     /// This was `"Other"`, which put an English word this app had made up into
@@ -25,10 +27,19 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
     /// screen through `Text(_:)` given a `String`, the overload that does not
     /// localize, so it showed in English however the phone was set — and the
     /// localization test could not see it, because a plain `String` is never
-    /// extracted into the catalogue. Empty instead, and the screens leave the
-    /// line out rather than inventing a category the store never gave.
-    public var category: String = ""
-    public var summary: String = ""
+    /// extracted into the catalogue.
+    ///
+    /// Then it was `""`, which is no better a way to say "absent": every
+    /// reader had to know that the empty string was not a category, and two of
+    /// them wrote `if let x, !x.isEmpty` — an optional and a sentinel checked
+    /// one after the other for one question. Absence has a spelling in this
+    /// language and `releaseNotes` beside it already used it.
+    ///
+    /// An empty string off the wire is normalised away in `init(from:)` and in
+    /// `OfficialCatalogApplication`, so the boundary is the only place that has
+    /// to know the store can say either.
+    public var category: String? = nil
+    public var summary: String? = nil
     public var releaseNotes: String? = nil
     public var iconURL: URL? = nil
     public var screenshotURLs: [URL] = []
@@ -42,16 +53,22 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
-        storeID = try container.decodeIfPresent(String.self, forKey: .storeID) ?? ""
+        storeID = try container.decodeIfPresent(String.self, forKey: .storeID)?.nilWhenEmpty
         name = try container.decode(String.self, forKey: .name)
         developer = try container.decode(String.self, forKey: .developer)
         version = try container.decode(String.self, forKey: .version)
         downloadURL = try container.decode(URL.self, forKey: .downloadURL)
         supportedPlatforms = try container.decode([String].self, forKey: .supportedPlatforms)
         kind = try container.decodeIfPresent(WatchApplicationKind.self, forKey: .kind) ?? .watchapp
-        category = try container.decodeIfPresent(String.self, forKey: .category) ?? ""
-        summary = try container.decodeIfPresent(String.self, forKey: .summary) ?? ""
-        releaseNotes = try container.decodeIfPresent(String.self, forKey: .releaseNotes)
+        // Normalised here, so no reader downstream has to treat "" as absence.
+        // The cache these come out of was written by earlier versions of this
+        // app, which wrote "" for a category the store had not given. The
+        // version before that wrote `"Other"`, which is left alone: the store
+        // is entitled to a category of that name, and a cache holding the old
+        // one is replaced by the next fetch anyway.
+        category = try container.decodeIfPresent(String.self, forKey: .category)?.nilWhenEmpty
+        summary = try container.decodeIfPresent(String.self, forKey: .summary)?.nilWhenEmpty
+        releaseNotes = try container.decodeIfPresent(String.self, forKey: .releaseNotes)?.nilWhenEmpty
         iconURL = try container.decodeIfPresent(URL.self, forKey: .iconURL)
         screenshotURLs = try container.decodeIfPresent([URL].self, forKey: .screenshotURLs) ?? []
         sha256 = try container.decodeIfPresent(String.self, forKey: .sha256)
@@ -73,7 +90,13 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
         // previous version of this app wrote, so it is not the store's 24 hex
         // digits by right, and anything left unescaped would land the reader
         // elsewhere on the site.
-        guard !storeID.isEmpty,
+        // Empty is refused as well as nil. The two decoding boundaries never
+        // produce one, but the memberwise initializer will take it from code,
+        // and an empty identifier percent-encodes to an empty string — so
+        // without this the link becomes the store's front page dressed up as
+        // one application's. This is the type's own invariant, checked once
+        // here rather than by every screen that reads the field.
+        guard let storeID, !storeID.isEmpty,
               let id = storeID.addingPercentEncoding(withAllowedCharacters: .alphanumerics)
         else { return nil }
         // The bare identifier is where the store settles: its own
@@ -282,7 +305,10 @@ struct OfficialCatalogApplication: Decodable {
     /// have. The `"Other"` that `CatalogApplication.category` used to default
     /// to could never be reached through this path at all.
     var category: String?
-    var description: String
+    /// Optional for the same reason as `category` above: a plain `String` here
+    /// throws `keyNotFound` on an entry that omits it, and one such entry in an
+    /// array loses the whole response it arrived in.
+    var description: String?
     var id: String
     var title: String
     var type: String
@@ -323,8 +349,10 @@ struct OfficialCatalogApplication: Decodable {
             downloadURL: downloadURL,
             supportedPlatforms: hardwarePlatforms?.map(\.name) ?? ["aplite", "basalt", "chalk", "diorite", "emery", "flint", "gabbro"],
             kind: kind,
-            category: category ?? "",
-            summary: description,
+            // The store sends `"category": ""` as readily as it omits the key,
+            // and both mean the same thing to a reader.
+            category: category?.nilWhenEmpty,
+            summary: description?.nilWhenEmpty,
             releaseNotes: release.releaseNotes,
             iconURL: iconImage?.values.compactMap(URL.init(string:)).first,
             screenshotURLs: screenshotImages?.flatMap { $0.values }.compactMap(URL.init(string:)) ?? []
@@ -350,4 +378,13 @@ public enum AppCatalogError: Error, Equatable, Sendable {
     case checksumMismatch
     case applicationIDMismatch
     case incompatibleHardware
+}
+
+extension String {
+    /// Nothing, where an empty string means the same as no string.
+    ///
+    /// Used at the two decoding boundaries above and nowhere else, on purpose:
+    /// the store can say either, and it is the boundary's job to settle that so
+    /// no reader downstream has to ask twice.
+    var nilWhenEmpty: String? { isEmpty ? nil : self }
 }

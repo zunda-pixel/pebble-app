@@ -120,7 +120,7 @@ struct ApplicationDetailContent: View {
                 FeedbackBanner(feedback: feedback)
             }
             
-            if let releaseNotes = subject.store?.releaseNotes, !releaseNotes.isEmpty {
+            if let releaseNotes = subject.store?.releaseNotes {
                 Section("Release Notes") { Text(releaseNotes) }
             }
 
@@ -149,7 +149,7 @@ struct ApplicationDetailContent: View {
                 }
             }
             
-            if let summary = subject.store?.summary, !summary.isEmpty {
+            if let summary = subject.store?.summary {
                 Section {
                     Text(summary)
                 }
@@ -163,7 +163,7 @@ struct ApplicationDetailContent: View {
                 if !subject.developer.isEmpty {
                     LabeledContent("Developer", value: subject.developer)
                 }
-                if let category = subject.store?.category, !category.isEmpty {
+                if let category = subject.store?.category {
                     LabeledContent("Category", value: category)
                 }
                 if !subject.platforms.isEmpty {

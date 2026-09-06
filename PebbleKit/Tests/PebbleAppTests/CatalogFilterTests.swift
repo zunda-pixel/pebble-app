@@ -16,7 +16,7 @@ import Testing
 struct CatalogFilterTests {
     private func application(
         name: String,
-        category: String,
+        category: String?,
         kind: WatchApplicationKind = .watchapp
     ) -> CatalogApplication {
         CatalogApplication(
@@ -29,7 +29,7 @@ struct CatalogFilterTests {
             supportedPlatforms: ["emery"],
             kind: kind,
             category: category,
-            summary: ""
+            summary: nil
         )
     }
 
@@ -57,7 +57,7 @@ struct CatalogFilterTests {
     /// invented name. Now it has none, and is only reachable with no filter.
     @Test func anApplicationWithNoCategoryIsShownButOffersNoCategory() {
         let applications = [
-            application(name: "Orbit", category: ""),
+            application(name: "Orbit", category: nil),
             application(name: "Tide", category: "Games"),
         ]
 
@@ -75,7 +75,7 @@ struct CatalogFilterTests {
             application(name: "Orbit", category: "Tools & Utilities"),
             application(name: "Tide", category: "Games"),
             application(name: "Ripple", category: "Games"),
-            application(name: "Plain", category: ""),
+            application(name: "Plain", category: nil),
         ]
 
         #expect(CatalogFilter.categories(in: applications) == ["Games", "Tools & Utilities"])

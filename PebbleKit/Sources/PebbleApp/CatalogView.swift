@@ -209,7 +209,7 @@ struct CatalogFilter {
     /// not name. "Every category" is a row above these rather than one of them,
     /// so there is nothing of this app's own in here.
     static func categories(in applications: [CatalogApplication]) -> [String] {
-        Set(applications.map(\.category)).filter { !$0.isEmpty }.sorted()
+        Set(applications.compactMap(\.category)).sorted()
     }
 
     func applied(to applications: [CatalogApplication]) -> [CatalogApplication] {
@@ -217,7 +217,7 @@ struct CatalogFilter {
             let matchesQuery = query.isEmpty
                 || application.name.localizedCaseInsensitiveContains(query)
                 || application.developer.localizedCaseInsensitiveContains(query)
-                || application.summary.localizedCaseInsensitiveContains(query)
+                || application.summary?.localizedCaseInsensitiveContains(query) == true
             let matchesCategory = category.map { application.category == $0 } ?? true
             let matchesKind = kind == .all
                 || (kind == .watchapps && application.kind == .watchapp)
@@ -227,7 +227,10 @@ struct CatalogFilter {
         return filtered.sorted { lhs, rhs in
             switch sort {
             case .name: lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
-            case .category: lhs.category.localizedCaseInsensitiveCompare(rhs.category) == .orderedAscending
+            // Uncategorised sort together, at the top, rather than being
+            // given a name so they can be sorted by it.
+            case .category: (lhs.category ?? "")
+                .localizedCaseInsensitiveCompare(rhs.category ?? "") == .orderedAscending
             case .version: lhs.version.compare(rhs.version, options: .numeric) == .orderedDescending
             }
         }
@@ -254,8 +257,8 @@ struct CatalogApplicationRow: View {
                 // Left out where the store did not name one, as the detail
                 // screen already does. It used to draw the model's `"Other"`,
                 // which was this app putting a word in the store's mouth.
-                if !application.category.isEmpty {
-                    Text(application.category).font(.caption).foregroundStyle(.secondary)
+                if let category = application.category {
+                    Text(category).font(.caption).foregroundStyle(.secondary)
                 }
             }
             Spacer()
@@ -288,7 +291,7 @@ struct CatalogStateLabel: View {
         CatalogApplicationRow(
             application: {
                 var uncategorised = PreviewSamples.catalogApplication
-                uncategorised.category = ""
+                uncategorised.category = nil
                 return uncategorised
             }(),
             state: .available

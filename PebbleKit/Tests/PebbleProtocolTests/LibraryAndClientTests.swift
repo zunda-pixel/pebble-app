@@ -757,7 +757,7 @@ struct CompanionStorageTests {
     /// page for anything published since it was the store. Following the
     /// feed is what this got wrong the first time.
     @Test func aCatalogApplicationLinksToItsStorePageOnlyWhenTheStoreKnowsIt() {
-        func application(storeID: String) -> CatalogApplication {
+        func application(storeID: String?) -> CatalogApplication {
             CatalogApplication(
                 id: UUID(), storeID: storeID, name: "App", developer: "Developer", version: "1.0",
                 downloadURL: URL(string: "https://example.com/app.pbw")!, supportedPlatforms: ["emery"]
@@ -768,8 +768,13 @@ struct CompanionStorageTests {
             application(storeID: "1b25cef73e2b471686672d07").storePageURL
                 == URL(string: "https://apps.repebble.com/1b25cef73e2b471686672d07")
         )
-        // The default, which is what a hand-written feed and a side-loaded
-        // package both leave behind.
+        // No identifier at all: a side-loaded package, or a catalogue
+        // cached before this field was kept.
+        #expect(application(storeID: nil).storePageURL == nil)
+        // And an empty one, which the decoding boundaries never produce but
+        // the memberwise initializer will accept. It percent-encodes to an
+        // empty string, so without the type's own guard the link would be the
+        // store's front page pretending to be one application's.
         #expect(application(storeID: "").storePageURL == nil)
         // And a legacy feed is whatever the reader pointed at, so the
         // identifier stays inside the one path segment it was given.
@@ -1175,7 +1180,55 @@ struct StoreLookupByUUIDTests {
         let found = try #require(await catalog().application(uuid: uuid, from: base))
 
         #expect(found.name == "Watch Tools")
-        #expect(found.category.isEmpty)
+        #expect(found.category == nil)
+        // The entry does carry a description, so the summary is still there:
+        // this test is about the one missing field, not about all of them.
+        #expect(found.summary == "Five watch utilities in one place.")
+    }
+
+    /// An empty string is the same answer as no answer.
+    ///
+    /// The store sends `"category": ""` as readily as it omits the key. It is
+    /// settled here, at the boundary, so that no screen has to write
+    /// `if let category, !category.isEmpty` — an optional and a sentinel
+    /// checked one after the other for one question, which is what three of
+    /// them were doing.
+    @Test func aFieldTheStoreSentEmptyReadsAsAbsent() async throws {
+        let base = URL(string: "https://store.invalid/blank/api")!
+        let uuid = UUID()
+        let answer = """
+        {
+          "data": [
+            {
+              "author": "Keynes",
+              "category": "",
+              "description": "",
+              "id": "1b25cef73e2b471686672d07",
+              "title": "Watch Tools",
+              "type": "watchapp",
+              "uuid": "\(uuid.uuidString.lowercased())",
+              "hardware_platforms": [{"name": "emery"}],
+              "latest_release": {
+                "pbw_file": "https://example.invalid/watch-tools.pbw",
+                "release_notes": "",
+                "version": "1.4.0"
+              }
+            }
+          ],
+          "limit": 1,
+          "offset": 0
+        }
+        """
+        StubURLProtocol.stub(
+            base.appending(path: "v1/apps/uuid").appending(path: uuid.uuidString.lowercased()),
+            status: 200,
+            body: Data(answer.utf8)
+        )
+
+        let found = try #require(await catalog().application(uuid: uuid, from: base))
+
+        #expect(found.category == nil)
+        #expect(found.summary == nil)
     }
 
     /// Not an error. Plenty of packages were never listed, and a reader who
