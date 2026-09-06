@@ -19,6 +19,20 @@ public struct ApplicationTransfer: Equatable, Sendable {
     public var progress: PutBytesTransferProgress
 }
 
+/// One application on its way to one named watch.
+///
+/// The other way round from `ApplicationTransfer`, which names the application
+/// for a screen that already knows the watch. An application's own screen knows
+/// the application and has to name the watch — and there can be more than one,
+/// because the same application goes to every watch that is connected.
+public struct WatchApplicationTransfer: Equatable, Sendable, Identifiable {
+    public var watchID: WatchID
+    public var watchName: String
+    public var progress: PutBytesTransferProgress
+
+    public var id: WatchID { watchID }
+}
+
 public enum CatalogInstallationState: Equatable, Sendable {
     case available
     case installed
@@ -101,6 +115,33 @@ public final class AppModel {
             name: (applications.apps + applications.watchfaces).first { $0.id == applicationID }?.displayName,
             progress: progress
         )
+    }
+
+    /// Which watches this one application is on its way to, and how far it has
+    /// got on each.
+    ///
+    /// For the application's own screen, which knows the application and not
+    /// the watch. It asks about this application rather than about whatever is
+    /// being sent, the way `ApplicationOperationBanner` has to on the library
+    /// screen: an application's page has no business showing another's bar.
+    ///
+    /// One entry per watch, because an installed application is pushed to every
+    /// connected watch and the two transfers get on at their own speeds.
+    ///
+    /// Says nothing about the download that comes first. Installing from the
+    /// store fetches the package over the network before any watch is written
+    /// to, and during that there is no transfer to report — `catalog.feedback`
+    /// is what says "Downloading Orbit…".
+    public func transfers(of applicationID: UUID) -> [WatchApplicationTransfer] {
+        connections.compactMap { connection in
+            guard connection.applicationBeingSent == applicationID,
+                  let progress = connection.transferProgress else { return nil }
+            return WatchApplicationTransfer(
+                watchID: connection.watch.id,
+                watchName: connection.watch.name,
+                progress: progress
+            )
+        }
     }
 
     public func firmwareTransferProgress(on watchID: WatchID) -> PutBytesTransferProgress? {

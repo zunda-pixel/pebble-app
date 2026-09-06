@@ -72,6 +72,12 @@ struct ApplicationDetailContent: View {
     var isAnyInstallRunning: Bool
     var isOperationInProgress: Bool
     var feedback: FeatureFeedback?
+    /// Which watches this application is on its way to, one per watch.
+    ///
+    /// Empty most of the time, and empty for the whole of the download that
+    /// precedes a store install — during which `isInstalling` is what says
+    /// anything is happening at all.
+    var transfers: [WatchApplicationTransfer] = []
     var install: () -> Void
     var configureApplication: () -> Void
     /// Nil where the launcher line cannot be edited from here, which leaves
@@ -93,7 +99,24 @@ struct ApplicationDetailContent: View {
                     Button(installButtonTitle, systemImage: "arrow.down.app", action: install)
                         .disabled(isAnyInstallRunning)
                 }
-                if isInstalling { ProgressView() }
+                // Only while there is nothing better to show. A spinner beside
+                // a bar that knows the byte count says less than the bar, and
+                // the two phases do not overlap: the download comes first,
+                // then a watch is written to.
+                if isInstalling && transfers.isEmpty { ProgressView() }
+                // The bytes used to be shown on the library screen alone,
+                // which is behind this one and has its tab bar hidden — so
+                // installing from here left the reader an indeterminate
+                // spinner while the numbers went somewhere they could not
+                // look. One row per watch, because the transfers get on at
+                // their own speeds.
+                ForEach(transfers) { transfer in
+                    TransferProgressRow(
+                        title: transfer.watchName,
+                        systemImage: "applewatch.radiowaves.left.and.right",
+                        progress: transfer.progress
+                    )
+                }
                 FeedbackBanner(feedback: feedback)
             }
             
@@ -330,6 +353,11 @@ struct ApplicationDetailView: View {
                     feedback: model.catalog.installingApplicationID == current.id
                         ? model.catalog.feedback
                         : nil,
+                    // Asked about this application, so a library synchronization
+                    // that pushes it to a watch that just connected shows here
+                    // too — `installingApplicationID` only knows about installs
+                    // started from the store.
+                    transfers: model.transfers(of: current.id),
                     install: {
                         if let storeEntry {
                             Task { await model.installCatalogApplication(storeEntry) }
@@ -385,6 +413,7 @@ struct CatalogApplicationDetailView: View {
             isAnyInstallRunning: model.catalog.installingApplicationID != nil,
             isOperationInProgress: model.isApplicationManagementBusy,
             feedback: model.catalog.feedback,
+            transfers: model.transfers(of: application.id),
             install: { Task { await model.installCatalogApplication(application) } },
             configureApplication: {
                 if let installed { Task { await model.configureApplication(installed) } }
@@ -419,6 +448,66 @@ struct CatalogApplicationDetailView: View {
             isAnyInstallRunning: false,
             isOperationInProgress: false,
             feedback: nil,
+            install: {},
+            configureApplication: {},
+            editGlance: {},
+            activateWatchface: {},
+            removeApplication: {}
+        )
+    }
+}
+
+#Preview("On its way to two watches") {
+    NavigationStack {
+        ApplicationDetailContent(
+            subject: ApplicationDetailSubject(store: PreviewSamples.catalogApplication, installed: nil),
+            isActive: false,
+            isInstalled: nil,
+            installationState: .available,
+            isInstalling: true,
+            isAnyInstallRunning: true,
+            isOperationInProgress: true,
+            feedback: .progress("Installing Orbit…"),
+            // One row per watch. They are sent the same application and get on
+            // at their own speeds, which is the thing a single bar could not say.
+            transfers: [
+                WatchApplicationTransfer(
+                    watchID: WatchID("preview-watch"),
+                    watchName: "Pebble 5209",
+                    progress: PutBytesTransferProgress(bytesSent: 240_000, totalBytes: 512_000)
+                ),
+                WatchApplicationTransfer(
+                    watchID: WatchID("preview-time"),
+                    watchName: "Pebble Time",
+                    progress: PutBytesTransferProgress(bytesSent: 32_768, totalBytes: 512_000)
+                ),
+            ],
+            install: {},
+            configureApplication: {},
+            editGlance: {},
+            activateWatchface: {},
+            removeApplication: {}
+        )
+    }
+}
+
+#Preview("Fetching the package, no watch written to yet") {
+    NavigationStack {
+        ApplicationDetailContent(
+            subject: ApplicationDetailSubject(store: PreviewSamples.catalogApplication, installed: nil),
+            isActive: false,
+            isInstalled: nil,
+            installationState: .available,
+            isInstalling: true,
+            isAnyInstallRunning: true,
+            isOperationInProgress: false,
+            // Interpolated rather than spelled out, so this is the key the
+            // model already writes — `Downloading %@…` — and not a second one
+            // that would need translating for a preview alone.
+            feedback: .progress("Downloading \("Orbit")…"),
+            // Empty: the download comes before any watch is written to, so the
+            // indeterminate spinner is all there is to show.
+            transfers: [],
             install: {},
             configureApplication: {},
             editGlance: {},

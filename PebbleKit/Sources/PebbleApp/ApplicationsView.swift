@@ -296,8 +296,13 @@ struct ApplicationOperationBanner: View {
             VStack(alignment: .leading, spacing: 8) {
                 FeedbackBanner(feedback: operationFeedback)
                 if let installingApplicationName, let installationProgress {
-                    InstallationProgressRow(
-                        applicationName: installingApplicationName,
+                    // Named for the application: this screen already knows
+                    // which watch, from the picker at the top. An
+                    // application's own screen is the other way round and
+                    // names the watch.
+                    TransferProgressRow(
+                        title: installingApplicationName,
+                        systemImage: "arrow.down.app",
                         progress: installationProgress
                     )
                 }
@@ -312,13 +317,21 @@ struct ApplicationOperationBanner: View {
     }
 }
 
-struct InstallationProgressRow: View {
-    var applicationName: String
+/// One transfer, as a bar and the bytes behind it.
+///
+/// The title is the caller's, because the two screens that show a transfer know
+/// different halves of it: the library screen has a watch picker and so names
+/// the application, while an application's own screen names the watch — and
+/// shows one of these per watch, since an installed application is pushed to
+/// every one that is connected.
+struct TransferProgressRow: View {
+    var title: String
+    var systemImage: String
     var progress: PutBytesTransferProgress
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label(applicationName, systemImage: "arrow.down.app")
+            Label(title, systemImage: systemImage)
                 .font(.headline)
             if progress.totalBytes > 0 {
                 ProgressView(

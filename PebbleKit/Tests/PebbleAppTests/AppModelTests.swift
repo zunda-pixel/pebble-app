@@ -548,6 +548,86 @@ struct AppModelTests {
         #expect(model.applicationTransfer(on: second.id) == nil)
     }
 
+    /// What one application's own screen sees while it is being sent.
+    ///
+    /// The other way round from `applicationTransfer(on:)`, which answers the
+    /// library screen — that one has a watch picker and asks "what is this
+    /// watch being sent". An application's page knows the application instead,
+    /// and has to name the watches; there is more than one, because an
+    /// installed application is pushed to every watch that is connected, and
+    /// the two get on at their own speeds.
+    ///
+    /// The bytes used to be shown on the library screen alone. That screen is
+    /// behind the application's, with its tab bar hidden, so installing from
+    /// the detail screen left the reader an indeterminate spinner while the
+    /// numbers went somewhere they could not look.
+    @Test
+    func oneApplicationsScreenSeesEveryWatchItIsGoingTo() async throws {
+        let scanner = MockWatchClient()
+        var connectionClients: [WatchID: MockWatchClient] = [:]
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let watchStore = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        let model = AppModel(
+            client: scanner,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: library,
+            watchStore: watchStore,
+            clientFactory: { watchID in
+                let client = MockWatchClient()
+                connectionClients[watchID] = client
+                return client
+            }
+        )
+
+        await model.scan()
+        let devices = model.discoveredWatches
+        let first = try #require(devices.first)
+        let second = try #require(devices.dropFirst().first)
+        await model.connect(to: first)
+        await model.connect(to: second)
+
+        let firstConnection = try #require(model.connections.first { $0.watch.id == first.id })
+        let secondConnection = try #require(model.connections.first { $0.watch.id == second.id })
+
+        // Nothing on its way yet.
+        let applicationID = UUID()
+        #expect(model.transfers(of: applicationID).isEmpty)
+
+        // The same application to both watches, at different points.
+        firstConnection.beginTransfer(.application(applicationID))
+        secondConnection.beginTransfer(.application(applicationID))
+        connectionClients[first.id]?.emit(.transferProgress(
+            PutBytesTransferProgress(bytesSent: 240, totalBytes: 512)
+        ))
+        connectionClients[second.id]?.emit(.transferProgress(
+            PutBytesTransferProgress(bytesSent: 32, totalBytes: 512)
+        ))
+        try await Task.sleep(for: .milliseconds(20))
+
+        let transfers = model.transfers(of: applicationID)
+        #expect(transfers.count == 2)
+        #expect(transfers.first { $0.watchID == first.id }?.progress
+            == PutBytesTransferProgress(bytesSent: 240, totalBytes: 512))
+        #expect(transfers.first { $0.watchID == second.id }?.progress
+            == PutBytesTransferProgress(bytesSent: 32, totalBytes: 512))
+        // Named, because the row says which watch rather than which application.
+        #expect(transfers.first { $0.watchID == first.id }?.watchName == first.name)
+
+        // Another application's page shows nothing while this one is being sent.
+        #expect(model.transfers(of: UUID()).isEmpty)
+
+        // Firmware is not this application's business, even on a watch that was
+        // sending it a moment ago.
+        firstConnection.endTransfer()
+        firstConnection.beginTransfer(.firmware)
+        #expect(model.transfers(of: applicationID).map(\.watchID) == [second.id])
+
+        secondConnection.endTransfer()
+        #expect(model.transfers(of: applicationID).isEmpty)
+    }
+
     @Test
     func connectingToTheConnectedWatchIsANoOp() async throws {
         let client = MockWatchClient()
