@@ -967,9 +967,26 @@ struct AppModelTests {
         let discovered = try #require(model.discoveredWatches.first)
         await model.connect(to: discovered)
 
+        // Waited for rather than counted. This was one `await Task.yield()`
+        // followed by the expectation, which asks the scheduler to consider
+        // other work once and then asserts as though it had finished: the
+        // event travels a stream consumed by another task, and on a machine
+        // busy with the other four hundred tests the yield returned before it
+        // arrived. The state was still `.connected` from the connect above —
+        // not passed through, not yet reached — and the test went red for a
+        // reason that had nothing to do with the app (#86, and the same trap
+        // as #79).
+        //
+        // Nothing in the app advances past `.reconnecting` on its own —
+        // `refreshConnectionState` keeps it while the connection's phase says
+        // so — which is what makes waiting for it sound rather than a race
+        // against a later transition. The loop is the assertion; with no
+        // timeout of its own it is bounded by the suite's deadline, the same
+        // choice `ChangeLog` makes in `ScriptedMusicTests`.
         client.emit(.reconnecting(watchID: discovered.id))
-        await Task.yield()
-        #expect(model.connectionState == .reconnecting(watchID: discovered.id))
+        while model.connectionState != .reconnecting(watchID: discovered.id) {
+            await Task.yield()
+        }
 
         var restoredDevice = ConnectedWatch(
             id: discovered.id,
@@ -984,9 +1001,14 @@ struct AppModelTests {
         )
         restoredDevice.batteryLevel = 63
         client.emit(.watchUpdated(restoredDevice))
-        try await Task.sleep(for: .milliseconds(20))
+        // Twenty milliseconds was the same guess with a wider margin: it says
+        // nothing about whether the event has been handled, only that some
+        // time has passed. `.watchUpdated` puts the connection back to
+        // `.connected` and leaves it there, so this waits for it too.
+        while model.connectionState != .connected(restoredDevice) {
+            await Task.yield()
+        }
 
-        #expect(model.connectionState == .connected(restoredDevice))
         #expect(model.connectedWatch?.batteryLevel == 63)
     }
 
