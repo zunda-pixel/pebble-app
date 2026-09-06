@@ -294,12 +294,22 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
             return
         }
         // On this transport the watch sends the reset request once it has subscribed;
-        // starting one from here too leaves both sides mid-handshake.
-        Task { [tag = clientTag] in
-            await PebbleDiagnostics.shared.record(
-                category: "pairing",
-                message: "[\(tag)] waiting for the watch to open the session"
-            )
+        // starting one from here too leaves both sides mid-handshake. One it sent
+        // before this side could answer is still answered.
+        let steps = setup.stepsToOpenTheSession(askingIfNeeded: false)
+        guard !steps.isEmpty else {
+            Task { [tag = clientTag] in
+                await PebbleDiagnostics.shared.record(
+                    category: "pairing",
+                    message: "[\(tag)] waiting for the watch to open the session"
+                )
+            }
+            return
+        }
+        do {
+            try perform(steps, answering: nil, on: peripheral)
+        } catch {
+            abortLink(peripheral, error: .protocolNegotiationFailed, step: "opening the session")
         }
     }
 
@@ -392,7 +402,13 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
         }
 
         do {
-            try write(.resetRequest(sequence: 0, version: .one), to: peripheral)
+            // Answering what the watch already asked for, if it got in first,
+            // rather than asking again into a watch that is waiting for us.
+            try perform(
+                setup.stepsToOpenTheSession(askingIfNeeded: true),
+                answering: nil,
+                on: peripheral
+            )
         } catch {
             abortLink(peripheral, error: .protocolNegotiationFailed, step: "opening the session")
         }
@@ -459,35 +475,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
                 }
                 return
             }
-            for step in steps {
-                switch step {
-                case .startSessionOver(let reason):
-                    abandonSession(on: peripheral, because: reason)
-
-                case .answerReset:
-                    try write(
-                        .resetComplete(sequence: 0, receiveWindow: 25, transmitWindow: 25),
-                        to: peripheral
-                    )
-
-                case .askForReset:
-                    try write(.resetRequest(sequence: 0, version: .one), to: peripheral)
-
-                case .openSession(let watchReceiveWindow, let watchTransmitWindow):
-                    try openSession(
-                        watchReceiveWindow: watchReceiveWindow,
-                        watchTransmitWindow: watchTransmitWindow,
-                        on: peripheral
-                    )
-
-                case .giveToSession:
-                    guard var session = ppogSession else { return }
-                    let actions = try session.receive(packet)
-                    ppogSession = session
-                    try handle(actions, peripheral: peripheral)
-                    updateAcknowledgementTimeout(for: peripheral)
-                }
-            }
+            try perform(steps, answering: packet, on: peripheral)
         } catch {
             guard ppogSession == nil else {
                 // A packet that makes no sense is no reason to drop a working
@@ -502,6 +490,47 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
                 return
             }
             abortLink(peripheral, error: .protocolNegotiationFailed, step: "handling a packet from the watch")
+        }
+    }
+
+    /// Carries out what `LinkSetup` decided.
+    ///
+    /// `packet` is the one the steps are answering, and only `.giveToSession`
+    /// needs it — a step nothing but `steps(for:hasSession:)` can produce, which
+    /// is why the steps that open a handshake may pass none.
+    private func perform(
+        _ steps: [PPoGStep],
+        answering packet: PPoGPacket?,
+        on peripheral: CBPeripheral
+    ) throws {
+        for step in steps {
+            switch step {
+            case .startSessionOver(let reason):
+                abandonSession(on: peripheral, because: reason)
+
+            case .answerReset:
+                try write(
+                    .resetComplete(sequence: 0, receiveWindow: 25, transmitWindow: 25),
+                    to: peripheral
+                )
+
+            case .askForReset:
+                try write(.resetRequest(sequence: 0, version: .one), to: peripheral)
+
+            case .openSession(let watchReceiveWindow, let watchTransmitWindow):
+                try openSession(
+                    watchReceiveWindow: watchReceiveWindow,
+                    watchTransmitWindow: watchTransmitWindow,
+                    on: peripheral
+                )
+
+            case .giveToSession:
+                guard let packet, var session = ppogSession else { return }
+                let actions = try session.receive(packet)
+                ppogSession = session
+                try handle(actions, peripheral: peripheral)
+                updateAcknowledgementTimeout(for: peripheral)
+            }
         }
     }
 

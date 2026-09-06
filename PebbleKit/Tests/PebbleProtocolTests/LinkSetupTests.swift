@@ -223,6 +223,83 @@ struct LinkSetupTests {
         )
     }
 
+    /// The reset that arrived too early, answered once there is a way to.
+    ///
+    /// Leaving it alone stopped the connect being dropped over it (#71) but not
+    /// the wait it costs: the watch is holding out for the answer to its own
+    /// request and will not take a fresh one in its place, so both sides go
+    /// quiet until its retry timer fires. On the reader's phone that was 1.15
+    /// seconds of silence against 26 milliseconds when the phone asked first.
+    @Test
+    func aResetThatArrivedTooEarlyIsAnsweredRatherThanAskedForAgain() {
+        var setup = LinkSetup()
+
+        #expect(setup.steps(for: .resetRequest(sequence: 0, version: .one), hasSession: false).isEmpty)
+        #expect(setup.watchAskedBeforeThereWasAnAnswer)
+
+        _ = setup.apply(status(paired: true, encrypted: true))
+
+        // Answered, not asked: asking would buy nothing and cost the retry.
+        #expect(setup.stepsToOpenTheSession(askingIfNeeded: true) == [.answerReset])
+        // And that answer is the one this side owed, so the watch's ResetComplete
+        // opens the session rather than drawing a second answer out of us.
+        #expect(setup.hasSentResetComplete)
+        #expect(
+            setup.steps(for: .resetComplete(sequence: 0, receiveWindow: 17, transmitWindow: 4), hasSession: false)
+                == [.openSession(watchReceiveWindow: 17, watchTransmitWindow: 4)]
+        )
+    }
+
+    /// The request is spent once answered, so a link that opens twice — the
+    /// characteristic subscribing after the phone has taken the transport over,
+    /// say — does not answer a reset the watch has long since had an answer to.
+    @Test
+    func aResetIsOnlyAnsweredOnceHoweverOftenTheSessionIsOpened() {
+        var setup = LinkSetup()
+        _ = setup.steps(for: .resetRequest(sequence: 0, version: .one), hasSession: false)
+        _ = setup.apply(status(paired: true, encrypted: true))
+
+        #expect(setup.stepsToOpenTheSession(askingIfNeeded: true) == [.answerReset])
+        #expect(setup.stepsToOpenTheSession(askingIfNeeded: true) == [.askForReset])
+        #expect(!setup.watchAskedBeforeThereWasAnAnswer)
+    }
+
+    /// A link the watch has said nothing on.
+    ///
+    /// Which of the two silences it is depends on the transport: the phone opens
+    /// the handshake on the watch's own service, and waits on the one it hosts
+    /// itself, where a request from here as well leaves both sides mid-handshake.
+    @Test
+    func aLinkTheWatchHasNotAskedOnIsOpenedOnlyWhereThatIsThisSidesJob() {
+        var reversed = LinkSetup()
+        _ = reversed.apply(status(paired: true, encrypted: true))
+        #expect(reversed.stepsToOpenTheSession(askingIfNeeded: true) == [.askForReset])
+
+        var forward = LinkSetup()
+        _ = forward.apply(status(paired: true, encrypted: true))
+        #expect(forward.stepsToOpenTheSession(askingIfNeeded: false).isEmpty)
+        // Nothing was claimed by waiting, so the watch's request is still answered.
+        #expect(
+            forward.steps(for: .resetRequest(sequence: 0, version: .one), hasSession: false) == [.answerReset]
+        )
+    }
+
+    /// Only a request is worth remembering. The leftovers of the last session
+    /// arrive the same way — three did on the reader's phone, alongside one
+    /// request — and answering a ResetComplete with a ResetComplete reads to the
+    /// watch as a request to tear the session down.
+    @Test
+    func theLeftoversOfTheLastSessionAreNotMistakenForARequest() {
+        var setup = LinkSetup()
+
+        _ = setup.steps(for: .data(sequence: 3, payload: [0x01]), hasSession: false)
+        _ = setup.steps(for: .acknowledgement(sequence: 3), hasSession: false)
+        _ = setup.steps(for: .resetComplete(sequence: 0, receiveWindow: 17, transmitWindow: 4), hasSession: false)
+
+        #expect(!setup.watchAskedBeforeThereWasAnAnswer)
+        #expect(setup.stepsToOpenTheSession(askingIfNeeded: true) == [.askForReset])
+    }
+
     @Test
     func dataAndAcknowledgementsGoStraightToTheSession() {
         var setup = LinkSetup()

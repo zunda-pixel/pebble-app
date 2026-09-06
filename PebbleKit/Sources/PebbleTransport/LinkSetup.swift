@@ -49,6 +49,9 @@ struct LinkSetup: Equatable {
     private(set) var pairing = Pairing.unknown
     private(set) var transport = Transport.reversed
     private(set) var hasSentResetComplete = false
+    /// Whether the watch asked for a session while there was still no way to
+    /// answer it. Kept so the answer can go out as soon as there is one.
+    private(set) var watchAskedBeforeThereWasAnAnswer = false
 
     /// A fresh link, keeping nothing from the last one.
     mutating func reset() {
@@ -112,6 +115,31 @@ struct LinkSetup: Equatable {
         hasSentResetComplete = false
     }
 
+    /// What to send now that there is a way to answer through, given whatever the
+    /// watch has already asked for.
+    ///
+    /// A request that arrived too early is answered rather than forgotten. The
+    /// watch is waiting for that answer and will not take a fresh request in its
+    /// place, so asking again buys nothing and costs its retry timer: 1.15
+    /// seconds of both sides waiting, measured on the reader's phone against 26
+    /// milliseconds when the phone asked first.
+    ///
+    /// A stale one is no worse than not answering. The watch that has moved on
+    /// asks again, and `steps(for:hasSession:)` answers a request whether or not
+    /// a ResetComplete was already owed.
+    ///
+    /// `askingIfNeeded` is false on the transport the phone hosts, where the
+    /// watch sends the request once it has subscribed and one from here as well
+    /// leaves both sides mid-handshake.
+    mutating func stepsToOpenTheSession(askingIfNeeded: Bool) -> [PPoGStep] {
+        guard watchAskedBeforeThereWasAnAnswer else {
+            return askingIfNeeded ? [.askForReset] : []
+        }
+        watchAskedBeforeThereWasAnAnswer = false
+        _ = claimResetComplete()
+        return [.answerReset]
+    }
+
     /// What a packet the watch has sent asks of the link, in the order it has to
     /// happen.
     ///
@@ -132,7 +160,13 @@ struct LinkSetup: Equatable {
         //
         // Every other packet yields at least one step, so an empty answer means
         // this and only this.
-        guard mayStartProtocol else { return [] }
+        guard mayStartProtocol else {
+            // Left alone, but not forgotten: the watch is now waiting for an
+            // answer, and `stepsToOpenTheSession(askingIfNeeded:)` is where it
+            // gets one.
+            if case .resetRequest = packet { watchAskedBeforeThereWasAnAnswer = true }
+            return []
+        }
 
         switch packet {
         case .resetRequest:
