@@ -102,6 +102,15 @@ extension AppModel {
             }
         }
         try? await reminderStore.setWrittenPinIDs(written.subtracting(removed), watchID: watchID)
+        // Said whichever way it went, the way the pins are: BlobDB cannot be
+        // listed, so this line is the only account of what left the watch. Only
+        // a failure used to be recorded, which left two of six removes in one
+        // on-device log belonging to nobody.
+        await PebbleDiagnostics.shared.record(
+            category: "timeline",
+            message: "\(connection.watch.name): removed \(removed.count)"
+                + " of \(forgotten.count) reminder(s) the app no longer has"
+        )
     }
 
     // One in the past has already been shown, or missed, and sending it would
