@@ -47,7 +47,9 @@ struct CatalogView: View {
             isUpdating: model.catalog.isUpdating,
             importApplication: importApplication,
             installUpdates: { Task { await model.installCatalogUpdates() } },
-            refresh: { Task { await model.refreshCatalog() } },
+            // Awaited rather than launched, so that the pull-to-refresh
+            // indicator stays up until the catalogue has actually been fetched.
+            refresh: { await model.refreshCatalog() },
             destination: { application in
                 CatalogApplicationDetailView(
                     application: application,
@@ -71,7 +73,7 @@ struct CatalogContent<Destination: View>: View {
     var isUpdating: Bool
     var importApplication: (() -> Void)?
     var installUpdates: () -> Void
-    var refresh: () -> Void
+    var refresh: @MainActor () async -> Void
     @ViewBuilder var destination: (CatalogApplication) -> Destination
 
     @State private var query = ""
@@ -111,6 +113,9 @@ struct CatalogContent<Destination: View>: View {
         }
         .searchable(text: $query)
         .navigationTitle(Text("Catalog"))
+        // A second pull while one is running is the model's to ignore, which
+        // it does — `updateCatalog` returns early when it is already updating.
+        .refreshable { await refresh() }
         .toolbar {
             // No way out of its own: the back button of the stack it was
             // pushed onto is the way out.
@@ -126,10 +131,22 @@ struct CatalogContent<Destination: View>: View {
                     }
                 }
                 Button("Update All", systemImage: "arrow.down.app", action: installUpdates)
-                Button("Refresh", systemImage: "arrow.clockwise", action: refresh)
-                    .disabled(isUpdating)
+                #if os(macOS)
+                // Kept here alone: `refreshable` is a gesture the phone has
+                // and a window does not, so dropping the button would leave
+                // the Mac with no way to fetch the catalogue at all.
+                Button("Refresh", systemImage: "arrow.clockwise") {
+                    Task { await refresh() }
+                }
+                .disabled(isUpdating)
+                #endif
             }
         }
+        #if os(iOS)
+        // Pushed from the Apps tab, and what is on screen is the catalogue
+        // rather than the tabs.
+        .toolbarVisibility(.hidden, for: .tabBar)
+        #endif
         .overlay {
             if filteredApplications.isEmpty {
                 ContentUnavailableView("No Catalog Apps", systemImage: "bag", description: Text("Catalog sources can be added in Settings."))
