@@ -80,6 +80,18 @@ struct ConfigurationWebView: View {
                 } else {
                     for try await _ in page.load(url) {}
                 }
+                // A load that was superseded ends here too: `.task(id:)` cancels
+                // the one before it, and the sequence finishes rather than
+                // throwing. Saying it is up would date the page from the load
+                // that was given up on — 5.5 seconds before the one the reader
+                // actually saw, on the reader's phone.
+                guard !Task.isCancelled else {
+                    await PebbleDiagnostics.shared.record(
+                        category: "configuration",
+                        message: "a second page took over before this one was up"
+                    )
+                    return
+                }
                 await PebbleDiagnostics.shared.record(
                     category: "configuration",
                     message: "the settings page is up"

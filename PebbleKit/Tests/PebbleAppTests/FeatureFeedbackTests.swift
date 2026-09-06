@@ -142,6 +142,31 @@ struct FeatureFeedbackTests {
         #expect(!AppModel.mayOpenConfigurationURL(try #require(URL(string: "https://user@example.com/s"))))
     }
 
+    /// What a settings page is named by in the log.
+    ///
+    /// The page was loaded twice for one opening on the reader's phone and
+    /// nothing could say whether that was two URLs or one, because only a
+    /// refusal was ever recorded. Naming it is the difference — and it has to be
+    /// a fingerprint: the query string carries the watch token and the reader's
+    /// account, which is why a refusal names the rule it broke and not the
+    /// address.
+    @Test func aSettingsPageIsNamedInTheLogByAFingerprintAndNotItsAddress() throws {
+        let withToken = try #require(URL(string: "https://example.com/s?token=abc123&account=reader@example.com"))
+        let fingerprint = AppModel.configurationFingerprint(withToken)
+
+        // Short enough to read at a glance, and the same URL always gives it.
+        #expect(fingerprint.count == 8)
+        #expect(AppModel.configurationFingerprint(withToken) == fingerprint)
+        // Nothing of the URL survives into it.
+        #expect(!fingerprint.contains("abc123"))
+        #expect(!fingerprint.contains("example"))
+
+        // Two pages that differ at all are told apart, which is the whole point:
+        // one fingerprint twice is a view reloading, two is two URLs arriving.
+        let other = try #require(URL(string: "https://example.com/s?token=abc124&account=reader@example.com"))
+        #expect(AppModel.configurationFingerprint(other) != fingerprint)
+    }
+
     /// A settings page an application built itself and handed over inline.
     ///
     /// AgroWeatherApp's is one of these — `scheme=data host=none` in the log —

@@ -1,6 +1,7 @@
 import Algorithms
 public import PebbleProtocol
 import AsyncOperations
+import CryptoKit
 import Defaults
 public import Foundation
 import Retry
@@ -53,7 +54,28 @@ extension AppModel {
             }
             return
         }
+        let isReplacing = applications.configurationURL != nil
         applications.configurationURL = url
+        Task { [fingerprint = Self.configurationFingerprint(url), isReplacing] in
+            // Said because the settings page was loaded twice for one opening
+            // and nothing could say whether that was two URLs or one: this line
+            // is the difference. Whether it replaced one, and a fingerprint
+            // rather than the URL — a settings page's query string carries the
+            // watch token and the reader's account, which is the same reason a
+            // refusal names the rule it broke and not the address.
+            await PebbleDiagnostics.shared.record(
+                category: "configuration",
+                message: isReplacing
+                    ? "a settings page \(fingerprint) replaced the one already showing"
+                    : "showing settings page \(fingerprint)"
+            )
+        }
+    }
+
+    /// Enough of a URL to tell one from another, and nothing that could identify
+    /// the reader or their watch.
+    static func configurationFingerprint(_ url: URL) -> String {
+        SHA256.hash(data: Data(url.absoluteString.utf8)).prefix(4).hexadecimalString
     }
 
     public var isApplicationManagementBusy: Bool {
