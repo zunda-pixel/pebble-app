@@ -1,3 +1,4 @@
+import CoreLocation
 import PebbleProtocol
 import Foundation
 import WebKit
@@ -13,6 +14,7 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
     private var appMessageHandler: (UUID, [AppMessageTuple]) async throws -> Void
     private var notificationHandler: (WatchApplication, String, String) async throws -> Void
     private var activeWatchHandler: () -> ConnectedWatch?
+    private var locationHandler: () async throws -> CLLocation
     private var loadContinuation: CheckedContinuation<Void, any Error>?
     private var loadedApplicationID: UUID?
     private let tokenStore = PebbleTokenStore()
@@ -21,12 +23,14 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
         openURLHandler: @escaping (URL) -> Void,
         appMessageHandler: @escaping (UUID, [AppMessageTuple]) async throws -> Void,
         notificationHandler: @escaping (WatchApplication, String, String) async throws -> Void,
-        activeWatchHandler: @escaping () -> ConnectedWatch?
+        activeWatchHandler: @escaping () -> ConnectedWatch?,
+        locationHandler: @escaping () async throws -> CLLocation
     ) {
         self.openURLHandler = openURLHandler
         self.appMessageHandler = appMessageHandler
         self.notificationHandler = notificationHandler
         self.activeWatchHandler = activeWatchHandler
+        self.locationHandler = locationHandler
         super.init()
     }
 
@@ -88,6 +92,33 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
           getWatchToken: () => \(watchTokenLiteral),
           showSimpleNotificationOnPebble: (title, body) =>
             webkit.messageHandlers.pebble.postMessage({type:'notification', title, body})
+        };
+        // `navigator.geolocation` is here but never answers: WebKit has no
+        // public way for an app to grant it, on `WKUIDelegate` or on the newer
+        // `WebPage.DeviceSensorAuthorization`, whose permissions are
+        // `deviceOrientationAndMotion` and `mediaCapture` and nothing else. So
+        // it is replaced by one that asks the app, which has the position
+        // already for the weather it sends the watch.
+        const positions = {};
+        let positionID = 0;
+        const ask = (success, failure) => {
+          const id = ++positionID;
+          positions[id] = {success, failure};
+          webkit.messageHandlers.pebble.postMessage({type:'position', id});
+          return id;
+        };
+        Object.defineProperty(navigator, 'geolocation', {configurable: true, value: {
+          getCurrentPosition: (success, failure) => { ask(success, failure); },
+          // Answered once rather than followed: the app asks for a position, it
+          // does not subscribe to them. An app watching gets the first fix and
+          // no refreshes, which is the whole of what is on offer.
+          watchPosition: (success, failure) => ask(success, failure),
+          clearWatch: id => { delete positions[id]; }
+        }});
+        window.__pebblePosition = (id, position, error) => {
+          const cb = positions[id]; if (!cb) return;
+          delete positions[id];
+          if (position) cb.success?.(position); else cb.failure?.(error);
         };
         window.__pebbleDispatch = (name, detail) => (listeners[name] || []).forEach(fn => fn(detail));
         window.__pebbleResult = (id, ok) => { const cb = callbacks[id]; if (!cb) return;
@@ -155,6 +186,10 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
             openURLHandler(url)
             return
         }
+        if type == "position", let requestID = body["id"] as? Int {
+            Task { await answerPosition(requestID: requestID) }
+            return
+        }
         if type == "notification",
            let title = body["title"] as? String,
            let notificationBody = body["body"] as? String,
@@ -204,6 +239,77 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
         loadedApplicationID = nil
         loadContinuation?.resume(throwing: error)
         loadContinuation = nil
+    }
+
+    /// Answers a script's request for a position, in the shape the web has for
+    /// one so that a script written against a browser reads it unchanged.
+    private func answerPosition(requestID: Int) async {
+        do {
+            let location = try await locationHandler()
+            await deliverPosition(requestID: requestID, position: Self.webPosition(location), error: nil)
+        } catch {
+            // The codes are the web's: 1 refused, 2 could not be found, 3 took
+            // too long. Refused is the one worth telling apart — the reader can
+            // do something about it, and the others they cannot.
+            let refused = (error as? WeatherSourceError) == .locationNotAllowed
+            await deliverPosition(
+                requestID: requestID,
+                position: nil,
+                error: [
+                    "code": refused ? 1 : 2,
+                    "message": refused
+                        ? "Pebble has not been allowed your position."
+                        : "Your position could not be found.",
+                ]
+            )
+            await PebbleDiagnostics.shared.record(
+                .warning,
+                category: "configuration",
+                message: "an application asked for a position and did not get one:"
+                    + " \(String(reflecting: error))"
+            )
+        }
+    }
+
+    private func deliverPosition(
+        requestID: Int,
+        position: [String: Any]?,
+        error: [String: Any]?
+    ) async {
+        guard let webView else { return }
+        _ = try? await webView.callAsyncJavaScript(
+            "window.__pebblePosition(id, position, error);",
+            arguments: [
+                "id": requestID,
+                "position": position as Any,
+                "error": error as Any,
+            ],
+            in: nil,
+            contentWorld: .page
+        )
+    }
+
+    /// A `CLLocation` as a `GeolocationPosition`.
+    ///
+    /// CoreLocation says "I do not know" with a negative number, and the web
+    /// says it with null; passing the negative through would have a script
+    /// draw a heading of -1 degrees.
+    private static func webPosition(_ location: CLLocation) -> [String: Any] {
+        func known(_ value: CLLocationDistance) -> Any {
+            value < 0 ? NSNull() : value
+        }
+        return [
+            "coords": [
+                "latitude": location.coordinate.latitude,
+                "longitude": location.coordinate.longitude,
+                "accuracy": known(location.horizontalAccuracy),
+                "altitude": location.verticalAccuracy < 0 ? NSNull() as Any : location.altitude as Any,
+                "altitudeAccuracy": known(location.verticalAccuracy),
+                "heading": known(location.course),
+                "speed": known(location.speed),
+            ],
+            "timestamp": location.timestamp.timeIntervalSince1970 * 1000,
+        ]
     }
 
     private func resolve(callbackID: Int, succeeded: Bool) async throws {

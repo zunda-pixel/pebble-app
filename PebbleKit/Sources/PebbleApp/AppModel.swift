@@ -197,7 +197,14 @@ public final class AppModel {
                 body: body
             )
         },
-        activeWatchHandler: { [weak self] in self?.connectedWatch }
+        activeWatchHandler: { [weak self] in self?.connectedWatch },
+        // The same position the weather is fetched for. A script asking for one
+        // is asking the phone, because WebKit gives an app no way to grant the
+        // web's own `navigator.geolocation`.
+        locationHandler: { [weak self] in
+            guard let self else { throw WeatherSourceError.locationNotAllowed }
+            return try await self.phoneLocationSource.currentLocation()
+        }
     )
 
     /// One directory for the fourteen stores.
