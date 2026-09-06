@@ -15,7 +15,25 @@ public enum WatchBoard: String, CaseIterable, Codable, Sendable {
     case robertEVT = "robert_evt"
     case robertBigboard = "robert_bb"
     case robertBigboard2 = "robert_bb2"
+    /// The three boards PebbleOS builds for the emulator, named as its own
+    /// `boards/` directories are. They were missing, so a watch in QEMU had no
+    /// board at all — which is the only thing the firmware screen goes on, and
+    /// left the diagnostic log writing "platform 245" for want of a name.
+    ///
+    /// They have no release asset: `build-qemu.yml` is a separate workflow from
+    /// the `build-firmware.yml` that publishes `normal_<board>_<version>.pbz`.
+    /// So the firmware catalogue answers `noFirmwareForBoard`, which is a
+    /// sentence, where a nil board was silence.
+    case qemuEmery = "qemu_emery"
+    case qemuFlint = "qemu_flint"
+    case qemuGabbro = "qemu_gabbro"
 
+    /// The platform byte the firmware puts in its version response.
+    ///
+    /// These are `FirmwareMetadataPlatform` in PebbleOS's
+    /// `include/pebbleos/firmware_metadata.h`, and only the ones that file
+    /// still has a `FIRMWARE_METADATA_HW_PLATFORM` mapping for are here — the
+    /// classic Pebbles are in that enum too, and this app cannot drive them.
     public init?(hardwarePlatform: UInt8) {
         switch hardwarePlatform {
         case 13: self = .robertEVT
@@ -26,8 +44,11 @@ public enum WatchBoard: String, CaseIterable, Codable, Sendable {
         case 19: self = .getafixEVT
         case 20: self = .getafixDVT
         case 21: self = .getafixDVT2
+        case 242: self = .qemuGabbro
         case 243: self = .obelixBigboard2
         case 244: self = .obelixBigboard
+        case 245: self = .qemuEmery
+        case 246: self = .qemuFlint
         case 247: self = .robertBigboard2
         case 249: self = .robertBigboard
         default: return nil

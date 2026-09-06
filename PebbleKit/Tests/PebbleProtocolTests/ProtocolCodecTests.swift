@@ -219,6 +219,52 @@ struct ProtocolCodecTests {
         ))
     }
 
+    /// Every platform PebbleOS still builds for is one this app recognises.
+    ///
+    /// The list is `FIRMWARE_METADATA_HW_PLATFORM` in PebbleOS's
+    /// `include/pebbleos/firmware_metadata.h` — the boards that file maps, and
+    /// so the only bytes a watch running current firmware can send. The three
+    /// emulator platforms were missing from both tables, which gave a watch in
+    /// QEMU no board at all: `ConnectedWatch.board` is what the firmware screen
+    /// goes on, and the diagnostic log had to write "platform 245" for want of
+    /// a name.
+    ///
+    /// The classic Pebbles are in that enum too and are deliberately absent
+    /// here: this app cannot drive them, and a nil board is the right answer.
+    @Test(arguments: [
+        (UInt8(15), WatchBoard.asterix, WatchModel.pebble2Duo),
+        (UInt8(17), .obelixDVT, .pebbleTime2),
+        (UInt8(18), .obelixPVT, .pebbleTime2),
+        (UInt8(243), .obelixBigboard2, .pebbleTime2),
+        (UInt8(20), .getafixDVT, .pebbleRound2),
+        (UInt8(21), .getafixDVT2, .pebbleRound2),
+        // The emulator's three, named as PebbleOS's own `boards/` are.
+        (UInt8(245), .qemuEmery, .pebbleTime2),
+        (UInt8(246), .qemuFlint, .pebble2Duo),
+        (UInt8(242), .qemuGabbro, .pebbleRound2),
+    ])
+    func everyPlatformTheFirmwareBuildsForIsKnown(
+        platform: UInt8,
+        board: WatchBoard,
+        model: WatchModel
+    ) {
+        #expect(WatchBoard(hardwarePlatform: platform) == board)
+        #expect(WatchModel(hardwarePlatform: platform) == model)
+    }
+
+    /// A board this app has never heard of is nil rather than a guess.
+    ///
+    /// Nil is honest — the byte is all the watch sent, and the board name is
+    /// not derivable from it — but it costs that watch its firmware screen.
+    /// Worth knowing when the next revision ships.
+    @Test func aPlatformTheAppDoesNotKnowHasNoBoard() {
+        // Classic Pebbles, and the byte after the newest board.
+        for platform: UInt8 in [0, 8, 12, 14, 22] {
+            #expect(WatchBoard(hardwarePlatform: platform) == nil)
+            #expect(WatchModel(hardwarePlatform: platform) == nil)
+        }
+    }
+
     @Test
     func watchVersionResponseDecodesRunningFirmwareAndSerial() throws {
         var payload = [UInt8](repeating: 0, count: 120)
