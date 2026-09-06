@@ -170,10 +170,17 @@ public final class MockWatchClient: WatchClient {
         appMessageResponses.append((transactionID, acknowledged))
     }
 
+    /// What the watch refuses. Set after connecting — the synchronization a
+    /// connect runs writes most of these records — to see what the app makes of
+    /// a refusal, which for several of them used to be nothing at all.
+    public var writeFailure: (any Error)?
+    public var removeFailure: (any Error)?
+
     /// One switch over every record, filling the same typed lists the tests
     /// have always read. A recorder the app never writes to is a case that was
     /// forgotten, and the compiler says which.
     public func write(_ record: BlobDBRecord) async throws {
+        if let writeFailure { throw writeFailure }
         switch record {
         case .application(let metadata):
             registeredApplications.removeAll { $0.applicationID == metadata.applicationID }
@@ -214,6 +221,7 @@ public final class MockWatchClient: WatchClient {
     }
 
     public func remove(_ key: BlobDBKey) async throws {
+        if let removeFailure { throw removeFailure }
         switch key {
         case .application(let applicationID):
             unregisteredApplicationIDs.append(applicationID)

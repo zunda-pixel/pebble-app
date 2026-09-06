@@ -229,6 +229,22 @@
         }
       }
     },
+    "%@ still has %@. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ still has %2$@. %3$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“%@”には“%@”がまだ残っています。%@"
+          }
+        }
+      }
+    },
     "%lld" : {
       "localizations" : {
         "ja" : {

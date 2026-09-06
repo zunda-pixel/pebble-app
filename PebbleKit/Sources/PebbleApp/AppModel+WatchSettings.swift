@@ -55,7 +55,14 @@ extension AppModel {
         timeline.isReminderAppEnabled = isEnabled
         Defaults[.reminderAppEnabled] = isEnabled
         for connection in activeConnections {
-            try? await connection.client.write(.reminderAppState(isEnabled ? .enabled : .notEnabled))
+            do {
+                try await connection.client.write(.reminderAppState(isEnabled ? .enabled : .notEnabled))
+            } catch {
+                // Said out loud like the three switches beside it. This one used
+                // to swallow the refusal, so the toggle stayed where the reader
+                // put it and the watch's Reminders app did not.
+                watchSettings.feedback = .failure(settingsFailureMessage(connection, error))
+            }
         }
     }
 

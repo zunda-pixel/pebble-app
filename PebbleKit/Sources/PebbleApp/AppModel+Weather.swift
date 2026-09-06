@@ -66,13 +66,32 @@ extension AppModel {
     }
 
     public func removeWeatherPlace(id: UUID) async {
+        // Named before it goes, for the failure that says which place is still
+        // on the watch.
+        let name = weather.places.first { $0.id == id }?.name ?? ""
         weather.places.removeAll { $0.id == id }
         saveWeatherPlaces()
         weather.reports.removeAll { $0.id == id }
-        // The watch keeps what it was given until it is told otherwise.
+        // The watch keeps what it was given until it is told otherwise — and
+        // until this said so, a refusal here left the place on the watch with
+        // nothing said about it anywhere: gone from the phone, still on the
+        // wrist, and no way to tell why.
         for connection in activeConnections where connection.watch.supportsWeatherApp {
-            try? await connection.client.remove(.weather(id))
-            try? await connection.client.write(.weatherOrder(weather.reports.map(\.id)))
+            do {
+                try await connection.client.remove(.weather(id))
+            } catch {
+                weather.feedback = .failure(
+                    "\(connection.watch.name) still has \(name). \(Text(refusalReason(for: error)))"
+                )
+                continue
+            }
+            do {
+                try await connection.client.write(.weatherOrder(weather.reports.map(\.id)))
+            } catch {
+                weather.feedback = .failure(
+                    "\(connection.watch.name) did not accept the list of places. \(Text(refusalReason(for: error)))"
+                )
+            }
         }
     }
 

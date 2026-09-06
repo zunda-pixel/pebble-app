@@ -10,15 +10,83 @@ import Testing
 @Suite
 @MainActor
 struct ReportedStateTests {
-    private func makeModel(directory: URL) -> AppModel {
+    private func makeModel(directory: URL, client: any WatchClient = MockWatchClient()) -> AppModel {
         AppModel(
-            client: MockWatchClient(),
+            client: client,
             storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: WatchApplicationLibrary(
                 fileURL: directory.appending(path: "applications.json")
             ),
             watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
         )
+    }
+
+    /// A refusal the app used to swallow.
+    ///
+    /// Three of the switches on the watch settings screen put a refusal on the
+    /// screen and the Reminders one did not, so the toggle stayed where the
+    /// reader put it and the watch's Reminders app did not. Nothing anywhere
+    /// said so.
+    @Test
+    func aRemindersAppTheWatchRefusesIsSaidOutLoud() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let client = MockWatchClient()
+        let model = makeModel(directory: directory, client: client)
+        await model.scan()
+        await model.connect(to: try #require(model.discoveredWatches.first))
+        // After connecting: the synchronization a connect runs writes this
+        // record too, and it is the reader's own toggle that is under test.
+        model.watchSettings.feedback = nil
+        client.writeFailure = BlobDBClientError.rejected(.databaseFull)
+
+        await model.setReminderAppEnabled(true)
+
+        #expect(model.watchSettings.feedback?.isFailure == true)
+        // The choice is still the reader's, and the next connection sends it
+        // again: what changed is that they know it did not land.
+        #expect(model.timeline.isReminderAppEnabled)
+    }
+
+    /// A place taken off the phone that the watch would not let go of.
+    ///
+    /// Adding one says when it fails; removing one did not, so the place left
+    /// the phone's list and stayed on the wrist with nothing said about it.
+    @Test
+    func aPlaceTheWatchWillNotLetGoOfIsSaidOutLoud() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let client = MockWatchClient()
+        let model = makeModel(directory: directory, client: client)
+        await model.scan()
+        let discovered = try #require(model.discoveredWatches.first)
+        await model.connect(to: discovered)
+
+        // The weather app is a capability, and the mock's watch answers without
+        // one until it says otherwise.
+        var capable = try #require(model.connectedWatch)
+        capable.capabilities = 1 << WatchCapability.weatherApp.rawValue
+        client.emit(.watchUpdated(capable))
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(model.connectedWatch?.supportsWeatherApp == true)
+
+        let kyoto = WeatherPlace(
+            id: UUID(),
+            name: "Kyoto",
+            latitude: 35.01,
+            longitude: 135.76,
+            followsPhone: false
+        )
+        model.weather.places = [kyoto]
+        model.weather.feedback = nil
+        client.removeFailure = BlobDBClientError.rejected(.databaseFull)
+
+        await model.removeWeatherPlace(id: kyoto.id)
+
+        // Gone from the phone either way — that part is the reader's decision —
+        // and now the screen says the watch still has it.
+        #expect(model.weather.places.isEmpty)
+        #expect(model.weather.feedback?.isFailure == true)
     }
 
     @Test
