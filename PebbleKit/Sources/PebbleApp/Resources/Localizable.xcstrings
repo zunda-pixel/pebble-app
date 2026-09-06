@@ -305,17 +305,6 @@
         }
       }
     },
-    "A few things are needed before it can show your day, your reminders, and the weather. Each one is asked for on its own screen, and any of them can wait." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "予定、リマインダー、天気をウォッチに表示するには、いくつかの許可が必要です。1画面につき1つずつ確認しますが、どれもあとにできます。"
-          }
-        }
-      }
-    },
     "A few things are needed before it can show your day, your reminders, and the weather. They are all on the next screen, and any of them can wait." : {
       "localizations" : {
         "ja" : {
@@ -656,28 +645,6 @@
         }
       }
     },
-    "Allow" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "許可"
-          }
-        }
-      }
-    },
-    "Allow Bluetooth access when requested." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "求められたらBluetoothへのアクセスを許可してください。"
-          }
-        }
-      }
-    },
     "Allow location access to use where the phone is." : {
       "localizations" : {
         "ja" : {
@@ -754,17 +721,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "答えなかった項目は、あとから“設定”で許可できます。“設定”には、このアプリが読み取りを許可されている項目も表示されます。"
-          }
-        }
-      }
-    },
-    "App Catalog" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アプリカタログ"
           }
         }
       }
@@ -1089,34 +1045,12 @@
         }
       }
     },
-    "Catalog JSON URL" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "カタログのJSON URL"
-          }
-        }
-      }
-    },
     "Catalog refresh failed; showing the offline cache." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "カタログを更新できなかったため、オフラインのキャッシュを表示しています。"
-          }
-        }
-      }
-    },
-    "Catalog sources can be added in Settings." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "カタログソースは“設定”で追加できます。"
           }
         }
       }
@@ -1187,17 +1121,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "“ファイル”からPBWパッケージを選択します"
-          }
-        }
-      }
-    },
-    "Choose Devices, then Scan to connect." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "“デバイス”を選択してから“スキャン”で接続します。"
           }
         }
       }
@@ -1278,17 +1201,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "これから"
-          }
-        }
-      }
-    },
-    "Compatibility" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "互換性"
           }
         }
       }
@@ -1459,17 +1371,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ファームウェアのアップデートを再開するには、ウォッチを接続してください。"
-          }
-        }
-      }
-    },
-    "Connect your Pebble, install watch apps, and keep timeline and health data synchronized." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "Pebbleを接続して、ウォッチアプリをインストールし、タイムラインとヘルスケアデータを常に同期できます。"
           }
         }
       }
@@ -1854,17 +1755,6 @@
         }
       }
     },
-    "Enter a valid HTTPS catalog URL." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "有効なHTTPSのカタログURLを入力してください。"
-          }
-        }
-      }
-    },
     "Erase %@?" : {
       "localizations" : {
         "ja" : {
@@ -2001,28 +1891,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "華氏"
-          }
-        }
-      }
-    },
-    "Favorite" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "お気に入りに追加"
-          }
-        }
-      }
-    },
-    "Favorite Watchface" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチフェイスをお気に入りに追加"
           }
         }
       }
@@ -2193,17 +2061,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチのログを取得"
-          }
-        }
-      }
-    },
-    "Get Started" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "はじめよう"
           }
         }
       }
@@ -2404,17 +2261,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "Pebbleアプリケーションを読み込み中"
-          }
-        }
-      }
-    },
-    "Incoming Call" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "着信"
           }
         }
       }
@@ -2795,17 +2641,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "メール"
-          }
-        }
-      }
-    },
-    "Makes this the active watchface" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "このウォッチフェイスを適用します"
           }
         }
       }
@@ -3296,17 +3131,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "プライバシー設定を開く"
-          }
-        }
-      }
-    },
-    "Opens this watch application's settings" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "このウォッチアプリケーションの設定を開きます"
           }
         }
       }
@@ -3827,17 +3651,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "アプリケーションを削除"
-          }
-        }
-      }
-    },
-    "Remove Favorite" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "お気に入りから削除"
           }
         }
       }
@@ -4552,17 +4365,6 @@
         }
       }
     },
-    "The connection failed: the watch has forgotten this phone, and the phone still holds the old pairing. Forget the watch in the system Bluetooth settings, then add it again here." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "接続に失敗しました。ウォッチ側はこのiPhoneを忘れていますが、iPhone側には以前のペアリング情報が残っています。“設定”のBluetoothでこのウォッチの登録を解除してから、もう一度追加してください。"
-          }
-        }
-      }
-    },
     "The connection failed: the watch has thrown away its pairing with this device. A Pebble keeps one, so pairing it with another phone or computer does this. Forget the watch in the system Bluetooth settings, then pair it again here." : {
       "localizations" : {
         "ja" : {
@@ -4965,17 +4767,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチにこのアプリケーション用の空き容量がありません。"
-          }
-        }
-      }
-    },
-    "The watch ended the connection. A Pebble talks to one phone or computer at a time, and gives itself to whichever asked last, so another device connecting takes it from this one. Connect again here to take it back." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチが接続を終了しました。Pebbleは一度に1台のiPhoneまたはコンピュータとしか通信せず、最後に接続してきた側に切り替わるため、ほかのデバイスが接続するとこのデバイスからは切断されます。こちらに戻すには、もう一度接続してください。"
           }
         }
       }
@@ -5660,17 +5451,6 @@
         }
       }
     },
-    "Turn on your Pebble and keep it nearby." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "Pebbleの電源を入れて、近くに置いてください。"
-          }
-        }
-      }
-    },
     "Turning one on asks the system for it. Anything left off can be turned on later in Settings." : {
       "localizations" : {
         "ja" : {
@@ -5757,17 +5537,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "すべてアップデート"
-          }
-        }
-      }
-    },
-    "Update Catalog" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "カタログをアップデート"
           }
         }
       }
@@ -6088,17 +5857,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "体重: %@"
-          }
-        }
-      }
-    },
-    "Welcome to Pebble" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "Pebbleへようこそ"
           }
         }
       }
