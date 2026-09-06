@@ -2394,6 +2394,7 @@
       }
     },
     "Incoming Call" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
