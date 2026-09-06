@@ -180,6 +180,40 @@ struct FeatureFeedbackTests {
         #expect(FeatureFeedback.failure("No.").isFailure == true)
     }
 
+    /// When it was said travels with it.
+    ///
+    /// Nothing here is taken away on a timer, so a message outlives the moment
+    /// it was true: "3 health update(s) received from the watch." is still on
+    /// the screen tomorrow, reading exactly as it did when it arrived. The
+    /// banner draws this so a reader can tell the two apart.
+    @Test func anAnswerSaysWhenItWasGiven() {
+        let then = Date(timeIntervalSince1970: 1_700_000_000)
+        #expect(FeatureFeedback.success("Done.", at: then).at == then)
+        #expect(FeatureFeedback.progress("Working…", at: then).at == then)
+        #expect(FeatureFeedback.failure("No.", at: then).at == then)
+
+        // Left off at almost every one of the hundred-odd places that writes
+        // one, which say what happened and not what time it is.
+        let now = Date()
+        #expect(FeatureFeedback.success("Done.").at.timeIntervalSince(now) < 1)
+    }
+
+    /// Two answers are the same when they say the same thing.
+    ///
+    /// The clock is shown, not compared: a test asking whether a screen said
+    /// "Done." is asking about the words, and could never name the instant the
+    /// model wrote them.
+    @Test func theClockDoesNotChangeWhatAnAnswerIs() {
+        let earlier = Date(timeIntervalSince1970: 1_700_000_000)
+        let later = Date(timeIntervalSince1970: 1_800_000_000)
+        #expect(FeatureFeedback.success("Done.", at: earlier) == .success("Done.", at: later))
+        #expect(FeatureFeedback.success("Done.", at: earlier) == .success("Done."))
+
+        // The kind and the words still tell them apart.
+        #expect(FeatureFeedback.success("Done.", at: earlier) != .failure("Done.", at: earlier))
+        #expect(FeatureFeedback.success("Done.", at: earlier) != .success("No.", at: earlier))
+    }
+
     /// Which settings pages may be opened.
     ///
     /// `https` alone refused two of the reader's applications — 91 Dub 4.0 and
