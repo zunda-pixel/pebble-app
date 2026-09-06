@@ -292,8 +292,16 @@ struct OfficialCatalogLookup: Decodable {
     var data: [OfficialCatalogApplication]
 }
 
+/// One entry as the store sends it.
+///
+/// Every field is optional but the ones an entry cannot be shown without, and
+/// those are checked in `application(kind:)` so that an entry this app cannot
+/// use costs that entry and not the response it arrived in. A plain `String`
+/// here throws `keyNotFound`, and these decode inside an array — so one bad
+/// entry in `v1/home/watchapps` lost all 73 of the day's featured applications,
+/// while the guard written to skip exactly such an entry never ran.
 struct OfficialCatalogApplication: Decodable {
-    var author: String
+    var author: String?
     /// Optional because the store need not send it, and one entry without it
     /// was enough to lose the response it arrived in.
     ///
@@ -309,9 +317,9 @@ struct OfficialCatalogApplication: Decodable {
     /// throws `keyNotFound` on an entry that omits it, and one such entry in an
     /// array loses the whole response it arrived in.
     var description: String?
-    var id: String
-    var title: String
-    var type: String
+    var id: String?
+    var title: String?
+    var type: String?
     var uuid: String?
     var hardwarePlatforms: [OfficialCatalogHardware]?
     var iconImage: [String: String]?
@@ -329,7 +337,7 @@ struct OfficialCatalogApplication: Decodable {
     /// The kind the entry says it is, for a lookup that was not made against a
     /// watchapps or watchfaces endpoint and so has nothing else to go on.
     var declaredKind: WatchApplicationKind? {
-        WatchApplicationKind(rawValue: type)
+        type.flatMap(WatchApplicationKind.init(rawValue:))
     }
 
     /// - Parameter kind: What the endpoint this came from was asked for, or nil
@@ -338,16 +346,21 @@ struct OfficialCatalogApplication: Decodable {
         guard let kind = kind ?? declaredKind else { return nil }
         guard let uuid, let applicationID = UUID(uuidString: uuid),
               uuid.lowercased() != "00000000-0000-0000-0000-000000000000", let release = latestRelease,
-              let downloadURL = URL(string: release.pbwFile),
-              ["https", "http"].contains(downloadURL.scheme?.lowercased()) else { return nil }
+              let pbwFile = release.pbwFile,
+              let downloadURL = URL(string: pbwFile),
+              ["https", "http"].contains(downloadURL.scheme?.lowercased()),
+              // A row needs both of these, so an entry the store will not name
+              // or attribute is one to skip — the same answer this already
+              // gives an entry with no UUID.
+              let title, let author else { return nil }
         return CatalogApplication(
             id: applicationID,
-            storeID: id,
+            storeID: id?.nilWhenEmpty,
             name: title,
             developer: author,
             version: release.version ?? "0",
             downloadURL: downloadURL,
-            supportedPlatforms: hardwarePlatforms?.map(\.name) ?? ["aplite", "basalt", "chalk", "diorite", "emery", "flint", "gabbro"],
+            supportedPlatforms: hardwarePlatforms?.compactMap(\.name) ?? ["aplite", "basalt", "chalk", "diorite", "emery", "flint", "gabbro"],
             kind: kind,
             // The store sends `"category": ""` as readily as it omits the key,
             // and both mean the same thing to a reader.
@@ -360,9 +373,16 @@ struct OfficialCatalogApplication: Decodable {
     }
 }
 
-struct OfficialCatalogHardware: Decodable { var name: String }
+/// Optional for the reason above: one platform in `hardware_platforms`
+/// without a name would otherwise have cost the whole response.
+struct OfficialCatalogHardware: Decodable { var name: String? }
 struct OfficialCatalogRelease: Decodable {
-    var pbwFile: String
+    /// Optional, and the clearest case of the fault above: `application(kind:)`
+    /// below already drops an entry whose `pbw_file` will not parse as an
+    /// `https` URL, so a release with no usable download was meant to cost one
+    /// entry. A *missing* key threw before that guard could run and cost the
+    /// response instead — a pulled release taking the catalogue with it.
+    var pbwFile: String?
     var releaseNotes: String?
     var version: String?
     private enum CodingKeys: String, CodingKey {

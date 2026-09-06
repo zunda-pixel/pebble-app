@@ -1231,6 +1231,53 @@ struct StoreLookupByUUIDTests {
         #expect(found.summary == nil)
     }
 
+    /// One unusable entry costs that entry, not the response it came in.
+    ///
+    /// `application(kind:)` was already written to skip an entry with no UUID
+    /// or an unusable download — but the fields it checked were plain `String`s
+    /// on the wire type above it, so a *missing* key threw `keyNotFound` before
+    /// the guard could run. These decode inside an array, so one pulled release
+    /// in `v1/home/watchapps` took all 73 of the day's featured applications
+    /// with it, and the guard meant to handle it never ran.
+    @Test func oneUnusableEntryDoesNotCostTheWholeResponse() async throws {
+        let base = URL(string: "https://store.invalid/partial/api")!
+        let uuid = UUID()
+        let answer = """
+        {
+          "data": [
+            { "id": "no-release", "title": "Gone", "author": "Keynes", "type": "watchapp",
+              "uuid": "\(UUID().uuidString.lowercased())", "latest_release": {} },
+            { "id": "no-title", "author": "Keynes", "type": "watchapp",
+              "uuid": "\(UUID().uuidString.lowercased())",
+              "latest_release": {"pbw_file": "https://example.invalid/a.pbw", "version": "1.0"} },
+            { "id": "no-type", "title": "Untyped", "author": "Keynes",
+              "uuid": "\(UUID().uuidString.lowercased())",
+              "latest_release": {"pbw_file": "https://example.invalid/b.pbw", "version": "1.0"} },
+            { "id": "1b25cef73e2b471686672d07", "title": "Watch Tools", "author": "Keynes",
+              "type": "watchapp", "uuid": "\(uuid.uuidString.lowercased())",
+              "hardware_platforms": [{"name": "emery"}, {}],
+              "latest_release": {"pbw_file": "https://example.invalid/watch-tools.pbw", "version": "1.4.0"} }
+          ],
+          "limit": 4,
+          "offset": 0
+        }
+        """
+        StubURLProtocol.stub(
+            base.appending(path: "v1/apps/uuid").appending(path: uuid.uuidString.lowercased()),
+            status: 200,
+            body: Data(answer.utf8)
+        )
+
+        // The lookup takes the entry's own word for its kind, so the untyped
+        // one is skipped too — and the good one at the end still arrives.
+        let found = try #require(await catalog().application(uuid: uuid, from: base))
+
+        #expect(found.name == "Watch Tools")
+        #expect(found.storeID == "1b25cef73e2b471686672d07")
+        // A platform entry with no name is dropped rather than taken as one.
+        #expect(found.supportedPlatforms == ["emery"])
+    }
+
     /// Not an error. Plenty of packages were never listed, and a reader who
     /// installed one from a file should see the screen without a complaint on
     /// it.
