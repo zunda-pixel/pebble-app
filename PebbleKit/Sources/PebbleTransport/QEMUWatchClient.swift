@@ -111,10 +111,28 @@ public final class QEMUWatchClient: WatchClient {
             batteryLevel: nil,
             serialNumber: information.serialNumber,
             hardwareRevision: information.hardwareRevision,
-            // The board was not passed on at all, so knowing that platform 245
-            // is `qemu_emery` bought nothing: the watch still reached the app
-            // without one, and the board is what the firmware screen goes on.
-            board: information.board
+            // Everything below was decoded and then dropped on the floor: this
+            // transport built its watch from four fields while the Bluetooth
+            // one passed on eleven. So knowing that platform 245 is
+            // `qemu_emery` bought nothing — the watch still reached the app
+            // without a board, which is the only thing the firmware screen
+            // goes on — and a watch in the emulator claimed to support
+            // nothing at all.
+            //
+            // `capabilities` is the one with teeth. PebbleOS sets
+            // `lang_pack_support` unconditionally in `prv_send_watch_versions`,
+            // so language packs, which worked here only because
+            // `sendLanguagePack` lets a watch reporting no capabilities
+            // through, keep working for the honest reason instead. Weather
+            // has no such escape hatch and so was never sent to a watch in the
+            // emulator; now it follows what the firmware says, which is
+            // whether `APP_ID_WEATHER` was built into that image.
+            isRunningRecoveryFirmware: information.isRunningRecoveryFirmware,
+            runningFirmwareSlot: information.runningFirmwareSlot,
+            board: information.board,
+            languageLocale: information.languageLocale,
+            languageVersion: information.languageVersion,
+            capabilities: information.capabilities
         )
         connectedWatch = device
         return device

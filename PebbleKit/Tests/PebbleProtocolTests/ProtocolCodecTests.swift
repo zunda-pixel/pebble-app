@@ -311,6 +311,59 @@ struct ProtocolCodecTests {
         }
     }
 
+    /// The capability bits mean what the firmware means by them.
+    ///
+    /// `WatchCapability`'s raw values are bit positions in the union at the top
+    /// of PebbleOS's `include/pbl/services/comm_session/session_remote_version.h`,
+    /// declared in that order and packed one bit each. Nothing checked that the
+    /// two lists had not drifted, and until now it barely mattered in the
+    /// emulator, where the whole field was thrown away — so a wrong bit would
+    /// have shown up first as a feature quietly missing from a real watch.
+    ///
+    /// Two bits are checked from each end of the field rather than all sixteen:
+    /// they are consecutive single bits, so an off-by-one anywhere moves these.
+    @Test func capabilityBitsMatchTheOrderTheFirmwareDeclaresThem() throws {
+        // The field is eight bytes at 142, least significant byte first.
+        func information(settingBits bits: [WatchCapability]) throws -> WatchVersionInformation {
+            var payload = [UInt8](repeating: 0, count: 150)
+            payload[0] = 0x01
+            payload[46] = 18
+            let flags = bits.reduce(UInt64(0)) { $0 | (1 << $1.rawValue) }
+            for index in 0..<8 {
+                payload[142 + index] = UInt8(truncatingIfNeeded: flags >> (UInt64(index) * 8))
+            }
+            return try WatchVersionCodec.decode(
+                PebbleProtocolFrame(endpoint: 16, payload: payload)
+            )
+        }
+
+        // `run_state_support` is the first field, `lang_pack_support` the fifth,
+        // and `weather_app_support` the twelfth.
+        let languageOnly = try information(settingBits: [.languagePack])
+        #expect(languageOnly.supportsLanguagePacks)
+        #expect(!languageOnly.supportsWeatherApp)
+
+        let weatherOnly = try information(settingBits: [.weatherApp])
+        #expect(weatherOnly.supportsWeatherApp)
+        #expect(!weatherOnly.supportsLanguagePacks)
+
+        let both = try information(settingBits: [.runState, .languagePack, .weatherApp, .customVibePattern])
+        #expect(both.supportsLanguagePacks)
+        #expect(both.supportsWeatherApp)
+        #expect(WatchCapability.runState.isSet(in: both.capabilities))
+        #expect(WatchCapability.customVibePattern.isSet(in: both.capabilities))
+        #expect(!WatchCapability.sendText.isSet(in: both.capabilities))
+
+        // A response too short to hold the field says nothing rather than
+        // guessing, which is what let the emulator's watch through before.
+        var short = [UInt8](repeating: 0, count: 120)
+        short[0] = 0x01
+        short[46] = 18
+        let older = try WatchVersionCodec.decode(PebbleProtocolFrame(endpoint: 16, payload: short))
+        #expect(older.capabilities == 0)
+        #expect(!older.supportsLanguagePacks)
+    }
+
     @Test
     func watchVersionResponseDecodesRunningFirmwareAndSerial() throws {
         var payload = [UInt8](repeating: 0, count: 120)
