@@ -15,6 +15,7 @@ enum PreviewSamples {
         firmwareVersion: "v4.36.2",
         batteryLevel: 72,
         serialNumber: "Q402P000000A",
+        hardwareRevision: "V2R2",
         board: .obelixPVT,
         languageLocale: "ja_JP",
         languageVersion: 1,
@@ -30,7 +31,8 @@ enum PreviewSamples {
         lastBatteryLevel: watch.batteryLevel,
         lastConnectedAt: .now,
         automaticallyConnects: true,
-        board: watch.board
+        board: watch.board,
+        hardwareRevision: watch.hardwareRevision
     )
 
     static let discovered = DiscoveredWatch(

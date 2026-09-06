@@ -5,6 +5,23 @@ import MemberwiseInit
 public struct WatchVersionInformation: Equatable, Sendable {
     public var firmwareVersion: String
     public var serialNumber: String
+    /// What was burned into the watch's one-time-programmable memory at the
+    /// factory — `V2R2` and the like. `mfg_get_hw_version` in PebbleOS's
+    /// `src/fw/mfg/mfg_serials.c` reads it from the newest locked OTP slot.
+    ///
+    /// Not the board. That is `board` below, and it comes from the platform
+    /// byte: this field is nine bytes wide, which `obelix_pvt` does not fit in,
+    /// and a watch off the bench has never had it written.
+    ///
+    /// Nil when the watch did not say — which covers an unprogrammed watch,
+    /// where the firmware sends its `XXXXXXXX` placeholder, and a field of
+    /// zeroes.
+    ///
+    /// Optional rather than empty-for-absent, unlike `languageLocale` above:
+    /// this is passed along four types to reach a screen, and "" would have to
+    /// be recognised as absence at every hop or it would win over a remembered
+    /// revision the moment a watch without one connected.
+    public var hardwareRevision: String? = nil
     public var hardwarePlatform: UInt8
     /// A watch in recovery firmware (PRF) answers version and ping requests and
     /// rejects every other endpoint.
@@ -91,11 +108,21 @@ public enum WatchVersionCodec {
         let slot: Int? = FirmwareFlag.dualSlot.isSet(in: flags)
             ? (FirmwareFlag.slot0.isSet(in: flags) ? 0 : 1)
             : nil
-        // After the two firmware metadata blocks, the bootloader timestamp, board,
-        // serial, Bluetooth address and resource version.
+        // After the two firmware metadata blocks, the bootloader timestamp, the
+        // manufacturing hardware revision, the serial, the Bluetooth address and
+        // the resource version.
+        //
+        // The offsets come from `struct VersionsMessage` in PebbleOS's
+        // `src/fw/kernel/system_versions.c` and `sizeof(FirmwareMetadata)` = 47
+        // (4 + 32 + 8 + 1 + 1 + 1) from `include/pebbleos/firmware_metadata.h`:
+        // command 0, running metadata 1, recovery metadata 48, bootloader
+        // timestamp 95, hw_version 99 for `MFG_HW_VERSION_SIZE` = 9, serial 108
+        // for 12, address 120 for 6. That is 126 in all, which is the length
+        // the firmware's own `_Static_assert` calls the pre-v1.5 version info.
         return WatchVersionInformation(
             firmwareVersion: fixedString(frame.payload[5..<37]),
             serialNumber: fixedString(frame.payload[108..<120]),
+            hardwareRevision: manufacturingRevision(frame.payload[99..<108]),
             hardwarePlatform: frame.payload[46],
             isRunningRecoveryFirmware: FirmwareFlag.recovery.isSet(in: flags),
             runningFirmwareSlot: slot,
@@ -121,6 +148,19 @@ public enum WatchVersionCodec {
     private static func fixedString(_ bytes: ArraySlice<UInt8>) -> String {
         let content = bytes.prefix { $0 != 0 }
         return String(decoding: content, as: UTF8.self)
+    }
+
+    /// The hardware revision, or nil when the watch has none to give.
+    ///
+    /// `mfg_get_hw_version` returns its `DUMMY_HWVER` — the literal string
+    /// `XXXXXXXX` — when no OTP slot has been locked, which is every watch that
+    /// has not been through the factory step that writes it. Showing that to a
+    /// reader as a hardware revision would be presenting a placeholder as a
+    /// fact, so it reads as absent, the same as a field of zeroes.
+    private static func manufacturingRevision(_ bytes: ArraySlice<UInt8>) -> String? {
+        let revision = fixedString(bytes)
+        guard !revision.isEmpty, !revision.allSatisfy({ $0 == "X" }) else { return nil }
+        return revision
     }
 }
 

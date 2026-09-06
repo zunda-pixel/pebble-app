@@ -87,8 +87,20 @@ public actor PebbleDiagnostics {
         let report = PebbleDiagnosticReport(
             generatedAt: Date(),
             operatingSystem: ProcessInfo.processInfo.operatingSystemVersionString,
-            deviceDescription: device.map {
-                "\($0.name) / \($0.model.displayName) / \($0.firmwareVersion ?? "unknown")"
+            // The board and the manufacturing revision are here because a
+            // report about a watch that does not say which revision it is
+            // cannot be matched against a hardware fault. Both read "unknown"
+            // rather than being left out: their absence is itself worth
+            // knowing, since an unrecognised board is why some watches have no
+            // firmware screen.
+            deviceDescription: device.map { device in
+                [
+                    device.name,
+                    device.model.displayName,
+                    device.board?.rawValue ?? "unknown board",
+                    device.hardwareRevision ?? "unknown revision",
+                    device.firmwareVersion ?? "unknown",
+                ].joined(separator: " / ")
             },
             applications: applications,
             entries: entries

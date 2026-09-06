@@ -139,6 +139,13 @@ struct WatchDetailContent<
                 if let serialNumber = watch.serialNumber {
                     LabeledContent("Serial Number", value: serialNumber)
                 }
+                // Beside the serial, which is where the watch itself puts it:
+                // the two are adjacent fields of the version response. Left out
+                // rather than shown empty on a watch that never had one
+                // written, which is every watch off the bench.
+                if let hardwareRevision = watch.hardwareRevision {
+                    LabeledContent("Hardware Revision", value: hardwareRevision)
+                }
                 if let batteryLevel = watch.batteryLevel {
                     LabeledContent("Battery", value: batteryLevel, format: .percent)
                 }

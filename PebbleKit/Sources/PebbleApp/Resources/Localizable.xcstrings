@@ -2125,6 +2125,16 @@
         }
       }
     },
+    "Hardware Revision" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ハードウェアバージョン"
+          }
+        }
+      }
+    },
     "Has companion JavaScript" : {
       "localizations" : {
         "ja" : {

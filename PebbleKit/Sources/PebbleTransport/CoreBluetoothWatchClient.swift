@@ -436,6 +436,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
             firmwareVersion: information.firmwareVersion,
             batteryLevel: latestBatteryLevel,
             serialNumber: information.serialNumber,
+            hardwareRevision: information.hardwareRevision,
             isRunningRecoveryFirmware: information.isRunningRecoveryFirmware,
             runningFirmwareSlot: information.runningFirmwareSlot,
             board: information.board,

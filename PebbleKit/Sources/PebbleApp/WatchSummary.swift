@@ -12,6 +12,8 @@ struct WatchSummary: Identifiable, Equatable {
     var name: String
     var model: WatchModel?
     var serialNumber: String?
+    /// Nil where no watch, connected or remembered, has one written.
+    var hardwareRevision: String?
     var batteryLevel: Int?
     var firmwareVersion: String?
     var languageLocale: String?
@@ -35,6 +37,7 @@ extension WatchSummary {
             name: connection?.watch.name ?? saved?.name ?? watchID.rawValue,
             model: connection?.watch.model ?? saved?.model,
             serialNumber: connection?.watch.serialNumber ?? saved?.serialNumber,
+            hardwareRevision: connection?.watch.hardwareRevision ?? saved?.hardwareRevision,
             batteryLevel: connection?.watch.batteryLevel ?? saved?.lastBatteryLevel,
             firmwareVersion: connection?.watch.firmwareVersion ?? saved?.firmwareVersion,
             languageLocale: connection?.watch.languageLocale,

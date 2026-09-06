@@ -89,6 +89,9 @@ public struct ConnectedWatch: Identifiable, Hashable, Sendable {
     public var firmwareVersion: String?
     public var batteryLevel: Int?
     public var serialNumber: String? = nil
+    /// The revision burned in at the factory, beside the serial it sits beside
+    /// in the version response. Nil on a watch that never had one written.
+    public var hardwareRevision: String? = nil
     /// A watch in recovery firmware rejects every endpoint except version and
     /// ping, so it can only be offered a firmware install.
     public var isRunningRecoveryFirmware: Bool = false

@@ -109,7 +109,12 @@ public final class QEMUWatchClient: WatchClient {
             model: WatchModel(hardwarePlatform: information.hardwarePlatform) ?? device.model,
             firmwareVersion: information.firmwareVersion,
             batteryLevel: nil,
-            serialNumber: information.serialNumber
+            serialNumber: information.serialNumber,
+            hardwareRevision: information.hardwareRevision,
+            // The board was not passed on at all, so knowing that platform 245
+            // is `qemu_emery` bought nothing: the watch still reached the app
+            // without one, and the board is what the firmware screen goes on.
+            board: information.board
         )
         connectedWatch = device
         return device

@@ -265,6 +265,52 @@ struct ProtocolCodecTests {
         }
     }
 
+    /// The revision burned in at the factory, which nobody was reading.
+    ///
+    /// It sits between the bootloader timestamp and the serial — nine bytes at
+    /// 99, per `struct VersionsMessage` in PebbleOS's
+    /// `src/fw/kernel/system_versions.c`. The serial the decoder already reads
+    /// starts at 108, so the two are checked together: if the offset were wrong
+    /// they would not both come out.
+    ///
+    /// Not the board. Nine bytes cannot hold `obelix_pvt`, and this comes from
+    /// OTP rather than from the firmware build.
+    @Test func watchVersionResponseDecodesTheManufacturingRevision() throws {
+        var payload = [UInt8](repeating: 0, count: 120)
+        payload[0] = 0x01
+        payload[46] = 18
+        payload.replaceSubrange(99..<103, with: Array("V2R2".utf8))
+        payload.replaceSubrange(108..<120, with: Array("Q402P000000A".utf8))
+
+        let information = try WatchVersionCodec.decode(
+            PebbleProtocolFrame(endpoint: 16, payload: payload)
+        )
+
+        #expect(information.hardwareRevision == "V2R2")
+        #expect(information.serialNumber == "Q402P000000A")
+        #expect(information.board == .obelixPVT)
+    }
+
+    /// A watch that has never been through the factory step says nothing.
+    ///
+    /// `mfg_get_hw_version` hands back `DUMMY_HWVER` — the literal `XXXXXXXX` —
+    /// when no OTP slot is locked. Passing that on would put a placeholder on a
+    /// watch's page where a hardware revision belongs.
+    @Test func anUnprogrammedRevisionReadsAsNothing() throws {
+        for written in ["XXXXXXXX", ""] {
+            var payload = [UInt8](repeating: 0, count: 120)
+            payload[0] = 0x01
+            payload[46] = 18
+            payload.replaceSubrange(99..<(99 + written.count), with: Array(written.utf8))
+
+            let information = try WatchVersionCodec.decode(
+                PebbleProtocolFrame(endpoint: 16, payload: payload)
+            )
+
+            #expect(information.hardwareRevision == nil)
+        }
+    }
+
     @Test
     func watchVersionResponseDecodesRunningFirmwareAndSerial() throws {
         var payload = [UInt8](repeating: 0, count: 120)
@@ -280,6 +326,8 @@ struct ProtocolCodecTests {
         #expect(information.firmwareVersion == "v5.1.0")
         #expect(information.serialNumber == "FLINT1234567")
         #expect(WatchModel(hardwarePlatform: information.hardwarePlatform) == .pebble2Duo)
+        // Zeroes, because this payload never wrote the field.
+        #expect(information.hardwareRevision == nil)
     }
 
     @Test

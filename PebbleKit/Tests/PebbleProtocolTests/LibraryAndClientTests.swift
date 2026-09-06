@@ -214,6 +214,76 @@ struct SavedWatchStoreTests {
         #expect(try await reloaded.allWatches()[0].firmwareVersion == "v1")
         #expect(try await reloaded.remove(watchID: device.id).isEmpty)
     }
+
+    /// A connection that does not know the hardware revision does not erase it.
+    ///
+    /// A watch's page shows the revision while the watch is away, the way it
+    /// already shows the serial, so it has to survive a reconnection. It is
+    /// kept the way the board is — and it matters more than the board, because
+    /// this one comes from OTP and a watch in recovery firmware can answer the
+    /// version request without it having been written.
+    @Test func aRememberedHardwareRevisionOutlivesAConnectionThatDoesNotSayIt() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        let watchID = WatchID("watch-1")
+
+        var watches = try await store.record(ConnectedWatch(
+            id: watchID,
+            name: "Pebble 5209",
+            model: .pebbleTime2,
+            firmwareVersion: "v1",
+            batteryLevel: nil,
+            serialNumber: "SERIAL",
+            hardwareRevision: "V2R2"
+        ))
+        #expect(watches[0].hardwareRevision == "V2R2")
+
+        watches = try await store.record(ConnectedWatch(
+            id: watchID,
+            name: "Pebble 5209",
+            model: .pebbleTime2,
+            firmwareVersion: "v1",
+            batteryLevel: nil,
+            serialNumber: "SERIAL"
+        ))
+        #expect(watches[0].hardwareRevision == "V2R2")
+    }
+
+    /// A `watches.json` from before the field existed still loads.
+    ///
+    /// A synthesized `init(from:)` does not fall back on a property's default
+    /// value, so a non-optional field added to `SavedWatch` would have refused
+    /// every file already on a reader's phone — which is the whole reason
+    /// `board` before it is optional too.
+    @Test func aStoreWrittenBeforeTheRevisionExistedStillLoads() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fileURL = directory.appending(path: "watches.json")
+        // As the store wrote it before `hardwareRevision` and `board` were
+        // fields: no key for either.
+        try Data("""
+        [{
+          "id": "watch-1",
+          "name": "Pebble 5209",
+          "model": "EMERY",
+          "firmwareVersion": "v4.36.2",
+          "serialNumber": "Q402P000000A",
+          "lastConnectedAt": 780000000,
+          "automaticallyConnects": true
+        }]
+        """.utf8).write(to: fileURL)
+
+        let watches = try await SavedWatchStore(fileURL: fileURL).allWatches()
+
+        #expect(watches.count == 1)
+        #expect(watches[0].serialNumber == "Q402P000000A")
+        #expect(watches[0].hardwareRevision == nil)
+        #expect(watches[0].board == nil)
+    }
 }
 
 @Suite

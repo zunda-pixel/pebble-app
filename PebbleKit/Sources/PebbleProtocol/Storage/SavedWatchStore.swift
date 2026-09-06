@@ -14,6 +14,14 @@ public struct SavedWatch: Codable, Equatable, Identifiable, Sendable {
     /// The board revision, remembered so firmware can be chosen for this watch
     /// while it is away.
     public var board: WatchBoard? = nil
+    /// The revision burned in at the factory, remembered so a watch's page can
+    /// show it while the watch is away, as it already does its serial.
+    ///
+    /// Optional, like `board` above and for the same reason: a synthesized
+    /// `init(from:)` does not fall back on a property's default value, so a
+    /// non-optional field added here would refuse every `watches.json` written
+    /// before it existed.
+    public var hardwareRevision: String? = nil
 }
 
 public actor SavedWatchStore {
@@ -47,7 +55,10 @@ public actor SavedWatchStore {
             lastBatteryLevel: device.batteryLevel,
             lastConnectedAt: Date(),
             automaticallyConnects: previous?.automaticallyConnects ?? true,
-            board: device.board ?? previous?.board
+            board: device.board ?? previous?.board,
+            // Kept from the last connection that knew it, the way the board is:
+            // a connection that does not say should not erase what is known.
+            hardwareRevision: device.hardwareRevision ?? previous?.hardwareRevision
         )
         updated.removeAll { $0.id == device.id }
         updated.insert(watch, at: 0)
