@@ -131,14 +131,18 @@ struct TimelineItemComposer: View {
             .formStyle(.grouped)
             .navigationTitle(Text(kind.newTitle))
             .toolbar {
-                Button(role: .cancel) { dismiss() }
-                Button("Add", role: .confirm) {
-                    let value = title
-                    let when = date
-                    dismiss()
-                    add(value, when)
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(role: .cancel) { dismiss() }
                 }
-                .disabled(!isComplete)
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(role: .confirm) {
+                        let value = title
+                        let when = date
+                        dismiss()
+                        add(value, when)
+                    }
+                    .disabled(!isComplete)
+                }
             }
         }
     }

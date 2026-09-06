@@ -110,20 +110,24 @@ struct CatalogContent<Destination: View>: View {
         .searchable(text: $query)
         .navigationTitle(Text("Catalog"))
         .toolbar {
-            Button(role: .close, action: close)
-            if let importApplication {
-                if isImportingApplication {
-                    ProgressView()
-                        .accessibilityLabel(Text("Importing Pebble application"))
-                } else {
-                    Button("Import", systemImage: "square.and.arrow.down", action: importApplication)
-                        .accessibilityHint(Text("Choose a PBW package from Files"))
-                        .disabled(isImportDisabled)
-                }
+            ToolbarItem(placement: .cancellationAction) {
+                Button(role: .close, action: close)
             }
-            Button("Update All", systemImage: "arrow.down.app", action: installUpdates)
-            Button("Refresh", systemImage: "arrow.clockwise", action: refresh)
-                .disabled(isUpdating)
+            ToolbarItemGroup(placement: .primaryAction) {
+                if let importApplication {
+                    if isImportingApplication {
+                        ProgressView()
+                            .accessibilityLabel(Text("Importing Pebble application"))
+                    } else {
+                        Button("Import", systemImage: "square.and.arrow.down", action: importApplication)
+                            .accessibilityHint(Text("Choose a PBW package from Files"))
+                            .disabled(isImportDisabled)
+                    }
+                }
+                Button("Update All", systemImage: "arrow.down.app", action: installUpdates)
+                Button("Refresh", systemImage: "arrow.clockwise", action: refresh)
+                    .disabled(isUpdating)
+            }
         }
         .overlay {
             if filteredApplications.isEmpty {

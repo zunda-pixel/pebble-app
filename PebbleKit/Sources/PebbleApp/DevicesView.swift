@@ -64,7 +64,7 @@ struct DevicesContent<Destination: View>: View {
         }
         .navigationTitle(Text("Devices"))
         .toolbar {
-            ToolbarItem {
+            ToolbarItem(placement: .primaryAction) {
                 Button("Add Watch", systemImage: "plus", action: addWatch)
                     .keyboardShortcut("r", modifiers: .command)
             }
@@ -178,7 +178,9 @@ struct AddWatchContent: View {
             }
             .navigationTitle(Text("Add Watch"))
             .toolbar {
-                Button(role: .close, action: close)
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(role: .close, action: close)
+                }
             }
         }
         #if os(macOS)

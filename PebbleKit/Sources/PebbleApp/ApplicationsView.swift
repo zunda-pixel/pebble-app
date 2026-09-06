@@ -134,10 +134,17 @@ struct ApplicationsView: View {
                 }
                 .navigationTitle(model.applications.configurationApplication?.displayName ?? "App Settings")
                 .toolbar {
-                    // Closing, not confirming: the page has its own submit, and
-                    // whatever it posted has already been applied by the time
-                    // this is reachable.
-                    Button(role: .close) { Task { await model.closeConfiguration() } }
+                    // The leading slot, which is where a modal's way out goes
+                    // on both platforms — named for cancelling, but nothing is
+                    // being cancelled here.
+                    ToolbarItem(placement: .cancellationAction) {
+                        // Closing, not confirming: the page has its own submit,
+                        // and whatever it posted has already been applied by
+                        // the time this is reachable.
+                        Button(role: .close) {
+                            Task { await model.closeConfiguration() }
+                        }
+                    }
                 }
             }
         }
