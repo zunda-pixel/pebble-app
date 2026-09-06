@@ -37,6 +37,15 @@ struct ConfigurationWebView: View {
     var closeHandler: @MainActor @Sendable (String?) -> Void
     @State private var page: WebPage
     @State private var loadErrorMessage: String?
+    /// Which of these views is loading, so a page loaded twice can say whether
+    /// that was one view starting over or two views racing.
+    ///
+    /// A `@State` initial value is taken once per identity, so two identities
+    /// carry two of these and one identity carries one however often its body
+    /// runs. That is the difference the log could not see: the second load runs
+    /// to the end while the first is thrown away, and whichever web view is on
+    /// screen is the one that never finishes.
+    @State private var identity = UUID()
 
     init(url: URL, closeHandler: @escaping @MainActor @Sendable (String?) -> Void) {
         self.url = url
@@ -68,8 +77,9 @@ struct ConfigurationWebView: View {
             let inlineHTML = url.inlineHTML
             await PebbleDiagnostics.shared.record(
                 category: "configuration",
-                message: inlineHTML.map { "loading \($0.utf8.count) byte(s) of page the application built" }
-                    ?? "loading a page over \(url.scheme ?? "no scheme")"
+                message: "[\(identity.uuidString.prefix(8))] "
+                    + (inlineHTML.map { "loading \($0.utf8.count) byte(s) of page the application built" }
+                        ?? "loading a page over \(url.scheme ?? "no scheme")")
             )
             do {
                 // A page the application's own JavaScript built is unpacked and
@@ -88,13 +98,14 @@ struct ConfigurationWebView: View {
                 guard !Task.isCancelled else {
                     await PebbleDiagnostics.shared.record(
                         category: "configuration",
-                        message: "a second page took over before this one was up"
+                        message: "[\(identity.uuidString.prefix(8))]"
+                            + " a second page took over before this one was up"
                     )
                     return
                 }
                 await PebbleDiagnostics.shared.record(
                     category: "configuration",
-                    message: "the settings page is up"
+                    message: "[\(identity.uuidString.prefix(8))] the settings page is up"
                 )
             } catch {
                 if let urlError = error as? URLError, urlError.code == .cannotFindHost {
@@ -105,7 +116,8 @@ struct ConfigurationWebView: View {
                 await PebbleDiagnostics.shared.record(
                     .error,
                     category: "configuration",
-                    message: "the settings page would not load: \(String(reflecting: error))"
+                    message: "[\(identity.uuidString.prefix(8))]"
+                        + " the settings page would not load: \(String(reflecting: error))"
                 )
             }
         }
