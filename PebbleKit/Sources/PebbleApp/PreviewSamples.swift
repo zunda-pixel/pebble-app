@@ -54,7 +54,6 @@ enum PreviewSamples {
         serialNumber: watch.serialNumber,
         batteryLevel: watch.batteryLevel,
         firmwareVersion: watch.firmwareVersion,
-        languageLocale: watch.languageLocale,
         phase: .connected,
         isSaved: true,
         automaticallyConnects: true,

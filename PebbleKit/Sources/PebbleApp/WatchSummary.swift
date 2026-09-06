@@ -16,7 +16,6 @@ struct WatchSummary: Identifiable, Equatable {
     var hardwareRevision: String?
     var batteryLevel: Int?
     var firmwareVersion: String?
-    var languageLocale: String?
     var isRunningRecoveryFirmware: Bool = false
     var phase: WatchConnectionPhase?
     var isSaved: Bool = false
@@ -40,7 +39,6 @@ extension WatchSummary {
             hardwareRevision: connection?.watch.hardwareRevision ?? saved?.hardwareRevision,
             batteryLevel: connection?.watch.batteryLevel ?? saved?.lastBatteryLevel,
             firmwareVersion: connection?.watch.firmwareVersion ?? saved?.firmwareVersion,
-            languageLocale: connection?.watch.languageLocale,
             isRunningRecoveryFirmware: connection?.watch.isRunningRecoveryFirmware == true,
             phase: connection?.phase,
             isSaved: saved != nil,
