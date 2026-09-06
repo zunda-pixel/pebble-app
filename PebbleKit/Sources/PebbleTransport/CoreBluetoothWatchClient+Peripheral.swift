@@ -324,10 +324,23 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
             )
             return
         }
-        Task {
+        // Notification sharing is said here as well as when it changes, because
+        // it only changes once and the log of every connection after that was
+        // silent about it. It decides more than notifications: incoming calls
+        // are the watch's to read over ANCS and nothing this app sends, so
+        // "no call on the watch" has two causes and this is what tells them
+        // apart.
+        #if os(iOS)
+        let sharing = peripheral.ancsAuthorized ? "allowed" : "refused"
+        #else
+        let sharing = "not asked on this platform"
+        #endif
+        Task { [sharing] in
             await PebbleDiagnostics.shared.record(
                 category: "pairing",
-                message: "[\(clientTag)] connectivity paired=\(status.isPaired) encrypted=\(status.isEncrypted) error=\(status.pairingError)"
+                message: "[\(clientTag)] connectivity paired=\(status.isPaired)"
+                    + " encrypted=\(status.isEncrypted) error=\(status.pairingError)"
+                    + ", notification sharing \(sharing)"
             )
         }
         switch setup.apply(status) {
