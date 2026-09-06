@@ -97,12 +97,20 @@ extension AppModel {
         // finished one did not get is what is kept.
         var firstUnfinished = queued.count
         for connection in activeConnections {
-            await removePinsTheAppHasForgotten(on: connection)
+            // What the reconciliation took off this watch, so the queue does not
+            // ask for it a second time: deleting a pin used to cost two removes,
+            // one from each.
+            let alreadyGone = await removePinsTheAppHasForgotten(on: connection)
             // Derived per watch, because what each already holds is its own: the
             // queue is the durable work and goes first, so an index into it
             // keeps its meaning however many pins this watch still needs.
             let derived = await upsertsStillNeeded(besides: queuedUpserts, on: connection)
-            let stopped = await send(queued + derived, to: connection, queuedCount: queued.count)
+            let stopped = await send(
+                queued + derived,
+                to: connection,
+                queuedCount: queued.count,
+                alreadyGone: alreadyGone
+            )
             firstUnfinished = min(firstUnfinished, min(stopped, queued.count))
         }
         try? await pendingTimelineOperationStore.save(Array(queued[firstUnfinished...]))
@@ -138,10 +146,15 @@ extension AppModel {
     /// count on its own cannot tell a queue that is not draining from digests
     /// that are not matching, which is exactly the question a synchronization
     /// that keeps sending the same number of pins raises.
+    ///
+    /// `alreadyGone` names what the reconciliation has just taken off this
+    /// watch. A queued delete for one of those is done rather than skipped:
+    /// the pin is off the watch, which is all the queue was asking for.
     private func send(
         _ operations: [PendingTimelineOperation],
         to connection: WatchConnection,
-        queuedCount: Int
+        queuedCount: Int,
+        alreadyGone: Set<UUID>
     ) async -> Int {
         let client = connection.client
         var taken = 0
@@ -155,6 +168,9 @@ extension AppModel {
                     taken += 1
                     if index < queuedCount { takenFromQueue += 1 }
                 case .delete(let id):
+                    // Counted by the reconciliation's own line, not here: one
+                    // pin leaving should read as one pin leaving.
+                    guard !alreadyGone.contains(id) else { continue }
                     try await retry(with: .watchWork) { try await client.remove(.timelinePin(id)) }
                     dropped += 1
                 }
@@ -185,17 +201,21 @@ extension AppModel {
         return operations.count
     }
 
-    /// Deletes the pins this watch was given and the app no longer has.
+    /// Deletes the pins this watch was given and the app no longer has, and
+    /// answers which ones went.
     ///
     /// BlobDB has no listing, so a pin can only be named from the app's own
     /// record of what it wrote. Without this, a pin whose delete was never
     /// queued — the queue was full, the app was reinstalled, the moment was
     /// missed — stays on the watch's timeline and is never mentioned again.
-    private func removePinsTheAppHasForgotten(on connection: WatchConnection) async {
+    ///
+    /// The answer matters because the queue usually holds a delete for the same
+    /// pin: letting go of one from the phone puts it in both places at once.
+    private func removePinsTheAppHasForgotten(on connection: WatchConnection) async -> Set<UUID> {
         let watchID = connection.watch.id
         let written = (try? await timelineStore.writtenPinDigests(watchID: watchID)) ?? [:]
         let forgotten = Set(written.keys).subtracting(timeline.pins.map(\.id))
-        guard !forgotten.isEmpty else { return }
+        guard !forgotten.isEmpty else { return [] }
         var removed: Set<UUID> = []
         let client = connection.client
         for id in forgotten {
@@ -217,6 +237,7 @@ extension AppModel {
             message: "\(connection.watch.name): removed \(removed.count)"
                 + " of \(forgotten.count) pin(s) the app no longer has"
         )
+        return removed
     }
 
     /// Empties the watch's own pin database and writes back what the app holds.

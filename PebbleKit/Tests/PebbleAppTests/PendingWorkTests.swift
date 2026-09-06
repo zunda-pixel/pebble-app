@@ -518,6 +518,41 @@ struct PendingWorkTests {
         #expect(client.timelinePinWrites.count == pinsBefore)
     }
 
+    /// Letting go of a pin takes it off the watch once.
+    ///
+    /// It went twice: `removeTimelinePins` queues a delete, and the
+    /// reconciliation that runs first sees the same pin missing from what the
+    /// app holds and takes it off too. The second remove came back
+    /// `keyDoesNotExist`, which is accepted, so nothing failed — every deletion
+    /// simply cost a round trip it did not need. The reader's log showed both:
+    /// `removed 1 of 1 pin(s) the app no longer has`, then `dropped 1`.
+    @Test
+    func aPinLetGoOfIsTakenOffTheWatchOnce() async throws {
+        let client = MockWatchClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = makeModel(client: client, directory: directory)
+        let kept = timelinePin("Standup", minutesFromNow: 60)
+        let going = timelinePin("Dentist", minutesFromNow: 120)
+        try await model.timelineStore.save([kept, going])
+        try await model.pendingTimelineOperationStore.save([])
+
+        await model.scan()
+        await model.connect(to: try #require(model.discoveredWatches.first))
+        await model.synchronizeTimeline()
+        #expect(client.timelinePinWrites.count == 2)
+        #expect(client.timelinePinRemovals.isEmpty)
+
+        // The reader deletes one, which queues a delete and leaves the pin out
+        // of what the app holds — so both mechanisms have it in their sights.
+        await model.removeTimelinePins([going])
+
+        #expect(client.timelinePinRemovals == [going.id])
+        #expect(client.timelinePins.map(\.id) == [kept.id])
+        // And the one that stayed was not written again on the way past.
+        #expect(client.timelinePinWrites.count == 2)
+    }
+
     /// Two pins under one identifier is not a state anything downstream can
     /// represent, so the timeline does not hold one.
     ///

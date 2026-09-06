@@ -14,6 +14,9 @@ public final class MockWatchClient: WatchClient {
     /// replaced a pin already here. `timelinePins` keeps one entry per pin the
     /// way the watch does, so it cannot say how often the same one was sent.
     public private(set) var timelinePinWrites: [UUID] = []
+    /// Every pin removal in order, for the same reason: removing a pin that has
+    /// already gone leaves no trace in `timelinePins`.
+    public private(set) var timelinePinRemovals: [UUID] = []
     public private(set) var clearedTimelineCount = 0
     public private(set) var installedObjects: [(bytes: [UInt8], objectType: PutBytesObjectType, appBankID: UInt32)] = []
     public private(set) var installedFirmwarePackages: [PBZFirmwarePackage] = []
@@ -228,6 +231,7 @@ public final class MockWatchClient: WatchClient {
             registeredApplications.removeAll { $0.applicationID == applicationID }
         case .timelinePin(let id):
             timelinePins.removeAll { $0.id == id }
+            timelinePinRemovals.append(id)
         case .timelineReminder(let id):
             timelineReminders.removeAll { $0.id == id }
             // Kept because a reminder the watch made was never written here, so
