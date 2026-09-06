@@ -26,8 +26,23 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
 }
 
 public enum WatchSettingsCodec {
-    /// The settings database. A watch that does not advertise
-    /// `settingsSync` has no such database and refuses the write.
+    /// The settings database. Every watch this app can drive has one, and takes
+    /// these writes.
+    ///
+    /// This used to say that a watch not advertising `settingsSync` has no such
+    /// database and refuses the write, which had the direction backwards and
+    /// would have sent the next reader to gate these writes on a bit the watch
+    /// never sets. `settings_sync_support` is the **phone's** claim to the
+    /// watch: `settings_blob_db_phone_supports_sync` in PebbleOS's
+    /// `src/fw/services/blob_db/settings_blob_db.c` reads it out of the cached
+    /// capabilities of the connected phone, and `prefs_sync.c` starts a sync
+    /// when the phone reports it. Measured on a watch in the emulator, which
+    /// clears bit 23 in its own version response and takes these writes anyway.
+    ///
+    /// What the bit does gate is the other direction — `blob_db_sync_db` at
+    /// `settings_blob_db.c:263` — so a setting changed on the watch does not
+    /// come back to the phone. This app does not claim the bit, deliberately;
+    /// see `PhoneVersionCodec.supportedCapabilities`.
     public static var databaseID: UInt8 { 0x0C }
 
     /// The key carries its terminator: the firmware accepts the name with or

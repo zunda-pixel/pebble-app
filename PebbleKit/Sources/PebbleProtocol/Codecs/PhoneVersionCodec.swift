@@ -35,6 +35,16 @@ public enum PhoneVersionCodec {
     /// without the reminders bit, reads only the first three fields of a
     /// now-playing frame without the extended-music bit, and falls back to the
     /// legacy firmware-update path without the smooth-progress bit.
+    /// Bit 23, `settings_sync_support`, is deliberately absent — and absent from
+    /// `PhoneCapability` too, so that claiming it takes a deliberate act.
+    ///
+    /// It is the phone's promise to take the watch's own settings back:
+    /// `prefs_sync.c` starts pushing the settings database the moment the phone
+    /// reports it. This app has nowhere to put them — the inbound `BlobDB2`
+    /// dispatch handles the notification-app and timeline databases and answers
+    /// `default: break` to everything else — so claiming the bit would set the
+    /// watch sending records that come back refused. A setting changed on the
+    /// watch therefore stays there; see the issue filed for that.
     public static var supportedCapabilities: Set<PhoneCapability> {
         [
             .appRunStateProtocol, .infiniteLogDump, .extendedMusicProtocol,
