@@ -102,6 +102,17 @@ public final class QEMUWatchClient: WatchClient {
                 self?.finishVersion(throwing: WatchConnectionError.connectionTimedOut)
             }
         }
+        // Said out loud, as the Bluetooth transport does. It said nothing here,
+        // which is how a watch arriving with no board and no capabilities went
+        // unremarked in the one environment this project verifies in.
+        await PebbleDiagnostics.shared.record(
+            information.isRunningRecoveryFirmware ? .error : .info,
+            category: "connection",
+            message: "[qemu] \(information.diagnosticSummary)"
+                + (information.isRunningRecoveryFirmware
+                    ? " (recovery firmware: only a firmware install will work)"
+                    : "")
+        )
         try await synchronizeTime()
         let device = ConnectedWatch(
             id: device.id,

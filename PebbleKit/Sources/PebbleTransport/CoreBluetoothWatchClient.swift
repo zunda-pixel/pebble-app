@@ -757,14 +757,13 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         let information = try WatchVersionCodec.decode(frame)
         Task { [
             tag = clientTag,
-            version = information.firmwareVersion,
-            board = information.board?.rawValue ?? "platform \(information.hardwarePlatform)",
+            summary = information.diagnosticSummary,
             recovery = information.isRunningRecoveryFirmware
         ] in
             await PebbleDiagnostics.shared.record(
                 recovery ? .error : .info,
                 category: "connection",
-                message: "[\(tag)] firmware \(version) on \(board)"
+                message: "[\(tag)] \(summary)"
                     + (recovery ? " (recovery firmware: only a firmware install will work)" : "")
             )
         }

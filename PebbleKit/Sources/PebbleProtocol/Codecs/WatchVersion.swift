@@ -47,10 +47,37 @@ public struct WatchVersionInformation: Equatable, Sendable {
     public var board: WatchBoard? {
         WatchBoard(hardwarePlatform: hardwarePlatform)
     }
+
+    /// One line about the watch, for the connection log and the diagnostic
+    /// report.
+    ///
+    /// Shared so that both transports say the same thing about the same watch.
+    /// The Bluetooth one wrote a shorter version of this and the emulator's
+    /// wrote nothing at all, which is how a watch reaching the app with no
+    /// board and no capabilities went unremarked.
+    ///
+    /// The capabilities are named rather than left as a number, because the
+    /// question a reader has is which feature the watch will refuse — and an
+    /// unrecognised board is printed as its platform byte, since that is the
+    /// one thing the watch definitely did say.
+    public var diagnosticSummary: String {
+        var parts = [
+            "firmware \(firmwareVersion)",
+            "on \(board?.rawValue ?? "platform \(hardwarePlatform)")",
+        ]
+        if let hardwareRevision { parts.append("rev \(hardwareRevision)") }
+        if let slot = runningFirmwareSlot { parts.append("slot \(slot)") }
+        if !languageLocale.isEmpty { parts.append("lang \(languageLocale) v\(languageVersion)") }
+        let named = WatchCapability.allCases.filter { $0.isSet(in: capabilities) }
+        parts.append(named.isEmpty
+            ? "no capabilities"
+            : "capabilities \(named.map(\.name).joined(separator: ","))")
+        return parts.joined(separator: " / ")
+    }
 }
 
 /// In the order the firmware declares them.
-public enum WatchCapability: UInt64, Sendable {
+public enum WatchCapability: UInt64, CaseIterable, Sendable {
     case runState = 0
     case infiniteLogDumping = 1
     case extendedMusicService = 2
@@ -70,6 +97,29 @@ public enum WatchCapability: UInt64, Sendable {
 
     public func isSet(in capabilities: UInt64) -> Bool {
         capabilities & (1 << rawValue) != 0
+    }
+
+    /// For the connection log. Spelled out rather than reflected, so renaming a
+    /// case does not silently rename what a saved diagnostic report says.
+    public var name: String {
+        switch self {
+        case .runState: "runState"
+        case .infiniteLogDumping: "infiniteLogDumping"
+        case .extendedMusicService: "extendedMusicService"
+        case .extendedNotificationService: "extendedNotificationService"
+        case .languagePack: "languagePack"
+        case .appMessage8k: "appMessage8k"
+        case .activityInsights: "activityInsights"
+        case .voiceAPI: "voiceAPI"
+        case .sendText: "sendText"
+        case .notificationFiltering: "notificationFiltering"
+        case .unreadCoredump: "unreadCoredump"
+        case .weatherApp: "weatherApp"
+        case .remindersApp: "remindersApp"
+        case .workoutApp: "workoutApp"
+        case .smoothFirmwareInstallProgress: "smoothFirmwareInstallProgress"
+        case .customVibePattern: "customVibePattern"
+        }
     }
 }
 
