@@ -14,6 +14,7 @@ struct NotificationSettingsContent<PhoneAppsDestination: View>: View {
     var notificationPreferences: NotificationDeliveryPreferences
     var applications: [WatchApplication]
     var notificationSourceAppCount: Int
+    var feedback: FeatureFeedback?
     var setCompanionNotificationsEnabled: (Bool) -> Void
     var setQuietHours: (_ enabled: Bool, _ start: Int?, _ end: Int?) -> Void
     var setNotificationsEnabled: (Bool, UUID) -> Void
@@ -21,6 +22,10 @@ struct NotificationSettingsContent<PhoneAppsDestination: View>: View {
 
     var body: some View {
         Form {
+            // The switches below answer here now. They used to write to the
+            // field a watch's detail screen shows, so flicking one in Settings
+            // replied on the watch's page instead.
+            FeedbackBanner(feedback: feedback)
             Section {
                 Toggle("Watch App Notifications", isOn: Binding(
                     get: { companionNotificationsEnabled },
@@ -89,6 +94,7 @@ struct NotificationSettingsContent<PhoneAppsDestination: View>: View {
             notificationPreferences: NotificationDeliveryPreferences(),
             applications: PreviewSamples.watchApplications + PreviewSamples.watchfaces,
             notificationSourceAppCount: PreviewSamples.notificationApps.count,
+            feedback: .success("Watch app notifications are enabled."),
             setCompanionNotificationsEnabled: { _ in },
             setQuietHours: { _, _, _ in },
             setNotificationsEnabled: { _, _ in },
@@ -108,6 +114,7 @@ struct NotificationSettingsContent<PhoneAppsDestination: View>: View {
             ),
             applications: [],
             notificationSourceAppCount: 0,
+            feedback: nil,
             setCompanionNotificationsEnabled: { _ in },
             setQuietHours: { _, _, _ in },
             setNotificationsEnabled: { _, _ in },

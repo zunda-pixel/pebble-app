@@ -83,6 +83,31 @@ struct FeatureFeedbackTests {
         #expect(model.catalog.feedback == nil)
     }
 
+    /// A delivery setting answers on the settings screen, and a test
+    /// notification on the watch's own page.
+    ///
+    /// One field served both, and only the watch's detail screen showed it —
+    /// so flicking a switch in Settings replied on a watch's page, where
+    /// nobody had asked anything.
+    @Test func aNotificationSettingAnswersOnTheSettingsScreenAndNotOnAWatchs() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = makeModel(directory: directory, client: MockWatchClient())
+
+        model.setCompanionNotificationsEnabled(false)
+
+        #expect(model.notifications.settingsFeedback == .success("Watch app notifications are disabled."))
+        // The field a watch's detail screen shows stays empty.
+        #expect(model.notifications.feedback == nil)
+
+        // And the other way round: the test notification is the watch page's,
+        // and says nothing in Settings.
+        await model.sendTestNotification()
+
+        #expect(model.notifications.feedback == .failure("Connect a Pebble before sending a test notification."))
+        #expect(model.notifications.settingsFeedback == .success("Watch app notifications are disabled."))
+    }
+
     /// Update All answers where its button is, which is the applications
     /// screen.
     ///

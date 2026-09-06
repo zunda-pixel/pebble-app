@@ -64,6 +64,11 @@ struct HealthContent: View {
                 ForEach(HealthAnalysisPeriod.allCases) { period in Text(period.title).tag(period) }
             }
             .pickerStyle(.segmented)
+            // At the top, because it says things that arrive on their own —
+            // "Received 3 health update(s) from the watch" turns up when the
+            // watch pushes them, and at the foot of the list it sat below two
+            // charts where it would never be seen.
+            FeedbackBanner(feedback: feedback)
             Section {
                 LabeledContent("Steps", value: newestSample?.steps ?? 0, format: .number)
                 LabeledContent("Sleep") {
@@ -135,7 +140,6 @@ struct HealthContent: View {
                 }
                 LabeledContent("Tracked Days", value: averages.sleepDays, format: .number)
             }
-            FeedbackBanner(feedback: feedback)
         }
         .navigationTitle(Text("Health"))
         .toolbar {

@@ -8,7 +8,7 @@ extension AppModel {
     public func setCompanionNotificationsEnabled(_ enabled: Bool) {
         notifications.companionEnabled = enabled
         Defaults[.companionNotificationsEnabled] = enabled
-        notifications.feedback = .success(
+        notifications.settingsFeedback = .success(
             enabled
                 ? "Watch app notifications are enabled."
                 : "Watch app notifications are disabled."
@@ -19,7 +19,7 @@ extension AppModel {
         if enabled { notifications.preferences.mutedApplicationIDs.remove(applicationID) }
         else { notifications.preferences.mutedApplicationIDs.insert(applicationID) }
         try? await notificationPreferenceStore.save(notifications.preferences)
-        notifications.feedback = .success(enabled ? "Notifications enabled for this app." : "Notifications muted for this app.")
+        notifications.settingsFeedback = .success(enabled ? "Notifications enabled for this app." : "Notifications muted for this app.")
     }
 
     public func setQuietHours(enabled: Bool, start: Int? = nil, end: Int? = nil) async {

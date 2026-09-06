@@ -45,6 +45,7 @@ struct CatalogView: View {
             isImportingApplication: isImportingApplication,
             isImportDisabled: isImportDisabled,
             isUpdating: model.catalog.isUpdating,
+            feedback: model.catalog.feedback,
             importApplication: importApplication,
             // Awaited rather than launched, so that the pull-to-refresh
             // indicator stays up until the catalogue has actually been fetched.
@@ -70,6 +71,7 @@ struct CatalogContent<Destination: View>: View {
     var isImportingApplication: Bool
     var isImportDisabled: Bool
     var isUpdating: Bool
+    var feedback: FeatureFeedback?
     var importApplication: (() -> Void)?
     var refresh: @MainActor () async -> Void
     @ViewBuilder var destination: (CatalogApplication) -> Destination
@@ -87,6 +89,11 @@ struct CatalogContent<Destination: View>: View {
 
     private var catalogList: some View {
         List {
+            // The catalogue's own answers used to have nowhere to go: a pull
+            // to refresh wrote to `catalog.feedback`, which only an
+            // application's detail screen showed — so the refresh said
+            // nothing here and then spoke up on the next screen opened.
+            FeedbackBanner(feedback: feedback)
             Section("Browse") {
                 Picker("Type", selection: $kind) {
                     ForEach(CatalogKindFilter.allCases) { Text($0.title).tag($0) }
@@ -239,6 +246,7 @@ struct CatalogStateLabel: View {
         isImportingApplication: false,
         isImportDisabled: false,
         isUpdating: false,
+        feedback: nil,
         importApplication: {},
         refresh: {},
         destination: { application in Text(verbatim: application.name) }
@@ -252,6 +260,7 @@ struct CatalogStateLabel: View {
         isImportingApplication: true,
         isImportDisabled: true,
         isUpdating: true,
+        feedback: .failure("Catalog refresh failed; showing the offline cache."),
         importApplication: {},
         refresh: {},
         destination: { _ in EmptyView() }

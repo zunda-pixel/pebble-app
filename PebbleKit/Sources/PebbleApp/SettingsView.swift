@@ -47,6 +47,7 @@ struct SettingsView: View {
                     notificationPreferences: model.notifications.preferences,
                     applications: model.applications.apps + model.applications.watchfaces,
                     notificationSourceAppCount: model.notifications.sourceApps.count,
+                    feedback: model.notifications.settingsFeedback,
                     setCompanionNotificationsEnabled: { model.setCompanionNotificationsEnabled($0) },
                     setQuietHours: { enabled, start, end in
                         Task { await model.setQuietHours(enabled: enabled, start: start, end: end) }
