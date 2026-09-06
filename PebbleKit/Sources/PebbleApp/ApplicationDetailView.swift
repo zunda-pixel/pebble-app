@@ -154,21 +154,21 @@ struct ApplicationDetailContent: View {
                         .disabled(isAnyInstallRunning)
                 }
                 if isInstalling { ProgressView() }
-                #if os(macOS)
-                // Rows here rather than a bottom bar: `bottomBar` is a
-                // placement iOS has and a window does not.
-                actions
-                #endif
                 FeedbackBanner(feedback: feedback)
             }
         }
         .formStyle(.grouped)
-        #if os(iOS)
         .toolbar {
-            ToolbarItemGroup(placement: .bottomBar) {
-                actions
-            }
+            // A bar at the bottom on the phone, where the thumb is, and the
+            // window's own toolbar on the Mac. `bottomBar` is a placement iOS
+            // has and a window does not.
+            #if os(iOS)
+            ToolbarItemGroup(placement: .bottomBar) { actions }
+            #else
+            ToolbarItemGroup(placement: .primaryAction) { actions }
+            #endif
         }
+        #if os(iOS)
         // The bottom bar and the tab bar want the same edge, and the actions
         // belong to what is on screen rather than to moving between tabs.
         .toolbarVisibility(.hidden, for: .tabBar)
@@ -189,7 +189,7 @@ struct ApplicationDetailContent: View {
     }
 
     /// Everything that can be done to this application, in one place so that
-    /// the bottom bar on iOS and the rows on macOS cannot drift apart.
+    /// the two bars it goes into cannot drift apart.
     ///
     /// Each is absent rather than disabled where it does not apply: there is
     /// nothing to configure in an application that is not installed, and no
