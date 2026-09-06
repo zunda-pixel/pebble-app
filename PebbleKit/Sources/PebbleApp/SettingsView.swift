@@ -41,7 +41,22 @@ struct SettingsView: View {
             },
             prepareDiagnosticReport: { Task { await model.prepareDiagnosticReport() } },
             weatherDestination: { WeatherView(model: model) },
-            notificationAppsDestination: { NotificationAppsView(model: model) }
+            notificationSettingsDestination: {
+                NotificationSettingsContent(
+                    companionNotificationsEnabled: model.notifications.companionEnabled,
+                    notificationPreferences: model.notifications.preferences,
+                    applications: model.applications.apps + model.applications.watchfaces,
+                    notificationSourceAppCount: model.notifications.sourceApps.count,
+                    setCompanionNotificationsEnabled: { model.setCompanionNotificationsEnabled($0) },
+                    setQuietHours: { enabled, start, end in
+                        Task { await model.setQuietHours(enabled: enabled, start: start, end: end) }
+                    },
+                    setNotificationsEnabled: { enabled, applicationID in
+                        Task { await model.setNotificationsEnabled(enabled, applicationID: applicationID) }
+                    },
+                    phoneAppsDestination: { NotificationAppsView(model: model) }
+                )
+            }
         )
         // iOS can take the recognizer's model back, so what is on the phone is
         // read again each time the screen appears rather than remembered.
@@ -49,7 +64,7 @@ struct SettingsView: View {
     }
 }
 
-struct SettingsContent<WeatherDestination: View, NotificationAppsDestination: View>: View {
+struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination: View>: View {
     var weatherPlaceNames: [String]
     var notificationSourceAppCount: Int
     var companionNotificationsEnabled: Bool
@@ -63,7 +78,7 @@ struct SettingsContent<WeatherDestination: View, NotificationAppsDestination: Vi
     var setNotificationsEnabled: (Bool, UUID) -> Void
     var prepareDiagnosticReport: () -> Void
     @ViewBuilder var weatherDestination: () -> WeatherDestination
-    @ViewBuilder var notificationAppsDestination: () -> NotificationAppsDestination
+    @ViewBuilder var notificationSettingsDestination: () -> NotificationSettingsDestination
 
     @State private var permissions = PhonePermissions()
     @Environment(\.scenePhase) private var scenePhase
@@ -98,76 +113,21 @@ struct SettingsContent<WeatherDestination: View, NotificationAppsDestination: Vi
                 }
             }
             Section {
-                permissionRow("Bluetooth", permissions.bluetooth)
-                permissionRow("Calendar", permissions.calendar)
-                permissionRow("Reminders", permissions.reminders)
-                permissionRow("Location", permissions.location)
-                permissionRow("Health", permissions.health)
-                Button("Open Privacy Settings", systemImage: "gear") {
-                    openPrivacySettings()
-                }
-            } header: {
-                Text("Permissions")
-            } footer: {
-                Text("What this app has been allowed to read. Health shows whether it may write to your Health data: iOS gives no way to ask whether reading was allowed.")
-            }
-            Section {
-                Toggle("Watch App Notifications", isOn: Binding(
-                    get: { companionNotificationsEnabled },
-                    set: { setCompanionNotificationsEnabled($0) }
-                ))
-                Toggle("Quiet Hours", isOn: Binding(
-                    get: { notificationPreferences.quietHoursEnabled },
-                    set: { value in setQuietHours(value, nil, nil) }
-                ))
-                if notificationPreferences.quietHoursEnabled {
-                    Stepper(
-                        "Starts at \(notificationPreferences.quietHoursStart):00",
-                        value: Binding(
-                            get: { notificationPreferences.quietHoursStart },
-                            set: { value in setQuietHours(true, value, nil) }
-                        ),
-                        in: 0...23
-                    )
-                    Stepper(
-                        "Ends at \(notificationPreferences.quietHoursEnd):00",
-                        value: Binding(
-                            get: { notificationPreferences.quietHoursEnd },
-                            set: { value in setQuietHours(true, nil, value) }
-                        ),
-                        in: 0...23
-                    )
-                }
-                if !applications.isEmpty {
-                    // Named for whose apps these are. It used to be "Per-App
-                    // Notifications", which says the shape and not the
-                    // subject — and the other notification screen is also per
-                    // app, for the phone's apps, so the two read as the same
-                    // thing twice.
-                    DisclosureGroup("Per Watch App") {
-                        ForEach(applications) { application in
-                            Toggle(application.displayName, isOn: Binding(
-                                get: { !notificationPreferences.mutedApplicationIDs.contains(application.id) },
-                                set: { enabled in setNotificationsEnabled(enabled, application.id) }
-                            ))
-                        }
-                    }
-                }
-            } header: {
-                Text("Notifications")
-            } footer: {
-                Text("System notifications are delivered directly to a paired Pebble using Apple Notification Center Service. This switch controls notifications created by installed watch apps. Test notifications can be sent from each watch's detail page.")
-            }
-            Section {
                 NavigationLink {
-                    notificationAppsDestination()
+                    PermissionsContent(permissions: permissions)
                 } label: {
-                    LabeledContent("Phone App Notifications") {
-                        Text("\(notificationSourceAppCount) apps")
+                    Text("Permissions")
+                }
+                NavigationLink {
+                    notificationSettingsDestination()
+                } label: {
+                    LabeledContent("Notifications") {
+                        // Said here because it is the one thing on that screen
+                        // worth knowing without opening it: nothing a watch
+                        // app raises will arrive.
+                        if !companionNotificationsEnabled { Text("Off") }
                     }
                 }
-            } footer: {
-                Text("Apps the watch has seen sending notifications, and what it does with each one.")
             }
             Section {
                 Toggle("Dictation from the Watch", isOn: Binding(
@@ -202,18 +162,6 @@ struct SettingsContent<WeatherDestination: View, NotificationAppsDestination: Vi
             if phase == .active { permissions = PhonePermissions.current() }
         }
     }
-
-    private func permissionRow(
-        _ name: LocalizedStringKey,
-        _ state: PhonePermissionState
-    ) -> some View {
-        LabeledContent {
-            Text(state.title)
-                .foregroundStyle(state.isSettled ? AnyShapeStyle(.secondary) : AnyShapeStyle(.orange))
-        } label: {
-            Text(name)
-        }
-    }
 }
 
 #Preview("Settings") {
@@ -232,7 +180,7 @@ struct SettingsContent<WeatherDestination: View, NotificationAppsDestination: Vi
             setNotificationsEnabled: { _, _ in },
             prepareDiagnosticReport: {},
             weatherDestination: { EmptyView() },
-            notificationAppsDestination: { EmptyView() }
+            notificationSettingsDestination: { EmptyView() }
         )
     }
 }
@@ -257,7 +205,7 @@ struct SettingsContent<WeatherDestination: View, NotificationAppsDestination: Vi
             setNotificationsEnabled: { _, _ in },
             prepareDiagnosticReport: {},
             weatherDestination: { EmptyView() },
-            notificationAppsDestination: { EmptyView() }
+            notificationSettingsDestination: { EmptyView() }
         )
     }
 }

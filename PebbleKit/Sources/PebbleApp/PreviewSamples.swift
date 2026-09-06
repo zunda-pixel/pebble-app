@@ -295,6 +295,32 @@ enum PreviewSamples {
     /// A model on a mock transport, for the navigation shells whose whole job is
     /// the chrome around a screen. What each screen shows previews from its own
     /// content view instead: a screen that loads from disk in `.task` would
+    /// Permission states for the screen that shows them.
+    ///
+    /// Here rather than written inline in the `#Preview`, because a memberwise
+    /// initializer generated for a type in this same module is not visible
+    /// from inside another macro's expansion — `PhonePermissions(bluetooth:…)`
+    /// in a `#Preview` body fails with "no accessible initializers", while the
+    /// identical call in an ordinary function a few lines below compiles. A
+    /// plain declaration like this one is an ordinary context.
+    static let permissionsAllowed = PhonePermissions(
+        bluetooth: .allowed,
+        calendar: .allowed,
+        reminders: .allowed,
+        location: .allowed,
+        health: .allowed
+    )
+
+    /// One of each kind of answer, including the two that cannot be settled:
+    /// `unknown` is what Health reading always reads back as.
+    static let permissionsWithheld = PhonePermissions(
+        bluetooth: .allowed,
+        calendar: .partly,
+        reminders: .denied,
+        location: .notDetermined,
+        health: .unknown
+    )
+
     /// overwrite anything set here.
     @MainActor
     static func appModel() -> AppModel {
