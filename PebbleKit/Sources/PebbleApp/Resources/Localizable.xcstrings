@@ -2715,6 +2715,16 @@
         }
       }
     },
+    "More" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "その他"
+          }
+        }
+      }
+    },
     "Music" : {
       "localizations" : {
         "ja" : {

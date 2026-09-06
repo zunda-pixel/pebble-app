@@ -55,6 +55,7 @@ struct HealthContent: View {
 
     @State private var period: HealthAnalysisPeriod = .week
     @State private var isImportingArchive = false
+    @State private var isConfirmingDeletion = false
 
     var body: some View {
         List {
@@ -133,28 +134,50 @@ struct HealthContent: View {
                 }
                 LabeledContent("Tracked Days", value: averages.sleepDays, format: .number)
             }
-            Button("Sync Health Data", systemImage: "arrow.triangle.2.circlepath", action: requestWatchSync)
-                .disabled(!isWatchConnected)
-            #if os(iOS)
-            Button("Sync with Apple Health", systemImage: "heart.fill", action: synchronizeWithHealthKit)
-            Button("Import from Apple Health", systemImage: "square.and.arrow.down", action: importFromHealthKit)
-            #endif
-            Button("Export Health Data", systemImage: "square.and.arrow.up", action: export)
-            if let exportURL { ShareLink(item: exportURL) { Text("Share Export") } }
-            Button("Import Health Archive", systemImage: "square.and.arrow.down.on.square") {
-                isImportingArchive = true
-            }
-            ConfirmingButton(
-                title: "Delete Local Health Data",
-                role: .destructive,
-                question: "Delete all local health data?",
-                explanation: "This removes locally stored step and sleep history. This action cannot be undone.",
-                confirmationTitle: "Delete Health Data",
-                action: deleteLocalData
-            )
             FeedbackBanner(feedback: feedback)
         }
         .navigationTitle(Text("Health"))
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    Button("Sync Health Data", systemImage: "arrow.triangle.2.circlepath", action: requestWatchSync)
+                        .disabled(!isWatchConnected)
+                    #if os(iOS)
+                    Button("Sync with Apple Health", systemImage: "heart.fill", action: synchronizeWithHealthKit)
+                    Button("Import from Apple Health", systemImage: "square.and.arrow.down", action: importFromHealthKit)
+                    #endif
+                    Section {
+                        Button("Export Health Data", systemImage: "square.and.arrow.up", action: export)
+                        if let exportURL { ShareLink(item: exportURL) { Text("Share Export") } }
+                        Button("Import Health Archive", systemImage: "square.and.arrow.down.on.square") {
+                            isImportingArchive = true
+                        }
+                    }
+                    Section {
+                        // Not a `ConfirmingButton` here. That one carries its
+                        // own dialog, and a menu item's view is gone by the
+                        // time the menu has closed, so the question would
+                        // never be asked. The dialog belongs to the screen
+                        // instead, below.
+                        Button("Delete Local Health Data", systemImage: "trash", role: .destructive) {
+                            isConfirmingDeletion = true
+                        }
+                    }
+                } label: {
+                    Label("More", systemImage: "ellipsis")
+                }
+            }
+        }
+        .confirmationDialog(
+            Text("Delete all local health data?"),
+            isPresented: $isConfirmingDeletion,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Health Data", role: .destructive, action: deleteLocalData)
+            Button(role: .cancel) {}
+        } message: {
+            Text("This removes locally stored step and sleep history. This action cannot be undone.")
+        }
         .fileImporter(isPresented: $isImportingArchive, allowedContentTypes: [.json]) { result in
             guard case .success(let url) = result else { return }
             importArchive(url)
