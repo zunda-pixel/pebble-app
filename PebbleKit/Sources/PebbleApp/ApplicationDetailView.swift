@@ -86,7 +86,48 @@ struct ApplicationDetailContent: View {
         Form {
             Section {
                 header
-                if let summary = subject.store?.summary, !summary.isEmpty {
+            }
+            
+            Section {
+                if canInstall {
+                    Button(installButtonTitle, systemImage: "arrow.down.app", action: install)
+                        .disabled(isAnyInstallRunning)
+                }
+                if isInstalling { ProgressView() }
+                FeedbackBanner(feedback: feedback)
+            }
+            
+            if let releaseNotes = subject.store?.releaseNotes, !releaseNotes.isEmpty {
+                Section("Release Notes") { Text(releaseNotes) }
+            }
+
+            if subject.installed != nil, subject.kind == .watchface {
+                Section("Watchface") {
+                    Button(isActive ? "Active" : "Activate", systemImage: "play.circle", action: activateWatchface)
+                        .disabled(isActive || isOperationInProgress)
+                }
+            }
+            
+            if let screenshots = subject.store?.screenshotURLs, !screenshots.isEmpty {
+                Section("Screenshots") {
+                    ScrollView(.horizontal) {
+                        HStack {
+                            ForEach(screenshots, id: \.self) { url in
+                                AsyncImage(url: url) { image in
+                                    image.resizable().scaledToFit()
+                                } placeholder: {
+                                    ProgressView()
+                                }
+                                .frame(width: 220, height: 220)
+                                .accessibilityLabel(Text("Screenshot of \(subject.name)"))
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if let summary = subject.store?.summary, !summary.isEmpty {
+                Section {
                     Text(summary)
                 }
             }
@@ -117,44 +158,6 @@ struct ApplicationDetailContent: View {
                 if let isInstalled, !isInstalled, subject.installed != nil {
                     Text("The watch is told about this application the next time it connects.")
                 }
-            }
-
-            if let screenshots = subject.store?.screenshotURLs, !screenshots.isEmpty {
-                Section("Screenshots") {
-                    ScrollView(.horizontal) {
-                        HStack {
-                            ForEach(screenshots, id: \.self) { url in
-                                AsyncImage(url: url) { image in
-                                    image.resizable().scaledToFit()
-                                } placeholder: {
-                                    ProgressView()
-                                }
-                                .frame(width: 220, height: 220)
-                                .accessibilityLabel(Text("Screenshot of \(subject.name)"))
-                            }
-                        }
-                    }
-                }
-            }
-
-            if let releaseNotes = subject.store?.releaseNotes, !releaseNotes.isEmpty {
-                Section("Release Notes") { Text(releaseNotes) }
-            }
-
-            if subject.installed != nil, subject.kind == .watchface {
-                Section("Watchface") {
-                    Button(isActive ? "Active" : "Activate", systemImage: "play.circle", action: activateWatchface)
-                        .disabled(isActive || isOperationInProgress)
-                }
-            }
-
-            Section {
-                if canInstall {
-                    Button(installButtonTitle, systemImage: "arrow.down.app", action: install)
-                        .disabled(isAnyInstallRunning)
-                }
-                if isInstalling { ProgressView() }
-                FeedbackBanner(feedback: feedback)
             }
         }
         .formStyle(.grouped)
