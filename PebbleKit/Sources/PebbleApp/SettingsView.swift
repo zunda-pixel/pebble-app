@@ -40,7 +40,6 @@ struct SettingsView: View {
                 Task { await model.setNotificationsEnabled(enabled, applicationID: applicationID) }
             },
             prepareDiagnosticReport: { Task { await model.prepareDiagnosticReport() } },
-            updateCatalog: { source in Task { await model.updateCatalog(source: source) } },
             weatherDestination: { WeatherView(model: model) },
             notificationAppsDestination: { NotificationAppsView(model: model) }
         )
@@ -63,12 +62,9 @@ struct SettingsContent<WeatherDestination: View, NotificationAppsDestination: Vi
     var setQuietHours: (_ enabled: Bool, _ start: Int?, _ end: Int?) -> Void
     var setNotificationsEnabled: (Bool, UUID) -> Void
     var prepareDiagnosticReport: () -> Void
-    var updateCatalog: (String) -> Void
     @ViewBuilder var weatherDestination: () -> WeatherDestination
     @ViewBuilder var notificationAppsDestination: () -> NotificationAppsDestination
 
-    @State private var catalogSource = Defaults[.catalogSource]
-        ?? AppCatalog.defaultSourceURL.absoluteString
     @State private var permissions = PhonePermissions()
     @Environment(\.scenePhase) private var scenePhase
 
@@ -192,12 +188,6 @@ struct SettingsContent<WeatherDestination: View, NotificationAppsDestination: Vi
                     }
                 }
             }
-            Section("App Catalog") {
-                TextField("Catalog JSON URL", text: $catalogSource)
-                Button("Update Catalog", systemImage: "arrow.clockwise") {
-                    updateCatalog(catalogSource)
-                }
-            }
         }
         .navigationTitle(Text("Settings"))
         // Any of these can be changed in the system settings while the app is in the
@@ -236,7 +226,6 @@ struct SettingsContent<WeatherDestination: View, NotificationAppsDestination: Vi
             setQuietHours: { _, _, _ in },
             setNotificationsEnabled: { _, _ in },
             prepareDiagnosticReport: {},
-            updateCatalog: { _ in },
             weatherDestination: { EmptyView() },
             notificationAppsDestination: { EmptyView() }
         )
@@ -262,7 +251,6 @@ struct SettingsContent<WeatherDestination: View, NotificationAppsDestination: Vi
             setQuietHours: { _, _, _ in },
             setNotificationsEnabled: { _, _ in },
             prepareDiagnosticReport: {},
-            updateCatalog: { _ in },
             weatherDestination: { EmptyView() },
             notificationAppsDestination: { EmptyView() }
         )

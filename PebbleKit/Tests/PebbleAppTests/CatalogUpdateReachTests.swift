@@ -112,7 +112,7 @@ struct CatalogUpdateReachTests {
             client: MockWatchClient(),
             storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: library,
-            appCatalog: AppCatalog(cacheURL: cacheURL, session: CatalogStubURLProtocol.session())
+            appCatalog: AppCatalog(cacheURL: cacheURL, session: StoreStubURLProtocol.session())
         )
         await model.loadApplications()
         await model.loadCatalog()
@@ -125,7 +125,7 @@ struct CatalogUpdateReachTests {
         let fixture = Fixture()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
-        CatalogStubURLProtocol.answer(fixture.lookupURL, with: fixture.storeAnswer(version: "2.0"))
+        StoreStubURLProtocol.answer(fixture.lookupURL, with: fixture.storeAnswer(version: "2.0"))
         let model = try await makeModel(fixture, directory: directory, installedVersion: "1.0")
         // It really is absent from what the feed loaded, which is what used to
         // make it invisible here.
@@ -144,7 +144,7 @@ struct CatalogUpdateReachTests {
         let fixture = Fixture()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
-        CatalogStubURLProtocol.answer(fixture.lookupURL, with: fixture.storeAnswer(version: "2.0"))
+        StoreStubURLProtocol.answer(fixture.lookupURL, with: fixture.storeAnswer(version: "2.0"))
         let model = try await makeModel(fixture, directory: directory, installedVersion: "2.0")
 
         #expect(await model.catalogUpdates().isEmpty)
@@ -161,46 +161,4 @@ struct CatalogUpdateReachTests {
 
         #expect(await model.catalogUpdates().isEmpty)
     }
-}
-
-/// A stubbed store, so the catalogue can be asked without one.
-///
-/// Answers 404 for anything not registered, which is what the real store does
-/// for a UUID it has never listed.
-private final class CatalogStubURLProtocol: URLProtocol {
-    private static let answers = Mutex<[URL: Data]>([:])
-
-    static func answer(_ url: URL, with data: Data) {
-        answers.withLock { $0[url] = data }
-    }
-
-    static func session() -> URLSession {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [CatalogStubURLProtocol.self]
-        return URLSession(configuration: configuration)
-    }
-
-    override class func canInit(with request: URLRequest) -> Bool { true }
-
-    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
-
-    override func startLoading() {
-        guard let url = request.url, let client else { return }
-        let body = Self.answers.withLock { $0[url] }
-        let response = HTTPURLResponse(
-            url: url,
-            statusCode: body == nil ? 404 : 200,
-            httpVersion: nil,
-            headerFields: ["Content-Type": "application/json"]
-        )
-        if let response {
-            client.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        }
-        if let body {
-            client.urlProtocol(self, didLoad: body)
-        }
-        client.urlProtocolDidFinishLoading(self)
-    }
-
-    override func stopLoading() {}
 }

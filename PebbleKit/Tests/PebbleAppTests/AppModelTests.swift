@@ -101,7 +101,6 @@ struct AppModelTests {
         #expect(Defaults.Keys.companionNotificationsEnabled.defaultValue)
         #expect(!Defaults.Keys.hasCompletedWatchSetup.defaultValue)
         #expect(Defaults.Keys.activeWatchfaceID.defaultValue == nil)
-        #expect(Defaults.Keys.catalogSource.defaultValue == nil)
         #expect(Defaults.Keys.healthKitLastExportDate.defaultValue == .distantPast)
     }
 

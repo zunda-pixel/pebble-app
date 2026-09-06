@@ -56,12 +56,13 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
     /// `apps.rebble.io` names only the 2014-era one in its `og:title`, while
     /// `apps.repebble.com` names all three.
     ///
-    /// Nil for an application the store does not know about: a hand-written
-    /// feed carries no `storeID`, and neither does one side-loaded from a file.
+    /// Nil for an application the store does not know about — one installed
+    /// from a file, or a catalogue cached before `storeID` was recorded.
     public var storePageURL: URL? {
-        // Strict escaping because the legacy feed is whatever URL the reader
-        // pointed at, so `storeID` is not the store's 24 hex digits by right.
-        // Anything left unescaped would land the reader elsewhere on the site.
+        // Escaped strictly all the same. `storeID` comes off a cache that a
+        // previous version of this app wrote, so it is not the store's 24 hex
+        // digits by right, and anything left unescaped would land the reader
+        // elsewhere on the site.
         guard !storeID.isEmpty,
               let id = storeID.addingPercentEncoding(withAllowedCharacters: .alphanumerics)
         else { return nil }
@@ -88,7 +89,16 @@ public struct CatalogSnapshot: Codable, Equatable, Sendable {
 }
 
 public actor AppCatalog {
-    /// Where applications are fetched from unless the user points elsewhere.
+    /// The store. The only one there is.
+    ///
+    /// This used to be a default the reader could replace in Settings, which
+    /// bought one thing — a hand-written feed of `[CatalogApplication]` under
+    /// a `.json` address — and cost every feature built on the store's own
+    /// API, each of which had to do nothing for such a feed. Installing a
+    /// package of one's own is what the file importer is for.
+    ///
+    /// If the store moves again, as it did once already, this is the line to
+    /// change.
     public static var defaultSourceURL: URL {
         URL(string: "https://appstore-api.repebble.com/api")!
     }
@@ -124,15 +134,11 @@ public actor AppCatalog {
 
     public func cachedApplications() throws -> [CatalogApplication] { try cachedSnapshot()?.applications ?? [] }
 
-    public func update(from sourceURL: URL, model: WatchModel?) async throws -> CatalogSnapshot {
-        let applications: [CatalogApplication]
-        if sourceURL.pathExtension.lowercased() == "json" {
-            applications = try await fetchLegacyFeed(sourceURL)
-        } else {
-            async let watchapps = fetchOfficialHome(sourceURL, kind: .watchapp, model: model)
-            async let watchfaces = fetchOfficialHome(sourceURL, kind: .watchface, model: model)
-            applications = try await watchapps + watchfaces
-        }
+    public func update(model: WatchModel?) async throws -> CatalogSnapshot {
+        let sourceURL = Self.defaultSourceURL
+        async let watchapps = fetchOfficialHome(sourceURL, kind: .watchapp, model: model)
+        async let watchfaces = fetchOfficialHome(sourceURL, kind: .watchface, model: model)
+        let applications = try await watchapps + watchfaces
         // Later entries win, so the newest description of an application is
         // the one kept.
         let unique = applications.reversed().uniqued(on: \.id)
@@ -183,19 +189,12 @@ public actor AppCatalog {
     /// Nil where the store does not have it, which is an answer worth keeping:
     /// plenty of packages were never listed.
     public func application(uuid: UUID, from baseURL: URL) async throws -> CatalogApplication? {
-        // Only the official store answers this. A legacy feed is a flat file.
-        guard baseURL.pathExtension.lowercased() != "json" else { return nil }
         let url = baseURL.appending(path: "v1/apps/uuid").appending(path: uuid.uuidString.lowercased())
         guard let data = try await responseDataAllowingNotFound(from: url) else { return nil }
         let response = try JSONDecoder().decode(OfficialCatalogLookup.self, from: data)
         // The kind comes off the entry rather than the endpoint here: this one
         // is asked by identifier, so it answers with whatever that is.
         return response.data.lazy.compactMap { $0.application(kind: nil) }.first
-    }
-
-    private func fetchLegacyFeed(_ url: URL) async throws -> [CatalogApplication] {
-        let data = try await responseData(from: url)
-        return try JSONDecoder().decode([CatalogApplication].self, from: data)
     }
 
     private func fetchOfficialHome(

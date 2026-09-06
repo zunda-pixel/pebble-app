@@ -1077,16 +1077,4 @@ struct StoreLookupByUUIDTests {
 
         #expect(try await catalog().application(uuid: uuid, from: base) == nil)
     }
-
-    /// A legacy feed is a flat file with no endpoints to ask, so it is not
-    /// asked. Nothing is sent, which is what the stub recording no request
-    /// shows.
-    @Test func aLegacyFeedIsNotAskedBecauseItCannotAnswer() async throws {
-        let base = URL(string: "https://feed.invalid/apps.json")!
-        let uuid = UUID()
-        let wouldBe = base.appending(path: "v1/apps/uuid").appending(path: uuid.uuidString.lowercased())
-
-        #expect(try await catalog().application(uuid: uuid, from: base) == nil)
-        #expect(StubURLProtocol.requestCount(for: wouldBe) == 0)
-    }
 }

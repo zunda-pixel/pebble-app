@@ -106,15 +106,27 @@ struct FeatureFeedbackTests {
     }
 
     /// The catalog too, which shared `dataSync` with health.
-    @Test func aCatalogURLThatIsNotHTTPSAnswersOnTheCatalogAlone() async throws {
+    ///
+    /// A refusal from the store rather than a rejected address: the address is
+    /// no longer the reader's to get wrong.
+    @Test func aCatalogThatCannotBeFetchedAnswersOnTheCatalogAlone() async throws {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
-        let model = makeModel(directory: directory, client: MockWatchClient())
+        let model = AppModel(
+            client: MockWatchClient(),
+            storageDirectory: StorageDirectory(url: directory),
+            // Nothing registered with the stub, so every request is a 404.
+            appCatalog: AppCatalog(
+                cacheURL: directory.appending(path: "catalog.json"),
+                session: StoreStubURLProtocol.session()
+            )
+        )
 
-        await model.updateCatalog(source: "http://example.com/catalog.json")
+        await model.refreshCatalog()
 
-        #expect(model.catalog.feedback == .failure("Enter a valid HTTPS catalog URL."))
+        #expect(model.catalog.feedback == .failure("The app catalog could not be updated."))
         #expect(model.health.feedback == nil)
+        #expect(model.timeline.feedback == nil)
     }
 
     /// A watch asked to restart is under way, not finished: the only news

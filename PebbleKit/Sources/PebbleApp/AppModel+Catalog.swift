@@ -16,20 +16,15 @@ extension AppModel {
         catch { catalog.feedback = .failure("The app catalog cache could not be loaded.") }
     }
 
-    public func updateCatalog(source: String) async {
-        guard let url = URL(string: source), url.scheme?.lowercased() == "https" else {
-            catalog.feedback = .failure("Enter a valid HTTPS catalog URL.")
-            return
-        }
+    public func refreshCatalog() async {
         guard !catalog.isUpdating else { return }
         catalog.isUpdating = true
         defer { catalog.isUpdating = false }
         do {
-            let snapshot = try await appCatalog.update(from: url, model: connectedWatch?.model)
+            let snapshot = try await appCatalog.update(model: connectedWatch?.model)
             catalog.applications = snapshot.applications
             catalog.sourceURL = snapshot.sourceURL
             catalog.lastUpdated = snapshot.fetchedAt
-            Defaults[.catalogSource] = source
             catalog.feedback = .success("App catalog updated with \(catalog.applications.count) apps.")
         } catch {
             catalog.feedback = .failure(
@@ -38,11 +33,6 @@ extension AppModel {
                     : "Catalog refresh failed; showing the offline cache."
             )
         }
-    }
-
-    public func refreshCatalog() async {
-        let source = Defaults[.catalogSource] ?? AppCatalog.defaultSourceURL.absoluteString
-        await updateCatalog(source: source)
     }
 
     /// What the store knows about something already in the library.
@@ -60,12 +50,11 @@ extension AppModel {
         guard !catalog.answeredStoreLookups.contains(applicationID) else {
             return catalog.storeEntries[applicationID]
         }
-        // The store the loaded catalogue came from, falling back to the one
-        // configured for the next fetch. Asking a different store than the
-        // listing came from would answer about a different application.
-        let source = catalog.sourceURL
-            ?? URL(string: Defaults[.catalogSource] ?? AppCatalog.defaultSourceURL.absoluteString)
-        guard let baseURL = source, baseURL.scheme?.lowercased() == "https" else { return nil }
+        // The store the loaded catalogue came from, which for a cache written
+        // before the store moved is not today's. Asking the one the listing
+        // came from is what makes the comparison mean anything.
+        let baseURL = catalog.sourceURL ?? AppCatalog.defaultSourceURL
+        guard baseURL.scheme?.lowercased() == "https" else { return nil }
         do {
             let entry = try await appCatalog.application(uuid: applicationID, from: baseURL)
             if let entry { catalog.storeEntries[applicationID] = entry }

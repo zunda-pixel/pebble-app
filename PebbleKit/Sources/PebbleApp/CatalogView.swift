@@ -146,7 +146,15 @@ struct CatalogContent<Destination: View>: View {
         #endif
         .overlay {
             if filteredApplications.isEmpty {
-                ContentUnavailableView("No Catalog Apps", systemImage: "bag", description: Text("Catalog sources can be added in Settings."))
+                // Two causes, and the screen cannot tell them apart: a filter
+                // that excludes everything, or a catalogue that was never
+                // fetched. Saying both beats naming the wrong one — and it
+                // used to name a setting that no longer exists.
+                ContentUnavailableView(
+                    "No Catalog Apps",
+                    systemImage: "bag",
+                    description: Text("Nothing matches, or the catalog could not be fetched.")
+                )
             }
         }
     }

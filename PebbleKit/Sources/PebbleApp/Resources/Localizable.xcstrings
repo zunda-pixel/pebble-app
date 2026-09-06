@@ -759,6 +759,7 @@
       }
     },
     "App Catalog" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -1089,6 +1090,7 @@
       }
     },
     "Catalog JSON URL" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -1109,6 +1111,7 @@
       }
     },
     "Catalog sources can be added in Settings." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -1852,6 +1855,7 @@
       }
     },
     "Enter a valid HTTPS catalog URL." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -3142,6 +3146,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このウォッチには未インストール"
+          }
+        }
+      }
+    },
+    "Nothing matches, or the catalog could not be fetched." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "条件に一致するアプリがないか、カタログを取得できませんでした。"
           }
         }
       }
@@ -5748,6 +5762,7 @@
       }
     },
     "Update Catalog" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {

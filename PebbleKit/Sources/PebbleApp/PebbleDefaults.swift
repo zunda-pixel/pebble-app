@@ -5,8 +5,6 @@ public import Defaults
 import Foundation
 
 extension Defaults.Keys {
-    static let catalogSource = Key<String?>("appCatalogSource")
-
     static let downloadedFirmware = Key<DownloadedFirmware?>("downloadedFirmware")
 
     /// The watch stores a temperature with no unit attached, so the unit the
