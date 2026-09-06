@@ -257,6 +257,14 @@ struct CatalogApplicationDetailContent: View {
                 Button(installButtonTitle, systemImage: "arrow.down.app", action: install)
                     .disabled(!canInstall || isAnyInstallRunning)
                 if isInstalling { ProgressView() }
+                // The feed carries a summary and a few screenshots; the store
+                // page has the rest — every screenshot, the whole changelog,
+                // and how many people have hearted it.
+                if let storePageURL = application.storePageURL {
+                    Link(destination: storePageURL) {
+                        Label("View in Store", systemImage: "safari")
+                    }
+                }
                 FeedbackBanner(feedback: feedback)
             }
         }

@@ -47,6 +47,24 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
         sha256 = try container.decodeIfPresent(String.self, forKey: .sha256)
     }
 
+    /// The store's own page for this application, where there is one.
+    ///
+    /// Built from `storeID` rather than decoded, though the feed does hand the
+    /// same address over as `links.share`. If the store ever moves, that field
+    /// is the one to read instead of guessing the shape here.
+    ///
+    /// Nil for an application the store does not know about: a hand-written
+    /// feed carries no `storeID`, and neither does one side-loaded from a file.
+    public var storePageURL: URL? {
+        // Strict escaping because the legacy feed is whatever URL the reader
+        // pointed at, so `storeID` is not the store's 24 hex digits by right.
+        // Anything left unescaped would land the reader elsewhere on the site.
+        guard !storeID.isEmpty,
+              let id = storeID.addingPercentEncoding(withAllowedCharacters: .alphanumerics)
+        else { return nil }
+        return URL(string: "https://apps.rebble.io/application/\(id)")
+    }
+
     public func supports(_ model: WatchModel) -> Bool {
         !Set(supportedPlatforms).isDisjoint(with: model.compatibleApplicationVariants)
     }

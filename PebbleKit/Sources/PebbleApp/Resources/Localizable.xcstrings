@@ -5836,6 +5836,16 @@
         }
       }
     },
+    "View in Store" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ストアで表示"
+          }
+        }
+      }
+    },
     "Voice" : {
       "localizations" : {
         "ja" : {

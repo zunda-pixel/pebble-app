@@ -674,6 +674,36 @@ struct CompanionStorageTests {
         #expect(!application.isNewer(than: "3.0"))
     }
 
+    /// The address of the store's own page, and who does not get one.
+    ///
+    /// The identifier the official feed calls `id` is the only key the store
+    /// answers to — its `links.share` is this same address, and its
+    /// collections list their members by it rather than by UUID. An
+    /// application with no `storeID` came from somewhere else, and offering a
+    /// link to a page that is not there would be worse than offering none.
+    @Test func aCatalogApplicationLinksToItsStorePageOnlyWhenTheStoreKnowsIt() {
+        func application(storeID: String) -> CatalogApplication {
+            CatalogApplication(
+                id: UUID(), storeID: storeID, name: "App", developer: "Developer", version: "1.0",
+                downloadURL: URL(string: "https://example.com/app.pbw")!, supportedPlatforms: ["emery"]
+            )
+        }
+
+        #expect(
+            application(storeID: "1b25cef73e2b471686672d07").storePageURL
+                == URL(string: "https://apps.rebble.io/application/1b25cef73e2b471686672d07")
+        )
+        // The default, which is what a hand-written feed and a side-loaded
+        // package both leave behind.
+        #expect(application(storeID: "").storePageURL == nil)
+        // And a legacy feed is whatever the reader pointed at, so the
+        // identifier stays inside the one path segment it was given.
+        #expect(
+            application(storeID: "../../elsewhere").storePageURL
+                == URL(string: "https://apps.rebble.io/application/%2E%2E%2F%2E%2E%2Felsewhere")
+        )
+    }
+
     @Test func catalogSnapshotPersistsOfflineMetadata() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         let url = directory.appending(path: "catalog.json")
