@@ -77,7 +77,18 @@ struct CatalogContent<Destination: View>: View {
     @ViewBuilder var destination: (CatalogApplication) -> Destination
 
     @State private var query = ""
-    @State private var category = "All"
+    /// Nil for every category.
+    ///
+    /// A missing value rather than a sentinel string. It was `"All"`, doing
+    /// three jobs at once — the row's label, the initial selection and the
+    /// "do not filter" mark — so it showed in English on a Japanese screen,
+    /// because `Text(_:)` given a `String` is the overload that does not
+    /// localize. And a category actually named All, which the store is free to
+    /// send, would have been the one category impossible to filter by.
+    ///
+    /// The categories themselves stay unlocalized on purpose: `Games` and
+    /// `Tools & Utilities` are the store's words, not this app's.
+    @State private var category: String?
     @State private var kind: CatalogKindFilter = .all
     @State private var sort: CatalogSort = .name
 
@@ -100,7 +111,11 @@ struct CatalogContent<Destination: View>: View {
                 }
                 .pickerStyle(.segmented)
                 Picker("Category", selection: $category) {
-                    ForEach(categories, id: \.self) { Text($0).tag($0) }
+                    // The one row here that is this app talking, so the one
+                    // row with a localized key. `String?.none` rather than a
+                    // word standing in for "no filter".
+                    Text("All Categories").tag(String?.none)
+                    ForEach(categories, id: \.self) { Text($0).tag(String?.some($0)) }
                 }
                 Picker("Sort", selection: $sort) {
                     ForEach(CatalogSort.allCases) { Text($0.title).tag($0) }
@@ -167,12 +182,43 @@ struct CatalogContent<Destination: View>: View {
     }
 
     private var filteredApplications: [CatalogApplication] {
+        CatalogFilter(query: query, category: category, kind: kind, sort: sort)
+            .applied(to: applications)
+    }
+
+    private var categories: [String] {
+        CatalogFilter.categories(in: applications)
+    }
+}
+
+/// Which of the catalogue's applications the three pickers leave on screen.
+///
+/// Its own type so that the fault it was written to fix can be shown to be
+/// gone. The predicate lived inside the view, where reaching it meant building
+/// the view, and what it did with a category named All could only be reasoned
+/// about — which is how `"All"` came to be the label, the initial selection and
+/// the "do not filter" mark all at once.
+struct CatalogFilter {
+    var query: String = ""
+    /// Nil for every category.
+    var category: String?
+    var kind: CatalogKindFilter = .all
+    var sort: CatalogSort = .name
+
+    /// What the store called the applications it sent, minus the ones it did
+    /// not name. "Every category" is a row above these rather than one of them,
+    /// so there is nothing of this app's own in here.
+    static func categories(in applications: [CatalogApplication]) -> [String] {
+        Set(applications.map(\.category)).filter { !$0.isEmpty }.sorted()
+    }
+
+    func applied(to applications: [CatalogApplication]) -> [CatalogApplication] {
         let filtered = applications.filter { application in
             let matchesQuery = query.isEmpty
                 || application.name.localizedCaseInsensitiveContains(query)
                 || application.developer.localizedCaseInsensitiveContains(query)
                 || application.summary.localizedCaseInsensitiveContains(query)
-            let matchesCategory = category == "All" || application.category == category
+            let matchesCategory = category.map { application.category == $0 } ?? true
             let matchesKind = kind == .all
                 || (kind == .watchapps && application.kind == .watchapp)
                 || (kind == .watchfaces && application.kind == .watchface)
@@ -185,10 +231,6 @@ struct CatalogContent<Destination: View>: View {
             case .version: lhs.version.compare(rhs.version, options: .numeric) == .orderedDescending
             }
         }
-    }
-
-    private var categories: [String] {
-        ["All"] + Set(applications.map(\.category)).sorted()
     }
 }
 
@@ -209,7 +251,12 @@ struct CatalogApplicationRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(application.name).font(.headline)
                 Text("\(application.developer) · \(application.version)").foregroundStyle(.secondary)
-                Text(application.category).font(.caption).foregroundStyle(.secondary)
+                // Left out where the store did not name one, as the detail
+                // screen already does. It used to draw the model's `"Other"`,
+                // which was this app putting a word in the store's mouth.
+                if !application.category.isEmpty {
+                    Text(application.category).font(.caption).foregroundStyle(.secondary)
+                }
             }
             Spacer()
             CatalogStateLabel(state: state)
@@ -236,6 +283,16 @@ struct CatalogStateLabel: View {
         CatalogApplicationRow(application: PreviewSamples.catalogApplication, state: .installed)
         CatalogApplicationRow(application: PreviewSamples.catalogApplication, state: .updateAvailable)
         CatalogApplicationRow(application: PreviewSamples.catalogApplication, state: .incompatible)
+        // The store did not name a category for this one. The line goes rather
+        // than being filled with a word the store never said.
+        CatalogApplicationRow(
+            application: {
+                var uncategorised = PreviewSamples.catalogApplication
+                uncategorised.category = ""
+                return uncategorised
+            }(),
+            state: .available
+        )
     }
 }
 

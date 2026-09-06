@@ -17,7 +17,17 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
     public var downloadURL: URL
     public var supportedPlatforms: [String]
     public var kind: WatchApplicationKind = .watchapp
-    public var category: String = "Other"
+    /// What the store called it — `Games`, `Tools & Utilities`. Empty when the
+    /// store did not say.
+    ///
+    /// This was `"Other"`, which put an English word this app had made up into
+    /// a model that otherwise only carries the store's own. It reached the
+    /// screen through `Text(_:)` given a `String`, the overload that does not
+    /// localize, so it showed in English however the phone was set — and the
+    /// localization test could not see it, because a plain `String` is never
+    /// extracted into the catalogue. Empty instead, and the screens leave the
+    /// line out rather than inventing a category the store never gave.
+    public var category: String = ""
     public var summary: String = ""
     public var releaseNotes: String? = nil
     public var iconURL: URL? = nil
@@ -39,7 +49,7 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
         downloadURL = try container.decode(URL.self, forKey: .downloadURL)
         supportedPlatforms = try container.decode([String].self, forKey: .supportedPlatforms)
         kind = try container.decodeIfPresent(WatchApplicationKind.self, forKey: .kind) ?? .watchapp
-        category = try container.decodeIfPresent(String.self, forKey: .category) ?? "Other"
+        category = try container.decodeIfPresent(String.self, forKey: .category) ?? ""
         summary = try container.decodeIfPresent(String.self, forKey: .summary) ?? ""
         releaseNotes = try container.decodeIfPresent(String.self, forKey: .releaseNotes)
         iconURL = try container.decodeIfPresent(URL.self, forKey: .iconURL)
@@ -261,7 +271,17 @@ struct OfficialCatalogLookup: Decodable {
 
 struct OfficialCatalogApplication: Decodable {
     var author: String
-    var category: String
+    /// Optional because the store need not send it, and one entry without it
+    /// was enough to lose the response it arrived in.
+    ///
+    /// This was a plain `String`. A missing key throws `keyNotFound`, and this
+    /// is decoded inside an array inside `OfficialCatalogLookup`, so a single
+    /// uncategorised application in `v1/home/watchapps` — 73 of them the day
+    /// this was measured — would have failed the whole catalogue fetch, and a
+    /// by-UUID lookup would have looked like an application the store does not
+    /// have. The `"Other"` that `CatalogApplication.category` used to default
+    /// to could never be reached through this path at all.
+    var category: String?
     var description: String
     var id: String
     var title: String
@@ -303,7 +323,7 @@ struct OfficialCatalogApplication: Decodable {
             downloadURL: downloadURL,
             supportedPlatforms: hardwarePlatforms?.map(\.name) ?? ["aplite", "basalt", "chalk", "diorite", "emery", "flint", "gabbro"],
             kind: kind,
-            category: category,
+            category: category ?? "",
             summary: description,
             releaseNotes: release.releaseNotes,
             iconURL: iconImage?.values.compactMap(URL.init(string:)).first,

@@ -1134,6 +1134,50 @@ struct StoreLookupByUUIDTests {
         #expect(found.supportedPlatforms.sorted() == ["basalt", "emery"])
     }
 
+    /// An entry the store sent without a category.
+    ///
+    /// It decodes, and the application comes back with no category rather than
+    /// with a word this app made up. `category` was a plain `String` here, so a
+    /// missing key threw `keyNotFound` — and because these are decoded as an
+    /// array, one uncategorised application would have failed the whole
+    /// response: a by-UUID lookup would have read as an application the store
+    /// does not have, and `v1/home/watchapps` would have lost all 73 of them.
+    @Test func anApplicationTheStoreDidNotCategoriseStillDecodes() async throws {
+        let base = URL(string: "https://store.invalid/uncategorised/api")!
+        let uuid = UUID()
+        let answer = """
+        {
+          "data": [
+            {
+              "author": "Keynes",
+              "description": "Five watch utilities in one place.",
+              "id": "1b25cef73e2b471686672d07",
+              "title": "Watch Tools",
+              "type": "watchapp",
+              "uuid": "\(uuid.uuidString.lowercased())",
+              "hardware_platforms": [{"name": "emery"}],
+              "latest_release": {
+                "pbw_file": "https://example.invalid/watch-tools.pbw",
+                "version": "1.4.0"
+              }
+            }
+          ],
+          "limit": 1,
+          "offset": 0
+        }
+        """
+        StubURLProtocol.stub(
+            base.appending(path: "v1/apps/uuid").appending(path: uuid.uuidString.lowercased()),
+            status: 200,
+            body: Data(answer.utf8)
+        )
+
+        let found = try #require(await catalog().application(uuid: uuid, from: base))
+
+        #expect(found.name == "Watch Tools")
+        #expect(found.category.isEmpty)
+    }
+
     /// Not an error. Plenty of packages were never listed, and a reader who
     /// installed one from a file should see the screen without a complaint on
     /// it.

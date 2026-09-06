@@ -635,6 +635,16 @@
         }
       }
     },
+    "All Categories" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "すべてのカテゴリ"
+          }
+        }
+      }
+    },
     "All Day" : {
       "localizations" : {
         "ja" : {
