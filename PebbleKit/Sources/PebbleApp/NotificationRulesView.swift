@@ -14,6 +14,7 @@ struct NotificationRulesView: View {
             appName: current.displayName,
             rules: current.filterRules,
             isSupported: model.connections.contains { $0.watch.supportsNotificationFiltering },
+            feedback: model.notifications.sourceAppFeedback,
             setRules: { rules in
                 Task {
                     await model.setNotificationSourceAppFilterRules(
@@ -31,6 +32,7 @@ struct NotificationRulesContent: View {
     var appName: String
     var rules: [NotificationFilterRule]
     var isSupported: Bool = true
+    var feedback: FeatureFeedback?
     var setRules: ([NotificationFilterRule]) -> Void
 
     @State private var pattern = ""
@@ -43,6 +45,7 @@ struct NotificationRulesContent: View {
 
     var body: some View {
         Form {
+            FeedbackBanner(feedback: feedback)
             Section {
                 if rules.isEmpty {
                     Text("Every notification from this app reaches the watch.")

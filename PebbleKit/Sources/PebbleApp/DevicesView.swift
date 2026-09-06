@@ -40,6 +40,11 @@ struct DevicesContent<Destination: View>: View {
 
     var body: some View {
         List {
+            // Above the watches, not below them. It carries the connection
+            // failures — the long one about the watch having forgotten this
+            // phone — and at the foot of the list that sat past every watch.
+            // `AddWatchContent` in this file already does it this way.
+            FeedbackBanner(feedback: feedback)
             if watches.isEmpty {
                 ContentUnavailableView {
                     Label("No Devices", systemImage: "applewatch")
@@ -59,8 +64,6 @@ struct DevicesContent<Destination: View>: View {
                     }
                 }
             }
-
-            FeedbackBanner(feedback: feedback)
         }
         .navigationTitle(Text("Devices"))
         .toolbar {

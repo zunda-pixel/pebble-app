@@ -2105,6 +2105,16 @@
         }
       }
     },
+    "Forgot %lld app(s)." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%lld個のアプリを忘れました。"
+          }
+        }
+      }
+    },
     "Gather Watch Logs" : {
       "localizations" : {
         "ja" : {
@@ -2591,6 +2601,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ランチャーの一行"
+          }
+        }
+      }
+    },
+    "Launcher line saved. A Pebble that is not connected is told when it connects." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ランチャーの一行を保存しました。接続していないPebbleには、接続したときに伝えます。"
           }
         }
       }
@@ -3515,6 +3535,16 @@
         }
       }
     },
+    "Quiet hours updated." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "サイレント時間帯を更新しました。"
+          }
+        }
+      }
+    },
     "Read During Activity" : {
       "localizations" : {
         "ja" : {
@@ -3841,6 +3871,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "保存されたウォッチを読み込めませんでした。"
+          }
+        }
+      }
+    },
+    "Saved. A Pebble that is not connected is told when it connects." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "保存しました。接続していないPebbleには、接続したときに伝えます。"
           }
         }
       }
@@ -4425,6 +4465,16 @@
         }
       }
     },
+    "The change could not be saved." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "変更内容を保存できませんでした。"
+          }
+        }
+      }
+    },
     "The connection failed: the watch has thrown away its pairing with this device. A Pebble keeps one, so pairing it with another phone or computer does this. Forget the watch in the system Bluetooth settings, then pair it again here." : {
       "localizations" : {
         "ja" : {
@@ -4527,6 +4577,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "インストールが停止しました"
+          }
+        }
+      }
+    },
+    "The launcher line could not be saved." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ランチャーの一行を保存できませんでした。"
           }
         }
       }

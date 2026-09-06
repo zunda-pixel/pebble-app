@@ -1,5 +1,8 @@
 public import PebbleProtocol
 public import Foundation
+// `FeatureFeedback` holds a `LocalizedStringKey`, whose literal initializer
+// needs the module that declares it.
+import SwiftUI
 
 extension AppModel {
     func loadAppGlances() async {
@@ -17,12 +20,19 @@ extension AppModel {
         // The watch refuses a glance that is not newer than the one it holds,
         // and the reader saving the same words twice still means "show this".
         written.updatedAt = .now
-        if let glances = try? await appGlanceStore.update(written) {
-            appGlances.glances = glances
+        guard let glances = try? await appGlanceStore.update(written) else {
+            // Was a `try?` with nothing after it: the line was not kept and
+            // the screen showed the reader their own words back.
+            appGlances.feedback = .failure("The launcher line could not be saved.")
+            return
         }
+        appGlances.glances = glances
         for connection in activeConnections {
             await synchronizeAppGlances(on: connection)
         }
+        // True whether a watch is connected or not: `synchronizeAppGlances` is
+        // run again for each connection as it is made.
+        appGlances.feedback = .success("Launcher line saved. A Pebble that is not connected is told when it connects.")
     }
 
     func synchronizeAppGlances(on connection: WatchConnection) async {

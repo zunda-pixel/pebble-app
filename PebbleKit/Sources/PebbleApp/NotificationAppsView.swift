@@ -7,6 +7,7 @@ struct NotificationAppsView: View {
     var body: some View {
         NotificationAppsContent(
             apps: model.notifications.sourceApps,
+            feedback: model.notifications.sourceAppFeedback,
             remove: { removed in
                 Task { await model.removeNotificationSourceApps(removed) }
             },
@@ -22,6 +23,7 @@ struct NotificationAppsView: View {
 /// rather than one run of rows.
 struct NotificationAppsContent<Destination: View, HistoryDestination: View>: View {
     var apps: [NotificationSourceApp]
+    var feedback: FeatureFeedback?
     var remove: ([NotificationSourceApp]) -> Void
     @ViewBuilder var destination: (NotificationSourceApp) -> Destination
     @ViewBuilder var historyDestination: () -> HistoryDestination
@@ -39,6 +41,7 @@ struct NotificationAppsContent<Destination: View, HistoryDestination: View>: Vie
 
     var body: some View {
         List {
+            FeedbackBanner(feedback: feedback)
             Section {
                 NavigationLink {
                     historyDestination()

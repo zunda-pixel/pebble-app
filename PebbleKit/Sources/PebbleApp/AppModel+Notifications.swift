@@ -27,6 +27,7 @@ extension AppModel {
         if let start { notifications.preferences.quietHoursStart = min(23, max(0, start)) }
         if let end { notifications.preferences.quietHoursEnd = min(23, max(0, end)) }
         try? await notificationPreferenceStore.save(notifications.preferences)
+        notifications.settingsFeedback = .success("Quiet hours updated.")
     }
 
     public func sendTestNotification(watchID: WatchID? = nil) async {
@@ -233,6 +234,24 @@ extension AppModel {
         }
     }
 
+    /// Keeps a change to one of the phone's apps and tells every watch.
+    ///
+    /// The five setters above each ended in this, and each ended it silently:
+    /// a store that refused the change was swallowed by a `try?`, and nothing
+    /// was said either way. One place to answer from, on the screens where
+    /// those changes are made.
+    private func keep(_ app: NotificationSourceApp) async {
+        guard let apps = try? await notificationSourceAppStore.update(app) else {
+            notifications.sourceAppFeedback = .failure("The change could not be saved.")
+            return
+        }
+        notifications.sourceApps = apps
+        for connection in activeConnections {
+            await synchronizeNotificationSourceApps(on: connection)
+        }
+        notifications.sourceAppFeedback = .success("Saved. A Pebble that is not connected is told when it connects.")
+    }
+
     func synchronizeNotificationSourceApps(on connection: WatchConnection) async {
         for app in notifications.sourceApps {
             // Cut down here rather than in the client, so that what is written
@@ -265,12 +284,7 @@ extension AppModel {
         }
         app.icon = icon
         app.stateUpdated = .now
-        if let apps = try? await notificationSourceAppStore.update(app) {
-            notifications.sourceApps = apps
-        }
-        for connection in activeConnections {
-            await synchronizeNotificationSourceApps(on: connection)
-        }
+        await keep(app)
     }
 
     public func setNotificationSourceAppColors(
@@ -284,12 +298,7 @@ extension AppModel {
         app.backgroundColor = background
         app.foregroundColor = foreground
         app.stateUpdated = .now
-        if let apps = try? await notificationSourceAppStore.update(app) {
-            notifications.sourceApps = apps
-        }
-        for connection in activeConnections {
-            await synchronizeNotificationSourceApps(on: connection)
-        }
+        await keep(app)
     }
 
     public func setNotificationSourceAppVibePattern(
@@ -301,12 +310,7 @@ extension AppModel {
         }
         app.vibePattern = pattern
         app.stateUpdated = .now
-        if let apps = try? await notificationSourceAppStore.update(app) {
-            notifications.sourceApps = apps
-        }
-        for connection in activeConnections {
-            await synchronizeNotificationSourceApps(on: connection)
-        }
+        await keep(app)
     }
 
     public func setNotificationSourceAppFilterRules(
@@ -318,12 +322,7 @@ extension AppModel {
         }
         app.filterRules = rules
         app.stateUpdated = .now
-        if let apps = try? await notificationSourceAppStore.update(app) {
-            notifications.sourceApps = apps
-        }
-        for connection in activeConnections {
-            await synchronizeNotificationSourceApps(on: connection)
-        }
+        await keep(app)
     }
 
     public func setNotificationSourceAppMute(bundleID: String, muteState: NotificationAppMuteState) async {
@@ -335,12 +334,7 @@ extension AppModel {
         app.stateUpdated = .now
         // `merge` is for records the watch sends, and its timestamp gate can
         // discard a change made in the same second.
-        if let apps = try? await notificationSourceAppStore.update(app) {
-            notifications.sourceApps = apps
-        }
-        for connection in activeConnections {
-            await synchronizeNotificationSourceApps(on: connection)
-        }
+        await keep(app)
     }
 
     // Named rather than numbered: the list they were picked from may have been
@@ -366,6 +360,9 @@ extension AppModel {
                 }
             }
         }
+        // Said by count rather than by name: this takes a swipe on one row and
+        // an edit-mode sweep over several, and the list is what is left.
+        notifications.sourceAppFeedback = .success("Forgot \(removed.count) app(s).")
     }
 
     func handleAppMessage(_ message: AppMessageData, from connection: WatchConnection) async {

@@ -50,6 +50,11 @@ struct WatchSettingsContent: View {
 
     var body: some View {
         Form {
+            // First, not last. A setting written to the watch answered below
+            // every other setting, where the reader had stopped looking.
+            if feedback != nil {
+                Section { FeedbackBanner(feedback: feedback) }
+            }
             Section {
                 ForEach(WatchSetting.allCases, id: \.self) { setting in
                     Toggle(setting.title, isOn: Binding(
@@ -168,9 +173,6 @@ struct WatchSettingsContent: View {
                     Label("Changes are kept and written when the watch connects.", systemImage: "info.circle")
                         .foregroundStyle(.secondary)
                 }
-            }
-            if feedback != nil {
-                Section { FeedbackBanner(feedback: feedback) }
             }
         }
         .formStyle(.grouped)

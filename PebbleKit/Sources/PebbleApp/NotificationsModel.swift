@@ -24,4 +24,12 @@ public final class NotificationsModel {
     /// a switch flicked in Settings onto a watch's detail page — the same
     /// fault as #60, which is what that field was split up to cure.
     public internal(set) var settingsFeedback: FeatureFeedback?
+
+    /// The answer to changing what the watch does with one of the phone's
+    /// apps, which is asked for on that app's own screens.
+    ///
+    /// Its own field rather than `settingsFeedback`, because those screens are
+    /// pushed from the settings screen — sharing would have put the reply on
+    /// the screen behind, which is the fault this was all split up to cure.
+    public internal(set) var sourceAppFeedback: FeatureFeedback?
 }

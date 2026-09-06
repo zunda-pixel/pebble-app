@@ -30,6 +30,7 @@ struct AppGlanceContent: View {
     var applicationName: String
     var glance: AppGlance
     var isInstalled: Bool = true
+    var feedback: FeatureFeedback?
     var save: (AppGlance) -> Void
     var cancel: () -> Void
 
@@ -51,6 +52,7 @@ struct AppGlanceContent: View {
     var body: some View {
         NavigationStack {
             Form {
+                FeedbackBanner(feedback: feedback)
                 Section {
                     TextField("Line", text: $subtitle, axis: .vertical)
                         .lineLimit(1...3)

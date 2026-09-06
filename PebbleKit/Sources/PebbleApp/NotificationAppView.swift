@@ -12,6 +12,7 @@ struct NotificationAppView: View {
     var body: some View {
         NotificationAppContent(
             app: current,
+            feedback: model.notifications.sourceAppFeedback,
             setMute: { state in
                 Task { await model.setNotificationSourceAppMute(bundleID: app.bundleID, muteState: state) }
             },
@@ -44,6 +45,7 @@ struct NotificationAppView: View {
 /// One phone app's notifications, as the watch shows them.
 struct NotificationAppContent<RulesDestination: View>: View {
     var app: NotificationSourceApp
+    var feedback: FeatureFeedback?
     var setMute: (NotificationAppMuteState) -> Void
     var setIcon: (PebbleTimelineIcon?) -> Void
     var setColours: (_ background: PebbleColor?, _ foreground: PebbleColor?) -> Void
@@ -56,6 +58,7 @@ struct NotificationAppContent<RulesDestination: View>: View {
 
     var body: some View {
         Form {
+            FeedbackBanner(feedback: feedback)
             Section {
                 Picker("Mute", selection: Binding(
                     get: { current.muteState },
