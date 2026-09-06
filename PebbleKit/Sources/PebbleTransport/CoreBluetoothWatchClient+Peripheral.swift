@@ -449,7 +449,17 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
         do {
             let packet = try PPoGPacket(decoding: bytes)
             recordPPoGPacket(packet, direction: "in")
-            for step in setup.steps(for: packet, hasSession: ppogSession != nil) {
+            let steps = setup.steps(for: packet, hasSession: ppogSession != nil)
+            if steps.isEmpty {
+                Task { [tag = clientTag] in
+                    await PebbleDiagnostics.shared.record(
+                        category: "ppog",
+                        message: "[\(tag)] a packet arrived before there was a way to answer it; left alone"
+                    )
+                }
+                return
+            }
+            for step in steps {
                 switch step {
                 case .startSessionOver(let reason):
                     abandonSession(on: peripheral, because: reason)

@@ -122,6 +122,18 @@ struct LinkSetup: Equatable {
     /// what the watch sends when its acknowledgement timeouts have run out,
     /// which is not a thing to wait around for on a real one.
     mutating func steps(for packet: PPoGPacket, hasSession: Bool) -> [PPoGStep] {
+        // Nothing, because there is nothing that can be done yet. The watch
+        // reaches the phone's own protocol service as a GATT client, so it can
+        // talk before this side has discovered anything to answer through: a
+        // reset arrived once at 11:52:02 with no `link established` behind it,
+        // the answer had nowhere to go, and the link was dropped over it. The
+        // watch asks again, so leaving it alone costs one round trip and
+        // dropping it cost the whole connect.
+        //
+        // Every other packet yields at least one step, so an empty answer means
+        // this and only this.
+        guard mayStartProtocol else { return [] }
+
         switch packet {
         case .resetRequest:
             var steps: [PPoGStep] = []

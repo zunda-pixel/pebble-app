@@ -105,10 +105,14 @@ actor SpeechBridge: PebbleVoiceTranscriptionProvider {
             // What was said is nobody's business but the reader's, and the
             // report is made to be shared: how much was heard, and how much
             // came back, is all that helps.
+            // Seconds to one place, because integer division read every
+            // dictation shorter than a second as "0 s" — which is most of
+            // them, and looks exactly like no audio arriving at all.
+            let seconds = Double(samples.count) / Double(max(1, encoderInfo.sampleRate))
             await PebbleDiagnostics.shared.record(
                 category: "voice",
                 message: "heard \(audioFrames.count) frames"
-                    + ", \(samples.count / max(1, Int(encoderInfo.sampleRate))) s"
+                    + ", \(seconds.formatted(.number.precision(.fractionLength(1)))) s"
                     + ", \(words.count) words back"
             )
             guard !words.isEmpty else { return .failed(.recognizerError) }

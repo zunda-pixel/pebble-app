@@ -189,9 +189,44 @@ struct LinkSetupTests {
         )
     }
 
+    /// A packet that arrives before this side can answer it.
+    ///
+    /// The watch reaches the phone's own protocol service as a GATT client, so
+    /// it can send a reset before the phone's discovery has produced anything
+    /// to answer through. One did, on the reader's phone: the answer had
+    /// nowhere to go, the write threw, and the whole connect was given up over
+    /// it — `giving up while handling a packet from the watch`, then a retry
+    /// three seconds later that worked.
+    @Test
+    func aPacketBeforeTheLinkCanAnswerIsLeftAlone() {
+        // A link that has discovered nothing: pairing is not known either way.
+        var setup = LinkSetup()
+        #expect(!setup.mayStartProtocol)
+
+        #expect(setup.steps(for: .resetRequest(sequence: 0, version: .one), hasSession: false).isEmpty)
+        #expect(setup.steps(for: .acknowledgement(sequence: 0), hasSession: false).isEmpty)
+        // Nothing was claimed on the way past, so the handshake that follows
+        // still owes its ResetComplete.
+        let owed = setup.claimResetComplete()
+        #expect(owed)
+
+        // Asked to pair and still waiting: still nothing to answer through.
+        var pairing = LinkSetup()
+        #expect(pairing.apply(status(paired: false, encrypted: false)) == .askWatchToPair)
+        #expect(pairing.steps(for: .resetRequest(sequence: 0, version: .one), hasSession: false).isEmpty)
+
+        // Bonded: now it is answered.
+        var ready = LinkSetup()
+        _ = ready.apply(status(paired: true, encrypted: true))
+        #expect(
+            ready.steps(for: .resetRequest(sequence: 0, version: .one), hasSession: false) == [.answerReset]
+        )
+    }
+
     @Test
     func dataAndAcknowledgementsGoStraightToTheSession() {
         var setup = LinkSetup()
+        _ = setup.apply(status(paired: true, encrypted: true))
         #expect(setup.steps(for: .data(sequence: 3, payload: [0x01]), hasSession: true) == [.giveToSession])
         #expect(setup.steps(for: .acknowledgement(sequence: 3), hasSession: true) == [.giveToSession])
         // Handed over even with no session: what to do about that is the
