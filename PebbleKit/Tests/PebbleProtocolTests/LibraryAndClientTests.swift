@@ -677,10 +677,15 @@ struct CompanionStorageTests {
     /// The address of the store's own page, and who does not get one.
     ///
     /// The identifier the official feed calls `id` is the only key the store
-    /// answers to — its `links.share` is this same address, and its
-    /// collections list their members by it rather than by UUID. An
-    /// application with no `storeID` came from somewhere else, and offering a
-    /// link to a page that is not there would be worse than offering none.
+    /// answers to — its collections list their members by it rather than by
+    /// UUID. An application with no `storeID` came from somewhere else, and
+    /// offering a link to a page that is not there would be worse than
+    /// offering none.
+    ///
+    /// The host is pinned here because the feed's own `links.share` gets it
+    /// wrong: that field says `apps.rebble.io`, which serves an empty front
+    /// page for anything published since it was the store. Following the
+    /// feed is what this got wrong the first time.
     @Test func aCatalogApplicationLinksToItsStorePageOnlyWhenTheStoreKnowsIt() {
         func application(storeID: String) -> CatalogApplication {
             CatalogApplication(
@@ -691,7 +696,7 @@ struct CompanionStorageTests {
 
         #expect(
             application(storeID: "1b25cef73e2b471686672d07").storePageURL
-                == URL(string: "https://apps.rebble.io/application/1b25cef73e2b471686672d07")
+                == URL(string: "https://apps.repebble.com/1b25cef73e2b471686672d07")
         )
         // The default, which is what a hand-written feed and a side-loaded
         // package both leave behind.
@@ -700,7 +705,7 @@ struct CompanionStorageTests {
         // identifier stays inside the one path segment it was given.
         #expect(
             application(storeID: "../../elsewhere").storePageURL
-                == URL(string: "https://apps.rebble.io/application/%2E%2E%2F%2E%2E%2Felsewhere")
+                == URL(string: "https://apps.repebble.com/%2E%2E%2F%2E%2E%2Felsewhere")
         )
     }
 

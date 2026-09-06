@@ -49,9 +49,12 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
 
     /// The store's own page for this application, where there is one.
     ///
-    /// Built from `storeID` rather than decoded, though the feed does hand the
-    /// same address over as `links.share`. If the store ever moves, that field
-    /// is the one to read instead of guessing the shape here.
+    /// Deliberately *not* the `links.share` the feed offers. That address is
+    /// `apps.rebble.io/application/…`, the Rebble store, which does not know
+    /// the applications published since — asked for one, it serves its own
+    /// front page with nothing on it. Measured against three identifiers:
+    /// `apps.rebble.io` names only the 2014-era one in its `og:title`, while
+    /// `apps.repebble.com` names all three.
     ///
     /// Nil for an application the store does not know about: a hand-written
     /// feed carries no `storeID`, and neither does one side-loaded from a file.
@@ -62,7 +65,9 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
         guard !storeID.isEmpty,
               let id = storeID.addingPercentEncoding(withAllowedCharacters: .alphanumerics)
         else { return nil }
-        return URL(string: "https://apps.rebble.io/application/\(id)")
+        // The bare identifier is where the store settles: its own
+        // `/en_US/application/…` redirects here.
+        return URL(string: "https://apps.repebble.com/\(id)")
     }
 
     public func supports(_ model: WatchModel) -> Bool {
