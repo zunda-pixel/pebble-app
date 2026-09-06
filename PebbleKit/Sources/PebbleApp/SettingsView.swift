@@ -28,6 +28,7 @@ struct SettingsView: View {
             notificationPreferences: model.notifications.preferences,
             applications: model.applications.apps + model.applications.watchfaces,
             diagnosticReportURL: model.diagnostics.reportURL,
+            diagnosticsFeedback: model.diagnostics.feedback[.report],
             voiceTranscription: model.voiceTranscriptionReadiness,
             setVoiceTranscriptionEnabled: { enabled in
                 Task { await model.setVoiceTranscriptionEnabled(enabled) }
@@ -72,6 +73,8 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
     var notificationPreferences: NotificationDeliveryPreferences
     var applications: [WatchApplication]
     var diagnosticReportURL: URL?
+    /// The answer to asking for a diagnostic report, which is asked for here.
+    var diagnosticsFeedback: FeatureFeedback?
     var voiceTranscription: VoiceTranscriptionReadiness
     var setVoiceTranscriptionEnabled: (Bool) -> Void
     var setCompanionNotificationsEnabled: (Bool) -> Void
@@ -148,6 +151,10 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
             }
             Section("Diagnostics") {
                 Button("Prepare Diagnostic Report", systemImage: "stethoscope", action: prepareDiagnosticReport)
+                // Beside the button that asked. This screen showed no feedback
+                // at all before, so a report that could not be written left it
+                // silent while the Apps tab spoke up about it.
+                FeedbackBanner(feedback: diagnosticsFeedback)
                 if let diagnosticReportURL {
                     ShareLink(item: diagnosticReportURL) {
                         Label("Share Diagnostic Report", systemImage: "square.and.arrow.up")
@@ -174,6 +181,31 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
             notificationPreferences: NotificationDeliveryPreferences(),
             applications: PreviewSamples.watchApplications + PreviewSamples.watchfaces,
             diagnosticReportURL: nil,
+            diagnosticsFeedback: nil,
+            voiceTranscription: .ready,
+            setVoiceTranscriptionEnabled: { _ in },
+            setCompanionNotificationsEnabled: { _ in },
+            setQuietHours: { _, _, _ in },
+            setNotificationsEnabled: { _, _ in },
+            prepareDiagnosticReport: {},
+            weatherDestination: { EmptyView() },
+            notificationSettingsDestination: { EmptyView() }
+        )
+    }
+}
+
+#Preview("The report could not be written") {
+    NavigationStack {
+        SettingsContent(
+            weatherPlaceNames: PreviewSamples.weatherPlaces.map(\.name),
+            notificationSourceAppCount: PreviewSamples.notificationApps.count,
+            companionNotificationsEnabled: true,
+            notificationPreferences: NotificationDeliveryPreferences(),
+            applications: PreviewSamples.watchApplications,
+            // Nil alongside the failure: an earlier report is not offered for
+            // sharing next to a message saying the report could not be made.
+            diagnosticReportURL: nil,
+            diagnosticsFeedback: .failure("The diagnostic report could not be created."),
             voiceTranscription: .ready,
             setVoiceTranscriptionEnabled: { _ in },
             setCompanionNotificationsEnabled: { _ in },
@@ -199,6 +231,7 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
             ),
             applications: [],
             diagnosticReportURL: URL(fileURLWithPath: "/tmp/pebble-diagnostics.txt"),
+            diagnosticsFeedback: nil,
             voiceTranscription: .needsInstalling,
             setVoiceTranscriptionEnabled: { _ in },
             setCompanionNotificationsEnabled: { _ in },

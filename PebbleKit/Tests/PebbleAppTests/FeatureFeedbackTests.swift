@@ -83,6 +83,40 @@ struct FeatureFeedbackTests {
         #expect(model.catalog.feedback == nil)
     }
 
+    /// A diagnostic report answers where it was asked for, which is Settings.
+    ///
+    /// Its failure used to be written to `applications.libraryFeedback` — a
+    /// field only the Apps tab draws. So a report that could not be written
+    /// said so on a screen nobody was looking at, while the settings screen,
+    /// which has the button, sat there as though nothing had been asked.
+    ///
+    /// The failure itself is not covered here: `AppModel` calls
+    /// `PebbleDiagnostics.shared` with no seam to stand in for it, and
+    /// `exportReport` writes into the temporary directory, which does not fail.
+    /// What is covered is the field it lands in and the two things the success
+    /// has to leave behind it.
+    @Test func aDiagnosticReportAnswersOnTheSettingsScreen() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = makeModel(directory: directory, client: MockWatchClient())
+
+        // As an earlier attempt would have left it.
+        model.diagnostics.feedback[.report] = .failure("The diagnostic report could not be created.")
+
+        await model.prepareDiagnosticReport()
+
+        // The Share row appearing is the answer, so the words go rather than
+        // being replaced — and an earlier failure does not outlive its cause.
+        #expect(model.diagnostics.reportURL != nil)
+        #expect(model.diagnostics.feedback[.report] == nil)
+        // Not on the Apps tab, which is where this used to end up.
+        #expect(model.applications.libraryFeedback == nil)
+        #expect(model.applications.managementFeedback == nil)
+        // Nor is it any other diagnostic's answer.
+        #expect(model.diagnostics.feedback[.screenshot] == nil)
+        #expect(model.diagnostics.feedback[.watchLogs] == nil)
+    }
+
     /// A delivery setting answers on the settings screen, and a test
     /// notification on the watch's own page.
     ///

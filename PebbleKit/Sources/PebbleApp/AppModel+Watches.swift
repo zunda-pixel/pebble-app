@@ -126,8 +126,20 @@ extension AppModel {
                 device: connectedWatch,
                 applications: applications.apps + applications.watchfaces
             )
+            // Nothing to say on success: the Share row appearing is the answer,
+            // and this clears whatever an earlier attempt left behind.
+            diagnostics.feedback[.report] = nil
         } catch {
-            applications.libraryFeedback = .failure("The diagnostic report could not be created.")
+            // The button for this is on the settings screen. This used to write
+            // to `applications.libraryFeedback`, which only the Apps tab shows
+            // — so a report that could not be written said so on a screen
+            // nobody was looking at, and the settings screen sat there as
+            // though nothing had been asked.
+            diagnostics.feedback[.report] = .failure("The diagnostic report could not be created.")
+            // And the earlier report goes with it. Leaving it would keep a
+            // Share row offering a file from before whatever went wrong, next
+            // to a message saying the report could not be created.
+            diagnostics.reportURL = nil
         }
     }
 
