@@ -86,8 +86,20 @@ struct ApplicationsView: View {
             }
         )
         .navigationTitle(Text("Apps"))
-        .task { await model.loadApplications() }
+        .task {
+            await model.loadApplications()
+            // The cached catalogue, read off disk without asking the network,
+            // so that Update All below knows whether there is anything to
+            // update before the catalogue screen has ever been opened.
+            await model.loadCatalog()
+        }
         .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("Update All", systemImage: "arrow.down.app") {
+                    Task { await model.installCatalogUpdates() }
+                }
+                .disabled(model.isApplicationManagementBusy)
+            }
             ToolbarItem(placement: .primaryAction) {
                 NavigationLink {
                     CatalogView(

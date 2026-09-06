@@ -46,7 +46,6 @@ struct CatalogView: View {
             isImportDisabled: isImportDisabled,
             isUpdating: model.catalog.isUpdating,
             importApplication: importApplication,
-            installUpdates: { Task { await model.installCatalogUpdates() } },
             // Awaited rather than launched, so that the pull-to-refresh
             // indicator stays up until the catalogue has actually been fetched.
             refresh: { await model.refreshCatalog() },
@@ -72,7 +71,6 @@ struct CatalogContent<Destination: View>: View {
     var isImportDisabled: Bool
     var isUpdating: Bool
     var importApplication: (() -> Void)?
-    var installUpdates: () -> Void
     var refresh: @MainActor () async -> Void
     @ViewBuilder var destination: (CatalogApplication) -> Destination
 
@@ -130,7 +128,6 @@ struct CatalogContent<Destination: View>: View {
                             .disabled(isImportDisabled)
                     }
                 }
-                Button("Update All", systemImage: "arrow.down.app", action: installUpdates)
                 #if os(macOS)
                 // Kept here alone: `refreshable` is a gesture the phone has
                 // and a window does not, so dropping the button would leave
@@ -235,7 +232,6 @@ struct CatalogStateLabel: View {
         isImportDisabled: false,
         isUpdating: false,
         importApplication: {},
-        installUpdates: {},
         refresh: {},
         destination: { application in Text(verbatim: application.name) }
     )
@@ -249,7 +245,6 @@ struct CatalogStateLabel: View {
         isImportDisabled: true,
         isUpdating: true,
         importApplication: {},
-        installUpdates: {},
         refresh: {},
         destination: { _ in EmptyView() }
     )

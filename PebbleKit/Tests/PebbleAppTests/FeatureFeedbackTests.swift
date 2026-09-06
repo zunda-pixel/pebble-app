@@ -83,6 +83,28 @@ struct FeatureFeedbackTests {
         #expect(model.catalog.feedback == nil)
     }
 
+    /// Update All answers where its button is, which is the applications
+    /// screen.
+    ///
+    /// It used to answer on `catalog.feedback` while its button sat in the
+    /// catalogue's toolbar — and the catalogue has no feedback banner, so the
+    /// words went nowhere. Pressing it and being told nothing at all is the
+    /// same shape of fault as #60, one screen further along.
+    @Test func installingCatalogUpdatesAnswersOnTheApplicationsScreen() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = makeModel(directory: directory, client: MockWatchClient())
+
+        // Nothing in the catalogue, so nothing to update — the answer a reader
+        // gets most often, and the one that used to be silent.
+        await model.installCatalogUpdates()
+
+        #expect(model.applications.managementFeedback == .success("Installed apps are up to date."))
+        #expect(model.applications.managementFeedback?.isFailure == false)
+        #expect(model.catalog.feedback == nil)
+        #expect(model.applications.libraryFeedback == nil)
+    }
+
     /// The catalog too, which shared `dataSync` with health.
     @Test func aCatalogURLThatIsNotHTTPSAnswersOnTheCatalogAlone() async throws {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)

@@ -113,16 +113,29 @@ extension AppModel {
         }
     }
 
+    /// Applications the store has a newer version of than the library does.
+    public var catalogUpdates: [CatalogApplication] {
+        catalog.applications.filter { catalogInstallationState(for: $0) == .updateAvailable }
+    }
+
+    /// Answers on the applications screen rather than the catalogue's.
+    ///
+    /// That is where the button lives, and the catalogue never showed this: it
+    /// has no feedback banner, so the words went to `catalog.feedback` and only
+    /// a detail screen would have shown them. The per-application progress
+    /// `installCatalogApplication` writes still goes there, which is why each
+    /// one is named here too.
     public func installCatalogUpdates() async {
-        let updates = catalog.applications.filter { catalogInstallationState(for: $0) == .updateAvailable }
+        let updates = catalogUpdates
         guard !updates.isEmpty else {
-            catalog.feedback = .success("Installed apps are up to date.")
+            applications.managementFeedback = .success("Installed apps are up to date.")
             return
         }
         for application in updates {
+            applications.managementFeedback = .progress("Downloading \(application.name)…")
             await installCatalogApplication(application)
             if applications.libraryFeedback != nil { return }
         }
-        catalog.feedback = .success("Installed \(updates.count) catalog update(s).")
+        applications.managementFeedback = .success("Installed \(updates.count) catalog update(s).")
     }
 }
