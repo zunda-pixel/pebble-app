@@ -112,14 +112,32 @@ final class ScriptedMusicSource: SystemMusicSource {
 
     private let runner: any MusicScriptRunner
     private let interval: Duration
+    /// Whether Music is there to be asked.
+    ///
+    /// Injected for the same reason `WatchPull` and `PendingReply` take their
+    /// sleeps and `MusicCoordinator` takes its debounce: read straight from
+    /// `NSRunningApplication`, this made the tests measure whether the reader
+    /// happened to have Music open. One answered `changes == 3` where the
+    /// script it was given never changed, because a moment of "not running"
+    /// puts the snapshot back to nil and says so.
+    private let isRunning: @MainActor () -> Bool
     private var watching: Task<Void, Never>?
     /// Whether the last script was refused, so a refusal is said once rather
     /// than every two seconds — and said again if it comes back after working.
     private var wasRefused = false
 
-    init(runner: any MusicScriptRunner, interval: Duration = .seconds(2)) {
+    init(
+        runner: any MusicScriptRunner,
+        interval: Duration = .seconds(2),
+        isRunning: @escaping @MainActor () -> Bool = {
+            !NSRunningApplication
+                .runningApplications(withBundleIdentifier: MusicScript.bundleID)
+                .isEmpty
+        }
+    ) {
         self.runner = runner
         self.interval = interval
+        self.isRunning = isRunning
     }
 
     func start() {
@@ -155,9 +173,7 @@ final class ScriptedMusicSource: SystemMusicSource {
     /// Asked before every script, because `tell application "Music"` launches
     /// Music when it is not running, and polling must not do that.
     private var isMusicRunning: Bool {
-        !NSRunningApplication
-            .runningApplications(withBundleIdentifier: MusicScript.bundleID)
-            .isEmpty
+        isRunning()
     }
 
     private func refresh() async {

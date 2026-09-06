@@ -51,22 +51,60 @@ struct ScriptedMusicTests {
 
     @Test
     func theSourceHoldsWhatItLastReadAndSaysWhenItChanges() async throws {
-        let runner = ScriptedAnswers(Self.playing)
-        let source = ScriptedMusicSource(runner: runner, interval: .milliseconds(10))
-        var changes = 0
-        source.onChange = { changes += 1 }
+        // Whether Music is open is said here rather than read off the machine:
+        // taken from `NSRunningApplication`, this counted the reader's own
+        // Music window and answered `changes == 3` under a full suite (#79).
+        let changes = ChangeLog()
+        let source = ScriptedMusicSource(
+            runner: ScriptedAnswers(Self.playing),
+            interval: .milliseconds(10),
+            isRunning: { true }
+        )
+        source.onChange = { changes.note() }
 
         source.start()
-        for _ in 0..<200 where source.snapshot == nil { await Task.yield() }
+        await changes.reach(1)
         #expect(source.snapshot?.nowPlaying.title == "Tell Me What It Is")
-        #expect(changes == 1)
 
-        // Reading the same thing again is not news.
-        for _ in 0..<50 { await Task.yield() }
-        #expect(changes == 1)
+        // Reading the same thing again is not news. Waited out rather than
+        // woken, because what is claimed is that nothing happens — and a busy
+        // machine can only make that more true, never less.
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(changes.count == 1)
 
         source.stop()
         #expect(source.snapshot == nil)
+    }
+
+    /// Music closing is news, and the snapshot goes with it.
+    ///
+    /// This is the branch that made #79 read as three changes: it puts the
+    /// snapshot back to nil and says so, which is right — the point is that a
+    /// test decides when it happens.
+    @Test
+    func aClosedMusicIsForgottenAndSaidOnce() async throws {
+        let open = Mutable(true)
+        let changes = ChangeLog()
+        let source = ScriptedMusicSource(
+            runner: ScriptedAnswers(Self.playing),
+            interval: .milliseconds(10),
+            isRunning: { open.value }
+        )
+        source.onChange = { changes.note() }
+
+        source.start()
+        await changes.reach(1)
+        #expect(source.snapshot != nil)
+
+        open.value = false
+        await changes.reach(2)
+        #expect(source.snapshot == nil)
+
+        // Still closed is not news again.
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(changes.count == 2)
+
+        source.stop()
     }
 
     @Test
@@ -85,6 +123,45 @@ struct ScriptedMusicTests {
 }
 
 /// A runner that answers with whatever it was given.
+/// How often the source said something changed, and a way to wait for the
+/// next one.
+///
+/// Woken by the thing it is waiting for rather than counting `Task.yield()`s:
+/// yielding offers another task a chance and does not make it take one, so a
+/// count of yields says nothing about whether a 10 ms poll has run. Waiting
+/// with no timeout of its own is deliberate — a change that never comes should
+/// be bounded by the suite's deadline, which names what it was waiting for.
+@MainActor
+private final class ChangeLog {
+    private(set) var count = 0
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+
+    func note() {
+        count += 1
+        let resuming = waiting
+        waiting = []
+        for continuation in resuming { continuation.resume() }
+    }
+
+    func reach(_ target: Int) async {
+        while count < target {
+            await withCheckedContinuation { continuation in
+                waiting.append(continuation)
+            }
+        }
+    }
+}
+
+/// A value a closure can be handed and a test can change afterwards.
+@MainActor
+private final class Mutable<Value> {
+    var value: Value
+
+    init(_ value: Value) {
+        self.value = value
+    }
+}
+
 private final class ScriptedAnswers: MusicScriptRunner {
     private let answer: String
 
