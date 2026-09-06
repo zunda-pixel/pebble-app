@@ -113,6 +113,9 @@ final class ScriptedMusicSource: SystemMusicSource {
     private let runner: any MusicScriptRunner
     private let interval: Duration
     private var watching: Task<Void, Never>?
+    /// Whether the last script was refused, so a refusal is said once rather
+    /// than every two seconds — and said again if it comes back after working.
+    private var wasRefused = false
 
     init(runner: any MusicScriptRunner, interval: Duration = .seconds(2)) {
         self.runner = runner
@@ -137,8 +140,12 @@ final class ScriptedMusicSource: SystemMusicSource {
 
     func perform(_ action: MusicAction) {
         guard isMusicRunning else { return }
-        Task { [runner] in
-            try? await runner.run(MusicScript.command(for: action))
+        Task { [weak self, runner] in
+            do {
+                _ = try await runner.run(MusicScript.command(for: action))
+            } catch {
+                await self?.sayItWasRefused(error, doing: "\(action)")
+            }
         }
         // The watch expects the change to show; asking again beats waiting for
         // the next turn of the loop.
@@ -161,13 +168,42 @@ final class ScriptedMusicSource: SystemMusicSource {
             }
             return
         }
-        guard let answer = try? await runner.run(MusicScript.read),
-              let fresh = MusicScript.snapshot(from: answer) else {
+        let answer: String?
+        do {
+            answer = try await runner.run(MusicScript.read)
+        } catch {
+            await sayItWasRefused(error, doing: "reading what is playing")
             return
         }
+        if wasRefused {
+            wasRefused = false
+            await PebbleDiagnostics.shared.record(
+                category: "music",
+                message: "Music is answering again"
+            )
+        }
+        guard let answer, let fresh = MusicScript.snapshot(from: answer) else { return }
         guard fresh != snapshot else { return }
         snapshot = fresh
         onChange?()
+    }
+
+    /// Said once, not every two seconds.
+    ///
+    /// This used to be a `try?`, and a refusal left nothing at all: the watch
+    /// was sent a track with no title — three length-zero strings, four bytes
+    /// on the wire — and there was no way to tell that from music that really
+    /// had stopped. What withholds it is the sandbox rather than the reader:
+    /// without `com.apple.security.automation.apple-events` the event never
+    /// reaches the permission system, so no prompt is ever shown.
+    private func sayItWasRefused(_ error: any Error, doing what: String) async {
+        guard !wasRefused else { return }
+        wasRefused = true
+        await PebbleDiagnostics.shared.record(
+            .error,
+            category: "music",
+            message: "Music refused \(what): \(String(reflecting: error))"
+        )
     }
 }
 
