@@ -107,6 +107,16 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
 
     var body: some View {
         Form {
+            NavigationLink {
+                notificationSettingsDestination()
+            } label: {
+                LabeledContent("Notifications") {
+                    // Said here because it is the one thing on that screen
+                    // worth knowing without opening it: nothing a watch
+                    // app raises will arrive.
+                    if !companionNotificationsEnabled { Text("Off") }
+                }
+            }
             Section {
                 NavigationLink {
                     weatherDestination()
@@ -121,16 +131,6 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
                     PermissionsContent(permissions: permissions)
                 } label: {
                     Text("Permissions")
-                }
-                NavigationLink {
-                    notificationSettingsDestination()
-                } label: {
-                    LabeledContent("Notifications") {
-                        // Said here because it is the one thing on that screen
-                        // worth knowing without opening it: nothing a watch
-                        // app raises will arrive.
-                        if !companionNotificationsEnabled { Text("Off") }
-                    }
                 }
             }
             Section {

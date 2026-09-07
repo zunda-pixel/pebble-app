@@ -2135,6 +2135,16 @@
         }
       }
     },
+    "General Information" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "一般情報"
+          }
+        }
+      }
+    },
     "Hardware Revision" : {
       "localizations" : {
         "ja" : {
