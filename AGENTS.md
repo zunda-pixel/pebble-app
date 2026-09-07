@@ -57,6 +57,15 @@ ships, so a green SwiftPM run says little about the app.
   attached iPhone on its own, and a run on the iPhone reports "No result" rather
   than a failure, which reads like a broken test rather than a wrong
   destination.
+- **A result with no `xcresultBundlePath` is a result that did not happen.**
+  When the test build fails, `RunAllTests` and `RunSomeTests` answer with the
+  previous run's numbers, so the reply carries a plausible total and a few cases
+  marked "No result" while nothing ran at all. That field is the only reliable
+  tell: `state: "No result"` reads like a genuine failure, and the total is
+  wrong only against a previous count nobody wrote down. Check it on every run,
+  and never report counts from a reply that lacks it. A round trip of the
+  destination — iPhone, then back to My Mac — is the cheap way to get a real
+  run, and is worth doing before the first run after adding a test.
 - One build at a time. The project is a shared resource: two `BuildProject` or
   `RunAllTests` calls at once collide, so parallel workers must edit only and
   leave building to whoever coordinates them.
