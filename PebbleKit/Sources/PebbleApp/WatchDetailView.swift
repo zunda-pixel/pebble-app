@@ -132,47 +132,6 @@ struct WatchDetailContent<
                 }
             }
 
-            // What is left here changes while the app is open. The model, the
-            // serial and the hardware revision moved to their own page: they
-            // are read once, when a form is asking for them, and they were
-            // pushing the battery and the connection state — the two a reader
-            // opens this screen for — down the list.
-            Section("Watch") {
-                if let batteryLevel = watch.batteryLevel {
-                    LabeledContent("Battery", value: batteryLevel, format: .percent)
-                }
-                LabeledContent("Status") {
-                    switch watch.phase {
-                    case .connected:
-                        Text("Connected")
-                    case .reconnecting:
-                        Text("Reconnecting…")
-                    case .disconnected, nil:
-                        Text("Not connected")
-                    }
-                }
-            }
-            Section("Connection") {
-                if watch.phase == nil, watch.isSaved {
-                    Button("Connect", systemImage: "applewatch.radiowaves.left.and.right", action: connect)
-                        .disabled(watch.isConnecting)
-                }
-                if watch.isSaved {
-                    Toggle("Connect Automatically", isOn: Binding(
-                        get: { watch.automaticallyConnects },
-                        set: { setAutomaticallyConnects($0) }
-                    ))
-                }
-                if watch.phase != nil {
-                    Button("Disconnect", role: .destructive, action: disconnect)
-                }
-                FeedbackBanner(feedback: connectionFeedback)
-            }
-            Section("Notifications") {
-                Button("Send Test Notification", systemImage: "bell.badge", action: sendTestNotification)
-                    .disabled(!watch.isConnected)
-                FeedbackBanner(feedback: notificationFeedback)
-            }
             Section {
                 // First, and with the model as its summary, so the row still
                 // says which watch this is without being opened — the one
@@ -217,6 +176,58 @@ struct WatchDetailContent<
                     Text("Diagnostics")
                 }
             }
+
+
+            // Between what a watch is and what its connection is doing, since
+            // the battery belongs to neither: it is the one value on this
+            // screen that changes on its own, so it sits on its own, without a
+            // heading a single row does not need.
+            //
+            // The `if` is outside the section rather than inside it because an
+            // empty section is not nothing. Measured on macOS 27 with
+            // `.formStyle(.grouped)`: a section with no rows leaves a gap and
+            // pulls the *next* section's header inside that section's box,
+            // where it loses its weight and gains a divider. No watch,
+            // connected or remembered, has a battery level until one is
+            // reported, so this is the state a watch is first opened in.
+            if let batteryLevel = watch.batteryLevel {
+                Section {
+                    LabeledContent("Battery", value: batteryLevel, format: .percent)
+                }
+            }
+
+            Section("Connection") {
+                LabeledContent("Status") {
+                    switch watch.phase {
+                    case .connected:
+                        Text("Connected")
+                    case .reconnecting:
+                        Text("Reconnecting…")
+                    case .disconnected, nil:
+                        Text("Not connected")
+                    }
+                }
+                if watch.phase == nil, watch.isSaved {
+                    Button("Connect", systemImage: "applewatch.radiowaves.left.and.right", action: connect)
+                        .disabled(watch.isConnecting)
+                }
+                if watch.isSaved {
+                    Toggle("Connect Automatically", isOn: Binding(
+                        get: { watch.automaticallyConnects },
+                        set: { setAutomaticallyConnects($0) }
+                    ))
+                }
+                if watch.phase != nil {
+                    Button("Disconnect", role: .destructive, action: disconnect)
+                }
+                FeedbackBanner(feedback: connectionFeedback)
+            }
+            Section("Notifications") {
+                Button("Send Test Notification", systemImage: "bell.badge", action: sendTestNotification)
+                    .disabled(!watch.isConnected)
+                FeedbackBanner(feedback: notificationFeedback)
+            }
+
             Section {
                 ConfirmingButton(
                     title: "Restart Watch",
