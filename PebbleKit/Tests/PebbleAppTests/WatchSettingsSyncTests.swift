@@ -222,3 +222,57 @@ struct WatchSettingChoiceTests {
         #expect(WatchSettingsCodec.decodeRecord(key: WatchSettingsCodec.key(for: .unitsWind), value: [9]) == nil)
     }
 }
+
+/// Settings wider than a byte.
+///
+/// `lightTimeoutMs` is a `uint32_t` in `prefs.c`, and
+/// `settings_blob_db_insert` writes what arrives straight into the settings
+/// file — so a four-byte pref given one byte is read back as that byte plus
+/// three of whatever was beside it (#93).
+@Suite
+struct WatchSettingWidthTests {
+    @Test func aDurationIsSentAsFourLittleEndianBytes() {
+        let frame = WatchSettingsCodec.insertFrame(.backlightTimeout, rawValue: 8_000, token: 1)
+
+        // 8000 = 0x1F40, little-endian across four bytes.
+        #expect(Array(frame.payload.suffix(4)) == [0x40, 0x1F, 0x00, 0x00])
+    }
+
+    @Test func aSwitchIsStillOneByte() {
+        let frame = WatchSettingsCodec.insertFrame(.backlight, rawValue: 1, token: 1)
+
+        #expect(frame.payload.last == 1)
+        #expect(WatchSetting.backlight.kind.width == 1)
+        #expect(WatchSetting.backlightTimeout.kind.width == 4)
+    }
+
+    /// Four bytes back, read as one number rather than as its first byte.
+    @Test func aDurationComingBackFromTheWatchIsReadWhole() {
+        let key = WatchSettingsCodec.key(for: .backlightTimeout)
+
+        #expect(WatchSettingsCodec.decodeRecord(key: key, value: [0x40, 0x1F, 0, 0])?.1 == 8_000)
+        // One byte is not a `uint32_t`, whatever it says.
+        #expect(WatchSettingsCodec.decodeRecord(key: key, value: [0x40]) == nil)
+    }
+
+    /// Only the lengths the watch itself offers, from
+    /// `src/fw/apps/system/settings/display.c`.
+    @Test func aLengthTheWatchDoesNotOfferIsRefused() {
+        let key = WatchSettingsCodec.key(for: .backlightTimeout)
+
+        #expect(WatchSetting.backlightTimeout.accepts(rawValue: 5_000))
+        #expect(!WatchSetting.backlightTimeout.accepts(rawValue: 4_000))
+        #expect(WatchSettingsCodec.decodeRecord(key: key, value: [0xA0, 0x0F, 0, 0]) == nil)
+    }
+
+    /// A picker carries the value, not the row it sits at: for a duration
+    /// those differ.
+    @Test func theOptionsCarryTheirOwnValues() {
+        #expect(WatchSetting.backlightTimeout.optionRawValues == [3_000, 5_000, 8_000])
+        #expect(WatchSetting.textSize.optionRawValues == [0, 1, 2, 3])
+        #expect(
+            WatchSetting.backlightTimeout.optionRawValues.count
+                == WatchSetting.backlightTimeout.optionTitles.count
+        )
+    }
+}

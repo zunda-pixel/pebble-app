@@ -3,11 +3,13 @@ import MemberwiseInit
 
 /// What one setting holds, and how wide it is on the wire.
 ///
-/// Both of these are a single byte, which is what the firmware stores them as:
-/// every key below reaches `prv_pref_set(key, &value, sizeof(value))` in
-/// `src/fw/shell/normal/prefs.c` with a `bool` or a `uint8_t` behind it. The
-/// keys that are wider — `lightTimeoutMs` is a `uint32_t` — are not modelled
-/// here yet, and adding one means adding a width, not squeezing it into a byte.
+/// The width is the firmware's own: every key below reaches
+/// `prv_pref_set(key, &value, sizeof(value))` in `src/fw/shell/normal/prefs.c`
+/// with a `bool`, a `uint8_t` or a `uint32_t` behind it, and this says which.
+///
+/// A wrong width is not caught for us. `settings_blob_db_insert` writes the
+/// bytes into the settings file as they arrive, so a four-byte pref given one
+/// byte is read back as that byte plus three of whatever was beside it.
 public enum WatchSettingKind: Equatable, Sendable {
     case boolean
     /// One of `0..<count`, numbered as the firmware numbers it.
@@ -16,6 +18,22 @@ public enum WatchSettingKind: Equatable, Sendable {
     /// "Ignoring attempt to set content size to invalid size" and keeps what it
     /// had, so a value past the end is a write that silently does nothing.
     case choice(count: Int)
+    /// A length of time in milliseconds, four bytes wide, and one of the
+    /// lengths the watch itself offers rather than any number at all.
+    ///
+    /// The watch's own display settings list `{ 3000, 5000, 8000 }` with the
+    /// labels "3 Seconds", "5 Seconds", "8 Seconds"
+    /// (`src/fw/apps/system/settings/display.c`). Offering a free number here
+    /// would let the reader pick one the watch has no name for.
+    case duration(milliseconds: [Int])
+
+    /// How many bytes the value takes, which is what the firmware stores it as.
+    public var width: Int {
+        switch self {
+        case .boolean, .choice: 1
+        case .duration: 4
+        }
+    }
 }
 
 /// The firmware accepts writes for a whitelisted set of keys only
@@ -37,12 +55,19 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
     /// `PreferredContentSize`: 0 small … 3 extra large. Named for what the
     /// watch calls it on screen rather than for the key, which says "style".
     case textSize = "textStyle"
+    /// `BacklightPreset`: 0 max brightness, 1 standard, 2 battery saver,
+    /// 3 advanced.
+    case backlightPreset = "lightPreset"
+    /// How long the backlight stays on, in milliseconds.
+    case backlightTimeout = "lightTimeoutMs"
 
     public var kind: WatchSettingKind {
         switch self {
         case .unitsDistance: .choice(count: 2)
         case .unitsWind: .choice(count: 3)
         case .textSize: .choice(count: 4)
+        case .backlightPreset: .choice(count: 4)
+        case .backlightTimeout: .duration(milliseconds: [3_000, 5_000, 8_000])
         default: .boolean
         }
     }
@@ -60,10 +85,27 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
         case .unitsWind: 0
         // `s_text_style = PreferredContentSizeDefault`, which is medium.
         case .textSize: 1
+        // `s_backlight_preset = BacklightPreset_Standard`.
+        case .backlightPreset: 1
+        // `DEFAULT_BACKLIGHT_TIMEOUT_MS` in `src/fw/shell/prefs.h`.
+        case .backlightTimeout: 3_000
         }
     }
 
     public var defaultValue: Bool { defaultRawValue != 0 }
+
+    /// Every value this setting can hold, in the order they should be offered.
+    ///
+    /// Not the same as the option's position: a choice is numbered from zero,
+    /// but a duration's value is the number of milliseconds, so a picker has to
+    /// carry the value rather than the index it sits at.
+    public var optionRawValues: [Int] {
+        switch kind {
+        case .boolean: [0, 1]
+        case .choice(let count): Array(0..<count)
+        case .duration(let milliseconds): milliseconds
+        }
+    }
 
     /// Whether a value is one this setting can hold, so that neither this app
     /// nor the watch is asked to store something meaningless.
@@ -71,6 +113,7 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
         switch kind {
         case .boolean: (0...1).contains(rawValue)
         case .choice(let count): (0..<count).contains(rawValue)
+        case .duration(let milliseconds): milliseconds.contains(rawValue)
         }
     }
 }
@@ -110,7 +153,12 @@ public enum WatchSettingsCodec {
         BlobDBCodec.insertFrame(
             databaseID: databaseID,
             key: key(for: setting),
-            value: [UInt8(truncatingIfNeeded: rawValue)],
+            // As many bytes as the firmware's own variable, little-endian the
+            // way an ARM struct is written: a four-byte pref given one byte is
+            // read as three bytes of whatever was next to it.
+            value: (0..<setting.kind.width).map {
+                UInt8(truncatingIfNeeded: rawValue >> (8 * $0))
+            },
             token: token
         )
     }
@@ -132,13 +180,15 @@ public enum WatchSettingsCodec {
         // The watch may send the name with its terminator or without it, the
         // same way the firmware accepts both from the phone.
         let name = String(decoding: key.prefix { $0 != 0 }, as: UTF8.self)
-        guard let setting = WatchSetting(rawValue: name), value.count == 1 else { return nil }
-        // A boolean is anything non-zero, the way C reads one; a choice has to
-        // be a value the setting has, or this app would show a picker with
+        guard let setting = WatchSetting(rawValue: name),
+              value.count == setting.kind.width else { return nil }
+        // A boolean is anything non-zero, the way C reads one; the others have
+        // to be a value the setting has, or this app would show a picker with
         // nothing selected and write the nonsense back to the other watch.
         let rawValue = switch setting.kind {
         case .boolean: value[0] == 0 ? 0 : 1
         case .choice: Int(value[0])
+        case .duration: value.reversed().reduce(0) { $0 << 8 | Int($1) }
         }
         guard setting.accepts(rawValue: rawValue) else { return nil }
         return (setting, rawValue)

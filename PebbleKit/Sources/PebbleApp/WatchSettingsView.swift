@@ -52,10 +52,12 @@ struct WatchSettingRow: View {
                 get: { rawValue != 0 },
                 set: { setRawValue($0 ? 1 : 0) }
             ))
-        case .choice:
+        case .choice, .duration:
             Picker(setting.title, selection: Binding(get: { rawValue }, set: setRawValue)) {
-                ForEach(Array(setting.optionTitles.enumerated()), id: \.offset) { option in
-                    Text(option.element).tag(option.offset)
+                // Tagged by the value, not by where the option sits: a
+                // duration's value is its milliseconds.
+                ForEach(Array(zip(setting.optionRawValues, setting.optionTitles)), id: \.0) { option in
+                    Text(option.1).tag(option.0)
                 }
             }
         }

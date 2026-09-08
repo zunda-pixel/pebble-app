@@ -193,10 +193,7 @@ struct BlobDBRecordTests {
     @Test func aWatchSettingCarriesItsOwnValue() throws {
         for setting in WatchSetting.allCases {
             // Every value the setting has, whether that is two or four of them.
-            let values = switch setting.kind {
-            case .boolean: Array(0...1)
-            case .choice(let count): Array(0..<count)
-            }
+            let values = setting.optionRawValues
             for rawValue in values {
                 try expect(
                     .watchSetting(setting, rawValue: rawValue),

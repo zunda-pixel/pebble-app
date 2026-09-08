@@ -331,6 +331,36 @@
         }
       }
     },
+    "3 Seconds" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "3秒"
+          }
+        }
+      }
+    },
+    "5 Seconds" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "5秒"
+          }
+        }
+      }
+    },
+    "8 Seconds" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "8秒"
+          }
+        }
+      }
+    },
     "24-Hour Clock" : {
       "localizations" : {
         "ja" : {
@@ -891,6 +921,26 @@
         }
       }
     },
+    "Backlight Brightness" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "バックライトの明るさ"
+          }
+        }
+      }
+    },
+    "Backlight Duration" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "バックライトの点灯時間"
+          }
+        }
+      }
+    },
     "Backlight on Wrist Flick" : {
       "localizations" : {
         "ja" : {
@@ -917,6 +967,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "バッテリー"
+          }
+        }
+      }
+    },
+    "Battery Saver" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "省電力"
           }
         }
       }
@@ -1007,6 +1067,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "本文"
+          }
+        }
+      }
+    },
+    "Brightest" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "最も明るい"
           }
         }
       }
@@ -1577,6 +1647,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "現在地"
+          }
+        }
+      }
+    },
+    "Custom" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "カスタム"
           }
         }
       }
