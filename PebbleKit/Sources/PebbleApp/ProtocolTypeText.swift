@@ -118,6 +118,9 @@ public extension WatchSetting {
         case .textSize: "Text Size"
         case .backlightPreset: "Backlight Brightness"
         case .backlightTimeout: "Backlight Duration"
+        case .backlightIntensity: "Backlight Level"
+        case .backlightTouchWake: "Backlight on Touch"
+        case .backlightDynamicMode: "Dynamic Backlight"
         }
     }
 
@@ -132,14 +135,20 @@ public extension WatchSetting {
         // `UnitsWind_FromDistance` means and what the watch does with it.
         case .unitsWind: ["Match Distance", "km/h", "mph"]
         case .textSize: ["Small", "Medium", "Large", "Extra Large"]
-        // `BacklightPreset`. "Advanced" is the watch's own word for "whatever
-        // the brightness and the other backlight settings were set to by hand",
-        // which this app cannot set yet — it is offered so that a watch already
-        // on it is not shown as being on something else.
+        // `BacklightPreset`. "Advanced" is the watch's own word for "the
+        // backlight settings were set by hand"; called "Custom" here because
+        // there is nothing advanced about it from this side. It is offered so
+        // that a watch on it is not shown as being on something else, and it
+        // is what the row falls back to whenever the underlying values have
+        // drifted from every preset.
         case .backlightPreset: ["Brightest", "Standard", "Battery Saver", "Custom"]
         // Said in seconds because the watch says seconds; the wire is
         // milliseconds and the reader never sees one.
         case .backlightTimeout: ["3 Seconds", "5 Seconds", "8 Seconds"]
+        // `BacklightTouchWake`, in the firmware's order.
+        case .backlightTouchWake: ["Double Tap", "Tap", "Off"]
+        // `BacklightDynamicMode`, in the firmware's order.
+        case .backlightDynamicMode: ["Off", "Bright", "Standard", "Dim"]
         default: []
         }
     }

@@ -941,6 +941,26 @@
         }
       }
     },
+    "Backlight Level" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "バックライトの輝度"
+          }
+        }
+      }
+    },
+    "Backlight on Touch" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "タッチでバックライト点灯"
+          }
+        }
+      }
+    },
     "Backlight on Wrist Flick" : {
       "localizations" : {
         "ja" : {
@@ -1067,6 +1087,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "本文"
+          }
+        }
+      }
+    },
+    "Bright" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "明るい"
           }
         }
       }
@@ -1771,6 +1801,16 @@
         }
       }
     },
+    "Dim" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "暗い"
+          }
+        }
+      }
+    },
     "Disconnect" : {
       "localizations" : {
         "ja" : {
@@ -1797,6 +1837,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "2回"
+          }
+        }
+      }
+    },
+    "Double Tap" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ダブルタップ"
           }
         }
       }
@@ -1887,6 +1937,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ダウンロード中…"
+          }
+        }
+      }
+    },
+    "Dynamic Backlight" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "バックライトの自動調光"
           }
         }
       }
@@ -4577,6 +4637,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "スクリーンショットを撮る"
+          }
+        }
+      }
+    },
+    "Tap" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "タップ"
           }
         }
       }

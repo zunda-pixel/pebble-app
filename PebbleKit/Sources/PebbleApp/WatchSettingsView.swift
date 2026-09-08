@@ -12,7 +12,18 @@ struct WatchSettingsView: View {
     var body: some View {
         WatchSettingsContent(
             watchSettings: Dictionary(
-                uniqueKeysWithValues: WatchSetting.allCases.map { ($0, model.watchSettingValue($0)) }
+                uniqueKeysWithValues: WatchSetting.allCases.map { setting in
+                    // The brightness row shows the preset the watch would
+                    // report rather than the number last written, the way
+                    // `backlight_get_preset` derives it: turning the brightness
+                    // down by hand leaves the watch on "Custom", and this
+                    // screen has to say so instead of claiming a preset the
+                    // watch has left behind.
+                    guard setting == .backlightPreset else {
+                        return (setting, model.watchSettingValue(setting))
+                    }
+                    return (setting, BacklightPreset.reported { model.watchSettingValue($0) })
+                }
             ),
             activitySettings: model.watchSettings.activity,
             heartRateSettings: model.watchSettings.heartRate,
@@ -45,6 +56,17 @@ struct WatchSettingRow: View {
     var rawValue: Int
     var setRawValue: (Int) -> Void
 
+    /// Where a dragging slider is now, before it has been written anywhere.
+    /// Nil while nothing is being dragged, so that a value arriving from the
+    /// watch is shown rather than being held off by a stale draft.
+    @State private var draft: Int?
+
+    private func commitDraft() {
+        guard let draft else { return }
+        setRawValue(draft)
+        self.draft = nil
+    }
+
     var body: some View {
         switch setting.kind {
         case .boolean:
@@ -59,6 +81,37 @@ struct WatchSettingRow: View {
                 ForEach(Array(zip(setting.optionRawValues, setting.optionTitles)), id: \.0) { option in
                     Text(option.1).tag(option.0)
                 }
+            }
+        case .number(let range):
+            // Not a picker: a hundred numbered rows would be a worse way to
+            // say "somewhere between dim and bright".
+            VStack(alignment: .leading) {
+                LabeledContent(setting.title) {
+                    Text(Double(draft ?? rawValue) / 100, format: .percent)
+                        .monospacedDigit()
+                }
+                Slider(
+                    value: Binding(
+                        get: { Double(draft ?? rawValue) },
+                        set: { draft = Int($0.rounded()) }
+                    ),
+                    in: Double(range.lowerBound)...Double(range.upperBound),
+                    // Whole numbers, because the setting is one — and because a
+                    // slider adjusted by voice moves by its step.
+                    step: 1,
+                    // On the way up rather than on every step: each write goes
+                    // to the watch, and a drag across the slider would be a
+                    // hundred of them.
+                    onEditingChanged: { isDragging in
+                        guard !isDragging else { return }
+                        commitDraft()
+                    }
+                )
+                // The documented callback covers a drag; it says nothing about
+                // a slider moved by voice, and a value that is only ever shown
+                // is a value quietly thrown away. So a draft left behind is
+                // written when the screen goes rather than never.
+                .onDisappear(perform: commitDraft)
             }
         }
     }
@@ -76,6 +129,19 @@ struct WatchSettingsContent: View {
     var setHeartRateSettings: (HeartRateSettings) -> Void
     var setReminderAppEnabled: (Bool) -> Void
 
+    /// The settings that get a row, which is not all of them.
+    ///
+    /// Touch wake and the dynamic backlight mode are written — a brightness
+    /// preset is a name for them among others — but not offered, because
+    /// neither is on every watch: the touchscreen rows are behind `CONFIG_TOUCH`
+    /// in the watch's own settings app and the dynamic mode is behind
+    /// `CONFIG_DYNAMIC_BACKLIGHT` in the sync whitelist itself. A row that does
+    /// nothing on the watch in front of the reader is worse than no row, and
+    /// telling the two apart needs the per-model gating #93 still owes.
+    static let shownSettings = WatchSetting.allCases.filter {
+        $0 != .backlightTouchWake && $0 != .backlightDynamicMode
+    }
+
     var body: some View {
         Form {
             // First, not last. A setting written to the watch answered below
@@ -84,7 +150,7 @@ struct WatchSettingsContent: View {
                 Section { FeedbackBanner(feedback: feedback) }
             }
             Section {
-                ForEach(WatchSetting.allCases, id: \.self) { setting in
+                ForEach(Self.shownSettings, id: \.self) { setting in
                     WatchSettingRow(
                         setting: setting,
                         rawValue: watchSettings[setting] ?? setting.defaultRawValue,
@@ -267,4 +333,17 @@ struct WatchSettingsContent: View {
             setReminderAppEnabled: { _ in }
         )
     }
+}
+
+/// The three backlight rows on their own, which is where the shapes differ:
+/// a preset picker, a duration picker, and the level as a slider.
+#Preview("Backlight rows") {
+    Form {
+        Section {
+            WatchSettingRow(setting: .backlightPreset, rawValue: 3, setRawValue: { _ in })
+            WatchSettingRow(setting: .backlightTimeout, rawValue: 8_000, setRawValue: { _ in })
+            WatchSettingRow(setting: .backlightIntensity, rawValue: 72, setRawValue: { _ in })
+        }
+    }
+    .formStyle(.grouped)
 }

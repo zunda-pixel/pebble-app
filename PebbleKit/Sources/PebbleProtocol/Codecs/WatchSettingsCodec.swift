@@ -26,11 +26,17 @@ public enum WatchSettingKind: Equatable, Sendable {
     /// (`src/fw/apps/system/settings/display.c`). Offering a free number here
     /// would let the reader pick one the watch has no name for.
     case duration(milliseconds: [Int])
+    /// Any number in a range, one byte wide.
+    ///
+    /// Unlike a choice, the numbers are not names for anything, so they are not
+    /// offered one at a time — `optionRawValues` lists them all and nothing
+    /// should build a picker out of that.
+    case number(range: ClosedRange<Int>)
 
     /// How many bytes the value takes, which is what the firmware stores it as.
     public var width: Int {
         switch self {
-        case .boolean, .choice: 1
+        case .boolean, .choice, .number: 1
         case .duration: 4
         }
     }
@@ -57,9 +63,19 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
     case textSize = "textStyle"
     /// `BacklightPreset`: 0 max brightness, 1 standard, 2 battery saver,
     /// 3 advanced.
+    ///
+    /// Not a setting of its own on the watch, however much it looks like one:
+    /// see `BacklightPreset` below for what writing it has to mean.
     case backlightPreset = "lightPreset"
     /// How long the backlight stays on, in milliseconds.
     case backlightTimeout = "lightTimeoutMs"
+    /// How bright the backlight is, 1 to 100.
+    case backlightIntensity = "lightIntensity"
+    /// `BacklightTouchWake`: 0 double tap, 1 tap, 2 off. Only a watch with a
+    /// touchscreen does anything with it.
+    case backlightTouchWake = "lightTouch"
+    /// `BacklightDynamicMode`: 0 off, 1 bright, 2 standard, 3 dim.
+    case backlightDynamicMode = "lightDynamicMode"
 
     public var kind: WatchSettingKind {
         switch self {
@@ -67,10 +83,26 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
         case .unitsWind: .choice(count: 3)
         case .textSize: .choice(count: 4)
         case .backlightPreset: .choice(count: 4)
+        case .backlightTouchWake: .choice(count: 3)
+        case .backlightDynamicMode: .choice(count: 4)
         case .backlightTimeout: .duration(milliseconds: [3_000, 5_000, 8_000])
+        // `BACKLIGHT_INTENSITY_MIN` to `BACKLIGHT_INTENSITY_MAX`. Zero is not
+        // in it: `prv_set_s_backlight_intensity` treats it as invalid and
+        // writes the default back, so a backlight is turned off with
+        // `lightEnabled` and not by winding this down.
+        case .backlightIntensity: .number(range: 1...100)
         default: .boolean
         }
     }
+
+    /// Whether the watch may not have this setting at all.
+    ///
+    /// `lightDynamicMode` sits behind `CONFIG_DYNAMIC_BACKLIGHT` in both
+    /// `prefs.c` and the sync whitelist, so a watch built without it answers
+    /// the write with `E_INVALID_OPERATION` — a logged warning on the watch and
+    /// nothing else (`settings_blob_db.c:332`). That is a fact about the model,
+    /// not a failure the reader did anything about, so it is not said out loud.
+    public var mayBeAbsent: Bool { self == .backlightDynamicMode }
 
     /// What the watch has before anybody changes it, from the initialisers in
     /// `prefs.c`.
@@ -89,6 +121,15 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
         case .backlightPreset: 1
         // `DEFAULT_BACKLIGHT_TIMEOUT_MS` in `src/fw/shell/prefs.h`.
         case .backlightTimeout: 3_000
+        // `shell_prefs_init` sets this to the Standard preset's own intensity,
+        // "so fresh devices report Mode: Standard" as its comment puts it, and
+        // not to `BACKLIGHT_INTENSITY_DEFAULT`, which is the value a *rejected*
+        // write falls back to.
+        case .backlightIntensity: 50
+        // `s_backlight_touch_wake = BacklightTouchWake_DoubleTap`.
+        case .backlightTouchWake: 0
+        // `s_backlight_dynamic_mode = BacklightDynamicMode_Standard`.
+        case .backlightDynamicMode: 2
         }
     }
 
@@ -104,6 +145,7 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
         case .boolean: [0, 1]
         case .choice(let count): Array(0..<count)
         case .duration(let milliseconds): milliseconds
+        case .number(let range): Array(range)
         }
     }
 
@@ -114,7 +156,76 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
         case .boolean: (0...1).contains(rawValue)
         case .choice(let count): (0..<count).contains(rawValue)
         case .duration(let milliseconds): milliseconds.contains(rawValue)
+        case .number(let range): range.contains(rawValue)
         }
+    }
+}
+
+/// A backlight preset, which is a name for seven other settings rather than a
+/// setting of its own.
+///
+/// This matters because writing `lightPreset` on its own does nothing a reader
+/// can see. The watch's own settings screen calls `backlight_set_preset`
+/// (`src/fw/shell/normal/prefs.c:1459`), which writes the preset key *and* the
+/// seven values it stands for. A phone write goes down a different road:
+/// `prefs_private_handle_blob_db_event` calls the per-pref handler, and
+/// `lightPreset`'s handler assigns the global and touches nothing else. So the
+/// brightness, the timeout, the sensor and the wrist flick all stay as they
+/// were, and `backlight_get_preset` — which compares them against the preset
+/// and answers `Advanced` on any mismatch — stops reporting the preset at all.
+/// The firmware's own comment on that function names this exact case:
+/// "they can drift independently (e.g. via phone sync)".
+///
+/// So a preset is written by writing what it means (#115).
+public enum BacklightPreset {
+    public static let maxBrightness = 0
+    public static let standard = 1
+    public static let batterySaver = 2
+    /// The watch's word for "these were set by hand". It stands for no set of
+    /// values, which is why choosing it writes only the preset key — the same
+    /// early return `backlight_set_preset` takes.
+    public static let advanced = 3
+
+    /// The values a concrete preset stands for, from `s_backlight_preset_settings`
+    /// in `prefs.c`. Nil for `advanced`, which stands for none.
+    public static func settings(for preset: Int) -> [WatchSetting: Int]? {
+        switch preset {
+        // Every concrete preset has the backlight on: the only off switch lives
+        // in the Advanced submenu, which these hide.
+        case maxBrightness: [
+            .backlight: 1, .backlightAmbientSensor: 1, .backlightIntensity: 100,
+            .backlightTimeout: 5_000, .backlightMotion: 1, .backlightTouchWake: 0,
+            .backlightDynamicMode: 0,
+        ]
+        case standard: [
+            .backlight: 1, .backlightAmbientSensor: 1, .backlightIntensity: 50,
+            .backlightTimeout: 3_000, .backlightMotion: 1, .backlightTouchWake: 0,
+            .backlightDynamicMode: 2,
+        ]
+        case batterySaver: [
+            .backlight: 1, .backlightAmbientSensor: 1, .backlightIntensity: 25,
+            .backlightTimeout: 3_000, .backlightMotion: 1, .backlightTouchWake: 0,
+            .backlightDynamicMode: 3,
+        ]
+        default: nil
+        }
+    }
+
+    /// The preset the watch would report for a set of values, worked out the
+    /// way `backlight_get_preset` works it out.
+    ///
+    /// Shown rather than the number last written, so that turning the
+    /// brightness down by hand reads as "Custom" here as it does on the wrist,
+    /// instead of leaving this screen claiming a preset the watch has left.
+    public static func reported(by value: (WatchSetting) -> Int) -> Int {
+        let stored = value(.backlightPreset)
+        guard let settings = settings(for: stored) else { return advanced }
+        // A watch whose dynamic backlight was compiled out does not compare
+        // that one, and neither does this: its value here is whatever default
+        // was never written anywhere, so letting it disagree would report
+        // Advanced on every such watch for ever.
+        let compared = settings.filter { !$0.key.mayBeAbsent }
+        return compared.allSatisfy { value($0.key) == $0.value } ? stored : advanced
     }
 }
 
@@ -187,7 +298,7 @@ public enum WatchSettingsCodec {
         // nothing selected and write the nonsense back to the other watch.
         let rawValue = switch setting.kind {
         case .boolean: value[0] == 0 ? 0 : 1
-        case .choice: Int(value[0])
+        case .choice, .number: Int(value[0])
         case .duration: value.reversed().reduce(0) { $0 << 8 | Int($1) }
         }
         guard setting.accepts(rawValue: rawValue) else { return nil }

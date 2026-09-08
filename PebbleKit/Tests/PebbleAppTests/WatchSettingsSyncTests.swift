@@ -276,3 +276,134 @@ struct WatchSettingWidthTests {
         )
     }
 }
+
+/// A backlight preset, which is not a setting.
+///
+/// Writing `lightPreset` alone reached the watch and changed nothing anybody
+/// could see: the watch's own settings app calls `backlight_set_preset`, which
+/// writes the preset key and the seven values it stands for, while a phone
+/// write lands on a handler that assigns the global and touches nothing else.
+/// `backlight_get_preset` then compares the seven against the preset and
+/// answers `Advanced` on any mismatch — its own comment blames "phone sync"
+/// for exactly this (#115).
+@Suite
+@MainActor
+struct BacklightPresetTests {
+    private func makeModel(directory: URL, client: MockWatchClient) -> AppModel {
+        AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        )
+    }
+
+    private func connectedModel(
+        _ directory: URL,
+        _ client: MockWatchClient
+    ) async throws -> AppModel {
+        let model = makeModel(directory: directory, client: client)
+        await model.scan()
+        await model.connect(to: try #require(model.discoveredWatches.first))
+        return model
+    }
+
+    @Test func choosingAPresetWritesEverythingItStandsFor() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let client = MockWatchClient()
+        let model = try await connectedModel(directory, client)
+
+        await model.setWatchSetting(.backlightPreset, rawValue: BacklightPreset.maxBrightness)
+
+        // `s_backlight_preset_settings[BacklightPreset_MaxBrightness]`.
+        #expect(client.writtenWatchSettings[.backlightPreset] == 0)
+        #expect(client.writtenWatchSettings[.backlightIntensity] == 100)
+        #expect(client.writtenWatchSettings[.backlightTimeout] == 5_000)
+        #expect(client.writtenWatchSettings[.backlight] == 1)
+        #expect(client.writtenWatchSettings[.backlightAmbientSensor] == 1)
+        #expect(client.writtenWatchSettings[.backlightMotion] == 1)
+        #expect(client.writtenWatchSettings[.backlightTouchWake] == 0)
+        #expect(client.writtenWatchSettings[.backlightDynamicMode] == 0)
+        // And kept on the phone, so that the connect-time sync writes the same
+        // seven again rather than the values the preset replaced.
+        #expect(model.watchSettingValue(.backlightIntensity) == 100)
+        #expect(model.watchSettingValue(.backlightTimeout) == 5_000)
+    }
+
+    /// "Custom" stands for no set of values, so it writes none — the same early
+    /// return `backlight_set_preset` takes for `Advanced`.
+    @Test func choosingCustomWritesOnlyThePreset() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let client = MockWatchClient()
+        let model = try await connectedModel(directory, client)
+
+        await model.setWatchSetting(.backlightPreset, rawValue: BacklightPreset.batterySaver)
+        await model.setWatchSetting(.backlightPreset, rawValue: BacklightPreset.advanced)
+
+        #expect(client.writtenWatchSettings[.backlightPreset] == 3)
+        // Left where Battery Saver put them rather than reset to anything.
+        #expect(client.writtenWatchSettings[.backlightIntensity] == 25)
+        #expect(model.watchSettingValue(.backlightIntensity) == 25)
+    }
+
+    /// What the watch would report, not what was last chosen.
+    @Test func aPresetIsReportedOnlyWhileItsValuesStillMatchIt() {
+        var values: [WatchSetting: Int] = [.backlightPreset: BacklightPreset.standard]
+        for (setting, value) in BacklightPreset.settings(for: BacklightPreset.standard) ?? [:] {
+            values[setting] = value
+        }
+        let reported = { (setting: WatchSetting) in values[setting] ?? setting.defaultRawValue }
+
+        #expect(BacklightPreset.reported(by: reported) == BacklightPreset.standard)
+
+        // One value moved by hand and the watch has left the preset behind.
+        values[.backlightIntensity] = 70
+        #expect(BacklightPreset.reported(by: reported) == BacklightPreset.advanced)
+
+        // Every concrete preset has the backlight on, so switching it off is
+        // Advanced however well the rest still match.
+        values[.backlightIntensity] = 50
+        values[.backlight] = 0
+        #expect(BacklightPreset.reported(by: reported) == BacklightPreset.advanced)
+    }
+
+    /// A watch built without `CONFIG_DYNAMIC_BACKLIGHT` has no such pref, so it
+    /// is not compared: doing so would report Custom on every such watch for
+    /// ever, whatever was chosen.
+    @Test func aSettingTheWatchMayNotHaveIsNotComparedAgainstThePreset() {
+        var values: [WatchSetting: Int] = [.backlightPreset: BacklightPreset.batterySaver]
+        for (setting, value) in BacklightPreset.settings(for: BacklightPreset.batterySaver) ?? [:] {
+            values[setting] = value
+        }
+        values[.backlightDynamicMode] = 1
+
+        #expect(WatchSetting.backlightDynamicMode.mayBeAbsent)
+        #expect(
+            BacklightPreset.reported { values[$0] ?? $0.defaultRawValue }
+                == BacklightPreset.batterySaver
+        )
+    }
+
+    /// `BACKLIGHT_INTENSITY_MIN` is 1. Zero is not "off": the handler calls it
+    /// invalid and writes `BACKLIGHT_INTENSITY_DEFAULT` back, so a backlight is
+    /// turned off with `lightEnabled` instead.
+    @Test func theBrightnessIsOneByteAndNeverZero() {
+        #expect(WatchSetting.backlightIntensity.kind.width == 1)
+        #expect(!WatchSetting.backlightIntensity.accepts(rawValue: 0))
+        #expect(WatchSetting.backlightIntensity.accepts(rawValue: 1))
+        #expect(WatchSetting.backlightIntensity.accepts(rawValue: 100))
+        #expect(!WatchSetting.backlightIntensity.accepts(rawValue: 101))
+
+        let frame = WatchSettingsCodec.insertFrame(.backlightIntensity, rawValue: 100, token: 1)
+        #expect(frame.payload.last == 100)
+        // And read back as its number rather than as non-zero.
+        #expect(
+            WatchSettingsCodec.decodeRecord(
+                key: WatchSettingsCodec.key(for: .backlightIntensity),
+                value: [72]
+            )?.1 == 72
+        )
+    }
+}

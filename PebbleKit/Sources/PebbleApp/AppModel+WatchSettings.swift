@@ -34,13 +34,32 @@ extension AppModel {
         // ignore it and keep what it had, leaving the screen showing one thing
         // and the watch doing another.
         guard setting.accepts(rawValue: rawValue) else { return }
-        watchSettings.values[setting.rawValue] = rawValue
+        // A backlight preset is a name for seven other settings, so choosing
+        // one writes all seven as well — see `BacklightPreset`. Without them
+        // the write reached the watch and changed nothing anybody could see
+        // (#115). Choosing "Custom" writes only the preset, which is the same
+        // early return the watch's own `backlight_set_preset` takes.
+        //
+        // The seven first and the chosen setting last, so that a watch which
+        // refuses one of them is not left claiming a preset it does not have.
+        let implied = setting == .backlightPreset
+            ? BacklightPreset.settings(for: rawValue) ?? [:]
+            : [:]
+        let changed = implied.map { ($0.key, $0.value) } + [(setting, rawValue)]
+        for (setting, rawValue) in changed {
+            watchSettings.values[setting.rawValue] = rawValue
+        }
         Defaults[.watchSettingValues] = watchSettings.values
         for connection in activeConnections {
-            do {
-                try await connection.client.write(.watchSetting(setting, rawValue: rawValue))
-            } catch {
-                watchSettings.feedback = .failure(settingsFailureMessage(connection, error))
+            for (setting, rawValue) in changed {
+                do {
+                    try await connection.client.write(.watchSetting(setting, rawValue: rawValue))
+                } catch {
+                    // A watch built without this setting refusing it says
+                    // nothing about what the reader did.
+                    guard !setting.mayBeAbsent else { continue }
+                    watchSettings.feedback = .failure(settingsFailureMessage(connection, error))
+                }
             }
         }
     }
