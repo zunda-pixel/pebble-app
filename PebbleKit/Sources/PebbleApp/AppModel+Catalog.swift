@@ -77,7 +77,15 @@ extension AppModel {
         guard let installed = (applications.apps + applications.watchfaces).first(where: { $0.id == application.id }) else {
             return .available
         }
-        return application.isNewer(than: installed.versionLabel) ? .updateAvailable : .installed
+        // Against the store's own number for what was installed, where there is
+        // one. The store's version and the package's label are not the same
+        // fact — see `WatchApplication.storeVersion` — and comparing across the
+        // two made a freshly installed release read as an update forever (#117).
+        // The label is only the yardstick for something that came in as a file,
+        // where it is the only version anybody has.
+        return application.isNewer(than: installed.storeVersion ?? installed.versionLabel)
+            ? .updateAvailable
+            : .installed
     }
 
     public func installCatalogApplication(_ application: CatalogApplication) async {
@@ -100,6 +108,18 @@ extension AppModel {
             applications.libraryFeedback = nil
             await importApplication(from: packageURL)
             try? FileManager.default.removeItem(at: packageURL)
+            // Which store release this was, written onto the imported record.
+            // The import itself only knows the package, and the package's own
+            // label is not reliably the store's number (#117): without this,
+            // the same release reads as an update again on the next check.
+            if applications.libraryFeedback == nil,
+               var imported = (applications.apps + applications.watchfaces)
+                   .first(where: { $0.id == application.id }) {
+                imported.storeVersion = application.version
+                if let library = try? await applicationLibrary.upsert(imported) {
+                    updateApplications(library)
+                }
+            }
             // The import speaks for itself when it went wrong; only the
             // success is this screen's to word.
             catalog.feedback = applications.libraryFeedback ?? .success("\(application.name) installed.")

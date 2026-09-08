@@ -162,3 +162,100 @@ struct CatalogUpdateReachTests {
         #expect(await model.catalogUpdates().isEmpty)
     }
 }
+
+/// Whether an installed release is current, judged against the right number.
+///
+/// The store's `version` and the package's `versionLabel` are not the same
+/// fact, and measured across the whole feed they disagree on three releases of
+/// thirty-one — a `2.1-rbl1` over a `2.1`, a `1.3.0` over a `1.3`, and a
+/// `1.2.6` whose package itself says `1.2.5`. Judged against the label, each
+/// was an update forever, freshly installed or not (#117).
+@Suite
+@MainActor
+struct CatalogUpdateLoopTests {
+    private func makeModel(directory: URL, installed: WatchApplication) async throws -> AppModel {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        _ = try await library.upsert(installed)
+        let model = AppModel(
+            client: MockWatchClient(),
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: library
+        )
+        await model.loadApplications()
+        return model
+    }
+
+    private func storeEntry(id: UUID, version: String) -> CatalogApplication {
+        CatalogApplication(
+            id: id,
+            storeID: "aaaaaaaaaaaaaaaaaaaaaaaa",
+            name: "Timer",
+            developer: "Somebody",
+            version: version,
+            downloadURL: URL(string: "https://store.invalid/timer.pbw")!,
+            supportedPlatforms: ["emery"]
+        )
+    }
+
+    private func installed(id: UUID, label: String, storeVersion: String?) -> WatchApplication {
+        WatchApplication(
+            id: id,
+            shortName: "Timer",
+            longName: "Timer",
+            companyName: "Somebody",
+            versionCode: 1,
+            versionLabel: label,
+            capabilities: [],
+            targetPlatforms: ["emery"],
+            kind: .watchapp,
+            storeVersion: storeVersion
+        )
+    }
+
+    /// The worst of the three measured: the store says 1.2.6 and the package
+    /// inside says 1.2.5, so no reading of the label can ever be current.
+    /// Remembering which store release was installed is what settles it.
+    @Test func aReleaseWhosePackageDisagreesWithTheStoreIsStillCurrent() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let id = UUID()
+        let model = try await makeModel(
+            directory: directory,
+            installed: installed(id: id, label: "1.2.5", storeVersion: "1.2.6")
+        )
+
+        #expect(model.catalogInstallationState(for: storeEntry(id: id, version: "1.2.6")) == .installed)
+        // And a release the store has actually moved past is still an update.
+        #expect(model.catalogInstallationState(for: storeEntry(id: id, version: "1.2.7")) == .updateAvailable)
+    }
+
+    /// A package that came in as a file has no store release to remember, and
+    /// its label is the only version anybody has.
+    @Test func aFileImportIsStillJudgedByItsOwnLabel() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let id = UUID()
+        let model = try await makeModel(
+            directory: directory,
+            installed: installed(id: id, label: "1.3", storeVersion: nil)
+        )
+
+        #expect(model.catalogInstallationState(for: storeEntry(id: id, version: "1.3")) == .installed)
+        #expect(model.catalogInstallationState(for: storeEntry(id: id, version: "1.3.0")) == .updateAvailable)
+    }
+
+    /// The field is new and optional, so a library written before it exists
+    /// still opens — with no remembered store release, which is the truth.
+    @Test func anOldLibraryFileDecodesWithNoStoreVersion() throws {
+        let json = """
+        [{"id":"\(UUID().uuidString)","shortName":"Old","longName":"Old","companyName":"C",
+          "versionLabel":"1.0","capabilities":[],"targetPlatforms":["emery"],
+          "kind":"watchapp","appKeys":{},"hasCompanionJavaScript":false}]
+        """
+        let decoded = try JSONDecoder().decode([WatchApplication].self, from: Data(json.utf8))
+
+        #expect(decoded.first?.storeVersion == nil)
+        #expect(decoded.first?.versionLabel == "1.0")
+    }
+}

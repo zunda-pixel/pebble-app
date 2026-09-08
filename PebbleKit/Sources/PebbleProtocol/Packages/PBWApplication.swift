@@ -68,6 +68,19 @@ public struct WatchApplication: Identifiable, Codable, Equatable, Sendable {
     public var kind: WatchApplicationKind
     public var appKeys: [String: UInt32] = [:]
     public var hasCompanionJavaScript: Bool = false
+    /// The store's own version string for the release this was installed from,
+    /// or nil for anything that came in as a file.
+    ///
+    /// Kept because the store's number and the package's `versionLabel` are
+    /// not the same fact and do not reliably agree. Measured across the whole
+    /// feed (2026-09-09): three of thirty-one releases say one thing in the
+    /// metadata and another inside the package — `2.1-rbl1` over a `2.1`, a
+    /// `1.3.0` over a `1.3`, and a `1.2.6` over a package that itself says
+    /// `1.2.5`. Comparing the store against the label made each of those an
+    /// update forever, freshly installed or not (#117). Only remembering which
+    /// store release was installed can settle it, because for that last one
+    /// the two numbers genuinely differ.
+    public var storeVersion: String? = nil
 
     public var displayName: String {
         longName.isEmpty ? shortName : longName
