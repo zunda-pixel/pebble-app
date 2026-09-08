@@ -32,4 +32,11 @@ public final class NotificationsModel {
     /// pushed from the settings screen — sharing would have put the reply on
     /// the screen behind, which is the fault this was all split up to cure.
     public internal(set) var sourceAppFeedback: FeatureFeedback?
+
+    /// The answer to clearing the list of what was sent, which is asked for on
+    /// the history screen and nowhere else.
+    ///
+    /// Its own field for the reason the two above have theirs: that screen is
+    /// pushed from the phone-apps screen, which is pushed from settings.
+    public internal(set) var historyFeedback: FeatureFeedback?
 }

@@ -7,6 +7,7 @@ struct NotificationHistoryView: View {
     var body: some View {
         NotificationHistoryContent(
             notifications: model.notifications.sent,
+            feedback: model.notifications.historyFeedback,
             forget: { Task { await model.forgetSentNotifications() } }
         )
     }
@@ -15,6 +16,9 @@ struct NotificationHistoryView: View {
 /// What this app has sent to a watch.
 struct NotificationHistoryContent: View {
     var notifications: [SentNotification]
+    /// The answer to clearing the list. There was nowhere to put one, so a
+    /// clear that failed emptied the screen and said nothing (#111).
+    var feedback: FeatureFeedback?
     var forget: () -> Void
 
     var body: some View {
@@ -44,9 +48,14 @@ struct NotificationHistoryContent: View {
                 Text("Only what this app sent. Notifications from your other apps go from iOS to the watch directly, and no app on the phone is shown what is in them.")
             }
 
+            // Beside the button that asked, and inside the same condition: a
+            // clear that worked leaves nothing to clear, so this section goes
+            // with the entries. A clear that failed leaves them, and the
+            // answer with them.
             if !notifications.isEmpty {
                 Section {
                     Button("Clear History", role: .destructive, action: forget)
+                    FeedbackBanner(feedback: feedback)
                 }
             }
         }
@@ -67,6 +76,7 @@ struct NotificationHistoryContent: View {
     NavigationStack {
         NotificationHistoryContent(
             notifications: PreviewSamples.sentNotifications,
+            feedback: nil,
             forget: {}
         )
     }
@@ -74,6 +84,18 @@ struct NotificationHistoryContent: View {
 
 #Preview("Nothing sent") {
     NavigationStack {
-        NotificationHistoryContent(notifications: [], forget: {})
+        NotificationHistoryContent(notifications: [], feedback: nil, forget: {})
+    }
+}
+
+#Preview("The history could not be cleared") {
+    NavigationStack {
+        // The entries are still there, which is the point: the file still
+        // holds them, so the screen still shows them.
+        NotificationHistoryContent(
+            notifications: PreviewSamples.sentNotifications,
+            feedback: .failure("The history could not be cleared."),
+            forget: {}
+        )
     }
 }

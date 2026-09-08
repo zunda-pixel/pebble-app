@@ -18,16 +18,40 @@ extension AppModel {
     public func setNotificationsEnabled(_ enabled: Bool, applicationID: UUID) async {
         if enabled { notifications.preferences.mutedApplicationIDs.remove(applicationID) }
         else { notifications.preferences.mutedApplicationIDs.insert(applicationID) }
-        try? await notificationPreferenceStore.save(notifications.preferences)
-        notifications.settingsFeedback = .success(enabled ? "Notifications enabled for this app." : "Notifications muted for this app.")
+        await savePreferences(
+            saying: .success(enabled ? "Notifications enabled for this app." : "Notifications muted for this app.")
+        )
     }
 
     public func setQuietHours(enabled: Bool, start: Int? = nil, end: Int? = nil) async {
         notifications.preferences.quietHoursEnabled = enabled
         if let start { notifications.preferences.quietHoursStart = min(23, max(0, start)) }
         if let end { notifications.preferences.quietHoursEnd = min(23, max(0, end)) }
-        try? await notificationPreferenceStore.save(notifications.preferences)
-        notifications.settingsFeedback = .success("Quiet hours updated.")
+        await savePreferences(saying: .success("Quiet hours updated."))
+    }
+
+    /// Writes the preferences down and answers for the write, not for the
+    /// intention.
+    ///
+    /// The change is kept when the write fails, because it is already in force:
+    /// what the app does with the next notification is read from
+    /// `notifications.preferences`, not from the file. Undoing it would take
+    /// away something that is working. What cannot be promised is that it
+    /// survives a restart, and that is what the failure says.
+    private func savePreferences(saying success: FeatureFeedback) async {
+        do {
+            try await notificationPreferenceStore.save(notifications.preferences)
+            notifications.settingsFeedback = success
+        } catch {
+            notifications.settingsFeedback = .failure(
+                "This change could not be saved. It works now, but the app will forget it when it next starts."
+            )
+            await PebbleDiagnostics.shared.record(
+                .error,
+                category: "notification",
+                message: "the notification preferences could not be saved: \(String(reflecting: error))"
+            )
+        }
     }
 
     public func sendTestNotification(watchID: WatchID? = nil) async {
@@ -151,9 +175,25 @@ extension AppModel {
         }
     }
 
+    /// Empties the list of what was sent, on screen and on disk.
+    ///
+    /// The screen is only emptied once the file is, unlike the preferences
+    /// above: "cleared" is a claim about what is stored, so showing an empty
+    /// list over a file that still holds everything is simply false — and the
+    /// entries come back at the next launch to prove it.
     public func forgetSentNotifications() async {
-        try? await sentNotificationStore.clear()
-        notifications.sent = []
+        do {
+            try await sentNotificationStore.clear()
+            notifications.sent = []
+            notifications.historyFeedback = nil
+        } catch {
+            notifications.historyFeedback = .failure("The history could not be cleared.")
+            await PebbleDiagnostics.shared.record(
+                .error,
+                category: "notification",
+                message: "the sent-notification history could not be cleared: \(String(reflecting: error))"
+            )
+        }
     }
 
     private func queue(_ notification: PendingDelivery<PebbleTimelineNotification>, reason: String) async {

@@ -4601,6 +4601,16 @@
         }
       }
     },
+    "The history could not be cleared." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "履歴を消去できませんでした。"
+          }
+        }
+      }
+    },
     "The install stopped" : {
       "localizations" : {
         "ja" : {
@@ -5317,6 +5327,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このアプリケーションはライブラリにありません。"
+          }
+        }
+      }
+    },
+    "This change could not be saved. It works now, but the app will forget it when it next starts." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "この変更内容を保存できませんでした。いまは有効ですが、次回の起動時には失われます。"
           }
         }
       }
