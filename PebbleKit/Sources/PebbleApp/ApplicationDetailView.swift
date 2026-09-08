@@ -20,6 +20,10 @@ struct ApplicationDetailSubject: Equatable, Sendable {
     var version: String
     var kind: WatchApplicationKind
     var platforms: [String]
+    /// What the application says it uses. The package's list where there is
+    /// one, the store's row otherwise — the precedence above, for the same
+    /// reason: the package describes the copy that will actually run.
+    var capabilities: [WatchApplicationCapability]
     /// The library's copy. Absent for something only in the store.
     var installed: WatchApplication?
     /// The store's copy. Absent for a package the store never listed, and
@@ -37,6 +41,9 @@ struct ApplicationDetailSubject: Equatable, Sendable {
         self.platforms = installed.targetPlatforms.isEmpty
             ? store?.supportedPlatforms ?? []
             : installed.targetPlatforms
+        self.capabilities = installed.declaredCapabilities.isEmpty
+            ? store?.declaredCapabilities ?? []
+            : installed.declaredCapabilities
         self.installed = installed
         self.store = store
     }
@@ -52,6 +59,7 @@ struct ApplicationDetailSubject: Equatable, Sendable {
             self.version = store.version
             self.kind = store.kind
             self.platforms = store.supportedPlatforms
+            self.capabilities = store.declaredCapabilities
             self.installed = nil
             self.store = store
         }
@@ -180,6 +188,21 @@ struct ApplicationDetailContent: View {
             } footer: {
                 if let isInstalled, !isInstalled, subject.installed != nil {
                     Text("The watch is told about this application the next time it connects.")
+                }
+            }
+
+            if !subject.capabilities.isEmpty {
+                Section {
+                    ForEach(subject.capabilities, id: \.code) { capability in
+                        CapabilityRow(capability: capability)
+                    }
+                } header: {
+                    Text("Uses")
+                } footer: {
+                    // Said plainly, because a list like this reads as a
+                    // permission sheet: these are the application's own words
+                    // about itself, and nothing here has been granted to it.
+                    Text("What the application says it uses. Nothing here is a permission you have given; the phone asks for its own when a feature needs one.")
                 }
             }
         }
@@ -315,6 +338,35 @@ struct ApplicationDetailContent: View {
             .font(.system(size: 40))
             .symbolRenderingMode(.hierarchical)
             .foregroundStyle(.tint)
+    }
+}
+
+/// One thing an application says it uses.
+///
+/// The three this app can name get a sentence saying what the application may
+/// do with them. A code it cannot name is shown as the code: the store adds
+/// them on its own schedule, and a package asking for something unrecognised is
+/// worth seeing rather than hiding.
+struct CapabilityRow: View {
+    var capability: WatchApplicationCapability
+
+    var body: some View {
+        switch capability {
+        case .health:
+            Label("Can read health data", systemImage: "heart")
+        case .location:
+            Label("Can ask where you are", systemImage: "location")
+        case .timeline:
+            Label("Can add timeline pins", systemImage: "pin")
+        case .other(let code):
+            // Not translated: it is the store's word, not this app's, the way
+            // a category is.
+            Label {
+                Text(verbatim: code)
+            } icon: {
+                Image(systemName: "questionmark.circle")
+            }
+        }
     }
 }
 
@@ -551,6 +603,62 @@ struct CatalogApplicationDetailView: View {
             install: {},
             configureApplication: {},
             editGlance: {},
+            activateWatchface: {},
+            removeApplication: {}
+        )
+    }
+}
+
+#Preview("What it says it uses") {
+    NavigationStack {
+        ApplicationDetailContent(
+            subject: ApplicationDetailSubject(
+                installed: {
+                    var declaring = PreviewSamples.watchApplications[0]
+                    // A code this app does not know sits beside the three it
+                    // does, because the store is free to add one.
+                    declaring.capabilities = ["health", "configurable", "location", "timeline", "sport"]
+                    return declaring
+                }(),
+                store: PreviewSamples.catalogApplication
+            ),
+            isActive: false,
+            isInstalled: true,
+            installationState: .installed,
+            isInstalling: false,
+            isAnyInstallRunning: false,
+            isOperationInProgress: false,
+            feedback: nil,
+            install: {},
+            configureApplication: {},
+            editGlance: {},
+            activateWatchface: {},
+            removeApplication: {}
+        )
+    }
+}
+
+#Preview("In the store only, and the store said what it uses") {
+    NavigationStack {
+        ApplicationDetailContent(
+            subject: ApplicationDetailSubject(
+                store: {
+                    var listed = PreviewSamples.catalogApplication
+                    listed.capabilities = ["location"]
+                    return listed
+                }(),
+                installed: nil
+            ),
+            isActive: false,
+            isInstalled: false,
+            installationState: .available,
+            isInstalling: false,
+            isAnyInstallRunning: false,
+            isOperationInProgress: false,
+            feedback: nil,
+            install: {},
+            configureApplication: {},
+            editGlance: nil,
             activateWatchface: {},
             removeApplication: {}
         )

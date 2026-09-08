@@ -1035,6 +1035,36 @@
         }
       }
     },
+    "Can add timeline pins" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "タイムラインにピンを追加できます"
+          }
+        }
+      }
+    },
+    "Can ask where you are" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "現在地を問い合わせられます"
+          }
+        }
+      }
+    },
+    "Can read health data" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ヘルスケアデータを読み取れます"
+          }
+        }
+      }
+    },
     "Cancel" : {
       "localizations" : {
         "ja" : {
@@ -5771,6 +5801,16 @@
         }
       }
     },
+    "Uses" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "使うもの"
+          }
+        }
+      }
+    },
     "Validated" : {
       "localizations" : {
         "ja" : {
@@ -6037,6 +6077,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "体重: %@"
+          }
+        }
+      }
+    },
+    "What the application says it uses. Nothing here is a permission you have given; the phone asks for its own when a feature needs one." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリが使うと自ら述べている内容です。ここに挙がっているものは、どれも許可を与えたものではありません。iPhone側の許可は、その機能が必要になったときに改めて求められます。"
           }
         }
       }

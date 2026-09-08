@@ -44,10 +44,19 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
     public var iconURL: URL? = nil
     public var screenshotURLs: [URL] = []
     public var sha256: String? = nil
+    /// What the store's row says the application uses, in the store's own
+    /// codes. Empty for a row that predates this field, and for one the store
+    /// gave nothing for.
+    public var capabilities: [String] = []
+
+    public var declaredCapabilities: [WatchApplicationCapability] {
+        WatchApplicationCapability.declared(in: capabilities)
+    }
 
     private enum CodingKeys: String, CodingKey {
         case id, storeID, name, developer, version, downloadURL, supportedPlatforms
         case kind, category, summary, releaseNotes, iconURL, screenshotURLs, sha256
+        case capabilities
     }
 
     public init(from decoder: any Decoder) throws {
@@ -72,6 +81,9 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
         iconURL = try container.decodeIfPresent(URL.self, forKey: .iconURL)
         screenshotURLs = try container.decodeIfPresent([URL].self, forKey: .screenshotURLs) ?? []
         sha256 = try container.decodeIfPresent(String.self, forKey: .sha256)
+        // Absent from every cache written before this field existed, which is
+        // why it decodes to empty rather than refusing the whole row.
+        capabilities = try container.decodeIfPresent([String].self, forKey: .capabilities) ?? []
     }
 
     /// The store's own page for this application, where there is one.
@@ -321,13 +333,16 @@ struct OfficialCatalogApplication: Decodable {
     var title: String?
     var type: String?
     var uuid: String?
+    /// What the store says the application uses: `health`, `location`,
+    /// `timeline`, `configurable`. Optional for the reason every field here is.
+    var capabilities: [String]?
     var hardwarePlatforms: [OfficialCatalogHardware]?
     var iconImage: [String: String]?
     var screenshotImages: [[String: String]]?
     var latestRelease: OfficialCatalogRelease?
 
     private enum CodingKeys: String, CodingKey {
-        case author, category, description, id, title, type, uuid
+        case author, capabilities, category, description, id, title, type, uuid
         case hardwarePlatforms = "hardware_platforms"
         case iconImage = "icon_image"
         case screenshotImages = "screenshot_images"
@@ -368,7 +383,8 @@ struct OfficialCatalogApplication: Decodable {
             summary: description?.nilWhenEmpty,
             releaseNotes: release.releaseNotes,
             iconURL: iconImage?.values.compactMap(URL.init(string:)).first,
-            screenshotURLs: screenshotImages?.flatMap { $0.values }.compactMap(URL.init(string:)) ?? []
+            screenshotURLs: screenshotImages?.flatMap { $0.values }.compactMap(URL.init(string:)) ?? [],
+            capabilities: capabilities ?? []
         )
     }
 }
