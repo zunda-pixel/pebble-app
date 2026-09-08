@@ -12,15 +12,15 @@ struct WatchSettingsView: View {
     var body: some View {
         WatchSettingsContent(
             watchSettings: Dictionary(
-                uniqueKeysWithValues: WatchSetting.allCases.map { ($0, model.isWatchSettingOn($0)) }
+                uniqueKeysWithValues: WatchSetting.allCases.map { ($0, model.watchSettingValue($0)) }
             ),
             activitySettings: model.watchSettings.activity,
             heartRateSettings: model.watchSettings.heartRate,
             isReminderAppEnabled: model.timeline.isReminderAppEnabled,
             isConnected: connection?.isConnected == true,
             feedback: model.watchSettings.feedback,
-            setWatchSetting: { setting, isOn in
-                Task { await model.setWatchSetting(setting, isOn: isOn) }
+            setWatchSetting: { setting, rawValue in
+                Task { await model.setWatchSetting(setting, rawValue: rawValue) }
             },
             setActivitySettings: { settings in
                 Task { await model.setActivitySettings(settings) }
@@ -36,14 +36,40 @@ struct WatchSettingsView: View {
 }
 
 /// The watch's own settings, and what its health tracking is told.
+/// One watch setting: a switch where it is one, a picker where it is a choice.
+///
+/// Both write the same thing — the number the firmware keeps — so the row is
+/// the only place that has to know which shape a setting has.
+struct WatchSettingRow: View {
+    var setting: WatchSetting
+    var rawValue: Int
+    var setRawValue: (Int) -> Void
+
+    var body: some View {
+        switch setting.kind {
+        case .boolean:
+            Toggle(setting.title, isOn: Binding(
+                get: { rawValue != 0 },
+                set: { setRawValue($0 ? 1 : 0) }
+            ))
+        case .choice:
+            Picker(setting.title, selection: Binding(get: { rawValue }, set: setRawValue)) {
+                ForEach(Array(setting.optionTitles.enumerated()), id: \.offset) { option in
+                    Text(option.element).tag(option.offset)
+                }
+            }
+        }
+    }
+}
+
 struct WatchSettingsContent: View {
-    var watchSettings: [WatchSetting: Bool]
+    var watchSettings: [WatchSetting: Int]
     var activitySettings: ActivitySettings
     var heartRateSettings: HeartRateSettings
     var isReminderAppEnabled: Bool
     var isConnected: Bool
     var feedback: FeatureFeedback?
-    var setWatchSetting: (WatchSetting, Bool) -> Void
+    var setWatchSetting: (WatchSetting, Int) -> Void
     var setActivitySettings: (ActivitySettings) -> Void
     var setHeartRateSettings: (HeartRateSettings) -> Void
     var setReminderAppEnabled: (Bool) -> Void
@@ -57,10 +83,11 @@ struct WatchSettingsContent: View {
             }
             Section {
                 ForEach(WatchSetting.allCases, id: \.self) { setting in
-                    Toggle(setting.title, isOn: Binding(
-                        get: { watchSettings[setting] ?? setting.defaultValue },
-                        set: { isOn in setWatchSetting(setting, isOn) }
-                    ))
+                    WatchSettingRow(
+                        setting: setting,
+                        rawValue: watchSettings[setting] ?? setting.defaultRawValue,
+                        setRawValue: { setWatchSetting(setting, $0) }
+                    )
                 }
             } header: {
                 Text("On the Watch")
@@ -205,7 +232,7 @@ struct WatchSettingsContent: View {
 #Preview("Connected") {
     NavigationStack {
         WatchSettingsContent(
-            watchSettings: [.clock24Hour: true, .backlight: true],
+            watchSettings: [.clock24Hour: 1, .backlight: 1, .unitsDistance: 0, .textSize: 2],
             activitySettings: ActivitySettings(),
             heartRateSettings: HeartRateSettings(),
             isReminderAppEnabled: true,

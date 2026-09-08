@@ -257,11 +257,11 @@ extension AppModel {
                     }
                 }
             case WatchSettingsCodec.databaseID:
-                if let (setting, isOn) = WatchSettingsCodec.decodeRecord(
+                if let (setting, rawValue) = WatchSettingsCodec.decodeRecord(
                     key: write.key,
                     value: write.value
                 ) {
-                    succeeded = await applyWatchSetting(setting, isOn: isOn, from: connection)
+                    succeeded = await applyWatchSetting(setting, rawValue: rawValue, from: connection)
                 } else {
                     // A key this app has no switch for, which is most of the
                     // firmware's seventy-odd syncable settings. Taken rather

@@ -113,6 +113,24 @@ public extension WatchSetting {
         case .menuScrollWrapAround: "Menus Wrap Around"
         case .musicShowVolumeControls: "Music: Volume Controls"
         case .musicShowProgressBar: "Music: Progress Bar"
+        case .unitsDistance: "Distance"
+        case .unitsWind: "Wind Speed"
+        case .textSize: "Text Size"
+        }
+    }
+
+    /// What each value of a choice is called, in the firmware's own order so
+    /// that the index is the number sent.
+    ///
+    /// Empty for a switch, which has a title and no options.
+    var optionTitles: [LocalizedStringKey] {
+        switch self {
+        case .unitsDistance: ["Kilometres", "Miles"]
+        // The first follows whatever distance is set to, which is what
+        // `UnitsWind_FromDistance` means and what the watch does with it.
+        case .unitsWind: ["Match Distance", "km/h", "mph"]
+        case .textSize: ["Small", "Medium", "Large", "Extra Large"]
+        default: []
         }
     }
 }

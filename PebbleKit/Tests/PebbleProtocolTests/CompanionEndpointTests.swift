@@ -581,7 +581,7 @@ struct WatchDiagnosticsTests {
 @MainActor
 struct WatchSettingsTests {
     @Test func aSettingIsWrittenAsOneByteUnderItsFirmwareName() {
-        let frame = WatchSettingsCodec.insertFrame(.clock24Hour, isOn: true, token: 0x0102)
+        let frame = WatchSettingsCodec.insertFrame(.clock24Hour, rawValue: 1, token: 0x0102)
 
         #expect(frame.endpoint == BlobDBCodec.endpoint)
         // The settings database, whose whitelist is keyed by the firmware's own

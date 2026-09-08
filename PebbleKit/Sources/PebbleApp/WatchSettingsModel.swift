@@ -8,8 +8,9 @@ public import Observation
 @Observable
 public final class WatchSettingsModel {
     /// Keyed by `WatchSetting.rawValue`, which is what the stored preference
-    /// holds and what the firmware reads.
-    public internal(set) var values: [String: Bool] = [:]
+    /// holds and what the firmware reads. The value is the number the firmware
+    /// keeps: 0 or 1 for a switch, and one of a small set for the rest.
+    public internal(set) var values: [String: Int] = [:]
     public internal(set) var activity = ActivitySettings()
     public internal(set) var heartRate = HeartRateSettings()
     public internal(set) var feedback: FeatureFeedback?

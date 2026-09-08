@@ -94,11 +94,11 @@ struct WatchSettingsSyncTests {
         )
 
         #expect(model.isWatchSettingOn(.clock24Hour) == !wasOn)
-        #expect(Defaults[.watchSettings][WatchSetting.clock24Hour.rawValue] == !wasOn)
+        #expect(Defaults[.watchSettingValues][WatchSetting.clock24Hour.rawValue] == (wasOn ? 0 : 1))
         // The other watch is told.
-        #expect(clients[second.id]?.writtenWatchSettings[.clock24Hour] == !wasOn)
+        #expect(clients[second.id]?.writtenWatchSettings[.clock24Hour] == (wasOn ? 0 : 1))
         // The one that told us is not written back to.
-        #expect(clients[first.id]?.writtenWatchSettings[.clock24Hour] == wasOn)
+        #expect(clients[first.id]?.writtenWatchSettings[.clock24Hour] == (wasOn ? 1 : 0))
     }
 
     /// A key this app has no switch for.
@@ -132,8 +132,8 @@ struct WatchSettingsSyncTests {
         let key = WatchSettingsCodec.key(for: .backlight)
 
         #expect(WatchSettingsCodec.decodeRecord(key: key, value: [1])?.0 == .backlight)
-        #expect(WatchSettingsCodec.decodeRecord(key: key, value: [1])?.1 == true)
-        #expect(WatchSettingsCodec.decodeRecord(key: key, value: [0])?.1 == false)
+        #expect(WatchSettingsCodec.decodeRecord(key: key, value: [1])?.1 == 1)
+        #expect(WatchSettingsCodec.decodeRecord(key: key, value: [0])?.1 == 0)
         // The firmware accepts the name either way from the phone and sends it
         // either way back.
         #expect(WatchSettingsCodec.decodeRecord(key: Array("lightEnabled".utf8), value: [1])?.0 == .backlight)
@@ -141,5 +141,84 @@ struct WatchSettingsSyncTests {
         // byte as a boolean would turn 10000 ms into "on".
         #expect(WatchSettingsCodec.decodeRecord(key: Array("lightEnabled".utf8), value: [0x10, 0x27]) == nil)
         #expect(WatchSettingsCodec.decodeRecord(key: Array("lightTimeoutMs".utf8), value: [1]) == nil)
+    }
+}
+
+/// Settings that are not switches.
+///
+/// The nine this app started with are all booleans, and everything from the
+/// stored preference to the BlobDB record assumed so. The firmware's list is
+/// some seventy keys and several are one-byte choices — the distance unit, the
+/// wind unit, the text size — with their values numbered in `prefs.c` (#93).
+@Suite
+@MainActor
+struct WatchSettingChoiceTests {
+    private func makeModel(directory: URL, client: MockWatchClient) -> AppModel {
+        AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        )
+    }
+
+    /// One byte, the number the firmware keeps.
+    @Test func aChoiceIsSentAsItsNumber() throws {
+        let frame = WatchSettingsCodec.insertFrame(.textSize, rawValue: 3, token: 1)
+
+        // The value is the last byte of the record, after the key.
+        #expect(frame.payload.last == 3)
+    }
+
+    /// `PreferredContentSize` runs 0...3, and `system_theme_set_content_size`
+    /// ignores anything past the end — so sending it would leave the screen
+    /// saying one thing and the watch doing another.
+    @Test func aValueTheSettingCannotHoldIsNotSent() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let client = MockWatchClient()
+        let model = makeModel(directory: directory, client: client)
+        await model.scan()
+        await model.connect(to: try #require(model.discoveredWatches.first))
+
+        // Connecting wrote every setting once, so the mock's record starts at
+        // the default and a refused write is one that leaves it there.
+        await model.setWatchSetting(.textSize, rawValue: 9)
+
+        #expect(client.writtenWatchSettings[.textSize] == WatchSetting.textSize.defaultRawValue)
+        #expect(model.watchSettingValue(.textSize) == WatchSetting.textSize.defaultRawValue)
+    }
+
+    @Test func aValueTheSettingCanHoldIsSentAndKept() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let client = MockWatchClient()
+        let model = makeModel(directory: directory, client: client)
+        await model.scan()
+        await model.connect(to: try #require(model.discoveredWatches.first))
+
+        await model.setWatchSetting(.unitsDistance, rawValue: 0)
+
+        #expect(client.writtenWatchSettings[.unitsDistance] == 0)
+        #expect(model.watchSettingValue(.unitsDistance) == 0)
+    }
+
+    /// A choice arriving from the watch, read as its number rather than as
+    /// "non-zero".
+    @Test func aChoiceComingBackFromTheWatchKeepsItsNumber() {
+        let key = WatchSettingsCodec.key(for: .textSize)
+
+        #expect(WatchSettingsCodec.decodeRecord(key: key, value: [2])?.1 == 2)
+        // A switch is still non-zero-or-not, the way C reads one.
+        #expect(
+            WatchSettingsCodec.decodeRecord(key: WatchSettingsCodec.key(for: .backlight), value: [7])?.1 == 1
+        )
+    }
+
+    /// A number this setting has no meaning for is refused rather than shown:
+    /// a picker with nothing selected, written on to the next watch, is worse
+    /// than not hearing it.
+    @Test func aChoiceOutOfRangeFromTheWatchIsRefused() {
+        #expect(WatchSettingsCodec.decodeRecord(key: WatchSettingsCodec.key(for: .unitsWind), value: [9]) == nil)
     }
 }

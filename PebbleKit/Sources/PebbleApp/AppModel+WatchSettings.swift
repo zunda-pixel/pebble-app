@@ -5,22 +5,40 @@ import SwiftUI
 
 extension AppModel {
     public func loadWatchSettings() {
-        watchSettings.values = Defaults[.watchSettings]
+        // The switches this app stored before settings had types, folded in
+        // under the same names. Read first so that anything already written in
+        // the new shape wins, and left on disk rather than deleted: a reader
+        // who moves back to an older build should still find their switches.
+        var values = Defaults[.watchSettings].mapValues { $0 ? 1 : 0 }
+        values.merge(Defaults[.watchSettingValues]) { _, stored in stored }
+        watchSettings.values = values
         watchSettings.activity = Defaults[.activitySettings]
         watchSettings.heartRate = Defaults[.heartRateSettings]
         timeline.isReminderAppEnabled = Defaults[.reminderAppEnabled]
     }
 
+    public func watchSettingValue(_ setting: WatchSetting) -> Int {
+        watchSettings.values[setting.rawValue] ?? setting.defaultRawValue
+    }
+
     public func isWatchSettingOn(_ setting: WatchSetting) -> Bool {
-        watchSettings.values[setting.rawValue] ?? setting.defaultValue
+        watchSettingValue(setting) != 0
     }
 
     public func setWatchSetting(_ setting: WatchSetting, isOn: Bool) async {
-        watchSettings.values[setting.rawValue] = isOn
-        Defaults[.watchSettings] = watchSettings.values
+        await setWatchSetting(setting, rawValue: isOn ? 1 : 0)
+    }
+
+    public func setWatchSetting(_ setting: WatchSetting, rawValue: Int) async {
+        // A value this setting cannot hold is not sent. The firmware would
+        // ignore it and keep what it had, leaving the screen showing one thing
+        // and the watch doing another.
+        guard setting.accepts(rawValue: rawValue) else { return }
+        watchSettings.values[setting.rawValue] = rawValue
+        Defaults[.watchSettingValues] = watchSettings.values
         for connection in activeConnections {
             do {
-                try await connection.client.write(.watchSetting(setting, isOn: isOn))
+                try await connection.client.write(.watchSetting(setting, rawValue: rawValue))
             } catch {
                 watchSettings.feedback = .failure(settingsFailureMessage(connection, error))
             }
@@ -47,14 +65,14 @@ extension AppModel {
     @discardableResult
     func applyWatchSetting(
         _ setting: WatchSetting,
-        isOn: Bool,
+        rawValue: Int,
         from connection: WatchConnection
     ) async -> Bool {
-        guard watchSettings.values[setting.rawValue] != isOn else { return true }
-        watchSettings.values[setting.rawValue] = isOn
-        Defaults[.watchSettings] = watchSettings.values
+        guard watchSettings.values[setting.rawValue] != rawValue else { return true }
+        watchSettings.values[setting.rawValue] = rawValue
+        Defaults[.watchSettingValues] = watchSettings.values
         for other in activeConnections where other !== connection {
-            try? await other.client.write(.watchSetting(setting, isOn: isOn))
+            try? await other.client.write(.watchSetting(setting, rawValue: rawValue))
         }
         return true
     }
@@ -103,7 +121,9 @@ extension AppModel {
     func synchronizeWatchSettings(on connection: WatchConnection) async {
         guard connection.isConnected, !connection.watch.isRunningRecoveryFirmware else { return }
         for setting in WatchSetting.allCases {
-            try? await connection.client.write(.watchSetting(setting, isOn: isWatchSettingOn(setting)))
+            try? await connection.client.write(
+                .watchSetting(setting, rawValue: watchSettingValue(setting))
+            )
         }
         try? await connection.client.write(.activitySettings(watchSettings.activity))
         try? await connection.client.write(.heartRateSettings(watchSettings.heartRate))

@@ -190,12 +190,17 @@ struct BlobDBRecordTests {
         )
     }
 
-    @Test func aWatchSettingCarriesItsOwnOnOrOff() throws {
+    @Test func aWatchSettingCarriesItsOwnValue() throws {
         for setting in WatchSetting.allCases {
-            for isOn in [true, false] {
+            // Every value the setting has, whether that is two or four of them.
+            let values = switch setting.kind {
+            case .boolean: Array(0...1)
+            case .choice(let count): Array(0..<count)
+            }
+            for rawValue in values {
                 try expect(
-                    .watchSetting(setting, isOn: isOn),
-                    [WatchSettingsCodec.insertFrame(setting, isOn: isOn, token: token)],
+                    .watchSetting(setting, rawValue: rawValue),
+                    [WatchSettingsCodec.insertFrame(setting, rawValue: rawValue, token: token)],
                     accepting: owned
                 )
             }

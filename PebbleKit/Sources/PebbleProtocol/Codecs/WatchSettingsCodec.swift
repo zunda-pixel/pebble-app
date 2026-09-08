@@ -1,6 +1,23 @@
 public import Foundation
 import MemberwiseInit
 
+/// What one setting holds, and how wide it is on the wire.
+///
+/// Both of these are a single byte, which is what the firmware stores them as:
+/// every key below reaches `prv_pref_set(key, &value, sizeof(value))` in
+/// `src/fw/shell/normal/prefs.c` with a `bool` or a `uint8_t` behind it. The
+/// keys that are wider — `lightTimeoutMs` is a `uint32_t` — are not modelled
+/// here yet, and adding one means adding a width, not squeezing it into a byte.
+public enum WatchSettingKind: Equatable, Sendable {
+    case boolean
+    /// One of `0..<count`, numbered as the firmware numbers it.
+    ///
+    /// Out of range is not sent: `system_theme_set_content_size` logs
+    /// "Ignoring attempt to set content size to invalid size" and keeps what it
+    /// had, so a value past the end is a write that silently does nothing.
+    case choice(count: Int)
+}
+
 /// The firmware accepts writes for a whitelisted set of keys only
 /// (`settings_blob_db.c`); anything else is refused.
 public enum WatchSetting: String, CaseIterable, Codable, Sendable {
@@ -13,14 +30,47 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
     case menuScrollWrapAround = "menuScrollWrapAround"
     case musicShowVolumeControls = "musicShowVolumeControls"
     case musicShowProgressBar = "musicShowProgressBar"
+    /// `UnitsDistance`: 0 kilometres, 1 miles.
+    case unitsDistance
+    /// `UnitsWind`: 0 follow the distance unit, 1 km/h, 2 mph.
+    case unitsWind
+    /// `PreferredContentSize`: 0 small … 3 extra large. Named for what the
+    /// watch calls it on screen rather than for the key, which says "style".
+    case textSize = "textStyle"
 
-    public var defaultValue: Bool {
+    public var kind: WatchSettingKind {
         switch self {
-        case .clock24Hour, .menuScrollWrapAround, .musicShowProgressBar:
-            false
+        case .unitsDistance: .choice(count: 2)
+        case .unitsWind: .choice(count: 3)
+        case .textSize: .choice(count: 4)
+        default: .boolean
+        }
+    }
+
+    /// What the watch has before anybody changes it, from the initialisers in
+    /// `prefs.c`.
+    public var defaultRawValue: Int {
+        switch self {
+        case .clock24Hour, .menuScrollWrapAround, .musicShowProgressBar: 0
         case .standbyMode, .backlight, .backlightAmbientSensor, .backlightMotion,
-             .timelineQuickView, .musicShowVolumeControls:
-            true
+             .timelineQuickView, .musicShowVolumeControls: 1
+        // `s_units_distance = UnitsDistance_Miles`.
+        case .unitsDistance: 1
+        // `s_units_wind = UnitsWind_FromDistance`.
+        case .unitsWind: 0
+        // `s_text_style = PreferredContentSizeDefault`, which is medium.
+        case .textSize: 1
+        }
+    }
+
+    public var defaultValue: Bool { defaultRawValue != 0 }
+
+    /// Whether a value is one this setting can hold, so that neither this app
+    /// nor the watch is asked to store something meaningless.
+    public func accepts(rawValue: Int) -> Bool {
+        switch kind {
+        case .boolean: (0...1).contains(rawValue)
+        case .choice(let count): (0..<count).contains(rawValue)
         }
     }
 }
@@ -54,13 +104,13 @@ public enum WatchSettingsCodec {
 
     public static func insertFrame(
         _ setting: WatchSetting,
-        isOn: Bool,
+        rawValue: Int,
         token: UInt16
     ) -> PebbleProtocolFrame {
         BlobDBCodec.insertFrame(
             databaseID: databaseID,
             key: key(for: setting),
-            value: [isOn ? 1 : 0],
+            value: [UInt8(truncatingIfNeeded: rawValue)],
             token: token
         )
     }
@@ -76,13 +126,22 @@ public enum WatchSettingsCodec {
     /// booleans at all, so there is nowhere on this side to put them.
     ///
     /// Nil too for a value that is not one byte, rather than reading the first
-    /// byte of something that was never a switch.
-    public static func decodeRecord(key: [UInt8], value: [UInt8]) -> (WatchSetting, Bool)? {
+    /// byte of something that was never one — `lightTimeoutMs` is four, and its
+    /// first byte is not a small number that means anything.
+    public static func decodeRecord(key: [UInt8], value: [UInt8]) -> (WatchSetting, Int)? {
         // The watch may send the name with its terminator or without it, the
         // same way the firmware accepts both from the phone.
         let name = String(decoding: key.prefix { $0 != 0 }, as: UTF8.self)
         guard let setting = WatchSetting(rawValue: name), value.count == 1 else { return nil }
-        return (setting, value[0] != 0)
+        // A boolean is anything non-zero, the way C reads one; a choice has to
+        // be a value the setting has, or this app would show a picker with
+        // nothing selected and write the nonsense back to the other watch.
+        let rawValue = switch setting.kind {
+        case .boolean: value[0] == 0 ? 0 : 1
+        case .choice: Int(value[0])
+        }
+        guard setting.accepts(rawValue: rawValue) else { return nil }
+        return (setting, rawValue)
     }
 }
 

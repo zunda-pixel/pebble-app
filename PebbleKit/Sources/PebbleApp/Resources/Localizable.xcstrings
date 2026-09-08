@@ -2001,6 +2001,16 @@
         }
       }
     },
+    "Extra Large" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "特大"
+          }
+        }
+      }
+    },
     "Factory Reset" : {
       "localizations" : {
         "ja" : {
@@ -2651,12 +2661,32 @@
         }
       }
     },
+    "Kilometres" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "キロメートル"
+          }
+        }
+      }
+    },
     "Kind" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "種類"
+          }
+        }
+      }
+    },
+    "km/h" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "km/h"
           }
         }
       }
@@ -2677,6 +2707,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "言語"
+          }
+        }
+      }
+    },
+    "Large" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "大"
           }
         }
       }
@@ -2821,12 +2861,32 @@
         }
       }
     },
+    "Match Distance" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "距離の単位に合わせる"
+          }
+        }
+      }
+    },
     "Match Upper and Lower Case" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "大文字と小文字を区別"
+          }
+        }
+      }
+    },
+    "Medium" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "中"
           }
         }
       }
@@ -2847,6 +2907,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "メッセージ"
+          }
+        }
+      }
+    },
+    "Miles" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "マイル"
           }
         }
       }
@@ -2907,6 +2977,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "その他"
+          }
+        }
+      }
+    },
+    "mph" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "mph"
           }
         }
       }
@@ -4211,6 +4291,16 @@
         }
       }
     },
+    "Small" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "小"
+          }
+        }
+      }
+    },
     "Sort" : {
       "localizations" : {
         "ja" : {
@@ -4437,6 +4527,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "文字"
+          }
+        }
+      }
+    },
+    "Text Size" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "文字サイズ"
           }
         }
       }
@@ -6183,6 +6283,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "手順"
+          }
+        }
+      }
+    },
+    "Wind Speed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "風速"
           }
         }
       }

@@ -15,6 +15,15 @@ extension Defaults.Keys {
         default: Locale.current.measurementSystem == .us
     )
 
+    /// What every watch setting is set to, keyed by the firmware's own name
+    /// and held as the number the firmware holds.
+    ///
+    /// A second key rather than a changed type on the first. The switches were
+    /// stored as `[String: Bool]`, and a `Key` whose type no longer matches the
+    /// data on disk decodes as nothing and quietly hands back the default — so
+    /// changing it in place would have reset every watch setting the reader had
+    /// chosen. `loadWatchSettings` reads the old key once and folds it in.
+    static let watchSettingValues = Key<[String: Int]>("watchSettingValues", default: [:])
     static let watchSettings = Key<[String: Bool]>("watchSettings", default: [:])
     static let activitySettings = Key<ActivitySettings>(
         "activitySettings",
