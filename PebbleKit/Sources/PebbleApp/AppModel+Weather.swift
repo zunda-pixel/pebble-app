@@ -139,15 +139,22 @@ extension AppModel {
         guard !reports.isEmpty else { return }
         weather.reports = reports
         weather.updated = .now
-        // A place whose forecast did not arrive shows a blank temperature and is
-        // left out of the ordering the watch is given.
-        if !placeFailed { weather.feedback = nil }
+        // Only a round with every place answered counts as "refreshed": a
+        // partial one leaves the clock alone, so the next opportunity retries.
+        if !placeFailed {
+            weather.feedback = nil
+            Defaults[.weatherRefreshedAt] = .now
+        }
         for connection in activeConnections {
             await sendWeather(to: connection)
         }
+        await updateWeatherTimelinePins()
     }
 
     func sendWeather(to connection: WatchConnection) async {
+        // The reader said the watch's weather app is not this app's to feed.
+        // The timeline pins have their own switch and their own path.
+        guard Defaults[.weatherWritesToWatch] else { return }
         guard connection.isConnected, !weather.reports.isEmpty else { return }
         // A watch without the weather app refuses the write, and one in recovery
         // firmware refuses everything.
@@ -226,5 +233,111 @@ extension AppModel {
         default:
             return "The forecast for \(place) could not be fetched. \(error.localizedDescription)"
         }
+    }
+}
+
+extension AppModel {
+    /// The watch's weather app and its timeline pins share this identity:
+    /// `UUID_WEATHER_DATA_SOURCE` in PebbleOS's `timeline.h`, the UUID the
+    /// firmware's own weather app registers under.
+    static let weatherDataSourceID = UUID(uuidString: "61B22BC8-1E29-460D-A236-3FE409A439FF")!
+
+    /// Refreshes if the forecast has gone stale, and quietly does nothing
+    /// otherwise. This is what the connect path and the foreground loop call:
+    /// neither promises a time, only that a forecast older than the chosen
+    /// interval is renewed at the next opportunity the OS gives the app.
+    ///
+    /// Staleness is measured from the last *successful* refresh, so a failure
+    /// makes the very next opportunity a retry rather than waiting a whole
+    /// interval to notice.
+    func refreshWeatherIfStale(now: Date = .now) async {
+        guard Defaults[.weatherAutoRefreshEnabled], !weather.places.isEmpty else { return }
+        if let refreshed = Defaults[.weatherRefreshedAt],
+           now.timeIntervalSince(refreshed) < Double(Defaults[.weatherRefreshMinutes]) * 60 {
+            return
+        }
+        await refreshWeather()
+    }
+
+    /// The three cards the weather puts on the timeline: today, tomorrow and
+    /// the day after, from the first place in the reader's own ordering.
+    ///
+    /// The IDs are fixed — the weather source UUID with the last byte swapped
+    /// for the day index — so a refresh rewrites the same three pins instead
+    /// of growing a trail, and yesterday's pin *becomes* today's rather than
+    /// expiring beside it. Rewriting and removal both ride the existing
+    /// timeline machinery, reconnect queue included.
+    static func weatherPins(from report: WeatherReport, now: Date = .now) -> [TimelinePin] {
+        func pinID(day: Int) -> UUID {
+            var bytes = weatherDataSourceID.uuid
+            bytes.15 = UInt8(day)
+            return UUID(uuid: bytes)
+        }
+        func pin(day: Int, high: Int16, low: Int16, phrase: String?) -> TimelinePin? {
+            let calendar = Calendar.current
+            guard let date = calendar.date(byAdding: .day, value: day, to: now),
+                  // Where the watch files a day's card: the morning of it. A
+                  // midnight pin sorts before "last night" on the timeline.
+                  let start = calendar.date(
+                      bySettingHour: 6, minute: 0, second: 0, of: calendar.startOfDay(for: date)
+                  ) else { return nil }
+            return TimelinePin(
+                id: pinID(day: day),
+                parentApplicationID: weatherDataSourceID,
+                timestamp: start,
+                title: "\(high)° / \(low)°",
+                subtitle: report.locationName,
+                body: phrase
+            )
+        }
+        var pins = [
+            pin(day: 0, high: report.todayHigh, low: report.todayLow, phrase: report.shortPhrase),
+            pin(day: 1, high: report.tomorrowHigh, low: report.tomorrowLow, phrase: nil),
+        ]
+        if let high = report.dayAfterTomorrowHigh, let low = report.dayAfterTomorrowLow {
+            pins.append(pin(day: 2, high: high, low: low, phrase: nil))
+        }
+        return pins.compactMap { $0 }
+    }
+
+    /// Puts the weather's pins on the timeline, or takes them off it, to match
+    /// the switch and the newest forecast. Removal is by absence: the timeline
+    /// sync deletes from the watch whatever the store no longer holds.
+    func updateWeatherTimelinePins() async {
+        let others = timeline.pins.filter { $0.parentApplicationID != Self.weatherDataSourceID }
+        let weatherPins: [TimelinePin] = if Defaults[.weatherPinsEnabled],
+            let primary = weather.reports.first {
+            Self.weatherPins(from: primary)
+        } else {
+            []
+        }
+        let changed = others + weatherPins
+        guard changed != timeline.pins else { return }
+        timeline.pins = changed
+        try? await timelineStore.save(timeline.pins)
+        await synchronizeTimeline()
+    }
+
+    public func setWeatherAutoRefresh(enabled: Bool) async {
+        Defaults[.weatherAutoRefreshEnabled] = enabled
+        if enabled { await refreshWeatherIfStale() }
+    }
+
+    public func setWeatherRefreshMinutes(_ minutes: Int) async {
+        Defaults[.weatherRefreshMinutes] = minutes
+        await refreshWeatherIfStale()
+    }
+
+    public func setWeatherWritesToWatch(_ enabled: Bool) async {
+        Defaults[.weatherWritesToWatch] = enabled
+        guard enabled else { return }
+        for connection in activeConnections {
+            await sendWeather(to: connection)
+        }
+    }
+
+    public func setWeatherPinsEnabled(_ enabled: Bool) async {
+        Defaults[.weatherPinsEnabled] = enabled
+        await updateWeatherTimelinePins()
     }
 }

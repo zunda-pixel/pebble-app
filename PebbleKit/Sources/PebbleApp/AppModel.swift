@@ -365,11 +365,26 @@ public final class AppModel {
             await scan()
         }
         observeEventKitChanges()
+        // The weather's clock, for as long as the app is running. Five minutes
+        // is how often staleness is *noticed*, not how often anything is
+        // fetched — the interval setting decides that. The OS decides whether
+        // the app runs at all, which is why nothing here promises a time.
+        Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(5 * 60))
+                guard let self else { return }
+                await self.refreshWeatherIfStale()
+            }
+        }
     }
 
     public func applicationDidBecomeActive() async {
         await start()
         await PebbleDiagnostics.shared.record(category: "lifecycle", message: "Application became active")
+        // Coming to the foreground is one of the few moments iOS promises the
+        // app is running, which makes it the reliable one of the staleness
+        // triggers.
+        await refreshWeatherIfStale()
         if !activeConnections.isEmpty {
             for connection in activeConnections {
                 try? await connection.client.synchronizeTime()
@@ -666,6 +681,9 @@ public final class AppModel {
         await synchronizeReminders(on: connection)
         await synchronizeWatchSettings(on: connection)
         await synchronizeApplicationLogging(on: connection)
+        // A stale forecast is renewed first, so the watch that just arrived is
+        // not handed yesterday's weather and left with it until the next tick.
+        await refreshWeatherIfStale()
         await sendWeather(to: connection)
         await requestHealthSync(on: connection)
         // After the applications, which is what says whether the watch has the

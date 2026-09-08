@@ -34,6 +34,12 @@ public struct WeatherReport: Equatable, Identifiable, Sendable {
     public var tomorrowLow: Int16
     public var shortPhrase: String
     public var updated: Date
+    /// The day after tomorrow, for the timeline pins alone: the Weather DB
+    /// record is version 3 and carries two days, so none of these three reach
+    /// the wire. Nil where the forecast did not run that far.
+    public var dayAfterTomorrowType: WeatherType? = nil
+    public var dayAfterTomorrowHigh: Int16? = nil
+    public var dayAfterTomorrowLow: Int16? = nil
 }
 
 public enum WeatherCodec {

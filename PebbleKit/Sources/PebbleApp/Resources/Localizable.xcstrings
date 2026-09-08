@@ -341,6 +341,26 @@
         }
       }
     },
+    "1 Hour" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "1時間"
+          }
+        }
+      }
+    },
+    "3 Hours" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "3時間"
+          }
+        }
+      }
+    },
     "3 Seconds" : {
       "localizations" : {
         "ja" : {
@@ -357,6 +377,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "5秒"
+          }
+        }
+      }
+    },
+    "6 Hours" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "6時間"
           }
         }
       }
@@ -381,12 +411,32 @@
         }
       }
     },
+    "30 Minutes" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "30分"
+          }
+        }
+      }
+    },
     "A few things are needed before it can show your day, your reminders, and the weather. They are all on the next screen, and any of them can wait." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "予定、リマインダー、天気をウォッチに表示するには、いくつかの許可が必要です。次の画面にまとめてあり、どれもあとにできます。"
+          }
+        }
+      }
+    },
+    "A forecast older than this is renewed when the app next gets the chance — when it opens, and while a watch is connected. Timeline Pins put today, tomorrow and the day after on the watch's timeline." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "これより古くなった予報は、次に機会があったとき（アプリを開いたときや、ウォッチが接続されているあいだ）に更新されます。タイムラインピンは、今日・明日・明後日の予報をウォッチのタイムラインに追加します。"
           }
         }
       }
@@ -4239,6 +4289,26 @@
         }
       }
     },
+    "Refresh After" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "更新の目安"
+          }
+        }
+      }
+    },
+    "Refresh Automatically" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "自動的に更新"
+          }
+        }
+      }
+    },
     "Refresh Now" : {
       "localizations" : {
         "ja" : {
@@ -4535,6 +4605,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "テスト通知を送信"
+          }
+        }
+      }
+    },
+    "Send to the Watch" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチに送信"
           }
         }
       }
@@ -5717,11 +5797,22 @@
       }
     },
     "The watch keeps the numbers it is given, so they are sent in this unit." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "ウォッチは渡された数値をそのまま保持するため、この単位で送信します。"
+          }
+        }
+      }
+    },
+    "The watch keeps the numbers it is given, so they are sent in this unit. Distance and wind units are the watch's own, on its settings screen." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチは渡された数値をそのまま保持するため、この単位で送信します。距離と風速の単位はウォッチ本体の設定で、“ウォッチ設定”画面にあります。"
           }
         }
       }
@@ -6146,6 +6237,16 @@
         }
       }
     },
+    "Timeline Pins" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "タイムラインピン"
+          }
+        }
+      }
+    },
     "Timeline Quick View" : {
       "localizations" : {
         "ja" : {
@@ -6382,6 +6483,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@に更新しました。"
+          }
+        }
+      }
+    },
+    "Updates" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "更新"
           }
         }
       }

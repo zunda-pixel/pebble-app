@@ -27,6 +27,20 @@ extension Defaults.Keys {
     /// Off until asked for: a notification nobody opted into is noise, and the
     /// system permission is only requested when this is first turned on.
     static let notifyWhenFullyCharged = Key<Bool>("notifyWhenFullyCharged", default: false)
+    /// The weather keeps itself fresh unless the reader says otherwise; off
+    /// means only opening the screen or pulling refreshes it.
+    static let weatherAutoRefreshEnabled = Key<Bool>("weatherAutoRefreshEnabled", default: true)
+    /// How stale a forecast may get before the next chance to refresh takes it.
+    /// A floor, not a schedule: the OS decides when the app runs.
+    static let weatherRefreshMinutes = Key<Int>("weatherRefreshMinutes", default: 60)
+    /// When a refresh last *succeeded*. A failure leaves this alone, which is
+    /// what makes the next trigger a retry.
+    static let weatherRefreshedAt = Key<Date?>("weatherRefreshedAt", default: nil)
+    /// The Weather DB writes and the timeline pins, separately: one is the
+    /// watch's weather app, the other is three cards on its timeline, and a
+    /// reader may want either without the other.
+    static let weatherWritesToWatch = Key<Bool>("weatherWritesToWatch", default: true)
+    static let weatherPinsEnabled = Key<Bool>("weatherPinsEnabled", default: false)
     static let notifyAboutFirmwareUpdates = Key<Bool>("notifyAboutFirmwareUpdates", default: false)
     /// The firmware version each watch was last told about, so the same update
     /// is announced once — across launches, not just within one.

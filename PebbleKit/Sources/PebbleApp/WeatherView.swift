@@ -1,3 +1,4 @@
+import Defaults
 import PebbleProtocol
 import SwiftUI
 
@@ -31,7 +32,11 @@ struct WeatherView: View {
             setUsesFahrenheit: { usesFahrenheit in
                 Task { await model.setWeatherUsesFahrenheit(usesFahrenheit) }
             },
-            refresh: { Task { await model.refreshWeather() } }
+            refresh: { Task { await model.refreshWeather() } },
+            setAutoRefresh: { enabled in Task { await model.setWeatherAutoRefresh(enabled: enabled) } },
+            setRefreshMinutes: { minutes in Task { await model.setWeatherRefreshMinutes(minutes) } },
+            setWritesToWatch: { enabled in Task { await model.setWeatherWritesToWatch(enabled) } },
+            setPinsEnabled: { enabled in Task { await model.setWeatherPinsEnabled(enabled) } }
         )
         .task {
             // A forecast an hour old is not worth sending; one from this
@@ -59,9 +64,19 @@ struct WeatherContent: View {
     var removePlaces: ([UUID]) -> Void
     var setUsesFahrenheit: (Bool) -> Void
     var refresh: () -> Void
+    var setAutoRefresh: (Bool) -> Void = { _ in }
+    var setRefreshMinutes: (Int) -> Void = { _ in }
+    var setWritesToWatch: (Bool) -> Void = { _ in }
+    var setPinsEnabled: (Bool) -> Void = { _ in }
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var placeQuery = ""
+    // Read through `@Default` so the rows follow the stored values wherever
+    // they are changed from.
+    @Default(.weatherAutoRefreshEnabled) private var autoRefreshEnabled
+    @Default(.weatherRefreshMinutes) private var refreshMinutes
+    @Default(.weatherWritesToWatch) private var writesToWatch
+    @Default(.weatherPinsEnabled) private var pinsEnabled
 
     private var followsPhone: Bool {
         places.contains(where: \.followsPhone)
@@ -130,7 +145,39 @@ struct WeatherContent: View {
                     .disabled(isRefreshing || places.isEmpty)
                 FeedbackBanner(feedback: feedback)
             } footer: {
-                Text("The watch keeps the numbers it is given, so they are sent in this unit.")
+                Text("The watch keeps the numbers it is given, so they are sent in this unit. Distance and wind units are the watch's own, on its settings screen.")
+            }
+
+            Section {
+                Toggle("Refresh Automatically", isOn: Binding(
+                    get: { autoRefreshEnabled },
+                    set: { setAutoRefresh($0) }
+                ))
+                if autoRefreshEnabled {
+                    Picker("Refresh After", selection: Binding(
+                        get: { refreshMinutes },
+                        set: { setRefreshMinutes($0) }
+                    )) {
+                        Text("30 Minutes").tag(30)
+                        Text("1 Hour").tag(60)
+                        Text("3 Hours").tag(180)
+                        Text("6 Hours").tag(360)
+                    }
+                }
+                Toggle("Send to the Watch", isOn: Binding(
+                    get: { writesToWatch },
+                    set: { setWritesToWatch($0) }
+                ))
+                Toggle("Timeline Pins", isOn: Binding(
+                    get: { pinsEnabled },
+                    set: { setPinsEnabled($0) }
+                ))
+            } header: {
+                Text("Updates")
+            } footer: {
+                // No promise of exact times: iOS decides when the app runs, so
+                // the interval is honestly a floor.
+                Text("A forecast older than this is renewed when the app next gets the chance — when it opens, and while a watch is connected. Timeline Pins put today, tomorrow and the day after on the watch's timeline.")
             }
 
             if !watchesWithoutWeather.isEmpty {

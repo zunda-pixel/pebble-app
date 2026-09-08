@@ -37,13 +37,16 @@ struct WeatherBridge {
             including: .current, .daily
         )
         let (current, daily) = weather
-        let today = daily.first { Calendar.current.isDate($0.date, inSameDayAs: now) } ?? daily.first
-        let tomorrow = daily.first { day in
-            guard let after = Calendar.current.date(byAdding: .day, value: 1, to: now) else {
-                return false
+        func day(offset: Int) -> DayWeather? {
+            guard let target = Calendar.current.date(byAdding: .day, value: offset, to: now) else {
+                return nil
             }
-            return Calendar.current.isDate(day.date, inSameDayAs: after)
-        } ?? daily.dropFirst().first
+            return daily.first { Calendar.current.isDate($0.date, inSameDayAs: target) }
+        }
+        let today = day(offset: 0) ?? daily.first
+        let tomorrow = day(offset: 1) ?? daily.dropFirst().first
+        // For the timeline pins alone; the watch's own record carries two days.
+        let dayAfter = day(offset: 2)
 
         func degrees(_ measurement: Measurement<UnitTemperature>?) -> Int16 {
             guard let measurement else { return 0 }
@@ -63,7 +66,10 @@ struct WeatherBridge {
             tomorrowHigh: degrees(tomorrow?.highTemperature),
             tomorrowLow: degrees(tomorrow?.lowTemperature),
             shortPhrase: current.condition.description,
-            updated: now
+            updated: now,
+            dayAfterTomorrowType: dayAfter.map { Self.watchType(for: $0.condition, isDaylight: true) },
+            dayAfterTomorrowHigh: dayAfter.map { degrees($0.highTemperature) },
+            dayAfterTomorrowLow: dayAfter.map { degrees($0.lowTemperature) }
         )
     }
 
