@@ -151,3 +151,52 @@ struct HealthMinuteRecordTests {
         #expect(try #require(read.first).heartRate?.average == 65)
     }
 }
+
+/// Which sessions are minute data, and which only look like it.
+///
+/// Measured on the test watch (Pebble Time 2, v4.36.2) on 2026-09-09: every
+/// connect opens two sessions, tag 81 and tag 85. The tag-85 one is protobuf —
+/// its first bytes are `12 0c` and then the watch's serial — and reading it as
+/// minute records filed a day in 1996 with whatever byte 0 of each 97-byte
+/// stretch happened to be.
+@Suite
+struct HealthDataLoggingTagTests {
+    private func session(tag: UInt8, itemSize: Int) -> [UInt8] {
+        var open = [UInt8](repeating: 0, count: 29)
+        open[0] = 0x01
+        open[1] = 1
+        open[22] = tag
+        open[27] = UInt8(itemSize & 0xFF)
+        open[28] = UInt8(itemSize >> 8)
+        return open
+    }
+
+    /// The first bytes of a real tag-85 session, as captured from the watch.
+    private let protobufLog: [UInt8] = [
+        0x63, 0x68, 0x12, 0x0c, 0x43, 0x31, 0x31, 0x31, 0x32, 0x38, 0x31, 0x31,
+        0x30, 0x33, 0x35, 0x56, 0x2a, 0x09, 0x20, 0x04, 0x28, 0x25, 0x32, 0x03,
+        0x30, 0x2d, 0x30, 0x18, 0xb6, 0xc8, 0x80, 0xd5, 0x06, 0x62, 0xf8, 0x01,
+    ]
+
+    @Test func aProtobufLogSessionIsNotReadAsSteps() throws {
+        var processor = HealthDataLoggingProcessor()
+        _ = try processor.process(
+            PebbleProtocolFrame(
+                endpoint: HealthDataLoggingCodec.endpoint,
+                payload: session(tag: 85, itemSize: protobufLog.count)
+            )
+        )
+
+        var data: [UInt8] = [0x02, 1]
+        data += [UInt8](repeating: 0, count: 8)
+        data += protobufLog
+        let result = try processor.process(
+            PebbleProtocolFrame(endpoint: HealthDataLoggingCodec.endpoint, payload: data)
+        )
+
+        // Taken and acknowledged, as any tag this app has no use for is, and
+        // nothing invented from it.
+        #expect(result.samples.isEmpty)
+        #expect(result.response != nil)
+    }
+}

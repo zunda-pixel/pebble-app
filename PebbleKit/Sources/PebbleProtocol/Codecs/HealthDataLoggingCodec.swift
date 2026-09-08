@@ -48,7 +48,16 @@ public struct HealthDataLoggingProcessor: Sendable {
     private func samples(from bytes: [UInt8], session: Session) throws -> [WatchHealthSample] {
         guard session.itemSize > 0 else { throw HealthDataLoggingError.invalidItemSize }
         switch session.tag {
-        case 81, 85:
+        // 81 and only 81. `DlsSystemTagActivityMinuteData` is the minute data;
+        // 85 is `DlsSystemTagProtobufLogSession`
+        // (`include/pbl/services/data_logging/data_logging_service.h`), and
+        // reading protobuf as minutes filed a day in 1996 with whatever byte 0
+        // of each 97-byte stretch happened to be. Measured on the test watch:
+        // a tag-85 session opens on every connect and its first bytes are
+        // `12 0c` followed by the watch's serial, which is a protobuf field,
+        // not a record header. The official app's `HEALTH_HR_TAG = 85` says
+        // otherwise and is wrong here; the firmware and the wire agree.
+        case 81:
             return try stepSamples(from: bytes, itemSize: session.itemSize)
         case 83, 84:
             return try sleepSamples(from: bytes, itemSize: session.itemSize)
