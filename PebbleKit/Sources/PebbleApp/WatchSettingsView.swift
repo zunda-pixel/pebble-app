@@ -72,6 +72,14 @@ struct WatchSettingRow: View {
     /// watch is shown rather than being held off by a stale draft.
     @State private var draft: Int?
 
+    /// A colour mid-pick. The picker has no "the drag ended" callback the way
+    /// the slider does, so this is written after a quiet moment instead — see
+    /// the `.task(id:)` on the row.
+    @State private var colorDraft: Int?
+
+    /// For reading a picked `Color` back as sRGB numbers.
+    @Environment(\.self) private var environment
+
     private func commitDraft() {
         guard let draft else { return }
         setRawValue(draft)
@@ -124,7 +132,50 @@ struct WatchSettingRow: View {
                 // written when the screen goes rather than never.
                 .onDisappear(perform: commitDraft)
             }
+        case .color:
+            ColorPicker(
+                setting.title,
+                selection: Binding(
+                    get: { Color(packedRGB: colorDraft ?? rawValue) },
+                    set: { colorDraft = $0.packedRGB(in: environment) }
+                ),
+                supportsOpacity: false
+            )
+            // A drag around the colour wheel is a stream of values and each
+            // write goes to the watch, so the write waits for a quiet moment.
+            // `task(id:)` cancels the sleeping task whenever the draft moves
+            // again, which is the debounce.
+            .task(id: colorDraft) {
+                guard let colorDraft else { return }
+                guard (try? await Task.sleep(for: .milliseconds(400))) != nil else { return }
+                setRawValue(colorDraft)
+                self.colorDraft = nil
+            }
         }
+    }
+}
+
+extension Color {
+    /// The backlight LED's colour, from the firmware's packed `0x00RRGGBB`.
+    init(packedRGB: Int) {
+        self.init(
+            red: Double((packedRGB >> 16) & 0xFF) / 255,
+            green: Double((packedRGB >> 8) & 0xFF) / 255,
+            blue: Double(packedRGB & 0xFF) / 255
+        )
+    }
+
+    /// The picked colour as the firmware packs it. Read back as sRGB rather
+    /// than the linear values `Color.Resolved` stores, for the same reason
+    /// `PebbleColor.init(nearest:in:)` does: the wire carries display values,
+    /// and rounding linear ones would darken the colour.
+    func packedRGB(in environment: EnvironmentValues) -> Int {
+        let resolved = resolveHDR(in: environment)
+        func channel(_ value: Float) -> Int {
+            min(255, max(0, Int((Double(value) * 255).rounded())))
+        }
+        return channel(resolved.red) << 16 | channel(resolved.green) << 8
+            | channel(resolved.blue)
     }
 }
 
@@ -133,7 +184,8 @@ extension WatchSetting {
     var isBacklight: Bool {
         switch self {
         case .backlight, .backlightAmbientSensor, .backlightMotion, .backlightPreset,
-             .backlightTimeout, .backlightIntensity, .backlightTouchWake, .backlightDynamicMode:
+             .backlightTimeout, .backlightIntensity, .backlightTouchWake, .backlightDynamicMode,
+             .backlightColor:
             true
         default:
             false
@@ -156,10 +208,16 @@ struct BacklightSettingsContent: View {
     var setWatchSetting: (WatchSetting, Int) -> Void
 
     /// The rows below the preset, in the order of `WatchSetting.allCases`.
+    ///
+    /// The colour is not one of them, although it is a backlight setting: the
+    /// footer under these says changing them makes the brightness Custom, and
+    /// the colour does not — no preset stands for a colour, and
+    /// `backlight_get_preset` never compares it. It sits with the preset
+    /// above instead.
     private var individualSettings: [WatchSetting] {
         WatchSetting.allCases.filter {
             $0.isBacklight && $0 != .backlight && $0 != .backlightPreset
-                && $0.isOffered(on: board)
+                && $0 != .backlightColor && $0.isOffered(on: board)
         }
     }
 
@@ -181,6 +239,9 @@ struct BacklightSettingsContent: View {
             Section {
                 row(.backlight)
                 row(.backlightPreset)
+                if WatchSetting.backlightColor.isOffered(on: board) {
+                    row(.backlightColor)
+                }
             }
             Section {
                 ForEach(individualSettings, id: \.self, content: row)

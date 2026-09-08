@@ -32,12 +32,19 @@ public enum WatchSettingKind: Equatable, Sendable {
     /// offered one at a time — `optionRawValues` lists them all and nothing
     /// should build a picker out of that.
     case number(range: ClosedRange<Int>)
+    /// A colour, packed `0x00RRGGBB` in four bytes, as `src/fw/shell/prefs.h`
+    /// says it and the `BACKLIGHT_COLOR_*` constants spell it.
+    ///
+    /// Any colour: the handler (`prv_set_s_backlight_color`) masks the top
+    /// byte off and validates nothing, so unlike the intensity there is no
+    /// value the watch would correct behind this app's back.
+    case color
 
     /// How many bytes the value takes, which is what the firmware stores it as.
     public var width: Int {
         switch self {
         case .boolean, .choice, .number: 1
-        case .duration: 4
+        case .duration, .color: 4
         }
     }
 }
@@ -76,6 +83,13 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
     case backlightTouchWake = "lightTouch"
     /// `BacklightDynamicMode`: 0 off, 1 bright, 2 standard, 3 dim.
     case backlightDynamicMode = "lightDynamicMode"
+    /// The backlight's colour, on a watch whose LED has one.
+    ///
+    /// The one setting here the watch itself offers no screen for: its own
+    /// Settings → Display never mentions it, and only the factory test app
+    /// (`apps/prf/mfg_backlight.c`) ever sets it on the wrist. The phone is
+    /// the only way a wearer can change it.
+    case backlightColor = "lightColor"
 
     public var kind: WatchSettingKind {
         switch self {
@@ -91,18 +105,22 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
         // writes the default back, so a backlight is turned off with
         // `lightEnabled` and not by winding this down.
         case .backlightIntensity: .number(range: 1...100)
+        case .backlightColor: .color
         default: .boolean
         }
     }
 
     /// Whether the watch may not have this setting at all.
     ///
-    /// `lightDynamicMode` sits behind `CONFIG_DYNAMIC_BACKLIGHT` in both
-    /// `prefs.c` and the sync whitelist, so a watch built without it answers
-    /// the write with `E_INVALID_OPERATION` — a logged warning on the watch and
-    /// nothing else (`settings_blob_db.c:332`). That is a fact about the model,
-    /// not a failure the reader did anything about, so it is not said out loud.
-    public var mayBeAbsent: Bool { self == .backlightDynamicMode }
+    /// `lightDynamicMode` sits behind `CONFIG_DYNAMIC_BACKLIGHT`, and
+    /// `lightColor` behind `CONFIG_BACKLIGHT_HAS_COLOR`, in both `prefs.c` and
+    /// the sync whitelist — so a watch built without one answers the write
+    /// with `E_INVALID_OPERATION`, a logged warning on the watch and nothing
+    /// else (`settings_blob_db.c:332`). That is a fact about the model, not a
+    /// failure the reader did anything about, so it is not said out loud.
+    public var mayBeAbsent: Bool {
+        self == .backlightDynamicMode || self == .backlightColor
+    }
 
     /// Whether this setting gets a row for a watch on this board.
     ///
@@ -120,6 +138,7 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
         switch self {
         case .backlightTouchWake: board?.hasTouch == true
         case .backlightDynamicMode: board?.hasDynamicBacklight == true
+        case .backlightColor: board?.hasColorBacklight == true
         default: true
         }
     }
@@ -150,6 +169,12 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
         case .backlightTouchWake: 0
         // `s_backlight_dynamic_mode = BacklightDynamicMode_Standard`.
         case .backlightDynamicMode: 2
+        // `BACKLIGHT_COLOR_WARM_WHITE`, which is obelix's
+        // `backlight_default_color` — and obelix is the only *hardware* whose
+        // whitelist takes this key at all. The emulator's default is plain
+        // white; it is a development tool, and warm white sent to it once is
+        // no loss.
+        case .backlightColor: 0xFFBFA2
         }
     }
 
@@ -166,6 +191,9 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
         case .choice(let count): Array(0..<count)
         case .duration(let milliseconds): milliseconds
         case .number(let range): Array(range)
+        // Sixteen million rows is not a list of options; a colour is picked,
+        // not chosen from.
+        case .color: []
         }
     }
 
@@ -177,6 +205,9 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
         case .choice(let count): (0..<count).contains(rawValue)
         case .duration(let milliseconds): milliseconds.contains(rawValue)
         case .number(let range): range.contains(rawValue)
+        // The top byte must be clear: the handler would mask it off anyway,
+        // but then the watch would hold a different number than this app.
+        case .color: (0...0xFFFFFF).contains(rawValue)
         }
     }
 }
@@ -328,7 +359,7 @@ public enum WatchSettingsCodec {
         let rawValue = switch setting.kind {
         case .boolean: value[0] == 0 ? 0 : 1
         case .choice, .number: Int(value[0])
-        case .duration: value.reversed().reduce(0) { $0 << 8 | Int($1) }
+        case .duration, .color: value.reversed().reduce(0) { $0 << 8 | Int($1) }
         }
         guard setting.accepts(rawValue: rawValue) else { return nil }
         return (setting, rawValue)

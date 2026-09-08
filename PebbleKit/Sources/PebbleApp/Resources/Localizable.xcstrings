@@ -941,6 +941,16 @@
         }
       }
     },
+    "Backlight Color" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "バックライトの色"
+          }
+        }
+      }
+    },
     "Backlight Duration" : {
       "localizations" : {
         "ja" : {

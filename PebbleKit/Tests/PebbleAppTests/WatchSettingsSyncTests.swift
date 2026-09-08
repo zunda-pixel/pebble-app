@@ -3,6 +3,7 @@ import PebbleProtocol
 import Defaults
 import Foundation
 import Testing
+import SwiftUI
 @testable import PebbleApp
 
 /// A setting changed on the watch, coming back to the phone.
@@ -482,5 +483,72 @@ struct WatchSettingGroupingTests {
             )
         }
         #expect(Set(grouped).count == grouped.count)
+    }
+}
+
+/// The backlight's colour: packed `0x00RRGGBB`, four bytes, and only on a
+/// board whose LED has colour — obelix's AW2016 and the emulator's
+/// `BACKLIGHT_QEMU_COLOR`; getafix's AW9364E and asterix's PWM do not select
+/// `CONFIG_BACKLIGHT_HAS_COLOR`, and with it goes the whitelist entry.
+@Suite
+struct BacklightColorTests {
+    @Test func aColourIsFourLittleEndianBytesWithTheTopByteClear() {
+        let frame = WatchSettingsCodec.insertFrame(.backlightColor, rawValue: 0xFFBFA2, token: 1)
+
+        // 0x00FFBFA2 little-endian: BB GG RR 00.
+        #expect(Array(frame.payload.suffix(4)) == [0xA2, 0xBF, 0xFF, 0x00])
+    }
+
+    @Test func aColourComingBackIsReadWholeAndTheTopByteIsRefused() {
+        let key = WatchSettingsCodec.key(for: .backlightColor)
+
+        #expect(
+            WatchSettingsCodec.decodeRecord(key: key, value: [0xA2, 0xBF, 0xFF, 0x00])?.1
+                == 0xFFBFA2
+        )
+        // The handler would mask a set top byte off, and then the watch would
+        // hold a different number than this app; refused instead.
+        #expect(WatchSettingsCodec.decodeRecord(key: key, value: [0xA2, 0xBF, 0xFF, 0x01]) == nil)
+        #expect(!WatchSetting.backlightColor.accepts(rawValue: 0x1000000))
+        #expect(WatchSetting.backlightColor.accepts(rawValue: 0))
+        #expect(WatchSetting.backlightColor.accepts(rawValue: 0xFFFFFF))
+    }
+
+    /// Only where the LED has colour, and never a failure banner where the
+    /// whitelist refuses it.
+    @Test func theColourRowFollowsTheLED() {
+        #expect(WatchSetting.backlightColor.isOffered(on: .obelixPVT))
+        #expect(WatchSetting.backlightColor.isOffered(on: .qemuEmery))
+        #expect(!WatchSetting.backlightColor.isOffered(on: .getafixDVT))
+        #expect(!WatchSetting.backlightColor.isOffered(on: .asterix))
+        #expect(!WatchSetting.backlightColor.isOffered(on: nil))
+        #expect(WatchSetting.backlightColor.mayBeAbsent)
+    }
+
+    /// No preset stands for a colour — `s_backlight_preset_settings` has no
+    /// colour field and `backlight_get_preset` never compares one — so picking
+    /// a colour must not demote the preset to Custom.
+    @Test func pickingAColourDoesNotDemoteThePreset() {
+        var values: [WatchSetting: Int] = [.backlightPreset: BacklightPreset.standard]
+        for (setting, value) in BacklightPreset.settings(for: BacklightPreset.standard) ?? [:] {
+            values[setting] = value
+        }
+        values[.backlightColor] = 0x00FF00
+
+        #expect(
+            BacklightPreset.reported(by: { values[$0] ?? $0.defaultRawValue }, on: .obelixPVT)
+                == BacklightPreset.standard
+        )
+    }
+
+    /// The round trip a picked colour makes through SwiftUI's `Color` and
+    /// back, which must not drift: a drift of one would write the watch a
+    /// colour nobody picked, on every look at the screen.
+    @MainActor
+    @Test func aPackedColourSurvivesTheTripThroughColor() {
+        for packed in [0x000000, 0xFFFFFF, 0xFFBFA2, 0x123456, 0x00FF00] {
+            let colour = Color(packedRGB: packed)
+            #expect(colour.packedRGB(in: EnvironmentValues()) == packed)
+        }
     }
 }

@@ -123,6 +123,7 @@ public extension WatchSetting {
         case .backlightIntensity: "Backlight Level"
         case .backlightTouchWake: "Backlight on Touch"
         case .backlightDynamicMode: "Dynamic Backlight"
+        case .backlightColor: "Backlight Color"
         }
     }
 
