@@ -45,6 +45,10 @@ public enum CatalogInstallationState: Equatable, Sendable {
 public final class AppModel {
     public internal(set) var connectionState: WatchConnectionState = .idle
     public internal(set) var connections: [WatchConnection] = []
+    /// The answer to flipping one of the phone-alert switches on the Settings
+    /// screen — refused notification permission, mostly. Beside the switches,
+    /// because that is where the reader is looking when it happens.
+    public internal(set) var phoneAlertsFeedback: FeatureFeedback?
     public internal(set) var connectingWatchIDs: Set<WatchID> = []
     /// Why the last attempt at each watch ended. A watch has its own screen with
     /// its own Connect button, and a failure that only reached the log left that
@@ -190,6 +194,17 @@ public final class AppModel {
     let pendingTimelineOperationStore: PendingTimelineOperationStore
     let pendingAppMessageStore: PendingAppMessageStore
     let pendingFirmwareUpdateStore: PendingFirmwareUpdateStore
+    let localNotifier: any LocalNotifying
+
+    /// The last battery level each watch reported this session, for telling a
+    /// climb to 100% from a watch that connected already full. Cleared when the
+    /// watch goes, so a reconnect starts over rather than notifying off a
+    /// reading from another wearing.
+    var chargeLevels: [WatchID: Int] = [:]
+    /// The watches already told about this charge. Unlatched when the level
+    /// falls to 97% or below, the way the official app does it, so the wobble
+    /// around full does not ring twice.
+    var chargeNotified: Set<WatchID> = []
     let firmwareCatalog = PebbleOSFirmwareCatalog()
     var pendingAppMessages: [StoredAppMessage] = []
     let calendarBridge = CalendarBridge()
@@ -266,8 +281,12 @@ public final class AppModel {
         appGlanceStore: AppGlanceStore? = nil,
         reminderStore: TimelinePinStore? = nil,
         appCatalog: AppCatalog? = nil,
-        clientFactory: (@MainActor (WatchID) -> any WatchClient)? = nil
+        clientFactory: (@MainActor (WatchID) -> any WatchClient)? = nil,
+        localNotifier: (any LocalNotifying)? = nil
     ) {
+        // The real one only touches the system centre inside its methods, so a
+        // test that never turns a notifying feature on never reaches it.
+        self.localNotifier = localNotifier ?? SystemLocalNotifier()
         scannerClient = client
         // Without a factory every connection shares the scanning client, which
         // limits the app to one watch at a time (mock and QEMU transports).
@@ -512,6 +531,7 @@ public final class AppModel {
             let needsResync = connection.consumePostReconnectSync()
             refreshConnectionState()
             Task { [weak self] in
+                await self?.trackChargeLevel(of: device)
                 await self?.recordConnectedWatch(device)
             }
             guard needsResync else { return }
@@ -532,6 +552,12 @@ public final class AppModel {
             clearBusyOperationState(on: connection)
         case .disconnected(let error):
             connections.removeAll { $0 === connection }
+            // The charge story starts over with the next connect: a level
+            // remembered across the gap could be from before a night off the
+            // wrist, and "it reached 100 since I last looked" is not the same
+            // fact as "it just finished charging".
+            chargeLevels.removeValue(forKey: connection.watch.id)
+            chargeNotified.remove(connection.watch.id)
             lastConnectionError = error
             // On the watch's own screen, where its Connect button is.
             connectionFailures[connection.watch.id] = error

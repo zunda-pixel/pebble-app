@@ -30,6 +30,10 @@ struct SettingsView: View {
             diagnosticReportURL: model.diagnostics.reportURL,
             diagnosticsFeedback: model.diagnostics.feedback[.report],
             voiceTranscription: model.voiceTranscriptionReadiness,
+            phoneAlertsFeedback: model.phoneAlertsFeedback,
+            setNotifyWhenFullyCharged: { enabled in
+                Task { await model.setNotifyWhenFullyCharged(enabled) }
+            },
             setVoiceTranscriptionEnabled: { enabled in
                 Task { await model.setVoiceTranscriptionEnabled(enabled) }
             },
@@ -76,6 +80,8 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
     /// The answer to asking for a diagnostic report, which is asked for here.
     var diagnosticsFeedback: FeatureFeedback?
     var voiceTranscription: VoiceTranscriptionReadiness
+    var phoneAlertsFeedback: FeatureFeedback?
+    var setNotifyWhenFullyCharged: (Bool) -> Void = { _ in }
     var setVoiceTranscriptionEnabled: (Bool) -> Void
     var setCompanionNotificationsEnabled: (Bool) -> Void
     var setQuietHours: (_ enabled: Bool, _ start: Int?, _ end: Int?) -> Void
@@ -86,6 +92,10 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
 
     @State private var permissions = PhonePermissions()
     @Environment(\.scenePhase) private var scenePhase
+    // Read through `@Default` rather than carried in as a parameter, so the
+    // switch follows the stored value even when the model turns it back off —
+    // a refused permission does exactly that.
+    @Default(.notifyWhenFullyCharged) private var notifyWhenFullyCharged
 
     private var voiceTranscriptionSummary: Text {
         switch voiceTranscription {
@@ -132,6 +142,17 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
                 } label: {
                     Text("Permissions")
                 }
+            }
+            Section {
+                Toggle("Notify When Fully Charged", isOn: Binding(
+                    get: { notifyWhenFullyCharged },
+                    set: { setNotifyWhenFullyCharged($0) }
+                ))
+                FeedbackBanner(feedback: phoneAlertsFeedback)
+            } header: {
+                Text("Phone Notifications")
+            } footer: {
+                Text("Tells this phone when a watch finishes charging. Turning it on asks for notification permission.")
             }
             Section {
                 Toggle("Dictation from the Watch", isOn: Binding(

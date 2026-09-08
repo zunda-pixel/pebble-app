@@ -24,6 +24,9 @@ extension Defaults.Keys {
     /// changing it in place would have reset every watch setting the reader had
     /// chosen. `loadWatchSettings` reads the old key once and folds it in.
     static let watchSettingValues = Key<[String: Int]>("watchSettingValues", default: [:])
+    /// Off until asked for: a notification nobody opted into is noise, and the
+    /// system permission is only requested when this is first turned on.
+    static let notifyWhenFullyCharged = Key<Bool>("notifyWhenFullyCharged", default: false)
     /// Quick-launch assignments, keyed by the firmware's own `ql…` names.
     /// Only the buttons the reader has actually set are here; an absent button
     /// keeps the firmware's default rather than being overwritten with it.

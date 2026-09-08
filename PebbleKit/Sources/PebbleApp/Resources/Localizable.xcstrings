@@ -157,6 +157,16 @@
         }
       }
     },
+    "%@ is fully charged." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%@の充電が完了しました。"
+          }
+        }
+      }
+    },
     "%@ is installed. The watch switches to it now." : {
       "localizations" : {
         "ja" : {
@@ -2401,6 +2411,16 @@
         }
       }
     },
+    "Fully Charged" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "充電完了"
+          }
+        }
+      }
+    },
     "Gather Watch Logs" : {
       "localizations" : {
         "ja" : {
@@ -3573,6 +3593,16 @@
         }
       }
     },
+    "Notifications are turned off for this app in the system settings." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“システム設定”でこのアプリの通知がオフになっています。"
+          }
+        }
+      }
+    },
     "Notifications enabled for this app." : {
       "localizations" : {
         "ja" : {
@@ -3589,6 +3619,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このアプリの通知をミュートしました。"
+          }
+        }
+      }
+    },
+    "Notify When Fully Charged" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "充電完了時に通知"
           }
         }
       }
@@ -3859,6 +3899,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "通話"
+          }
+        }
+      }
+    },
+    "Phone Notifications" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "iPhoneへの通知"
           }
         }
       }
@@ -4839,6 +4889,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "タップ"
+          }
+        }
+      }
+    },
+    "Tells this phone when a watch finishes charging. Turning it on asks for notification permission." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチの充電が完了したときに、iPhoneに通知します。オンにすると、通知の許可を求められます。"
           }
         }
       }

@@ -1,4 +1,5 @@
 public import PebbleProtocol
+import Defaults
 import PebbleTransport
 import AsyncOperations
 import Foundation
@@ -189,5 +190,50 @@ extension AppModel {
         } catch {
             watches.feedback = .failure("The watch connection history could not be saved.")
         }
+    }
+}
+
+extension AppModel {
+    /// Tells the phone when a watch finishes charging, if the reader asked.
+    ///
+    /// The shape follows the official app's `BatteryFullyChargedNotification`:
+    /// only the *climb* to 100% counts, so a watch that connects already full
+    /// says nothing — its first reading has no earlier one to climb from. One
+    /// notification per charge: the latch opens again only when the level
+    /// falls to 97% or below, so the wobble around full does not ring twice.
+    func trackChargeLevel(of device: ConnectedWatch) async {
+        guard let level = device.batteryLevel else { return }
+        let previous = chargeLevels[device.id]
+        chargeLevels[device.id] = level
+        if level <= 97 { chargeNotified.remove(device.id) }
+        guard Defaults[.notifyWhenFullyCharged],
+              level >= 100,
+              let previous, previous < 100,
+              !chargeNotified.contains(device.id) else { return }
+        chargeNotified.insert(device.id)
+        await localNotifier.post(
+            identifier: "fully-charged-\(device.id.rawValue)",
+            title: String(localized: "Fully Charged", bundle: .module),
+            body: String(localized: "\(device.name) is fully charged.", bundle: .module)
+        )
+    }
+
+    /// Turns the full-charge notification on or off. Asking to be notified is
+    /// the one moment the system permission is worth asking for; refused, the
+    /// switch falls back rather than promising what cannot arrive.
+    public func setNotifyWhenFullyCharged(_ enabled: Bool) async {
+        guard enabled else {
+            Defaults[.notifyWhenFullyCharged] = false
+            return
+        }
+        guard await localNotifier.requestAuthorization() else {
+            Defaults[.notifyWhenFullyCharged] = false
+            phoneAlertsFeedback = .failure(
+                "Notifications are turned off for this app in the system settings."
+            )
+            return
+        }
+        Defaults[.notifyWhenFullyCharged] = true
+        phoneAlertsFeedback = nil
     }
 }
