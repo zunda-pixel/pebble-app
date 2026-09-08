@@ -56,6 +56,62 @@ public enum WatchBoard: String, CaseIterable, Codable, Sendable {
     }
 }
 
+public extension WatchBoard {
+    /// What this board was built with, read out of `boards/<name>/defconfig`
+    /// in PebbleOS. These gate settings rows: a switch for hardware the watch
+    /// does not have is a row that does nothing in front of the reader.
+    ///
+    /// Per board and not per model, because the emulator differs from the
+    /// hardware it stands in for: `qemu_emery` is a Pebble Time 2 to
+    /// `WatchModel`, but its defconfig has no `CONFIG_DYNAMIC_BACKLIGHT`
+    /// where the real board's does — gating by model would offer the emulated
+    /// watch a row its whitelist refuses.
+    ///
+    /// The robert boards answer false throughout: they have no `boards/`
+    /// directory in this PebbleOS tree, so what they were built with cannot be
+    /// read, and a row that might do nothing is worse than no row.
+
+    /// `CONFIG_TOUCH`. Gates the touch-wake row; the `lightTouch` pref itself
+    /// exists on every board and is compared against presets everywhere.
+    var hasTouch: Bool {
+        switch self {
+        case .getafixEVT, .getafixDVT, .getafixDVT2,
+             .obelixEVT, .obelixDVT, .obelixPVT, .obelixBigboard, .obelixBigboard2,
+             .qemuEmery, .qemuGabbro:
+            true
+        default:
+            false
+        }
+    }
+
+    /// `CONFIG_DYNAMIC_BACKLIGHT`. Unlike the other two, this one gates the
+    /// *whitelist* itself (`settings_blob_db.c`): a board without it answers
+    /// a `lightDynamicMode` write with `E_INVALID_OPERATION`.
+    var hasDynamicBacklight: Bool {
+        switch self {
+        case .getafixEVT, .getafixDVT, .getafixDVT2,
+             .obelixEVT, .obelixDVT, .obelixPVT, .obelixBigboard, .obelixBigboard2:
+            true
+        default:
+            false
+        }
+    }
+
+    /// `CONFIG_BACKLIGHT_HAS_COLOR`, selected by the LED driver: obelix's
+    /// AW2016 and the emulator's `BACKLIGHT_QEMU_COLOR` have colour; getafix's
+    /// AW9364E and asterix's PWM do not. Also whitelist-gating, for
+    /// `lightColor`.
+    var hasColorBacklight: Bool {
+        switch self {
+        case .obelixEVT, .obelixDVT, .obelixPVT, .obelixBigboard, .obelixBigboard2,
+             .qemuEmery:
+            true
+        default:
+            false
+        }
+    }
+}
+
 public enum WatchModel: String, CaseIterable, Codable, Sendable {
     case pebble2Duo = "FLINT"
     case pebbleTime2 = "EMERY"

@@ -104,6 +104,26 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
     /// not a failure the reader did anything about, so it is not said out loud.
     public var mayBeAbsent: Bool { self == .backlightDynamicMode }
 
+    /// Whether this setting gets a row for a watch on this board.
+    ///
+    /// The two conditional rows are conditional differently. `lightTouch` is a
+    /// pref every board keeps and every whitelist takes; the watch's own
+    /// settings app just hides the row behind `CONFIG_TOUCH`, because a wake
+    /// gesture for a screen that cannot feel one does nothing. This app hides
+    /// it for the same reason. `lightDynamicMode` is out of the whitelist
+    /// itself on a board built without it, so its row would not even reach
+    /// the pref.
+    ///
+    /// A nil board — a watch this app cannot place — hides both: a row that
+    /// might do nothing is worse than no row.
+    public func isOffered(on board: WatchBoard?) -> Bool {
+        switch self {
+        case .backlightTouchWake: board?.hasTouch == true
+        case .backlightDynamicMode: board?.hasDynamicBacklight == true
+        default: true
+        }
+    }
+
     /// What the watch has before anybody changes it, from the initialisers in
     /// `prefs.c`.
     public var defaultRawValue: Int {
@@ -217,14 +237,23 @@ public enum BacklightPreset {
     /// Shown rather than the number last written, so that turning the
     /// brightness down by hand reads as "Custom" here as it does on the wrist,
     /// instead of leaving this screen claiming a preset the watch has left.
-    public static func reported(by value: (WatchSetting) -> Int) -> Int {
+    ///
+    /// The board says which settings take part. A watch whose dynamic
+    /// backlight was compiled out never compares it — its value here is
+    /// whatever default was never written anywhere, so letting it disagree
+    /// would report Advanced on every such watch for ever. A watch that *has*
+    /// it compares it the way its own `backlight_get_preset` does, or the
+    /// wrist would say Advanced while this screen still claimed Standard.
+    /// A nil board is read as the cautious one: not compared.
+    public static func reported(
+        by value: (WatchSetting) -> Int,
+        on board: WatchBoard? = nil
+    ) -> Int {
         let stored = value(.backlightPreset)
         guard let settings = settings(for: stored) else { return advanced }
-        // A watch whose dynamic backlight was compiled out does not compare
-        // that one, and neither does this: its value here is whatever default
-        // was never written anywhere, so letting it disagree would report
-        // Advanced on every such watch for ever.
-        let compared = settings.filter { !$0.key.mayBeAbsent }
+        let compared = settings.filter {
+            !$0.key.mayBeAbsent || $0.key.isOffered(on: board)
+        }
         return compared.allSatisfy { value($0.key) == $0.value } ? stored : advanced
     }
 }

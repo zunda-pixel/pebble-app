@@ -9,6 +9,13 @@ struct WatchSettingsView: View {
         model.connections.first { $0.watch.id == watchID }
     }
 
+    /// The connected watch's board, or the remembered one while it is away —
+    /// the same fallback the firmware screen uses. Nil for a watch neither
+    /// knows, which hides the rows only some boards have.
+    private var board: WatchBoard? {
+        connection?.watch.board ?? model.watches.saved.first { $0.id == watchID }?.board
+    }
+
     var body: some View {
         WatchSettingsContent(
             watchSettings: Dictionary(
@@ -22,9 +29,13 @@ struct WatchSettingsView: View {
                     guard setting == .backlightPreset else {
                         return (setting, model.watchSettingValue(setting))
                     }
-                    return (setting, BacklightPreset.reported { model.watchSettingValue($0) })
+                    return (
+                        setting,
+                        BacklightPreset.reported(by: { model.watchSettingValue($0) }, on: board)
+                    )
                 }
             ),
+            board: board,
             activitySettings: model.watchSettings.activity,
             heartRateSettings: model.watchSettings.heartRate,
             isReminderAppEnabled: model.timeline.isReminderAppEnabled,
@@ -119,6 +130,7 @@ struct WatchSettingRow: View {
 
 struct WatchSettingsContent: View {
     var watchSettings: [WatchSetting: Int]
+    var board: WatchBoard?
     var activitySettings: ActivitySettings
     var heartRateSettings: HeartRateSettings
     var isReminderAppEnabled: Bool
@@ -129,17 +141,13 @@ struct WatchSettingsContent: View {
     var setHeartRateSettings: (HeartRateSettings) -> Void
     var setReminderAppEnabled: (Bool) -> Void
 
-    /// The settings that get a row, which is not all of them.
-    ///
-    /// Touch wake and the dynamic backlight mode are written — a brightness
-    /// preset is a name for them among others — but not offered, because
-    /// neither is on every watch: the touchscreen rows are behind `CONFIG_TOUCH`
-    /// in the watch's own settings app and the dynamic mode is behind
-    /// `CONFIG_DYNAMIC_BACKLIGHT` in the sync whitelist itself. A row that does
-    /// nothing on the watch in front of the reader is worse than no row, and
-    /// telling the two apart needs the per-model gating #93 still owes.
-    static let shownSettings = WatchSetting.allCases.filter {
-        $0 != .backlightTouchWake && $0 != .backlightDynamicMode
+    /// The settings that get a row, which depends on whose settings they are:
+    /// touch wake is only on a watch with a touchscreen, and the dynamic
+    /// backlight mode is out of the sync whitelist itself on a board built
+    /// without it. What each board has is read from its PebbleOS defconfig —
+    /// see `WatchBoard.hasTouch` and friends.
+    private var shownSettings: [WatchSetting] {
+        WatchSetting.allCases.filter { $0.isOffered(on: board) }
     }
 
     var body: some View {
@@ -150,7 +158,7 @@ struct WatchSettingsContent: View {
                 Section { FeedbackBanner(feedback: feedback) }
             }
             Section {
-                ForEach(Self.shownSettings, id: \.self) { setting in
+                ForEach(shownSettings, id: \.self) { setting in
                     WatchSettingRow(
                         setting: setting,
                         rawValue: watchSettings[setting] ?? setting.defaultRawValue,
@@ -301,6 +309,8 @@ struct WatchSettingsContent: View {
     NavigationStack {
         WatchSettingsContent(
             watchSettings: [.clock24Hour: 1, .backlight: 1, .unitsDistance: 0, .textSize: 2],
+            // A Pebble Time 2, which has every conditional row.
+            board: .obelixPVT,
             activitySettings: ActivitySettings(),
             heartRateSettings: HeartRateSettings(),
             isReminderAppEnabled: true,
@@ -318,6 +328,8 @@ struct WatchSettingsContent: View {
     NavigationStack {
         WatchSettingsContent(
             watchSettings: [:],
+            // A watch the app cannot place, which hides the conditional rows.
+            board: nil,
             activitySettings: ActivitySettings(),
             heartRateSettings: HeartRateSettings(
                 isEnabled: false,

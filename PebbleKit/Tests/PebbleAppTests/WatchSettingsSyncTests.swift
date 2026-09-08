@@ -407,3 +407,59 @@ struct BacklightPresetTests {
         )
     }
 }
+
+/// Which rows a board gets, read from its PebbleOS defconfig.
+///
+/// Per board and not per model, because the emulator differs from the hardware
+/// it stands in for: `qemu_emery` is a Pebble Time 2 to `WatchModel`, but its
+/// defconfig has no `CONFIG_DYNAMIC_BACKLIGHT` where the real board's does.
+@Suite
+struct WatchBoardSettingsTests {
+    @Test func theTouchRowIsOnlyForABoardWithATouchscreen() {
+        // `CONFIG_TOUCH=y` in getafix, obelix, qemu_emery and qemu_gabbro;
+        // not in asterix or qemu_flint.
+        #expect(WatchSetting.backlightTouchWake.isOffered(on: .obelixPVT))
+        #expect(WatchSetting.backlightTouchWake.isOffered(on: .getafixDVT))
+        #expect(WatchSetting.backlightTouchWake.isOffered(on: .qemuEmery))
+        #expect(!WatchSetting.backlightTouchWake.isOffered(on: .asterix))
+        #expect(!WatchSetting.backlightTouchWake.isOffered(on: .qemuFlint))
+    }
+
+    @Test func theDynamicModeRowFollowsTheWhitelistItself() {
+        // `CONFIG_DYNAMIC_BACKLIGHT=y` in getafix and obelix only — notably
+        // not in qemu_emery, which is why this is per board and not per model.
+        #expect(WatchSetting.backlightDynamicMode.isOffered(on: .obelixPVT))
+        #expect(WatchSetting.backlightDynamicMode.isOffered(on: .getafixEVT))
+        #expect(!WatchSetting.backlightDynamicMode.isOffered(on: .qemuEmery))
+        #expect(!WatchSetting.backlightDynamicMode.isOffered(on: .asterix))
+    }
+
+    /// A watch the app cannot place gets neither: a row that might do nothing
+    /// is worse than no row. The robert boards read the same way, since this
+    /// PebbleOS tree has no defconfig for them to read.
+    @Test func aBoardTheAppCannotPlaceHidesTheConditionalRows() {
+        #expect(!WatchSetting.backlightTouchWake.isOffered(on: nil))
+        #expect(!WatchSetting.backlightDynamicMode.isOffered(on: nil))
+        #expect(!WatchSetting.backlightDynamicMode.isOffered(on: .robertBigboard2))
+        // The unconditional ones are unconditional.
+        #expect(WatchSetting.backlightIntensity.isOffered(on: nil))
+        #expect(WatchSetting.clock24Hour.isOffered(on: nil))
+    }
+
+    /// On a board that has the dynamic mode, the preset comparison includes
+    /// it, the way that board's own `backlight_get_preset` does.
+    @Test func aBoardWithTheDynamicModeComparesItAgainstThePreset() {
+        var values: [WatchSetting: Int] = [.backlightPreset: BacklightPreset.standard]
+        for (setting, value) in BacklightPreset.settings(for: BacklightPreset.standard) ?? [:] {
+            values[setting] = value
+        }
+        values[.backlightDynamicMode] = 1
+        let reported = { (setting: WatchSetting) in values[setting] ?? setting.defaultRawValue }
+
+        // The watch with it says Advanced, so this must too.
+        #expect(BacklightPreset.reported(by: reported, on: .obelixPVT) == BacklightPreset.advanced)
+        // The watch without it has no such pref to disagree.
+        #expect(BacklightPreset.reported(by: reported, on: .qemuEmery) == BacklightPreset.standard)
+        #expect(BacklightPreset.reported(by: reported, on: nil) == BacklightPreset.standard)
+    }
+}
