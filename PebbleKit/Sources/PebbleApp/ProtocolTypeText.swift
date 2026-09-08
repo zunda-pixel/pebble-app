@@ -111,8 +111,10 @@ public extension WatchSetting {
         case .backlightMotion: "Backlight on Wrist Flick"
         case .timelineQuickView: "Timeline Quick View"
         case .menuScrollWrapAround: "Menus Wrap Around"
-        case .musicShowVolumeControls: "Music: Volume Controls"
-        case .musicShowProgressBar: "Music: Progress Bar"
+        // Bare, because they sit in a section headed "Music": the prefix they
+        // used to carry was doing that section's job on a flat list.
+        case .musicShowVolumeControls: "Volume Controls"
+        case .musicShowProgressBar: "Progress Bar"
         case .unitsDistance: "Distance"
         case .unitsWind: "Wind Speed"
         case .textSize: "Text Size"

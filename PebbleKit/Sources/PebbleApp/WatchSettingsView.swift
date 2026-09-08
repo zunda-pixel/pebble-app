@@ -206,18 +206,26 @@ struct WatchSettingsContent: View {
     var setHeartRateSettings: (HeartRateSettings) -> Void
     var setReminderAppEnabled: (Bool) -> Void
 
-    /// The settings that get a row here, which depends on whose settings they
-    /// are: touch wake is only on a watch with a touchscreen, and the dynamic
-    /// backlight mode is out of the sync whitelist itself on a board built
-    /// without it. What each board has is read from its PebbleOS defconfig —
-    /// see `WatchBoard.hasTouch` and friends.
-    ///
-    /// The backlight family is not here: eight rows of one feature were
-    /// crowding out the other seven settings, so they live on their own screen
-    /// behind one row, the way the watch itself keeps them behind Backlight
-    /// Settings.
-    private var shownSettings: [WatchSetting] {
-        WatchSetting.allCases.filter { $0.isOffered(on: board) && !$0.isBacklight }
+    /// The main list, grouped by what a setting is about rather than listed in
+    /// declaration order. Static and spelled out, so `WatchSettingGroupingTests`
+    /// can hold that every setting is either here or on the Backlight screen —
+    /// a new case added to `WatchSetting` fails a test instead of silently
+    /// getting no row.
+    static let appearanceSettings: [WatchSetting] = [.clock24Hour, .timelineQuickView, .textSize]
+    static let unitSettings: [WatchSetting] = [.unitsDistance, .unitsWind]
+    static let musicSettings: [WatchSetting] = [.musicShowVolumeControls, .musicShowProgressBar]
+    /// The ones that are about nothing in particular, in the untitled section
+    /// with the Backlight link.
+    static let generalSettings: [WatchSetting] = [.standbyMode, .menuScrollWrapAround]
+
+    private func rows(_ settings: [WatchSetting]) -> some View {
+        ForEach(settings.filter { $0.isOffered(on: board) }, id: \.self) { setting in
+            WatchSettingRow(
+                setting: setting,
+                rawValue: watchSettings[setting] ?? setting.defaultRawValue,
+                setRawValue: { setWatchSetting(setting, $0) }
+            )
+        }
     }
 
     /// What the one backlight row says at a glance: "Off" when the backlight
@@ -241,14 +249,17 @@ struct WatchSettingsContent: View {
             if feedback != nil {
                 Section { FeedbackBanner(feedback: feedback) }
             }
+            Section("Appearance") {
+                rows(Self.appearanceSettings)
+            }
+            Section("Units") {
+                rows(Self.unitSettings)
+            }
+            Section("Music") {
+                rows(Self.musicSettings)
+            }
             Section {
-                ForEach(shownSettings, id: \.self) { setting in
-                    WatchSettingRow(
-                        setting: setting,
-                        rawValue: watchSettings[setting] ?? setting.defaultRawValue,
-                        setRawValue: { setWatchSetting(setting, $0) }
-                    )
-                }
+                rows(Self.generalSettings)
                 NavigationLink {
                     BacklightSettingsContent(
                         watchSettings: watchSettings,
@@ -259,9 +270,8 @@ struct WatchSettingsContent: View {
                 } label: {
                     LabeledContent("Backlight") { Text(backlightSummary) }
                 }
-            } header: {
-                Text("On the Watch")
             } footer: {
+                // On the last of the four, but it speaks for all of them.
                 Text("These are the watch's own settings. They are written again whenever it connects, so this is the copy that wins.")
             }
 

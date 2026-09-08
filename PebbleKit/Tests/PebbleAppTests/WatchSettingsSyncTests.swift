@@ -463,3 +463,24 @@ struct WatchBoardSettingsTests {
         #expect(BacklightPreset.reported(by: reported, on: nil) == BacklightPreset.standard)
     }
 }
+
+/// The main list is grouped by hand, and a hand-kept list can silently drop
+/// whatever is added after it was written. Every setting has to be somewhere:
+/// in one of the four groups, or on the Backlight screen.
+@Suite
+struct WatchSettingGroupingTests {
+    @Test func everySettingHasARowSomewhere() {
+        let grouped = WatchSettingsContent.appearanceSettings
+            + WatchSettingsContent.unitSettings
+            + WatchSettingsContent.musicSettings
+            + WatchSettingsContent.generalSettings
+
+        for setting in WatchSetting.allCases {
+            #expect(
+                grouped.contains(setting) != setting.isBacklight,
+                "\(setting) needs a row in exactly one place"
+            )
+        }
+        #expect(Set(grouped).count == grouped.count)
+    }
+}

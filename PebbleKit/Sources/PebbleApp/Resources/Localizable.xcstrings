@@ -821,6 +821,16 @@
         }
       }
     },
+    "Appearance" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "画面表示"
+          }
+        }
+      }
+    },
     "Application Name" : {
       "localizations" : {
         "ja" : {
@@ -3152,6 +3162,7 @@
       }
     },
     "Music: Progress Bar" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -3162,6 +3173,7 @@
       }
     },
     "Music: Volume Controls" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -3807,6 +3819,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "インストールを準備中"
+          }
+        }
+      }
+    },
+    "Progress Bar" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "プログレスバー"
           }
         }
       }
@@ -6027,6 +6049,16 @@
         }
       }
     },
+    "Units" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "単位"
+          }
+        }
+      }
+    },
     "Unknown" : {
       "localizations" : {
         "ja" : {
@@ -6173,6 +6205,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "音声"
+          }
+        }
+      }
+    },
+    "Volume Controls" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "音量コントロール"
           }
         }
       }
