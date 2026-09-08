@@ -275,6 +275,16 @@
         }
       }
     },
+    "%lld bpm" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%lld bpm"
+          }
+        }
+      }
+    },
     "%lld dBm" : {
       "localizations" : {
         "ja" : {
@@ -301,6 +311,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld件の地点"
+          }
+        }
+      }
+    },
+    "%lld–%lld bpm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld–%2$lld bpm"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%1$lld–%2$lld bpm"
           }
         }
       }
@@ -831,6 +857,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このPebbleの自動再接続情報が削除されます。"
+          }
+        }
+      }
+    },
+    "Average Heart Rate" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "心拍数の平均"
           }
         }
       }
@@ -2821,6 +2857,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "分"
+          }
+        }
+      }
+    },
+    "Minutes Measured" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "測定分数"
           }
         }
       }

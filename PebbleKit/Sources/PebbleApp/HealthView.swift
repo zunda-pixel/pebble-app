@@ -96,6 +96,18 @@ struct HealthContent: View {
                         Text("\(active) min")
                     }
                 }
+                // The range rather than one number: the watch measures a
+                // scattered handful of minutes, so a lone average would hide
+                // both how high it went and how little it watched.
+                if let heartRate = newestSample?.heartRate {
+                    LabeledContent("Heart Rate") {
+                        Text("\(heartRate.lowest)–\(heartRate.highest) bpm")
+                    }
+                    LabeledContent("Average Heart Rate") {
+                        Text("\(heartRate.average) bpm")
+                    }
+                    LabeledContent("Minutes Measured", value: heartRate.measuredMinutes, format: .number)
+                }
                 // A night the watch broke into a sleep and a nap, or into two
                 // halves with a wakeful hour between them, is two rows: one
                 // range would say the reader slept through what they did not.

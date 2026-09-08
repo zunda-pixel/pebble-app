@@ -22,6 +22,13 @@ public struct WatchHealthSample: Codable, Equatable, Identifiable, Sendable {
     /// Apple Health's exercise minutes: the part of the day that counted as
     /// effort, which is what the watch means by active time.
     public var activeMinutes: Int = 0
+    /// The day's heart rate as the watch measured it, minute by minute.
+    ///
+    /// Nil where nothing measured it: a day from HealthKit, a file written
+    /// before this existed, a watch with no sensor, or a day the sensor was
+    /// off. Distinct from a day of zeroes, which would read as a heart that
+    /// stopped.
+    public var heartRate: WatchHeartRateSummary? = nil
     public var timeZoneIdentifier: String = TimeZone.current.identifier
     public var source: WatchHealthDataSource = .watch
     public var updatedAt: Date = Date()
@@ -29,7 +36,7 @@ public struct WatchHealthSample: Codable, Equatable, Identifiable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case id, date, steps, sleepMinutes, deepSleepMinutes, sleepSessions
         case activeKilocalories, restingKilocalories, distanceMetres, activeMinutes
-        case timeZoneIdentifier, source, updatedAt
+        case heartRate, timeZoneIdentifier, source, updatedAt
     }
 
     public init(from decoder: any Decoder) throws {
@@ -44,10 +51,42 @@ public struct WatchHealthSample: Codable, Equatable, Identifiable, Sendable {
         restingKilocalories = try container.decodeIfPresent(Int.self, forKey: .restingKilocalories) ?? 0
         distanceMetres = try container.decodeIfPresent(Int.self, forKey: .distanceMetres) ?? 0
         activeMinutes = try container.decodeIfPresent(Int.self, forKey: .activeMinutes) ?? 0
+        heartRate = try container.decodeIfPresent(WatchHeartRateSummary.self, forKey: .heartRate)
         timeZoneIdentifier = try container.decodeIfPresent(String.self, forKey: .timeZoneIdentifier)
             ?? TimeZone.current.identifier
         source = try container.decodeIfPresent(WatchHealthDataSource.self, forKey: .source) ?? .watch
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? date
+    }
+}
+
+/// A day's heart rate, reduced to what a day-granular record can hold honestly.
+///
+/// The watch measures a beat count per minute and only for the minutes its
+/// sensor ran, so a day is a handful of readings scattered through it rather
+/// than a continuous line. `lowest` is the smallest measured minute and not a
+/// resting heart rate: that is a derived figure with a definition of its own,
+/// and calling this by that name would be claiming an algorithm this app does
+/// not have.
+@MemberwiseInit(.public)
+public struct WatchHeartRateSummary: Codable, Equatable, Sendable {
+    public var lowest: Int
+    public var average: Int
+    public var highest: Int
+    /// How many minutes the watch actually measured, so a reader can tell an
+    /// average over four minutes from one over four hours.
+    public var measuredMinutes: Int
+
+    /// Nil for a day with nothing measured, rather than a summary of zeroes.
+    public static func from(_ beatsPerMinute: [Int]) -> Self? {
+        guard let lowest = beatsPerMinute.min(), let highest = beatsPerMinute.max() else {
+            return nil
+        }
+        return Self(
+            lowest: lowest,
+            average: beatsPerMinute.reduce(0, +) / beatsPerMinute.count,
+            highest: highest,
+            measuredMinutes: beatsPerMinute.count
+        )
     }
 }
 
@@ -95,6 +134,18 @@ public actor WatchHealthStore {
             resolved.restingKilocalories = max(existing.restingKilocalories, normalized.restingKilocalories)
             resolved.distanceMetres = max(existing.distanceMetres, normalized.distanceMetres)
             resolved.activeMinutes = max(existing.activeMinutes, normalized.activeMinutes)
+            // The other way round from the calories above: only the watch
+            // measures this, so a HealthKit record for the same day carries
+            // nil — and being the newer of the two would otherwise have wiped
+            // what the watch measured. Whichever record has one keeps it, and
+            // the newer wins only when both do.
+            resolved.heartRate = switch (existing.heartRate, normalized.heartRate) {
+            case (let older?, let newer?):
+                normalized.updatedAt >= existing.updatedAt ? newer : older
+            case (let only?, nil): only
+            case (nil, let only?): only
+            case (nil, nil): nil
+            }
             // The night is taken whole from whichever record is newer: its
             // total, its restful part and the sessions it was made of belong
             // together, and mixing two readings of one night makes a third

@@ -57,28 +57,65 @@ public struct HealthDataLoggingProcessor: Sendable {
         }
     }
 
+    /// Where the fields this reads sit inside one minute of `AlgMinuteDLSSample`
+    /// (`include/pbl/services/activity/activity_algorithm.h`).
+    ///
+    /// | byte | field | since version |
+    /// | --- | --- | --- |
+    /// | 0 | steps | 4 |
+    /// | 1–5 | orientation, vmc, light, flags | 4–5 |
+    /// | 6–11 | resting and active calories, distance | 6 |
+    /// | 12 | heart rate | 7 |
+    /// | 13–15 | heart rate weight and zone | 12, 13 |
+    private enum MinuteSample {
+        static let steps = 0
+        static let heartRate = 12
+        static let firstVersionWithHeartRate = 7
+    }
+
     private func stepSamples(from bytes: [UInt8], itemSize: Int) throws -> [WatchHealthSample] {
-        var daily: [Date: Int] = [:]
+        var daily: [Date: (steps: Int, heartRates: [Int])] = [:]
         for itemStart in stride(from: 0, to: bytes.count - (bytes.count % itemSize), by: itemSize) {
             let itemEnd = itemStart + itemSize
             guard itemEnd <= bytes.count, itemSize >= 9 else { continue }
             let version = Int(try uint16(bytes, at: itemStart))
-            guard [5, 6, 7, 8, 13].contains(version) else { continue }
             var timestamp = try uint32(bytes, at: itemStart + 2)
+            // The record says how big its samples are, at byte 7 of the header,
+            // and this used to work the same number out from the version — off
+            // a list of versions that had 8 in it, which has never existed, and
+            // not 4 or 12, which do (#112). Reading what the watch wrote also
+            // means a version added after this was written parses rather than
+            // being dropped, which is what the firmware's own note asks for:
+            // "only appending more properties is allowed".
+            let recordSize = Int(bytes[itemStart + 7])
             let recordCount = Int(bytes[itemStart + 8])
+            guard recordSize > MinuteSample.steps else { continue }
             var cursor = itemStart + 9
-            let recordSize = 6 + (version >= 6 ? 6 : 0) + (version >= 7 ? 1 : 0)
-                + (version >= 8 ? 2 : 0) + (version >= 13 ? 1 : 0)
             for _ in 0..<recordCount where cursor + recordSize <= itemEnd {
-                let steps = Int(bytes[cursor])
                 let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
-                daily[Calendar.current.startOfDay(for: date), default: 0] += steps
+                let day = Calendar.current.startOfDay(for: date)
+                var entry = daily[day] ?? (steps: 0, heartRates: [])
+                entry.steps += Int(bytes[cursor + MinuteSample.steps])
+                // Zero is the watch saying it did not measure this minute, not
+                // a heart that stopped: averaging it in would halve the day.
+                if version >= MinuteSample.firstVersionWithHeartRate,
+                   recordSize > MinuteSample.heartRate {
+                    let beats = Int(bytes[cursor + MinuteSample.heartRate])
+                    if beats > 0 { entry.heartRates.append(beats) }
+                }
+                daily[day] = entry
                 cursor += recordSize
                 timestamp &+= 60
             }
         }
-        return daily.map {
-            WatchHealthSample(date: $0.key, steps: $0.value, sleepMinutes: 0, source: .watch)
+        return daily.map { day, entry in
+            WatchHealthSample(
+                date: day,
+                steps: entry.steps,
+                sleepMinutes: 0,
+                heartRate: .from(entry.heartRates),
+                source: .watch
+            )
         }
     }
 
