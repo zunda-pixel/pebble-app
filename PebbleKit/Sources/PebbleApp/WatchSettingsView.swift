@@ -128,6 +128,71 @@ struct WatchSettingRow: View {
     }
 }
 
+extension WatchSetting {
+    /// The rows that belong on the Backlight screen rather than the main list.
+    var isBacklight: Bool {
+        switch self {
+        case .backlight, .backlightAmbientSensor, .backlightMotion, .backlightPreset,
+             .backlightTimeout, .backlightIntensity, .backlightTouchWake, .backlightDynamicMode:
+            true
+        default:
+            false
+        }
+    }
+}
+
+/// The backlight, whole, on a screen of its own.
+///
+/// The watch keeps these behind its own Backlight Settings submenu, and this
+/// screen follows it for the same two reasons: eight rows of one feature were
+/// drowning the main list, and a reader who changes the duration while a
+/// preset is chosen sees the brightness fall to Custom — surprising on a flat
+/// list (#116), expected on a screen that groups the preset with the values
+/// it stands for.
+struct BacklightSettingsContent: View {
+    var watchSettings: [WatchSetting: Int]
+    var board: WatchBoard?
+    var feedback: FeatureFeedback?
+    var setWatchSetting: (WatchSetting, Int) -> Void
+
+    /// The rows below the preset, in the order of `WatchSetting.allCases`.
+    private var individualSettings: [WatchSetting] {
+        WatchSetting.allCases.filter {
+            $0.isBacklight && $0 != .backlight && $0 != .backlightPreset
+                && $0.isOffered(on: board)
+        }
+    }
+
+    private func row(_ setting: WatchSetting) -> WatchSettingRow {
+        WatchSettingRow(
+            setting: setting,
+            rawValue: watchSettings[setting] ?? setting.defaultRawValue,
+            setRawValue: { setWatchSetting(setting, $0) }
+        )
+    }
+
+    var body: some View {
+        Form {
+            // The same banner the main screen shows: a write these rows caused
+            // should not answer on a screen the reader has left.
+            if feedback != nil {
+                Section { FeedbackBanner(feedback: feedback) }
+            }
+            Section {
+                row(.backlight)
+                row(.backlightPreset)
+            }
+            Section {
+                ForEach(individualSettings, id: \.self, content: row)
+            } footer: {
+                Text("Changing any of these sets Backlight Brightness to Custom, as it does on the watch itself.")
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle(Text("Backlight"))
+    }
+}
+
 struct WatchSettingsContent: View {
     var watchSettings: [WatchSetting: Int]
     var board: WatchBoard?
@@ -141,13 +206,32 @@ struct WatchSettingsContent: View {
     var setHeartRateSettings: (HeartRateSettings) -> Void
     var setReminderAppEnabled: (Bool) -> Void
 
-    /// The settings that get a row, which depends on whose settings they are:
-    /// touch wake is only on a watch with a touchscreen, and the dynamic
+    /// The settings that get a row here, which depends on whose settings they
+    /// are: touch wake is only on a watch with a touchscreen, and the dynamic
     /// backlight mode is out of the sync whitelist itself on a board built
     /// without it. What each board has is read from its PebbleOS defconfig —
     /// see `WatchBoard.hasTouch` and friends.
+    ///
+    /// The backlight family is not here: eight rows of one feature were
+    /// crowding out the other seven settings, so they live on their own screen
+    /// behind one row, the way the watch itself keeps them behind Backlight
+    /// Settings.
     private var shownSettings: [WatchSetting] {
-        WatchSetting.allCases.filter { $0.isOffered(on: board) }
+        WatchSetting.allCases.filter { $0.isOffered(on: board) && !$0.isBacklight }
+    }
+
+    /// What the one backlight row says at a glance: "Off" when the backlight
+    /// is off, the preset's name otherwise — the same summary the watch's own
+    /// Display screen puts under its Backlight row (`display.c:666`).
+    private var backlightSummary: LocalizedStringKey {
+        guard watchSettings[.backlight] ?? WatchSetting.backlight.defaultRawValue != 0 else {
+            return "Off"
+        }
+        let preset = watchSettings[.backlightPreset]
+            ?? WatchSetting.backlightPreset.defaultRawValue
+        return WatchSetting.backlightPreset.optionTitles.indices.contains(preset)
+            ? WatchSetting.backlightPreset.optionTitles[preset]
+            : "Custom"
     }
 
     var body: some View {
@@ -164,6 +248,16 @@ struct WatchSettingsContent: View {
                         rawValue: watchSettings[setting] ?? setting.defaultRawValue,
                         setRawValue: { setWatchSetting(setting, $0) }
                     )
+                }
+                NavigationLink {
+                    BacklightSettingsContent(
+                        watchSettings: watchSettings,
+                        board: board,
+                        feedback: feedback,
+                        setWatchSetting: setWatchSetting
+                    )
+                } label: {
+                    LabeledContent("Backlight") { Text(backlightSummary) }
                 }
             } header: {
                 Text("On the Watch")
@@ -347,15 +441,19 @@ struct WatchSettingsContent: View {
     }
 }
 
-/// The three backlight rows on their own, which is where the shapes differ:
-/// a preset picker, a duration picker, and the level as a slider.
-#Preview("Backlight rows") {
-    Form {
-        Section {
-            WatchSettingRow(setting: .backlightPreset, rawValue: 3, setRawValue: { _ in })
-            WatchSettingRow(setting: .backlightTimeout, rawValue: 8_000, setRawValue: { _ in })
-            WatchSettingRow(setting: .backlightIntensity, rawValue: 72, setRawValue: { _ in })
-        }
+/// The backlight screen for a Pebble Time 2, which has every row: the enable
+/// switch and the preset above, six individual values below — a duration
+/// picker and the level as a slider among them.
+#Preview("Backlight screen") {
+    NavigationStack {
+        BacklightSettingsContent(
+            watchSettings: [
+                .backlight: 1, .backlightPreset: 3, .backlightTimeout: 8_000,
+                .backlightIntensity: 72,
+            ],
+            board: .obelixPVT,
+            feedback: nil,
+            setWatchSetting: { _, _ in }
+        )
     }
-    .formStyle(.grouped)
 }

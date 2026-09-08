@@ -1271,6 +1271,16 @@
         }
       }
     },
+    "Changing any of these sets Backlight Brightness to Custom, as it does on the watch itself." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "いずれかを変更すると、ウォッチ本体と同じように“バックライトの明るさ”が“カスタム”に切り替わります。"
+          }
+        }
+      }
+    },
     "Check for Updates" : {
       "localizations" : {
         "ja" : {
