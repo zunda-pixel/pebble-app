@@ -24,6 +24,13 @@ extension Defaults.Keys {
     /// changing it in place would have reset every watch setting the reader had
     /// chosen. `loadWatchSettings` reads the old key once and folds it in.
     static let watchSettingValues = Key<[String: Int]>("watchSettingValues", default: [:])
+    /// Quick-launch assignments, keyed by the firmware's own `ql…` names.
+    /// Only the buttons the reader has actually set are here; an absent button
+    /// keeps the firmware's default rather than being overwritten with it.
+    static let quickLaunchAssignments = Key<[String: QuickLaunchAssignment]>(
+        "quickLaunchAssignments",
+        default: [:]
+    )
     static let watchSettings = Key<[String: Bool]>("watchSettings", default: [:])
     static let activitySettings = Key<ActivitySettings>(
         "activitySettings",
@@ -53,4 +60,5 @@ extension Defaults.Keys {
 extension DownloadedFirmware: Defaults.Serializable {}
 extension WeatherPlace: Defaults.Serializable {}
 extension ActivitySettings: Defaults.Serializable {}
+extension QuickLaunchAssignment: Defaults.Serializable {}
 extension HeartRateSettings: Defaults.Serializable {}

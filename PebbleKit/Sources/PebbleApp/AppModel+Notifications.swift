@@ -262,6 +262,13 @@ extension AppModel {
                     value: write.value
                 ) {
                     succeeded = await applyWatchSetting(setting, rawValue: rawValue, from: connection)
+                } else if let (button, assignment) = WatchSettingsCodec.decodeQuickLaunch(
+                    key: write.key,
+                    value: write.value
+                ) {
+                    // A button held down on the wrist to assign whatever was
+                    // running.
+                    succeeded = await applyQuickLaunch(button, assignment: assignment, from: connection)
                 } else {
                     // A key this app has no switch for, which is most of the
                     // firmware's seventy-odd syncable settings. Taken rather

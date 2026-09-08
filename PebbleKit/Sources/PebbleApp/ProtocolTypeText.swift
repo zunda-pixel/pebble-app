@@ -124,6 +124,12 @@ public extension WatchSetting {
         case .backlightTouchWake: "Backlight on Touch"
         case .backlightDynamicMode: "Dynamic Backlight"
         case .backlightColor: "Backlight Color"
+        // "Manual" is the firmware's own word for the hand-operated switch,
+        // as against the calendar and the schedules.
+        case .quietTimeManual: "Manual"
+        case .quietTimeSmart: "During Calendar Events"
+        case .quietTimeWeekdayScheduleEnabled, .quietTimeWeekendScheduleEnabled: "Scheduled"
+        case .quietTimeWeekdaySchedule, .quietTimeWeekendSchedule: "Schedule"
         }
     }
 

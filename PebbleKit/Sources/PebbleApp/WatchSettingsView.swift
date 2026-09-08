@@ -36,6 +36,8 @@ struct WatchSettingsView: View {
                 }
             ),
             board: board,
+            quickLaunchAssignments: { model.quickLaunchAssignment(for: $0) },
+            applications: model.applications.apps + model.applications.watchfaces,
             activitySettings: model.watchSettings.activity,
             heartRateSettings: model.watchSettings.heartRate,
             isReminderAppEnabled: model.timeline.isReminderAppEnabled,
@@ -43,6 +45,9 @@ struct WatchSettingsView: View {
             feedback: model.watchSettings.feedback,
             setWatchSetting: { setting, rawValue in
                 Task { await model.setWatchSetting(setting, rawValue: rawValue) }
+            },
+            setQuickLaunch: { button, assignment in
+                Task { await model.setQuickLaunch(button, to: assignment) }
             },
             setActivitySettings: { settings in
                 Task { await model.setActivitySettings(settings) }
@@ -84,6 +89,29 @@ struct WatchSettingRow: View {
         guard let draft else { return }
         setRawValue(draft)
         self.draft = nil
+    }
+
+    /// One end of a schedule as a `Date` today, for a `DatePicker` that only
+    /// shows the clock. Only the hour and minute survive the trip back.
+    private func scheduleTimeBinding(
+        _ schedule: QuietTimeSchedule,
+        get: @escaping (QuietTimeSchedule) -> (Int, Int),
+        set: @escaping (inout QuietTimeSchedule, Int, Int) -> Void
+    ) -> Binding<Date> {
+        Binding(
+            get: {
+                let (hour, minute) = get(schedule)
+                return Calendar.current.date(
+                    bySettingHour: hour, minute: minute, second: 0, of: Date()
+                ) ?? Date()
+            },
+            set: { date in
+                let components = Calendar.current.dateComponents([.hour, .minute], from: date)
+                var changed = schedule
+                set(&changed, components.hour ?? 0, components.minute ?? 0)
+                setRawValue(changed.rawValue)
+            }
+        )
     }
 
     var body: some View {
@@ -132,6 +160,28 @@ struct WatchSettingRow: View {
                 // written when the screen goes rather than never.
                 .onDisappear(perform: commitDraft)
             }
+        case .schedule:
+            // Two clock rows rather than one row of four numbers: the value is
+            // a daily time range, and a reader thinks in clock times.
+            let schedule = QuietTimeSchedule(rawValue: rawValue)
+            DatePicker(
+                "Start",
+                selection: scheduleTimeBinding(
+                    schedule,
+                    get: { ($0.fromHour, $0.fromMinute) },
+                    set: { $0.fromHour = $1; $0.fromMinute = $2 }
+                ),
+                displayedComponents: .hourAndMinute
+            )
+            DatePicker(
+                "End",
+                selection: scheduleTimeBinding(
+                    schedule,
+                    get: { ($0.toHour, $0.toMinute) },
+                    set: { $0.toHour = $1; $0.toMinute = $2 }
+                ),
+                displayedComponents: .hourAndMinute
+            )
         case .color:
             ColorPicker(
                 setting.title,
@@ -190,6 +240,142 @@ extension WatchSetting {
         default:
             false
         }
+    }
+
+    /// The rows that belong on the Quiet Time screen.
+    var isQuietTime: Bool {
+        switch self {
+        case .quietTimeManual, .quietTimeSmart,
+             .quietTimeWeekdayScheduleEnabled, .quietTimeWeekendScheduleEnabled,
+             .quietTimeWeekdaySchedule, .quietTimeWeekendSchedule:
+            true
+        default:
+            false
+        }
+    }
+}
+
+/// The watch's own Quiet Time, which is not this app's Quiet Hours: this
+/// silences the watch, while Quiet Hours on the Notifications screen decides
+/// what the phone forwards at all. Kept apart so the two are never mistaken
+/// for one setting (#93).
+struct QuietTimeSettingsContent: View {
+    var watchSettings: [WatchSetting: Int]
+    var feedback: FeatureFeedback?
+    var setWatchSetting: (WatchSetting, Int) -> Void
+
+    private func row(_ setting: WatchSetting) -> WatchSettingRow {
+        WatchSettingRow(
+            setting: setting,
+            rawValue: watchSettings[setting] ?? setting.defaultRawValue,
+            setRawValue: { setWatchSetting(setting, $0) }
+        )
+    }
+
+    private func isOn(_ setting: WatchSetting) -> Bool {
+        (watchSettings[setting] ?? setting.defaultRawValue) != 0
+    }
+
+    var body: some View {
+        Form {
+            if feedback != nil {
+                Section { FeedbackBanner(feedback: feedback) }
+            }
+            Section {
+                row(.quietTimeManual)
+                row(.quietTimeSmart)
+            } footer: {
+                Text("Quiet Time silences the watch. What the phone forwards is decided by Quiet Hours on the Notifications screen.")
+            }
+            Section("Weekdays") {
+                row(.quietTimeWeekdayScheduleEnabled)
+                if isOn(.quietTimeWeekdayScheduleEnabled) {
+                    row(.quietTimeWeekdaySchedule)
+                }
+            }
+            Section("Weekends") {
+                row(.quietTimeWeekendScheduleEnabled)
+                if isOn(.quietTimeWeekendScheduleEnabled) {
+                    row(.quietTimeWeekendSchedule)
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle(Text("Quiet Time"))
+    }
+}
+
+/// What a long press of each button launches.
+///
+/// The candidates are the watch's installed applications and watchfaces, plus
+/// the one system app worth naming: the Quiet Time toggle, which is what the
+/// firmware itself puts on Back.
+struct QuickLaunchSettingsContent: View {
+    var assignments: (QuickLaunchButton) -> QuickLaunchAssignment
+    var applications: [WatchApplication]
+    var feedback: FeatureFeedback?
+    var setAssignment: (QuickLaunchButton, QuickLaunchAssignment) -> Void
+
+    private func title(for button: QuickLaunchButton) -> LocalizedStringKey {
+        switch button {
+        case .up: "Hold Up"
+        case .down: "Hold Down"
+        case .select: "Hold Select"
+        case .back: "Hold Back"
+        }
+    }
+
+    private func isUnnamed(_ id: UUID) -> Bool {
+        id != QuickLaunchAssignment.invalidID
+            && id != QuickLaunchAssignment.quietTimeToggleID
+            && !applications.contains { $0.id == id }
+    }
+
+    private func binding(for button: QuickLaunchButton) -> Binding<UUID> {
+        Binding(
+            get: {
+                let assignment = assignments(button)
+                return assignment.isEnabled ? assignment.applicationID : QuickLaunchAssignment.invalidID
+            },
+            set: { id in
+                setAssignment(
+                    button,
+                    id == QuickLaunchAssignment.invalidID
+                        ? .off
+                        : QuickLaunchAssignment(isEnabled: true, applicationID: id)
+                )
+            }
+        )
+    }
+
+    var body: some View {
+        Form {
+            if feedback != nil {
+                Section { FeedbackBanner(feedback: feedback) }
+            }
+            Section {
+                ForEach(QuickLaunchButton.allCases, id: \.self) { button in
+                    Picker(title(for: button), selection: binding(for: button)) {
+                        Text("Off").tag(QuickLaunchAssignment.invalidID)
+                        Text("Quiet Time").tag(QuickLaunchAssignment.quietTimeToggleID)
+                        ForEach(applications) { application in
+                            Text(application.displayName).tag(application.id)
+                        }
+                        // An app assigned on the wrist that this phone cannot
+                        // name — a system app, or something since uninstalled.
+                        // Without its own row the picker would show nothing
+                        // selected, and choosing anything else would lose it.
+                        if isUnnamed(binding(for: button).wrappedValue) {
+                            Text("Unnamed App").tag(binding(for: button).wrappedValue)
+                        }
+                    }
+                }
+            } footer: {
+                Text("Holding a button on the watchface opens the app assigned to it.")
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle(Text("Quick Launch"))
     }
 }
 
@@ -257,12 +443,15 @@ struct BacklightSettingsContent: View {
 struct WatchSettingsContent: View {
     var watchSettings: [WatchSetting: Int]
     var board: WatchBoard?
+    var quickLaunchAssignments: (QuickLaunchButton) -> QuickLaunchAssignment = { .firmwareDefault(for: $0) }
+    var applications: [WatchApplication] = []
     var activitySettings: ActivitySettings
     var heartRateSettings: HeartRateSettings
     var isReminderAppEnabled: Bool
     var isConnected: Bool
     var feedback: FeatureFeedback?
     var setWatchSetting: (WatchSetting, Int) -> Void
+    var setQuickLaunch: (QuickLaunchButton, QuickLaunchAssignment) -> Void = { _, _ in }
     var setActivitySettings: (ActivitySettings) -> Void
     var setHeartRateSettings: (HeartRateSettings) -> Void
     var setReminderAppEnabled: (Bool) -> Void
@@ -276,7 +465,7 @@ struct WatchSettingsContent: View {
     static let unitSettings: [WatchSetting] = [.unitsDistance, .unitsWind]
     static let musicSettings: [WatchSetting] = [.musicShowVolumeControls, .musicShowProgressBar]
     /// The ones that are about nothing in particular, in the untitled section
-    /// with the Backlight link.
+    /// with the Backlight, Quiet Time and Quick Launch links.
     static let generalSettings: [WatchSetting] = [.standbyMode, .menuScrollWrapAround]
 
     private func rows(_ settings: [WatchSetting]) -> some View {
@@ -301,6 +490,20 @@ struct WatchSettingsContent: View {
         return WatchSetting.backlightPreset.optionTitles.indices.contains(preset)
             ? WatchSetting.backlightPreset.optionTitles[preset]
             : "Custom"
+    }
+
+    /// "On" while switched on by hand, "Scheduled" while only a schedule or
+    /// the calendar could turn it on, "Off" otherwise.
+    private var quietTimeSummary: LocalizedStringKey {
+        func isOn(_ setting: WatchSetting) -> Bool {
+            (watchSettings[setting] ?? setting.defaultRawValue) != 0
+        }
+        if isOn(.quietTimeManual) { return "On" }
+        if isOn(.quietTimeSmart) || isOn(.quietTimeWeekdayScheduleEnabled)
+            || isOn(.quietTimeWeekendScheduleEnabled) {
+            return "Scheduled"
+        }
+        return "Off"
     }
 
     var body: some View {
@@ -330,6 +533,25 @@ struct WatchSettingsContent: View {
                     )
                 } label: {
                     LabeledContent("Backlight") { Text(backlightSummary) }
+                }
+                NavigationLink {
+                    QuietTimeSettingsContent(
+                        watchSettings: watchSettings,
+                        feedback: feedback,
+                        setWatchSetting: setWatchSetting
+                    )
+                } label: {
+                    LabeledContent("Quiet Time") { Text(quietTimeSummary) }
+                }
+                NavigationLink {
+                    QuickLaunchSettingsContent(
+                        assignments: quickLaunchAssignments,
+                        applications: applications,
+                        feedback: feedback,
+                        setAssignment: setQuickLaunch
+                    )
+                } label: {
+                    Text("Quick Launch")
                 }
             } footer: {
                 // On the last of the four, but it speaks for all of them.
@@ -525,6 +747,32 @@ struct WatchSettingsContent: View {
             board: .obelixPVT,
             feedback: nil,
             setWatchSetting: { _, _ in }
+        )
+    }
+}
+
+#Preview("Quiet Time") {
+    NavigationStack {
+        QuietTimeSettingsContent(
+            watchSettings: [
+                .quietTimeWeekdayScheduleEnabled: 1,
+                .quietTimeWeekdaySchedule: QuietTimeSchedule(
+                    fromHour: 22, fromMinute: 30, toHour: 7, toMinute: 0
+                ).rawValue,
+            ],
+            feedback: nil,
+            setWatchSetting: { _, _ in }
+        )
+    }
+}
+
+#Preview("Quick Launch") {
+    NavigationStack {
+        QuickLaunchSettingsContent(
+            assignments: { .firmwareDefault(for: $0) },
+            applications: PreviewSamples.watchApplications,
+            feedback: nil,
+            setAssignment: { _, _ in }
         )
     }
 }

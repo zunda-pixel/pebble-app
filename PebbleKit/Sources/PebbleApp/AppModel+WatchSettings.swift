@@ -12,6 +12,7 @@ extension AppModel {
         var values = Defaults[.watchSettings].mapValues { $0 ? 1 : 0 }
         values.merge(Defaults[.watchSettingValues]) { _, stored in stored }
         watchSettings.values = values
+        watchSettings.quickLaunch = Defaults[.quickLaunchAssignments]
         watchSettings.activity = Defaults[.activitySettings]
         watchSettings.heartRate = Defaults[.heartRateSettings]
         timeline.isReminderAppEnabled = Defaults[.reminderAppEnabled]
@@ -96,6 +97,39 @@ extension AppModel {
         return true
     }
 
+    public func quickLaunchAssignment(for button: QuickLaunchButton) -> QuickLaunchAssignment {
+        watchSettings.quickLaunch[button.rawValue] ?? .firmwareDefault(for: button)
+    }
+
+    public func setQuickLaunch(_ button: QuickLaunchButton, to assignment: QuickLaunchAssignment) async {
+        watchSettings.quickLaunch[button.rawValue] = assignment
+        Defaults[.quickLaunchAssignments] = watchSettings.quickLaunch
+        for connection in activeConnections {
+            do {
+                try await connection.client.write(.quickLaunch(button, assignment))
+            } catch {
+                watchSettings.feedback = .failure(settingsFailureMessage(connection, error))
+            }
+        }
+    }
+
+    /// A button held down on the wrist to assign whatever was running, pushed
+    /// back the way a flicked switch is — see `applyWatchSetting`.
+    @discardableResult
+    func applyQuickLaunch(
+        _ button: QuickLaunchButton,
+        assignment: QuickLaunchAssignment,
+        from connection: WatchConnection
+    ) async -> Bool {
+        guard watchSettings.quickLaunch[button.rawValue] != assignment else { return true }
+        watchSettings.quickLaunch[button.rawValue] = assignment
+        Defaults[.quickLaunchAssignments] = watchSettings.quickLaunch
+        for other in activeConnections where other !== connection {
+            try? await other.client.write(.quickLaunch(button, assignment))
+        }
+        return true
+    }
+
     public func setActivitySettings(_ settings: ActivitySettings) async {
         watchSettings.activity = settings
         Defaults[.activitySettings] = settings
@@ -143,6 +177,13 @@ extension AppModel {
             try? await connection.client.write(
                 .watchSetting(setting, rawValue: watchSettingValue(setting))
             )
+        }
+        // Only the buttons the reader has set. Writing the firmware default to
+        // the rest would be harmless today, but a default written is a default
+        // this app now owns, and it has no reason to own what nobody touched.
+        for (key, assignment) in watchSettings.quickLaunch {
+            guard let button = QuickLaunchButton(rawValue: key) else { continue }
+            try? await connection.client.write(.quickLaunch(button, assignment))
         }
         try? await connection.client.write(.activitySettings(watchSettings.activity))
         try? await connection.client.write(.heartRateSettings(watchSettings.heartRate))

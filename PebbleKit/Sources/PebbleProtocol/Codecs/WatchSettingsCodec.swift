@@ -39,13 +39,49 @@ public enum WatchSettingKind: Equatable, Sendable {
     /// byte off and validates nothing, so unlike the intensity there is no
     /// value the watch would correct behind this app's back.
     case color
+    /// A daily time range: `DoNotDisturbSchedule` in PebbleOS's
+    /// `do_not_disturb.h`, packed `{from_hour, from_minute, to_hour,
+    /// to_minute}` — one byte each, in that order on the wire. See
+    /// `QuietTimeSchedule` for reading and writing one.
+    case schedule
 
     /// How many bytes the value takes, which is what the firmware stores it as.
     public var width: Int {
         switch self {
         case .boolean, .choice, .number: 1
-        case .duration, .color: 4
+        case .duration, .color, .schedule: 4
         }
+    }
+}
+
+/// One of the watch's Quiet Time schedules, read out of and packed back into
+/// the number a `.schedule` setting carries.
+///
+/// The packing puts `fromHour` in the low byte so that the little-endian
+/// encoder writes it first, which is where `DoNotDisturbSchedule` keeps it.
+@MemberwiseInit(.public)
+public struct QuietTimeSchedule: Equatable, Sendable {
+    public var fromHour: Int = 0
+    public var fromMinute: Int = 0
+    /// The firmware's own default schedule runs midnight to six — the legacy
+    /// `dndSchedule` it migrates from is `{.from_hour = 0, .to_hour = 6}`.
+    public var toHour: Int = 6
+    public var toMinute: Int = 0
+
+    public init(rawValue: Int) {
+        fromHour = rawValue & 0xFF
+        fromMinute = (rawValue >> 8) & 0xFF
+        toHour = (rawValue >> 16) & 0xFF
+        toMinute = (rawValue >> 24) & 0xFF
+    }
+
+    public var rawValue: Int {
+        fromHour | fromMinute << 8 | toHour << 16 | toMinute << 24
+    }
+
+    public var isValid: Bool {
+        (0..<24).contains(fromHour) && (0..<24).contains(toHour)
+            && (0..<60).contains(fromMinute) && (0..<60).contains(toMinute)
     }
 }
 
@@ -91,6 +127,22 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
     /// the only way a wearer can change it.
     case backlightColor = "lightColor"
 
+    // The watch's own Quiet Time, which is not this app's Quiet Hours: these
+    // silence the *watch*, while the app's own setting decides what the phone
+    // forwards at all. They live in the firmware's notification-preferences
+    // file rather than the shell one, but arrive over the same settings
+    // database — `settings_blob_db_insert` sorts them by whitelist
+    // (`s_syncable_notif_prefs`).
+
+    /// Quiet Time switched on by hand, until it is switched off.
+    case quietTimeManual = "dndManuallyEnabled"
+    /// Quiet Time during calendar events, which the firmware calls smart DND.
+    case quietTimeSmart = "dndSmartEnabled"
+    case quietTimeWeekdayScheduleEnabled = "dndWeekdayScheduleEnabled"
+    case quietTimeWeekendScheduleEnabled = "dndWeekendScheduleEnabled"
+    case quietTimeWeekdaySchedule = "dndWeekdaySchedule"
+    case quietTimeWeekendSchedule = "dndWeekendSchedule"
+
     public var kind: WatchSettingKind {
         switch self {
         case .unitsDistance: .choice(count: 2)
@@ -106,6 +158,7 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
         // `lightEnabled` and not by winding this down.
         case .backlightIntensity: .number(range: 1...100)
         case .backlightColor: .color
+        case .quietTimeWeekdaySchedule, .quietTimeWeekendSchedule: .schedule
         default: .boolean
         }
     }
@@ -175,6 +228,12 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
         // white; it is a development tool, and warm white sent to it once is
         // no loss.
         case .backlightColor: 0xFFBFA2
+        // Off across the board, as `alerts_preferences.c` initialises them.
+        case .quietTimeManual, .quietTimeSmart,
+             .quietTimeWeekdayScheduleEnabled, .quietTimeWeekendScheduleEnabled: 0
+        // Midnight to six, the legacy schedule both new ones migrate from.
+        case .quietTimeWeekdaySchedule, .quietTimeWeekendSchedule:
+            QuietTimeSchedule().rawValue
         }
     }
 
@@ -192,8 +251,8 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
         case .duration(let milliseconds): milliseconds
         case .number(let range): Array(range)
         // Sixteen million rows is not a list of options; a colour is picked,
-        // not chosen from.
-        case .color: []
+        // not chosen from. A schedule likewise.
+        case .color, .schedule: []
         }
     }
 
@@ -208,6 +267,7 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
         // The top byte must be clear: the handler would mask it off anyway,
         // but then the watch would hold a different number than this app.
         case .color: (0...0xFFFFFF).contains(rawValue)
+        case .schedule: QuietTimeSchedule(rawValue: rawValue).isValid
         }
     }
 }
@@ -289,6 +349,78 @@ public enum BacklightPreset {
     }
 }
 
+/// One of the button gestures a watch can launch an app from, under the key
+/// the firmware keeps it as.
+///
+/// The four long presses only. `qlSingleClickUp`, `qlSingleClickDown` and the
+/// two combos exist in the whitelist too, but their firmware defaults carry
+/// system apps (health, the timeline) and which watch does anything with a
+/// single click or a combo is not yet established — an assignment that does
+/// nothing on the watch in front of the reader is worse than none.
+public enum QuickLaunchButton: String, CaseIterable, Codable, Sendable {
+    case up = "qlUp"
+    case down = "qlDown"
+    case select = "qlSelect"
+    case back = "qlBack"
+}
+
+/// What one button launches: `QuickLaunchPreference` in PebbleOS's `prefs.c`,
+/// a `bool` and a `Uuid` — seventeen bytes, no padding, the UUID in its
+/// textual byte order.
+@MemberwiseInit(.public)
+public struct QuickLaunchAssignment: Codable, Equatable, Sendable {
+    public var isEnabled: Bool = false
+    public var applicationID: UUID = QuickLaunchAssignment.invalidID
+
+    /// `UUID_INVALID`, sixteen bytes of 0xFF. The handler
+    /// (`prv_normalize_quick_launch_pref`) forces `enabled` off whenever the
+    /// UUID is this, so "off" is spelled the same on both sides.
+    public static let invalidID = UUID(uuid: (
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
+    ))
+
+    /// `QUIET_TIME_TOGGLE_UUID`: the system toggle the firmware itself puts on
+    /// a long press of Back, and the one system app worth offering by name.
+    public static let quietTimeToggleID = UUID(uuid: (
+        0x22, 0x20, 0xD8, 0x05, 0xCF, 0x9A, 0x4E, 0x12,
+        0x92, 0xB9, 0x5C, 0xA7, 0x78, 0xAF, 0xF6, 0xBB
+    ))
+
+    /// Nothing assigned. The same shape the firmware initialises three of the
+    /// four buttons with.
+    public static let off = QuickLaunchAssignment()
+
+    /// What the watch has before anybody changes it: Back toggles Quiet Time,
+    /// the rest are off (`s_quick_launch_up` and friends in `prefs.c`).
+    public static func firmwareDefault(for button: QuickLaunchButton) -> QuickLaunchAssignment {
+        switch button {
+        case .back: QuickLaunchAssignment(isEnabled: true, applicationID: quietTimeToggleID)
+        default: .off
+        }
+    }
+
+    public func encoded() -> [UInt8] {
+        let bytes = applicationID.uuid
+        return [isEnabled ? 1 : 0] + [
+            bytes.0, bytes.1, bytes.2, bytes.3, bytes.4, bytes.5, bytes.6, bytes.7,
+            bytes.8, bytes.9, bytes.10, bytes.11, bytes.12, bytes.13, bytes.14, bytes.15,
+        ]
+    }
+
+    /// Nil for anything that is not exactly seventeen bytes: the firmware
+    /// reads the record back into a struct of that size, and a record of any
+    /// other length never reaches its handler.
+    public init?(decoding value: [UInt8]) {
+        guard value.count == 17 else { return nil }
+        isEnabled = value[0] != 0
+        applicationID = UUID(uuid: (
+            value[1], value[2], value[3], value[4], value[5], value[6], value[7], value[8],
+            value[9], value[10], value[11], value[12], value[13], value[14], value[15], value[16]
+        ))
+    }
+}
+
 public enum WatchSettingsCodec {
     /// The settings database. Every watch this app can drive has one, and takes
     /// these writes.
@@ -334,6 +466,31 @@ public enum WatchSettingsCodec {
         )
     }
 
+    public static func insertFrame(
+        _ button: QuickLaunchButton,
+        assignment: QuickLaunchAssignment,
+        token: UInt16
+    ) -> PebbleProtocolFrame {
+        BlobDBCodec.insertFrame(
+            databaseID: databaseID,
+            key: Array(button.rawValue.utf8) + [0],
+            value: assignment.encoded(),
+            token: token
+        )
+    }
+
+    /// A quick-launch record the watch pushed back — a button held down on the
+    /// wrist to assign whatever was running.
+    public static func decodeQuickLaunch(
+        key: [UInt8],
+        value: [UInt8]
+    ) -> (QuickLaunchButton, QuickLaunchAssignment)? {
+        let name = String(decoding: key.prefix { $0 != 0 }, as: UTF8.self)
+        guard let button = QuickLaunchButton(rawValue: name),
+              let assignment = QuickLaunchAssignment(decoding: value) else { return nil }
+        return (button, assignment)
+    }
+
     /// One record the watch pushed back, where this app has a switch for it.
     ///
     /// Nil for a key this app does not model, which is most of them: the
@@ -359,7 +516,7 @@ public enum WatchSettingsCodec {
         let rawValue = switch setting.kind {
         case .boolean: value[0] == 0 ? 0 : 1
         case .choice, .number: Int(value[0])
-        case .duration, .color: value.reversed().reduce(0) { $0 << 8 | Int($1) }
+        case .duration, .color, .schedule: value.reversed().reduce(0) { $0 << 8 | Int($1) }
         }
         guard setting.accepts(rawValue: rawValue) else { return nil }
         return (setting, rawValue)

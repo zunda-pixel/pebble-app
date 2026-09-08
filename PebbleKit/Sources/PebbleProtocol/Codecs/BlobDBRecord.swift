@@ -37,6 +37,7 @@ public enum BlobDBRecord: Equatable, Sendable {
     case weatherOrder([UUID])
     /// Only the settings the firmware lists as syncable are accepted.
     case watchSetting(WatchSetting, rawValue: Int)
+    case quickLaunch(QuickLaunchButton, QuickLaunchAssignment)
     case activitySettings(ActivitySettings)
     case heartRateSettings(HeartRateSettings)
     case healthDay(WatchHealthDay)
@@ -77,6 +78,9 @@ public enum BlobDBRecord: Equatable, Sendable {
 
         case .watchSetting(let setting, let rawValue):
             [Self.owned { WatchSettingsCodec.insertFrame(setting, rawValue: rawValue, token: $0) }]
+
+        case .quickLaunch(let button, let assignment):
+            [Self.owned { WatchSettingsCodec.insertFrame(button, assignment: assignment, token: $0) }]
 
         case .activitySettings(let settings):
             [Self.owned { HealthSettingsCodec.insertFrame(settings, token: $0) }]

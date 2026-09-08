@@ -25,6 +25,7 @@ public final class MockWatchClient: WatchClient {
     public private(set) var timelineReminders: [TimelinePin] = []
     public private(set) var writtenWeatherLocationOrder: [UUID] = []
     public private(set) var writtenWatchSettings: [WatchSetting: Int] = [:]
+    public private(set) var writtenQuickLaunch: [QuickLaunchButton: QuickLaunchAssignment] = [:]
     public private(set) var writtenActivitySettings: ActivitySettings?
     public private(set) var writtenHeartRateSettings: HeartRateSettings?
     public private(set) var writtenHealthDays: [WatchHealthDay] = []
@@ -216,6 +217,8 @@ public final class MockWatchClient: WatchClient {
             writtenWeatherLocationOrder = orderedIDs
         case .watchSetting(let setting, let rawValue):
             writtenWatchSettings[setting] = rawValue
+        case .quickLaunch(let button, let assignment):
+            writtenQuickLaunch[button] = assignment
         case .activitySettings(let settings):
             writtenActivitySettings = settings
         case .heartRateSettings(let settings):

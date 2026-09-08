@@ -467,7 +467,7 @@ struct WatchBoardSettingsTests {
 
 /// The main list is grouped by hand, and a hand-kept list can silently drop
 /// whatever is added after it was written. Every setting has to be somewhere:
-/// in one of the four groups, or on the Backlight screen.
+/// in one of the four groups, or on the Backlight or Quiet Time screen.
 @Suite
 struct WatchSettingGroupingTests {
     @Test func everySettingHasARowSomewhere() {
@@ -478,7 +478,7 @@ struct WatchSettingGroupingTests {
 
         for setting in WatchSetting.allCases {
             #expect(
-                grouped.contains(setting) != setting.isBacklight,
+                grouped.contains(setting) != (setting.isBacklight || setting.isQuietTime),
                 "\(setting) needs a row in exactly one place"
             )
         }
@@ -550,5 +550,145 @@ struct BacklightColorTests {
             let colour = Color(packedRGB: packed)
             #expect(colour.packedRGB(in: EnvironmentValues()) == packed)
         }
+    }
+}
+
+/// The watch's own Quiet Time, which is not this app's Quiet Hours.
+///
+/// These keys live in the firmware's notification-preferences whitelist
+/// (`s_syncable_notif_prefs`) rather than the shell one, but arrive over the
+/// same settings database. A schedule is `DoNotDisturbSchedule`: packed
+/// `{from_hour, from_minute, to_hour, to_minute}`, one byte each.
+@Suite
+struct QuietTimeSettingTests {
+    @Test func aScheduleIsPackedTheWayTheFirmwareReadsIt() {
+        let schedule = QuietTimeSchedule(fromHour: 22, fromMinute: 30, toHour: 7, toMinute: 15)
+        let frame = WatchSettingsCodec.insertFrame(
+            .quietTimeWeekdaySchedule,
+            rawValue: schedule.rawValue,
+            token: 1
+        )
+
+        // from_hour first on the wire, as the struct is laid out.
+        #expect(Array(frame.payload.suffix(4)) == [22, 30, 7, 15])
+    }
+
+    @Test func aScheduleComingBackIsReadWholeAndNonsenseIsRefused() {
+        let key = WatchSettingsCodec.key(for: .quietTimeWeekendSchedule)
+
+        let read = WatchSettingsCodec.decodeRecord(key: key, value: [22, 30, 7, 15])
+        #expect(read.map { QuietTimeSchedule(rawValue: $0.1) }
+            == QuietTimeSchedule(fromHour: 22, fromMinute: 30, toHour: 7, toMinute: 15))
+        // Hour 25 is not a time of day.
+        #expect(WatchSettingsCodec.decodeRecord(key: key, value: [25, 0, 6, 0]) == nil)
+        #expect(!WatchSetting.quietTimeWeekdaySchedule.accepts(
+            rawValue: QuietTimeSchedule(fromHour: 0, fromMinute: 60, toHour: 6, toMinute: 0).rawValue
+        ))
+    }
+
+    /// Midnight to six, the legacy schedule both new ones migrate from.
+    @Test func theDefaultScheduleIsTheFirmwares() {
+        let schedule = QuietTimeSchedule(
+            rawValue: WatchSetting.quietTimeWeekdaySchedule.defaultRawValue
+        )
+
+        #expect(schedule == QuietTimeSchedule(fromHour: 0, fromMinute: 0, toHour: 6, toMinute: 0))
+        #expect(WatchSetting.quietTimeManual.defaultRawValue == 0)
+    }
+
+    /// On every board: the notification preferences are not compile-gated.
+    @Test func quietTimeIsOfferedEverywhere() {
+        for setting in WatchSetting.allCases where setting.isQuietTime {
+            #expect(setting.isOffered(on: nil))
+            #expect(!setting.mayBeAbsent)
+        }
+    }
+}
+
+/// What a long press launches: `QuickLaunchPreference`, a bool and a UUID,
+/// seventeen bytes with no padding.
+@Suite
+@MainActor
+struct QuickLaunchTests {
+    private func makeModel(directory: URL, client: MockWatchClient) -> AppModel {
+        AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        )
+    }
+
+    @Test func anAssignmentIsSeventeenBytesEnabledThenUUID() {
+        let id = UUID(uuidString: "2220D805-CF9A-4E12-92B9-5CA778AFF6BB")!
+        let assignment = QuickLaunchAssignment(isEnabled: true, applicationID: id)
+
+        let encoded = assignment.encoded()
+        #expect(encoded.count == 17)
+        #expect(encoded[0] == 1)
+        // The UUID in its textual byte order, which is how PebbleOS's Uuid
+        // struct lays its bytes out.
+        #expect(Array(encoded[1...4]) == [0x22, 0x20, 0xD8, 0x05])
+        #expect(QuickLaunchAssignment(decoding: encoded) == assignment)
+        // Sixteen bytes is not a QuickLaunchPreference, whatever it says.
+        #expect(QuickLaunchAssignment(decoding: Array(encoded.dropLast())) == nil)
+    }
+
+    /// Back toggles Quiet Time out of the box; the rest do nothing
+    /// (`s_quick_launch_up` and friends in `prefs.c`).
+    @Test func theFirmwareDefaultsAreMirrored() {
+        #expect(QuickLaunchAssignment.firmwareDefault(for: .back)
+            == QuickLaunchAssignment(
+                isEnabled: true,
+                applicationID: QuickLaunchAssignment.quietTimeToggleID
+            ))
+        #expect(QuickLaunchAssignment.firmwareDefault(for: .up) == .off)
+        #expect(QuickLaunchAssignment.off.isEnabled == false)
+        #expect(QuickLaunchAssignment.off.applicationID == QuickLaunchAssignment.invalidID)
+    }
+
+    @Test func anAssignmentIsWrittenAndKeptAndOnlySetButtonsAreSynced() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let client = MockWatchClient()
+        let model = makeModel(directory: directory, client: client)
+        await model.scan()
+        await model.connect(to: try #require(model.discoveredWatches.first))
+
+        let id = UUID()
+        await model.setQuickLaunch(.up, to: QuickLaunchAssignment(isEnabled: true, applicationID: id))
+
+        #expect(client.writtenQuickLaunch[.up]?.applicationID == id)
+        #expect(model.quickLaunchAssignment(for: .up).applicationID == id)
+        // Untouched buttons answer the firmware's default rather than a stored
+        // copy, and the connect-time sync must not have written them: a
+        // default written is a default this app now owns.
+        #expect(model.quickLaunchAssignment(for: .back)
+            == QuickLaunchAssignment.firmwareDefault(for: .back))
+        #expect(client.writtenQuickLaunch[.back] == nil)
+        #expect(client.writtenQuickLaunch[.select] == nil)
+    }
+
+    /// A button held down on the wrist, arriving over the settings database.
+    @Test func anAssignmentPushedByTheWatchIsKept() throws {
+        let id = UUID()
+        let bytes = id.uuid
+        let value: [UInt8] = [
+            1, bytes.0, bytes.1, bytes.2, bytes.3, bytes.4, bytes.5, bytes.6, bytes.7,
+            bytes.8, bytes.9, bytes.10, bytes.11, bytes.12, bytes.13, bytes.14, bytes.15,
+        ]
+
+        let decoded = WatchSettingsCodec.decodeQuickLaunch(
+            key: Array("qlSelect".utf8) + [0],
+            value: value
+        )
+
+        #expect(decoded?.0 == .select)
+        #expect(decoded?.1 == QuickLaunchAssignment(isEnabled: true, applicationID: id))
+        // A shell-pref key is not a quick-launch record.
+        #expect(WatchSettingsCodec.decodeQuickLaunch(
+            key: WatchSettingsCodec.key(for: .clock24Hour),
+            value: value
+        ) == nil)
     }
 }

@@ -1971,12 +1971,32 @@
         }
       }
     },
+    "During Calendar Events" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "カレンダーの予定中"
+          }
+        }
+      }
+    },
     "Dynamic Backlight" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "バックライトの自動調光"
+          }
+        }
+      }
+    },
+    "End" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "終了"
           }
         }
       }
@@ -2551,6 +2571,56 @@
         }
       }
     },
+    "Hold Back" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "戻るボタン長押し"
+          }
+        }
+      }
+    },
+    "Hold Down" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "下ボタン長押し"
+          }
+        }
+      }
+    },
+    "Hold Select" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "選択ボタン長押し"
+          }
+        }
+      }
+    },
+    "Hold Up" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "上ボタン長押し"
+          }
+        }
+      }
+    },
+    "Holding a button on the watchface opens the app assigned to it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチフェイスの表示中にボタンを長押しすると、そのボタンに割り当てたアプリが開きます。"
+          }
+        }
+      }
+    },
     "Icon" : {
       "localizations" : {
         "ja" : {
@@ -3027,6 +3097,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "メール"
+          }
+        }
+      }
+    },
+    "Manual" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "手動"
           }
         }
       }
@@ -3543,6 +3623,16 @@
         }
       }
     },
+    "On" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "オン"
+          }
+        }
+      }
+    },
     "On the Watch" : {
       "localizations" : {
         "ja" : {
@@ -3903,6 +3993,16 @@
         }
       }
     },
+    "Quick Launch" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "クイック起動"
+          }
+        }
+      }
+    },
     "Quiet Hours" : {
       "localizations" : {
         "ja" : {
@@ -3919,6 +4019,26 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "サイレント時間帯を更新しました。"
+          }
+        }
+      }
+    },
+    "Quiet Time" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "クワイエットタイム"
+          }
+        }
+      }
+    },
+    "Quiet Time silences the watch. What the phone forwards is decided by Quiet Hours on the Notifications screen." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "クワイエットタイムはウォッチを消音する機能です。iPhoneが何を転送するかは、“通知”画面のサイレント時間帯で決まります。"
           }
         }
       }
@@ -4273,6 +4393,26 @@
         }
       }
     },
+    "Schedule" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "スケジュール"
+          }
+        }
+      }
+    },
+    "Scheduled" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "スケジュール"
+          }
+        }
+      }
+    },
     "Screen" : {
       "localizations" : {
         "ja" : {
@@ -4519,6 +4659,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "スタンバイモード"
+          }
+        }
+      }
+    },
+    "Start" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "開始"
           }
         }
       }
@@ -6075,6 +6225,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "不明"
+          }
+        }
+      }
+    },
+    "Unnamed App" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "名称不明のアプリ"
           }
         }
       }
