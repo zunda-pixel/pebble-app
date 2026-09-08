@@ -34,6 +34,9 @@ struct SettingsView: View {
             setNotifyWhenFullyCharged: { enabled in
                 Task { await model.setNotifyWhenFullyCharged(enabled) }
             },
+            setNotifyAboutFirmwareUpdates: { enabled in
+                Task { await model.setNotifyAboutFirmwareUpdates(enabled) }
+            },
             setVoiceTranscriptionEnabled: { enabled in
                 Task { await model.setVoiceTranscriptionEnabled(enabled) }
             },
@@ -82,6 +85,7 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
     var voiceTranscription: VoiceTranscriptionReadiness
     var phoneAlertsFeedback: FeatureFeedback?
     var setNotifyWhenFullyCharged: (Bool) -> Void = { _ in }
+    var setNotifyAboutFirmwareUpdates: (Bool) -> Void = { _ in }
     var setVoiceTranscriptionEnabled: (Bool) -> Void
     var setCompanionNotificationsEnabled: (Bool) -> Void
     var setQuietHours: (_ enabled: Bool, _ start: Int?, _ end: Int?) -> Void
@@ -96,6 +100,7 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
     // switch follows the stored value even when the model turns it back off —
     // a refused permission does exactly that.
     @Default(.notifyWhenFullyCharged) private var notifyWhenFullyCharged
+    @Default(.notifyAboutFirmwareUpdates) private var notifyAboutFirmwareUpdates
 
     private var voiceTranscriptionSummary: Text {
         switch voiceTranscription {
@@ -148,11 +153,15 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
                     get: { notifyWhenFullyCharged },
                     set: { setNotifyWhenFullyCharged($0) }
                 ))
+                Toggle("Notify About Firmware Updates", isOn: Binding(
+                    get: { notifyAboutFirmwareUpdates },
+                    set: { setNotifyAboutFirmwareUpdates($0) }
+                ))
                 FeedbackBanner(feedback: phoneAlertsFeedback)
             } header: {
                 Text("Phone Notifications")
             } footer: {
-                Text("Tells this phone when a watch finishes charging. Turning it on asks for notification permission.")
+                Text("Tells this phone when a watch finishes charging or a new PebbleOS is published. Turning these on asks for notification permission.")
             }
             Section {
                 Toggle("Dictation from the Watch", isOn: Binding(

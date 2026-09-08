@@ -206,7 +206,7 @@ extension AppModel {
         let previous = chargeLevels[device.id]
         chargeLevels[device.id] = level
         if level <= 97 { chargeNotified.remove(device.id) }
-        guard Defaults[.notifyWhenFullyCharged],
+        guard notifyWhenFullyChargedEnabled,
               level >= 100,
               let previous, previous < 100,
               !chargeNotified.contains(device.id) else { return }
@@ -223,16 +223,19 @@ extension AppModel {
     /// switch falls back rather than promising what cannot arrive.
     public func setNotifyWhenFullyCharged(_ enabled: Bool) async {
         guard enabled else {
+            notifyWhenFullyChargedEnabled = false
             Defaults[.notifyWhenFullyCharged] = false
             return
         }
         guard await localNotifier.requestAuthorization() else {
+            notifyWhenFullyChargedEnabled = false
             Defaults[.notifyWhenFullyCharged] = false
             phoneAlertsFeedback = .failure(
                 "Notifications are turned off for this app in the system settings."
             )
             return
         }
+        notifyWhenFullyChargedEnabled = true
         Defaults[.notifyWhenFullyCharged] = true
         phoneAlertsFeedback = nil
     }

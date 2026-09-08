@@ -2301,6 +2301,16 @@
         }
       }
     },
+    "Firmware Update" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ファームウェアアップデート"
+          }
+        }
+      }
+    },
     "Firmware update cancelled; recovery data was retained." : {
       "localizations" : {
         "ja" : {
@@ -3623,6 +3633,16 @@
         }
       }
     },
+    "Notify About Firmware Updates" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ファームウェアアップデートを通知"
+          }
+        }
+      }
+    },
     "Notify When Fully Charged" : {
       "localizations" : {
         "ja" : {
@@ -3779,6 +3799,22 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "PebbleOS %@"
+          }
+        }
+      }
+    },
+    "PebbleOS %@ is available for %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PebbleOS %1$@ is available for %2$@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%2$@にPebbleOS %1$@が利用できます。"
           }
         }
       }
@@ -4893,7 +4929,18 @@
         }
       }
     },
+    "Tells this phone when a watch finishes charging or a new PebbleOS is published. Turning these on asks for notification permission." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチの充電が完了したとき、または新しいPebbleOSが公開されたときに、iPhoneに通知します。オンにすると、通知の許可を求められます。"
+          }
+        }
+      }
+    },
     "Tells this phone when a watch finishes charging. Turning it on asks for notification permission." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {

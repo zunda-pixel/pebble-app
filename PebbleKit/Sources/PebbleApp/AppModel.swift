@@ -196,6 +196,15 @@ public final class AppModel {
     let pendingFirmwareUpdateStore: PendingFirmwareUpdateStore
     let localNotifier: any LocalNotifying
 
+    /// The two phone-alert switches, held on the instance rather than read out
+    /// of `Defaults` at the moment of use. `Defaults` is process-global, and in
+    /// the test process one suite flipping a key there marched every other
+    /// suite's model into the real notification centre — which aborts without
+    /// an app bundle — and the real firmware catalogue. The setters keep
+    /// `Defaults` as the stored copy; this is the working one.
+    var notifyWhenFullyChargedEnabled = Defaults[.notifyWhenFullyCharged]
+    var notifyAboutFirmwareUpdatesEnabled = Defaults[.notifyAboutFirmwareUpdates]
+
     /// The last battery level each watch reported this session, for telling a
     /// climb to 100% from a watch that connected already full. Cleared when the
     /// watch goes, so a reconnect starts over rather than notifying off a
@@ -205,7 +214,13 @@ public final class AppModel {
     /// falls to 97% or below, the way the official app does it, so the wobble
     /// around full does not ring twice.
     var chargeNotified: Set<WatchID> = []
-    let firmwareCatalog = PebbleOSFirmwareCatalog()
+    let firmwareCatalog: PebbleOSFirmwareCatalog
+
+    /// When each (watch, running version) pair last got a *successful* answer
+    /// from the firmware catalogue, for the fifteen-minute cache the official
+    /// app keeps. Failures are deliberately absent: a network that refused is
+    /// not a catalogue that answered "up to date".
+    var firmwareCheckedAt: [String: Date] = [:]
     var pendingAppMessages: [StoredAppMessage] = []
     let calendarBridge = CalendarBridge()
     // Held behind its protocol so a test can answer for the Reminders app,
@@ -282,11 +297,13 @@ public final class AppModel {
         reminderStore: TimelinePinStore? = nil,
         appCatalog: AppCatalog? = nil,
         clientFactory: (@MainActor (WatchID) -> any WatchClient)? = nil,
-        localNotifier: (any LocalNotifying)? = nil
+        localNotifier: (any LocalNotifying)? = nil,
+        firmwareCatalog: PebbleOSFirmwareCatalog? = nil
     ) {
         // The real one only touches the system centre inside its methods, so a
         // test that never turns a notifying feature on never reaches it.
         self.localNotifier = localNotifier ?? SystemLocalNotifier()
+        self.firmwareCatalog = firmwareCatalog ?? PebbleOSFirmwareCatalog()
         scannerClient = client
         // Without a factory every connection shares the scanning client, which
         // limits the app to one watch at a time (mock and QEMU transports).
@@ -655,6 +672,9 @@ public final class AppModel {
         // app a glance belongs to.
         await synchronizeAppGlances(on: connection)
         await resumePendingFirmwareUpdate(on: connection)
+        // Last: everything above is for this connection, and a network round
+        // trip to GitHub should not hold any of it up.
+        await checkFirmwareUpdateUnattended(on: connection)
     }
 
 }

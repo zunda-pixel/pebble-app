@@ -163,6 +163,11 @@ extension AppModel {
         _ package: PBZFirmwarePackage,
         on connection: WatchConnection
     ) async throws {
+        // The update this notification announced is now under way; a banner
+        // for it outlived its purpose the moment the transfer started.
+        await localNotifier.remove(
+            identifier: Self.firmwareNotificationIdentifier(for: connection.watch.id)
+        )
         try package.validateIntegrity()
         guard let journal = try await pendingFirmwareUpdateStore.journal(),
               journal.packageSHA256 == package.sha256,
@@ -274,6 +279,99 @@ extension AppModel {
         } catch {
             firmware.feedback = .failure("Firmware update stopped safely: \(error.localizedDescription)")
         }
+    }
+
+    static func firmwareNotificationIdentifier(for watchID: WatchID) -> String {
+        "firmware-update-\(watchID.rawValue)"
+    }
+
+    /// Whether a published tag is ahead of what the watch is running.
+    ///
+    /// Both sides usually carry a `v` — the release tag is `v4.37.0` and the
+    /// version response says the same — but only usually, so it is stripped
+    /// rather than assumed. Numeric compare after that, the same way the app
+    /// versions in the store are judged.
+    static func isFirmwareVersion(_ candidate: String, newerThan running: String) -> Bool {
+        func bare(_ version: String) -> String {
+            version.hasPrefix("v") ? String(version.dropFirst()) : version
+        }
+        return bare(candidate).compare(bare(running), options: .numeric) == .orderedDescending
+    }
+
+    /// The connect-time check, which tells the phone about an update instead
+    /// of waiting for the reader to ask (#102).
+    ///
+    /// The shape follows the official app's `FirmwareUpdateCheck` and
+    /// `FirmwareUpdateUiTracker`: one successful answer per (watch, running
+    /// version) is good for fifteen minutes, a failed fetch is not an answer
+    /// and caches nothing, and the same release is announced to the same watch
+    /// once — across launches, since the announcement is stored. A newer
+    /// release replaces the announcement under the same identifier, which is
+    /// how "the target version changed" cleans up after the old one.
+    func checkFirmwareUpdateUnattended(on connection: WatchConnection) async {
+        guard notifyAboutFirmwareUpdatesEnabled else { return }
+        let device = connection.watch
+        // A watch in recovery firmware is mid-rescue: what it needs is the
+        // resume path with its confirmation, not an advertisement.
+        guard !device.isRunningRecoveryFirmware,
+              let board = device.board,
+              let running = device.firmwareVersion else { return }
+        let cacheKey = "\(device.id.rawValue)|\(running)"
+        if let checked = firmwareCheckedAt[cacheKey],
+           Date().timeIntervalSince(checked) < 15 * 60 {
+            return
+        }
+        let release: PebbleOSFirmwareRelease
+        do {
+            release = try await firmwareCatalog.latestRelease(for: board)
+        } catch {
+            // Not cached: a network that refused is not a catalogue that
+            // answered "up to date". Said in the log, because a check that
+            // fails silently on every connect looks exactly like one that
+            // never ran.
+            await PebbleDiagnostics.shared.record(
+                .error,
+                category: "firmware",
+                message: "The update check could not reach the catalogue: \(String(reflecting: error))"
+            )
+            return
+        }
+        firmwareCheckedAt[cacheKey] = Date()
+        guard Self.isFirmwareVersion(release.versionTag, newerThan: running) else { return }
+        guard Defaults[.notifiedFirmwareVersions][device.id.rawValue] != release.versionTag else {
+            return
+        }
+        Defaults[.notifiedFirmwareVersions][device.id.rawValue] = release.versionTag
+        await localNotifier.post(
+            identifier: Self.firmwareNotificationIdentifier(for: device.id),
+            title: String(localized: "Firmware Update", bundle: .module),
+            body: String(
+                localized: "PebbleOS \(release.versionTag) is available for \(device.name).",
+                bundle: .module
+            )
+        )
+    }
+
+    /// The firmware-update notification switch, with the same permission
+    /// contract as the charge one: asked for only when turned on, and turned
+    /// back off when refused.
+    public func setNotifyAboutFirmwareUpdates(_ enabled: Bool) async {
+        guard enabled else {
+            notifyAboutFirmwareUpdatesEnabled = false
+            Defaults[.notifyAboutFirmwareUpdates] = false
+            return
+        }
+        guard await localNotifier.requestAuthorization() else {
+            notifyAboutFirmwareUpdatesEnabled = false
+            Defaults[.notifyAboutFirmwareUpdates] = false
+            phoneAlertsFeedback = .failure(
+                "Notifications are turned off for this app in the system settings."
+            )
+            return
+        }
+        notifyAboutFirmwareUpdatesEnabled = true
+        Defaults[.notifyAboutFirmwareUpdates] = true
+        phoneAlertsFeedback = nil
     }
 
     public func resumeFirmwareUpdate(watchID: WatchID? = nil) async {

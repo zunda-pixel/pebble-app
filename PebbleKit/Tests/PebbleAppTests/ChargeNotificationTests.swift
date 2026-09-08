@@ -57,7 +57,10 @@ struct ChargeNotificationTests {
         _ model: AppModel,
         enabled: Bool = true
     ) async throws -> ConnectedWatch {
-        Defaults[.notifyWhenFullyCharged] = enabled
+        // Instance state, not `Defaults`: the stored key is process-global, and
+        // flipping it here once marched every concurrently running suite's
+        // model into the real notification centre.
+        model.notifyWhenFullyChargedEnabled = enabled
         await model.scan()
         await model.connect(to: try #require(model.discoveredWatches.first))
         return try #require(model.connectedWatch)
@@ -74,10 +77,7 @@ struct ChargeNotificationTests {
 
     @Test func theClimbToFullIsSaidOnceWithTheWatchsName() async throws {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        defer {
-            try? FileManager.default.removeItem(at: directory)
-            Defaults[.notifyWhenFullyCharged] = false
-        }
+        defer { try? FileManager.default.removeItem(at: directory) }
         let client = MockWatchClient()
         let notifier = SpyNotifier()
         let model = makeModel(directory: directory, client: client, notifier: notifier)
@@ -97,10 +97,7 @@ struct ChargeNotificationTests {
     /// which is not news.
     @Test func aWatchThatArrivesFullSaysNothing() async throws {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        defer {
-            try? FileManager.default.removeItem(at: directory)
-            Defaults[.notifyWhenFullyCharged] = false
-        }
+        defer { try? FileManager.default.removeItem(at: directory) }
         let client = MockWatchClient()
         let notifier = SpyNotifier()
         let model = makeModel(directory: directory, client: client, notifier: notifier)
@@ -115,10 +112,7 @@ struct ChargeNotificationTests {
     /// Down to 97 opens the latch; a new climb is a new charge.
     @Test func aFallToNinetySevenArmsTheNextCharge() async throws {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        defer {
-            try? FileManager.default.removeItem(at: directory)
-            Defaults[.notifyWhenFullyCharged] = false
-        }
+        defer { try? FileManager.default.removeItem(at: directory) }
         let client = MockWatchClient()
         let notifier = SpyNotifier()
         let model = makeModel(directory: directory, client: client, notifier: notifier)
@@ -162,13 +156,14 @@ struct ChargeNotificationTests {
 
         await model.setNotifyWhenFullyCharged(true)
 
+        #expect(model.notifyWhenFullyChargedEnabled == false)
         #expect(Defaults[.notifyWhenFullyCharged] == false)
         #expect(model.phoneAlertsFeedback != nil)
         #expect(notifier.authorizationRequests == 1)
 
         notifier.authorized = true
         await model.setNotifyWhenFullyCharged(true)
-        #expect(Defaults[.notifyWhenFullyCharged] == true)
+        #expect(model.notifyWhenFullyChargedEnabled == true)
         #expect(model.phoneAlertsFeedback == nil)
     }
 }

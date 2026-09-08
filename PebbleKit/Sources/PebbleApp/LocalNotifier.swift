@@ -22,9 +22,20 @@ public protocol LocalNotifying {
 /// The real centre. Touches `UNUserNotificationCenter` only inside its
 /// methods, so merely constructing the model in a test process is safe.
 public struct SystemLocalNotifier: LocalNotifying {
+    /// Whether this process can talk to the notification centre at all.
+    ///
+    /// `UNUserNotificationCenter.current()` does not fail in a process without
+    /// an app bundle — it aborts it. Any test that reaches this by a road
+    /// nobody thought to stub takes the whole test process and every suite
+    /// running beside it, which is precisely what happened the first time
+    /// `performFirmwareUpdate` learned to take a notification down. An app
+    /// bundle ends in `.app`; the xctest runner does not.
+    private static let hasNotificationCenter = Bundle.main.bundleURL.pathExtension == "app"
+
     public init() {}
 
     public func requestAuthorization() async -> Bool {
+        guard Self.hasNotificationCenter else { return false }
         let center = UNUserNotificationCenter.current()
         let settings = await center.notificationSettings()
         switch settings.authorizationStatus {
@@ -38,6 +49,7 @@ public struct SystemLocalNotifier: LocalNotifying {
     }
 
     public func post(identifier: String, title: String, body: String) async {
+        guard Self.hasNotificationCenter else { return }
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
@@ -48,6 +60,7 @@ public struct SystemLocalNotifier: LocalNotifying {
     }
 
     public func remove(identifier: String) async {
+        guard Self.hasNotificationCenter else { return }
         let center = UNUserNotificationCenter.current()
         center.removePendingNotificationRequests(withIdentifiers: [identifier])
         center.removeDeliveredNotifications(withIdentifiers: [identifier])

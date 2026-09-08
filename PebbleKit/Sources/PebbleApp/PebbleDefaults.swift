@@ -27,6 +27,13 @@ extension Defaults.Keys {
     /// Off until asked for: a notification nobody opted into is noise, and the
     /// system permission is only requested when this is first turned on.
     static let notifyWhenFullyCharged = Key<Bool>("notifyWhenFullyCharged", default: false)
+    static let notifyAboutFirmwareUpdates = Key<Bool>("notifyAboutFirmwareUpdates", default: false)
+    /// The firmware version each watch was last told about, so the same update
+    /// is announced once — across launches, not just within one.
+    static let notifiedFirmwareVersions = Key<[String: String]>(
+        "notifiedFirmwareVersions",
+        default: [:]
+    )
     /// Quick-launch assignments, keyed by the firmware's own `ql…` names.
     /// Only the buttons the reader has actually set are here; an absent button
     /// keeps the firmware's default rather than being overwritten with it.
