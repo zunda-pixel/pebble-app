@@ -46,6 +46,7 @@ struct CatalogView: View {
             isImportDisabled: isImportDisabled,
             isUpdating: model.catalog.isUpdating,
             feedback: model.catalog.feedback,
+            importFeedback: model.applications.importFeedback,
             importApplication: importApplication,
             // Awaited rather than launched, so that the pull-to-refresh
             // indicator stays up until the catalogue has actually been fetched.
@@ -72,6 +73,10 @@ struct CatalogContent<Destination: View>: View {
     var isImportDisabled: Bool
     var isUpdating: Bool
     var feedback: FeatureFeedback?
+    /// The answer to the `Import` button in this screen's own toolbar. Separate
+    /// from `feedback`, which is the catalogue's: one is about the store, the
+    /// other about a file from this phone.
+    var importFeedback: FeatureFeedback?
     var importApplication: (() -> Void)?
     var refresh: @MainActor () async -> Void
     @ViewBuilder var destination: (CatalogApplication) -> Destination
@@ -105,6 +110,10 @@ struct CatalogContent<Destination: View>: View {
             // application's detail screen showed — so the refresh said
             // nothing here and then spoke up on the next screen opened.
             FeedbackBanner(feedback: feedback)
+            // The import's own answer, which used to be drawn on the screen
+            // this one is pushed over: the spinner in the toolbar stopped and
+            // a failure was left where the reader was not looking (#110).
+            FeedbackBanner(feedback: importFeedback)
             Section("Browse") {
                 Picker("Type", selection: $kind) {
                     ForEach(CatalogKindFilter.allCases) { Text($0.title).tag($0) }
@@ -321,6 +330,23 @@ struct CatalogStateLabel: View {
         isImportDisabled: true,
         isUpdating: true,
         feedback: .failure("Catalog refresh failed; showing the offline cache."),
+        importApplication: {},
+        refresh: {},
+        destination: { _ in EmptyView() }
+    )
+}
+
+#Preview("A file that could not be imported") {
+    // The two banners together, because they are two different subjects: the
+    // store could not be reached, and the file the reader picked was refused.
+    CatalogContent(
+        applications: [PreviewSamples.catalogApplication],
+        state: { _ in .available },
+        isImportingApplication: false,
+        isImportDisabled: false,
+        isUpdating: false,
+        feedback: .failure("Catalog refresh failed; showing the offline cache."),
+        importFeedback: .failure("The package is not built for any connected watch."),
         importApplication: {},
         refresh: {},
         destination: { _ in EmptyView() }

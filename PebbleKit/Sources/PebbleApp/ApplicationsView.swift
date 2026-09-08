@@ -54,6 +54,7 @@ struct ApplicationsView: View {
             isLoading: model.applications.isLoading,
             libraryFeedback: model.applications.libraryFeedback,
             operationFeedback: model.applications.managementFeedback,
+            importFeedback: model.applications.importFeedback,
             isOperationInProgress: model.isApplicationManagementBusy,
             installingApplicationName: transfer?.name,
             installationProgress: transfer?.progress,
@@ -171,6 +172,7 @@ struct ApplicationsContent<Detail: View>: View {
     var isLoading: Bool
     var libraryFeedback: FeatureFeedback?
     var operationFeedback: FeatureFeedback?
+    var importFeedback: FeatureFeedback?
     var isOperationInProgress: Bool
     var installingApplicationName: String?
     var installationProgress: PutBytesTransferProgress?
@@ -207,7 +209,8 @@ struct ApplicationsContent<Detail: View>: View {
                     operationFeedback: operationFeedback,
                     installingApplicationName: installingApplicationName,
                     installationProgress: installationProgress,
-                    libraryFeedback: libraryFeedback
+                    libraryFeedback: libraryFeedback,
+                    importFeedback: importFeedback
                 )
                 List {
                     // Each section carries the kind it is for as its identity.
@@ -285,9 +288,13 @@ struct ApplicationOperationBanner: View {
     var installingApplicationName: String?
     var installationProgress: PutBytesTransferProgress?
     var libraryFeedback: FeatureFeedback?
+    /// Shown here as well as on the catalogue, because a package dropped on
+    /// this screen is imported by the same call as the one the catalogue's
+    /// button makes.
+    var importFeedback: FeatureFeedback?
 
     private var isEmpty: Bool {
-        operationFeedback == nil && libraryFeedback == nil
+        operationFeedback == nil && libraryFeedback == nil && importFeedback == nil
             && (installingApplicationName == nil || installationProgress == nil)
     }
 
@@ -307,6 +314,7 @@ struct ApplicationOperationBanner: View {
                     )
                 }
                 FeedbackBanner(feedback: libraryFeedback)
+                FeedbackBanner(feedback: importFeedback)
             }
             .font(.callout)
             .frame(maxWidth: .infinity, alignment: .leading)

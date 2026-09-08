@@ -211,14 +211,17 @@ extension AppModel {
                 expirePendingSnapshot(applicationID: application.id)
             }
             hasLoadedApplications = true
-            applications.libraryFeedback = nil
+            // Said rather than left silent, because the screen that asked is
+            // the catalogue and the library it landed in is behind it: the
+            // reader would otherwise watch a spinner stop and learn nothing.
+            applications.importFeedback = .success("\(application.displayName) was added.")
         } catch {
             // The watch refused the registration, not the bytes, so nothing has been
             // transferred and the import stands.
             if let importedApplicationID {
                 expirePendingSnapshot(applicationID: importedApplicationID)
             }
-            applications.libraryFeedback = .failure(applicationErrorMessage(error))
+            applications.importFeedback = .failure(applicationErrorMessage(error))
         }
     }
 

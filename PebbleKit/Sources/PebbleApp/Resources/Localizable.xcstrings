@@ -245,6 +245,16 @@
         }
       }
     },
+    "%@ was added." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“%@”をライブラリに追加しました。"
+          }
+        }
+      }
+    },
     "%lld" : {
       "localizations" : {
         "ja" : {

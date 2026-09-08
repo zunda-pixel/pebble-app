@@ -13,6 +13,14 @@ public final class ApplicationsModel {
     public internal(set) var activeWatchfaceID: UUID?
     public internal(set) var isLoading = false
     public internal(set) var isImporting = false
+    /// The answer to importing a package from a file, which is asked for on the
+    /// catalogue screen and by dropping one on the applications screen.
+    ///
+    /// Apart from `libraryFeedback` because the catalogue is pushed over the
+    /// applications screen: sharing the field would have put the reply to
+    /// removing an app or activating a watchface onto the store's screen. It is
+    /// drawn on both screens because either of them can start an import.
+    public internal(set) var importFeedback: FeatureFeedback?
     public internal(set) var libraryFeedback: FeatureFeedback?
     /// The library operations — importing, removing, reordering, synchronizing —
     /// are phone-side and take turns: each rewrites the one library and then
