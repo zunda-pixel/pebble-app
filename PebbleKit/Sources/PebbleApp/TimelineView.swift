@@ -60,18 +60,24 @@ struct TimelineView: View {
                         Label("Add", systemImage: "plus")
                     }
                 }
-                ToolbarItem(placement: .secondaryAction) {
-                    // Each list is filled from its own app on the phone, and
-                    // asking reads that one rather than both.
-                    switch kind {
-                    case .pins:
+                // Each list is filled from its own app on the phone, and
+                // asking reads that one rather than both. One ToolbarItem per
+                // button: the phone's navigation bar shows an item's first
+                // view and quietly drops the rest.
+                switch kind {
+                case .pins:
+                    ToolbarItem(placement: .secondaryAction) {
                         Button("Sync Calendar", systemImage: "calendar.badge.clock") {
                             Task { await model.synchronizeCalendar() }
                         }
+                    }
+                    ToolbarItem(placement: .secondaryAction) {
                         Button("Calendars", systemImage: "calendar") {
                             showsCalendarSettings = true
                         }
-                    case .reminders:
+                    }
+                case .reminders:
+                    ToolbarItem(placement: .secondaryAction) {
                         Button("Sync Reminders", systemImage: "checklist") {
                             Task { await model.synchronizeRemindersApp() }
                         }
