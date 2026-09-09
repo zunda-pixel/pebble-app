@@ -2151,6 +2151,16 @@
         }
       }
     },
+    "Event Reminders" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "予定のリマインダー"
+          }
+        }
+      }
+    },
     "Events become timeline pins on the watch, so the day ahead is on your wrist." : {
       "localizations" : {
         "ja" : {
@@ -7013,6 +7023,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "風速"
+          }
+        }
+      }
+    },
+    "With Event Reminders on, the watch buzzes at each of an event's alerts, the way the phone does." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“予定のリマインダー”をオンにすると、予定に設定された各通知の時刻に、iPhoneと同じようにウォッチも振動でお知らせします。"
           }
         }
       }

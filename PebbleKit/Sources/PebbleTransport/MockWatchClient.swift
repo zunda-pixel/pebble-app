@@ -23,6 +23,10 @@ public final class MockWatchClient: WatchClient {
     public private(set) var installedFiles: [(bytes: [UInt8], filename: String)] = []
     public private(set) var writtenWeather: [WeatherReport] = []
     public private(set) var timelineReminders: [TimelinePin] = []
+    /// Every reminder write in order, the way `timelinePinWrites` counts the
+    /// pins: `timelineReminders` keeps one entry per reminder and cannot say
+    /// how often the same one was sent.
+    public private(set) var timelineReminderWrites: [UUID] = []
     public private(set) var writtenWeatherLocationOrder: [UUID] = []
     public private(set) var writtenWatchSettings: [WatchSetting: Int] = [:]
     public private(set) var writtenQuickLaunch: [QuickLaunchButton: QuickLaunchAssignment] = [:]
@@ -205,6 +209,7 @@ public final class MockWatchClient: WatchClient {
         case .timelineReminder(let reminder):
             timelineReminders.removeAll { $0.id == reminder.id }
             timelineReminders.append(reminder)
+            timelineReminderWrites.append(reminder.id)
         case .notificationSourceApp(let app):
             writtenNotificationSourceApps.removeAll { $0.bundleID == app.bundleID }
             writtenNotificationSourceApps.append(app)

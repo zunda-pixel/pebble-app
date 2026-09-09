@@ -83,8 +83,9 @@ final class CalendarBridge {
 
     func timelinePins(
         disabledCalendarIdentifiers: Set<String> = [],
-        includeDeclined: Bool = false
-    ) async throws -> [TimelinePin] {
+        includeDeclined: Bool = false,
+        remindersEnabled: Bool = false
+    ) async throws -> (pins: [TimelinePin], reminders: [TimelinePin]) {
         guard try await store.requestFullAccessToEvents() else { throw CalendarBridgeError.accessDenied }
         let start = Date()
         let end = Calendar.current.date(byAdding: .day, value: 30, to: start) ?? start
@@ -97,12 +98,15 @@ final class CalendarBridge {
         // Reminders are read too, but as reminders: `RemindersBridge` puts them
         // in the database the watch buzzes from rather than on the timeline,
         // where they could only be looked at.
-        let pins = events.map { event in
-            TimelinePin(
-                id: stableID(Self.occurrenceKey(
-                    identity: event.eventIdentifier ?? event.title ?? "Calendar Event",
-                    occurrence: event.occurrenceDate ?? event.startDate
-                )),
+        var pins: [TimelinePin] = []
+        var reminders: [TimelinePin] = []
+        for event in events {
+            let key = Self.occurrenceKey(
+                identity: event.eventIdentifier ?? event.title ?? "Calendar Event",
+                occurrence: event.occurrenceDate ?? event.startDate
+            )
+            let pin = TimelinePin(
+                id: Self.stableID(key),
                 parentApplicationID: Self.calendarApplicationID,
                 timestamp: event.startDate,
                 durationMinutes: UInt16(clamping: Int(event.endDate.timeIntervalSince(event.startDate) / 60)),
@@ -111,8 +115,56 @@ final class CalendarBridge {
                 body: event.location,
                 isAllDay: event.isAllDay
             )
+            pins.append(pin)
+            guard remindersEnabled else { continue }
+            reminders += Self.eventReminders(
+                for: pin,
+                occurrenceKey: key,
+                fireDates: (event.alarms ?? []).map { Self.fireDate(of: $0, eventStart: event.startDate) }
+            )
         }
-        return pins.sorted { $0.timestamp < $1.timestamp }
+        return (
+            pins.sorted { $0.timestamp < $1.timestamp },
+            reminders.sorted { $0.timestamp < $1.timestamp }
+        )
+    }
+
+    /// When an alarm goes off. EventKit keeps one of two shapes: a date of its
+    /// own, or an offset from the event's start — negative for before, the
+    /// usual case.
+    static func fireDate(of alarm: EKAlarm, eventStart: Date) -> Date {
+        alarm.absoluteDate ?? eventStart.addingTimeInterval(alarm.relativeOffset)
+    }
+
+    /// The event's alarms as reminders for the watch's Reminder database, which
+    /// buzzes for each at its moment — the phone's own advance notice, kept
+    /// when the phone is out of reach.
+    ///
+    /// The parent is the *pin*, not the calendar app: `reminders.c` looks the
+    /// parent up in the pin database to work out how long a snooze should be.
+    /// The identifier is derived from the occurrence and the alarm's moment, so
+    /// reading the same alarm twice is the same reminder, and moving an alarm
+    /// is one reminder leaving and another arriving.
+    static func eventReminders(
+        for pin: TimelinePin,
+        occurrenceKey: String,
+        fireDates: [Date]
+    ) -> [TimelinePin] {
+        // An event can carry the same alert twice; the watch would buzz twice.
+        var seen: Set<Date> = []
+        return fireDates.sorted(by: <).compactMap { fire in
+            guard seen.insert(fire).inserted else { return nil }
+            return TimelinePin(
+                id: stableID("reminder|\(occurrenceKey)|\(fire.timeIntervalSince1970)"),
+                parentApplicationID: pin.id,
+                timestamp: fire,
+                title: pin.title,
+                subtitle: nil,
+                body: pin.body,
+                isAllDay: pin.isAllDay,
+                kind: .reminder
+            )
+        }
     }
 
     /// What tells one occurrence of an event from another.
@@ -132,7 +184,7 @@ final class CalendarBridge {
         "\(identity)|\(occurrence.timeIntervalSince1970)"
     }
 
-    private func stableID(_ value: String) -> UUID {
+    private nonisolated static func stableID(_ value: String) -> UUID {
         let bytes = Array(SHA256.hash(data: Data(value.utf8)).prefix(16))
         return UUID(uuid: (bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7], bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]))
     }

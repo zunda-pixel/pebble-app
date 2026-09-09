@@ -176,6 +176,10 @@ public final class AppModel {
     let watchStore: SavedWatchStore
     let timelineStore: TimelinePinStore
     let reminderStore: TimelinePinStore
+    /// The reminders derived from calendar event alerts, kept apart from the
+    /// reader's own: these are replaced wholesale by every calendar read, and
+    /// deleting one by hand would only have the next read put it back.
+    let calendarReminderStore: TimelinePinStore
     let healthStore: WatchHealthStore
     let appCatalog: AppCatalog
     let languagePackCatalog = PebbleLanguagePackCatalog()
@@ -318,6 +322,7 @@ public final class AppModel {
         self.reminderStore = reminderStore
             ?? TimelinePinStore(directory: storageDirectory, name: "timeline.reminders")
         timelineStore = TimelinePinStore(directory: storageDirectory, name: "timeline")
+        calendarReminderStore = TimelinePinStore(directory: storageDirectory, name: "timeline.calendar-reminders")
         healthStore = WatchHealthStore(directory: storageDirectory)
         // Passed in for the same reason as the stores above: a test that has to
         // answer for the store needs to hold the catalogue the model holds.
@@ -679,6 +684,7 @@ public final class AppModel {
         await flushPendingAppMessages()
         await synchronizeTimeline()
         await synchronizeReminders(on: connection)
+        await synchronizeCalendarReminders(on: connection)
         await synchronizeWatchSettings(on: connection)
         await synchronizeApplicationLogging(on: connection)
         // A stale forecast is renewed first, so the watch that just arrived is

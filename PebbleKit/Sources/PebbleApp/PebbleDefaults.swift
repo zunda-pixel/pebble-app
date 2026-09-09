@@ -76,6 +76,7 @@ extension Defaults.Keys {
     static let calendarPreferences = Key<[CalendarPreference]>("calendarPreferences", default: [])
     static let calendarPinsEnabled = Key<Bool>("calendarPinsEnabled", default: true)
     static let calendarIncludesDeclined = Key<Bool>("calendarIncludesDeclined", default: false)
+    static let calendarRemindersEnabled = Key<Bool>("calendarRemindersEnabled", default: true)
 
     static let companionNotificationsEnabled = Key<Bool>("companionNotificationsEnabled", default: true)
 

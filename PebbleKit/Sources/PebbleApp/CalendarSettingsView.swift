@@ -17,6 +17,9 @@ struct CalendarSettingsView: View {
             },
             setIncludesDeclined: { included in
                 Task { await model.setCalendarIncludesDeclined(included) }
+            },
+            setRemindersEnabled: { enabled in
+                Task { await model.setCalendarRemindersEnabled(enabled) }
             }
         )
         // Opening this screen is the reader asking about calendars, which is
@@ -32,9 +35,11 @@ struct CalendarSettingsContent: View {
     var setCalendarEnabled: (PhoneCalendar, Bool) -> Void
     var setPinsEnabled: (Bool) -> Void = { _ in }
     var setIncludesDeclined: (Bool) -> Void = { _ in }
+    var setRemindersEnabled: (Bool) -> Void = { _ in }
 
     @Default(.calendarPinsEnabled) private var pinsEnabled
     @Default(.calendarIncludesDeclined) private var includesDeclined
+    @Default(.calendarRemindersEnabled) private var remindersEnabled
     // The stored preferences, observed so the rows move when the model writes
     // them — the row's own value comes through `isCalendarEnabled`, which
     // resolves reissued identifiers the same way the sync does.
@@ -62,8 +67,16 @@ struct CalendarSettingsContent: View {
                     get: { includesDeclined },
                     set: { setIncludesDeclined($0) }
                 ))
+                Toggle("Event Reminders", isOn: Binding(
+                    get: { remindersEnabled },
+                    set: { setRemindersEnabled($0) }
+                ))
+                .disabled(!pinsEnabled)
             } footer: {
-                Text("Events from the calendars below appear on the watch's timeline for the next 30 days. Turning a calendar off takes its events off the watch as well.")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Events from the calendars below appear on the watch's timeline for the next 30 days. Turning a calendar off takes its events off the watch as well.")
+                    Text("With Event Reminders on, the watch buzzes at each of an event's alerts, the way the phone does.")
+                }
             }
             ForEach(sources, id: \.title) { source in
                 Section(source.title) {

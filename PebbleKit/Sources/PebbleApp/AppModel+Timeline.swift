@@ -374,11 +374,17 @@ extension AppModel {
         await synchronizeCalendar()
     }
 
+    public func setCalendarRemindersEnabled(_ enabled: Bool) async {
+        Defaults[.calendarRemindersEnabled] = enabled
+        await synchronizeCalendar()
+    }
+
     public func synchronizeCalendar() async {
         do {
             // The master switch empties the fetch rather than skipping the
             // sync: absence is what queues the deletions, on the watch too.
             let calendarPins: [TimelinePin]
+            let calendarReminders: [TimelinePin]
             if Defaults[.calendarPinsEnabled] {
                 // The list is read here and not only on the settings screen,
                 // because the disabled set has to be derived from what EventKit
@@ -392,13 +398,16 @@ extension AppModel {
                         given: Defaults[.calendarPreferences]
                     )
                 )
-                calendarPins = try await calendarBridge.timelinePins(
+                (calendarPins, calendarReminders) = try await calendarBridge.timelinePins(
                     disabledCalendarIdentifiers: disabled,
-                    includeDeclined: Defaults[.calendarIncludesDeclined]
+                    includeDeclined: Defaults[.calendarIncludesDeclined],
+                    remindersEnabled: Defaults[.calendarRemindersEnabled]
                 )
             } else {
                 calendarPins = []
+                calendarReminders = []
             }
+            try await calendarReminderStore.save(calendarReminders)
             let oldCalendarPins = timeline.pins.filter { $0.parentApplicationID == CalendarBridge.calendarApplicationID }
 
             timeline.pins.removeAll { $0.parentApplicationID == CalendarBridge.calendarApplicationID }
@@ -412,8 +421,62 @@ extension AppModel {
                 try await queueTimelineOperation(.upsert(pin))
             }
             if connectedWatch != nil { await synchronizeTimeline() }
+            // After the pins: a reminder's parent is its pin, which the watch
+            // reads back for the snooze arithmetic.
+            for connection in activeConnections {
+                await synchronizeCalendarReminders(on: connection)
+            }
             timeline.feedback = .success("Calendar synchronized with Timeline.")
         } catch { timeline.feedback = .failure("Calendar access or synchronization failed.") }
+    }
+
+    /// Brings this watch's Reminder database to the calendar reminders the app
+    /// holds: what vanished is removed, what changed or never arrived is
+    /// written, and what the watch already holds — by the digest of the bytes
+    /// it was written as — costs nothing.
+    ///
+    /// No queue, unlike the pins: every calendar read replaces the whole set,
+    /// so the store itself is the durable record and absence from it is what
+    /// names a deletion.
+    func synchronizeCalendarReminders(on connection: WatchConnection) async {
+        guard connection.isConnected else { return }
+        let reminders = (try? await calendarReminderStore.pins()) ?? []
+        let watchID = connection.watch.id
+        var digests = (try? await calendarReminderStore.writtenPinDigests(watchID: watchID)) ?? [:]
+        let current = Set(reminders.map(\.id))
+        let client = connection.client
+        var removed = 0
+        var written = 0
+        do {
+            for id in digests.keys where !current.contains(id) {
+                try await retry(with: .watchWork) { try await client.remove(.timelineReminder(id)) }
+                digests[id] = nil
+                removed += 1
+            }
+            // One in the past has already buzzed or been missed — `reminder_db.c`
+            // refuses anything older than fifteen minutes outright.
+            for reminder in reminders where reminder.timestamp > .now {
+                guard digests[reminder.id] != reminder.writtenDigest else { continue }
+                try await retry(with: .watchWork) { try await client.write(.timelineReminder(reminder)) }
+                digests[reminder.id] = reminder.writtenDigest
+                written += 1
+            }
+        } catch {
+            // The digests written below only claim what got through; the next
+            // connection picks up the rest.
+            await PebbleDiagnostics.shared.record(
+                .error,
+                category: "timeline",
+                message: "\(connection.watch.name) refused a calendar reminder: \(String(reflecting: error))"
+            )
+        }
+        try? await calendarReminderStore.setWrittenPinDigests(digests, watchID: watchID)
+        if removed + written > 0 {
+            await PebbleDiagnostics.shared.record(
+                category: "timeline",
+                message: "\(connection.watch.name) took \(written) calendar reminder(s) and dropped \(removed)"
+            )
+        }
     }
 
     /// One store, one notification: EventKit says a calendar or a reminder
