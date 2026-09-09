@@ -40,7 +40,11 @@ public enum BlobDBRecord: Equatable, Sendable {
     case quickLaunch(QuickLaunchButton, QuickLaunchAssignment)
     case activitySettings(ActivitySettings)
     case heartRateSettings(HeartRateSettings)
+    case heartRateZones(HeartRateZonePreferences)
     case healthDay(WatchHealthDay)
+    /// The thirty-day averages, sent as a pair because the watch shows them
+    /// side by side and half a comparison is worse than none.
+    case healthAverages(steps: UInt32, sleepSeconds: UInt32)
     case reminderAppState(PebbleReminderAppState)
 
     /// The frames this record turns into, in the order they must be sent.
@@ -87,6 +91,15 @@ public enum BlobDBRecord: Equatable, Sendable {
 
         case .heartRateSettings(let settings):
             [Self.owned { HealthSettingsCodec.insertFrame(settings, token: $0) }]
+
+        case .heartRateZones(let preferences):
+            [Self.owned { HealthSettingsCodec.insertFrame(preferences, token: $0) }]
+
+        case .healthAverages(let steps, let sleepSeconds):
+            [
+                Self.owned { HealthStatsCodec.averageStepsFrame(steps: steps, token: $0) },
+                Self.owned { HealthStatsCodec.averageSleepFrame(seconds: sleepSeconds, token: $0) },
+            ]
 
         case .healthDay(let day):
             // The firmware keeps a day's movement and its sleep as two records

@@ -40,6 +40,7 @@ struct WatchSettingsView: View {
             applications: model.applications.apps + model.applications.watchfaces,
             activitySettings: model.watchSettings.activity,
             heartRateSettings: model.watchSettings.heartRate,
+            heartRateZones: model.watchSettings.heartRateZones,
             isReminderAppEnabled: model.timeline.isReminderAppEnabled,
             isConnected: connection?.isConnected == true,
             feedback: model.watchSettings.feedback,
@@ -48,6 +49,9 @@ struct WatchSettingsView: View {
             },
             setQuickLaunch: { button, assignment in
                 Task { await model.setQuickLaunch(button, to: assignment) }
+            },
+            setHeartRateZones: { preferences in
+                Task { await model.setHeartRateZones(preferences) }
             },
             setActivitySettings: { settings in
                 Task { await model.setActivitySettings(settings) }
@@ -447,11 +451,13 @@ struct WatchSettingsContent: View {
     var applications: [WatchApplication] = []
     var activitySettings: ActivitySettings
     var heartRateSettings: HeartRateSettings
+    var heartRateZones: HeartRateZonePreferences = HeartRateZonePreferences()
     var isReminderAppEnabled: Bool
     var isConnected: Bool
     var feedback: FeatureFeedback?
     var setWatchSetting: (WatchSetting, Int) -> Void
     var setQuickLaunch: (QuickLaunchButton, QuickLaunchAssignment) -> Void = { _, _ in }
+    var setHeartRateZones: (HeartRateZonePreferences) -> Void = { _ in }
     var setActivitySettings: (ActivitySettings) -> Void
     var setHeartRateSettings: (HeartRateSettings) -> Void
     var setReminderAppEnabled: (Bool) -> Void
@@ -605,6 +611,19 @@ struct WatchSettingsContent: View {
                     ),
                     in: 5...120
                 )
+                // As the firmware numbers them: 0 female, 1 male, 2 other.
+                Picker("Gender", selection: Binding(
+                    get: { Int(activitySettings.gender) },
+                    set: { value in
+                        var settings = activitySettings
+                        settings.gender = Int8(clamping: value)
+                        setActivitySettings(settings)
+                    }
+                )) {
+                    Text("Female").tag(0)
+                    Text("Male").tag(1)
+                    Text("Other").tag(2)
+                }
             } header: {
                 Text("About You")
             } footer: {
@@ -649,6 +668,23 @@ struct WatchSettingsContent: View {
                 Text("Heart Rate")
             }
 
+            if heartRateSettings.isEnabled {
+                Section {
+                    zoneStepper("Resting", \.restingBPM)
+                    zoneStepper("Elevated", \.elevatedBPM)
+                    zoneStepper("Maximum", \.maximumBPM)
+                    zoneStepper("Zone 1", \.zone1BPM)
+                    zoneStepper("Zone 2", \.zone2BPM)
+                    zoneStepper("Zone 3", \.zone3BPM)
+                } header: {
+                    Text("Heart Rate Zones")
+                } footer: {
+                    // The same two chains the firmware's own handler enforces;
+                    // a step that would break one simply does not move.
+                    Text("The watch grades a workout against these. Resting stays under elevated, elevated under maximum, and each zone starts above the one before.")
+                }
+            }
+
             Section {
                 Toggle("Reminders App", isOn: Binding(
                     get: { isReminderAppEnabled },
@@ -667,6 +703,32 @@ struct WatchSettingsContent: View {
         }
         .formStyle(.grouped)
         .navigationTitle(Text("Watch Settings"))
+    }
+
+    /// One boundary of the zones, stepped in beats per minute. A step that
+    /// would put the numbers out of order does not move: the firmware's
+    /// handler would refuse the whole record and reset it, so refusing the
+    /// step here is the kinder version of the same rule.
+    private func zoneStepper(
+        _ title: LocalizedStringKey,
+        _ keyPath: WritableKeyPath<HeartRateZonePreferences, Int>
+    ) -> some View {
+        Stepper(
+            value: Binding(
+                get: { heartRateZones[keyPath: keyPath] },
+                set: { value in
+                    var changed = heartRateZones
+                    changed[keyPath: keyPath] = value
+                    guard changed.isValid else { return }
+                    setHeartRateZones(changed)
+                }
+            ),
+            in: 1...255
+        ) {
+            LabeledContent(title) {
+                Text("\(heartRateZones[keyPath: keyPath]) bpm")
+            }
+        }
     }
 
     private func activityBinding(_ keyPath: WritableKeyPath<ActivitySettings, Bool>) -> Binding<Bool> {

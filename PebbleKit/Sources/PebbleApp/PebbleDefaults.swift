@@ -64,6 +64,10 @@ extension Defaults.Keys {
         "heartRateSettings",
         default: HeartRateSettings()
     )
+    static let heartRateZonePreferences = Key<HeartRateZonePreferences>(
+        "heartRateZonePreferences",
+        default: HeartRateZonePreferences()
+    )
     static let reminderAppEnabled = Key<Bool>("reminderAppEnabled", default: true)
 
     static let companionNotificationsEnabled = Key<Bool>("companionNotificationsEnabled", default: true)
@@ -86,3 +90,4 @@ extension WeatherPlace: Defaults.Serializable {}
 extension ActivitySettings: Defaults.Serializable {}
 extension QuickLaunchAssignment: Defaults.Serializable {}
 extension HeartRateSettings: Defaults.Serializable {}
+extension HeartRateZonePreferences: Defaults.Serializable {}

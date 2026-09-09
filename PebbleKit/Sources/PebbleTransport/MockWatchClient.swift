@@ -28,6 +28,8 @@ public final class MockWatchClient: WatchClient {
     public private(set) var writtenQuickLaunch: [QuickLaunchButton: QuickLaunchAssignment] = [:]
     public private(set) var writtenActivitySettings: ActivitySettings?
     public private(set) var writtenHeartRateSettings: HeartRateSettings?
+    public private(set) var writtenHeartRateZones: HeartRateZonePreferences?
+    public private(set) var writtenHealthAverages: (steps: UInt32, sleepSeconds: UInt32)?
     public private(set) var writtenHealthDays: [WatchHealthDay] = []
     public private(set) var writtenReminderAppState: PebbleReminderAppState?
     public private(set) var sentImages: [(token: UInt8, kindValue: UInt8, image: EncodedImage?)] = []
@@ -223,6 +225,10 @@ public final class MockWatchClient: WatchClient {
             writtenActivitySettings = settings
         case .heartRateSettings(let settings):
             writtenHeartRateSettings = settings
+        case .heartRateZones(let preferences):
+            writtenHeartRateZones = preferences
+        case .healthAverages(let steps, let sleepSeconds):
+            writtenHealthAverages = (steps, sleepSeconds)
         case .healthDay(let day):
             writtenHealthDays.removeAll { $0.weekday == day.weekday }
             writtenHealthDays.append(day)

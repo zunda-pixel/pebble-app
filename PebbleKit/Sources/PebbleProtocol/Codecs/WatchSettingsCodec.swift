@@ -583,10 +583,54 @@ public struct HeartRateSettings: Codable, Equatable, Sendable {
     }
 }
 
+/// The zone boundaries the watch grades a workout's heart rate against:
+/// `HeartRatePreferences` in PebbleOS's `activity.h`, six packed bytes.
+///
+/// The firmware's handler (`prv_set_s_activity_hr_preferences`) refuses a
+/// record whose numbers are out of order — resting over elevated, a zone
+/// below the one before it — so `isValid` holds the same two chains and
+/// nothing disordered is sent.
+@MemberwiseInit(.public)
+public struct HeartRateZonePreferences: Codable, Equatable, Sendable {
+    /// `ACTIVITY_HEART_RATE_DEFAULT_PREFERENCES`: 70 / 100 / (220 − 30), with
+    /// zones at 50%, 70% and 85% of the heart-rate reserve.
+    public var restingBPM: Int = 70
+    public var elevatedBPM: Int = 100
+    public var maximumBPM: Int = 190
+    public var zone1BPM: Int = 130
+    public var zone2BPM: Int = 154
+    public var zone3BPM: Int = 172
+
+    public var isValid: Bool {
+        let all = [restingBPM, elevatedBPM, maximumBPM, zone1BPM, zone2BPM, zone3BPM]
+        return all.allSatisfy { (1...255).contains($0) }
+            && restingBPM <= elevatedBPM && elevatedBPM <= maximumBPM
+            && zone1BPM <= zone2BPM && zone2BPM <= zone3BPM
+    }
+
+    public func encoded() -> [UInt8] {
+        [restingBPM, elevatedBPM, maximumBPM, zone1BPM, zone2BPM, zone3BPM]
+            .map { UInt8(clamping: $0) }
+    }
+}
+
 public enum HealthSettingsCodec {
     public static var databaseID: UInt8 { 0x07 }
     public static var activityKey: String { "activityPreferences" }
     public static var heartRateKey: String { "hrmPreferences" }
+    public static var heartRateZonesKey: String { "heartRatePreferences" }
+
+    public static func insertFrame(
+        _ preferences: HeartRateZonePreferences,
+        token: UInt16
+    ) -> PebbleProtocolFrame {
+        BlobDBCodec.insertFrame(
+            databaseID: databaseID,
+            key: Array(heartRateZonesKey.utf8),
+            value: preferences.encoded(),
+            token: token
+        )
+    }
 
     public static func insertFrame(
         _ settings: ActivitySettings,
@@ -625,6 +669,11 @@ public struct WatchHealthDay: Equatable, Sendable {
     public var activeSeconds: UInt32
     public var sleepSeconds: UInt32
     public var deepSleepSeconds: UInt32
+    /// What this weekday usually looks like, from past weeks. Nil where there
+    /// is no history to say, in which case the day's own values stand in —
+    /// which is what a phone with one week of history can honestly claim.
+    public var typicalSleepSeconds: UInt32? = nil
+    public var typicalDeepSleepSeconds: UInt32? = nil
 }
 
 public enum HealthStatsCodec {
@@ -658,8 +707,9 @@ public enum HealthStatsCodec {
             + day.activeSeconds.littleEndianBytes
     }
 
-    /// `SleepData`. The four "typical" values are sent as the day's own, which
-    /// is what a phone that keeps one week of history can honestly say.
+    /// `SleepData`. The typicals are this weekday's own history where the
+    /// phone has one, and the day's own values where it does not — which is
+    /// what a phone with one week of history can honestly say.
     public static func sleepValue(for day: WatchHealthDay) -> [UInt8] {
         recordVersion.littleEndianBytes
             + UInt32(clamping: Int(day.lastProcessed.timeIntervalSince1970)).littleEndianBytes
@@ -667,8 +717,8 @@ public enum HealthStatsCodec {
             + day.deepSleepSeconds.littleEndianBytes
             + UInt32(0).littleEndianBytes
             + UInt32(0).littleEndianBytes
-            + day.sleepSeconds.littleEndianBytes
-            + day.deepSleepSeconds.littleEndianBytes
+            + (day.typicalSleepSeconds ?? day.sleepSeconds).littleEndianBytes
+            + (day.typicalDeepSleepSeconds ?? day.deepSleepSeconds).littleEndianBytes
             + UInt32(0).littleEndianBytes
             + UInt32(0).littleEndianBytes
     }
@@ -687,6 +737,27 @@ public enum HealthStatsCodec {
             databaseID: databaseID,
             key: Array(sleepKey(weekday: day.weekday).utf8),
             value: sleepValue(for: day),
+            token: token
+        )
+    }
+
+    /// The thirty-day averages the watch shows against today: one `uint32`
+    /// each, under the keys `health_db.c` builds — `"average" + "_dailySteps"`
+    /// and `"average" + "_sleepDuration"`.
+    public static func averageStepsFrame(steps: UInt32, token: UInt16) -> PebbleProtocolFrame {
+        BlobDBCodec.insertFrame(
+            databaseID: databaseID,
+            key: Array("average_dailySteps".utf8),
+            value: steps.littleEndianBytes,
+            token: token
+        )
+    }
+
+    public static func averageSleepFrame(seconds: UInt32, token: UInt16) -> PebbleProtocolFrame {
+        BlobDBCodec.insertFrame(
+            databaseID: databaseID,
+            key: Array("average_sleepDuration".utf8),
+            value: seconds.littleEndianBytes,
             token: token
         )
     }

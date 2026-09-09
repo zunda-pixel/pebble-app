@@ -15,6 +15,7 @@ extension AppModel {
         watchSettings.quickLaunch = Defaults[.quickLaunchAssignments]
         watchSettings.activity = Defaults[.activitySettings]
         watchSettings.heartRate = Defaults[.heartRateSettings]
+        watchSettings.heartRateZones = Defaults[.heartRateZonePreferences]
         timeline.isReminderAppEnabled = Defaults[.reminderAppEnabled]
     }
 
@@ -142,6 +143,22 @@ extension AppModel {
         }
     }
 
+    public func setHeartRateZones(_ preferences: HeartRateZonePreferences) async {
+        // The firmware's handler refuses a disordered record and resets to its
+        // defaults, so a slip of the stepper must not be allowed to wipe the
+        // reader's other five numbers.
+        guard preferences.isValid else { return }
+        watchSettings.heartRateZones = preferences
+        Defaults[.heartRateZonePreferences] = preferences
+        for connection in activeConnections {
+            do {
+                try await connection.client.write(.heartRateZones(preferences))
+            } catch {
+                watchSettings.feedback = .failure(settingsFailureMessage(connection, error))
+            }
+        }
+    }
+
     public func setHeartRateSettings(_ settings: HeartRateSettings) async {
         watchSettings.heartRate = settings
         Defaults[.heartRateSettings] = settings
@@ -187,6 +204,7 @@ extension AppModel {
         }
         try? await connection.client.write(.activitySettings(watchSettings.activity))
         try? await connection.client.write(.heartRateSettings(watchSettings.heartRate))
+        try? await connection.client.write(.heartRateZones(watchSettings.heartRateZones))
         try? await connection.client.write(
             .reminderAppState(timeline.isReminderAppEnabled ? .enabled : .notEnabled)
         )
@@ -207,6 +225,14 @@ extension AppModel {
                 )
                 return
             }
+        }
+        // The month against today, and what this weekday usually looks like.
+        // Sent beside the days because the watch's own Health screens compare
+        // against these, and without them every day reads as unprecedented.
+        if let averages = Self.thirtyDayAverages(of: health.samples) {
+            try? await connection.client.write(
+                .healthAverages(steps: averages.steps, sleepSeconds: averages.sleepSeconds)
+            )
         }
         guard !days.isEmpty else { return }
         // Which fields were filled, not what was in them: four of the six come
@@ -250,6 +276,7 @@ extension AppModel {
             guard let weekday = calendar.dateComponents([.weekday], from: day).weekday else {
                 return nil
             }
+            let typical = Self.typicalSleep(onWeekday: weekday - 1, of: health.samples, before: startOfToday)
             return WatchHealthDay(
                 // `weekday` counts from 1 for Sunday; the firmware counts from 0.
                 weekday: weekday - 1,
@@ -264,7 +291,9 @@ extension AppModel {
                 distanceMetres: UInt32(clamping: sample.distanceMetres),
                 activeSeconds: UInt32(clamping: sample.activeMinutes * 60),
                 sleepSeconds: UInt32(clamping: sample.sleepMinutes * 60),
-                deepSleepSeconds: UInt32(clamping: sample.deepSleepMinutes * 60)
+                deepSleepSeconds: UInt32(clamping: sample.deepSleepMinutes * 60),
+                typicalSleepSeconds: typical?.sleep,
+                typicalDeepSleepSeconds: typical?.deep
             )
         }
     }
@@ -274,5 +303,63 @@ extension AppModel {
         _ error: any Error
     ) -> LocalizedStringKey {
         "\(connection.watch.name) did not accept the setting. \(error.localizedDescription)"
+    }
+}
+
+extension AppModel {
+    /// The mean day of the last thirty, over the days that had anything to
+    /// say: a watch off the wrist on Sunday should not drag the average down
+    /// as a Sunday of zero steps. Nil where there is no history at all —
+    /// half a comparison is worse than none.
+    static func thirtyDayAverages(
+        of samples: [WatchHealthSample],
+        now: Date = .now
+    ) -> (steps: UInt32, sleepSeconds: UInt32)? {
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: now)
+        guard let oldest = calendar.date(byAdding: .day, value: -30, to: startOfToday) else {
+            return nil
+        }
+        let month = samples.filter { $0.date >= oldest && $0.date < startOfToday }
+        let stepDays = month.filter { $0.steps > 0 }
+        let sleepDays = month.filter { $0.sleepMinutes > 0 }
+        guard !stepDays.isEmpty || !sleepDays.isEmpty else { return nil }
+        let steps = stepDays.isEmpty
+            ? 0
+            : stepDays.reduce(0) { $0 + $1.steps } / stepDays.count
+        let sleepMinutes = sleepDays.isEmpty
+            ? 0
+            : sleepDays.reduce(0) { $0 + $1.sleepMinutes } / sleepDays.count
+        return (UInt32(clamping: steps), UInt32(clamping: sleepMinutes * 60))
+    }
+
+    /// What this weekday usually looks like: the median over the past four
+    /// weeks' worth of that weekday, not the mean — one sleepless deadline
+    /// night should not move what "usual" means.
+    ///
+    /// `weekday` counts from 0 for Sunday, the way the firmware counts.
+    static func typicalSleep(
+        onWeekday weekday: Int,
+        of samples: [WatchHealthSample],
+        before startOfToday: Date
+    ) -> (sleep: UInt32, deep: UInt32)? {
+        let calendar = Calendar.current
+        guard let oldest = calendar.date(byAdding: .day, value: -28, to: startOfToday) else {
+            return nil
+        }
+        let days = samples.filter { sample in
+            sample.date >= oldest && sample.date < startOfToday
+                && sample.sleepMinutes > 0
+                && calendar.dateComponents([.weekday], from: sample.date).weekday == weekday + 1
+        }
+        guard !days.isEmpty else { return nil }
+        func median(_ values: [Int]) -> Int {
+            let sorted = values.sorted()
+            return sorted[sorted.count / 2]
+        }
+        return (
+            sleep: UInt32(clamping: median(days.map { $0.sleepMinutes * 60 })),
+            deep: UInt32(clamping: median(days.map { $0.deepSleepMinutes * 60 }))
+        )
     }
 }
