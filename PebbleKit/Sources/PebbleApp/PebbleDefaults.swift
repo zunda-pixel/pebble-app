@@ -70,6 +70,13 @@ extension Defaults.Keys {
     )
     static let reminderAppEnabled = Key<Bool>("reminderAppEnabled", default: true)
 
+    /// One row per calendar the reader has touched a switch for; a calendar
+    /// with no row is enabled. Carried by name and owner as well as by
+    /// identifier, because EventKit reissues identifiers on a full sync.
+    static let calendarPreferences = Key<[CalendarPreference]>("calendarPreferences", default: [])
+    static let calendarPinsEnabled = Key<Bool>("calendarPinsEnabled", default: true)
+    static let calendarIncludesDeclined = Key<Bool>("calendarIncludesDeclined", default: false)
+
     static let companionNotificationsEnabled = Key<Bool>("companionNotificationsEnabled", default: true)
 
     /// Off until the reader asks for it: the recognizer's model is a download,
@@ -91,3 +98,4 @@ extension ActivitySettings: Defaults.Serializable {}
 extension QuickLaunchAssignment: Defaults.Serializable {}
 extension HeartRateSettings: Defaults.Serializable {}
 extension HeartRateZonePreferences: Defaults.Serializable {}
+extension CalendarPreference: Defaults.Serializable {}

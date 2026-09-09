@@ -1241,12 +1241,32 @@
         }
       }
     },
+    "Calendar on the Timeline" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "タイムラインのカレンダー"
+          }
+        }
+      }
+    },
     "Calendar synchronized with Timeline." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "カレンダーをタイムラインと同期しました。"
+          }
+        }
+      }
+    },
+    "Calendars" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "カレンダー"
           }
         }
       }
@@ -2141,6 +2161,16 @@
         }
       }
     },
+    "Events from the calendars below appear on the watch's timeline for the next 30 days. Turning a calendar off takes its events off the watch as well." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "以下のカレンダーの今後30日間の予定が、ウォッチのタイムラインに表示されます。カレンダーをオフにすると、そのカレンダーの予定はウォッチからも削除されます。"
+          }
+        }
+      }
+    },
     "Every 10 Minutes" : {
       "localizations" : {
         "ja" : {
@@ -2797,6 +2827,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "Pebbleアプリケーションを読み込み中"
+          }
+        }
+      }
+    },
+    "Include Declined Events" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "辞退した予定を含める"
           }
         }
       }

@@ -35,6 +35,7 @@ struct TimelineView: View {
     var model: AppModel
     @State private var kind = TimelineListKind.pins
     @State private var composing: TimelineListKind?
+    @State private var showsCalendarSettings = false
 
     var body: some View {
         content
@@ -67,6 +68,9 @@ struct TimelineView: View {
                         Button("Sync Calendar", systemImage: "calendar.badge.clock") {
                             Task { await model.synchronizeCalendar() }
                         }
+                        Button("Calendars", systemImage: "calendar") {
+                            showsCalendarSettings = true
+                        }
                     case .reminders:
                         Button("Sync Reminders", systemImage: "checklist") {
                             Task { await model.synchronizeRemindersApp() }
@@ -75,6 +79,11 @@ struct TimelineView: View {
                 }
             }
             .navigationTitle(Text("Timeline"))
+            .sheet(isPresented: $showsCalendarSettings) {
+                NavigationStack {
+                    CalendarSettingsView(model: model)
+                }
+            }
             .sheet(item: $composing) { kind in
                 TimelineItemComposer(kind: kind) { title, date in
                     Task {

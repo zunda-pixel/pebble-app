@@ -1,4 +1,5 @@
 import Algorithms
+import Defaults
 public import PebbleProtocol
 import AsyncAlgorithms
 import EventKit
@@ -329,10 +330,77 @@ extension AppModel {
         return current.filter { digests[$0.id] != $0.writtenDigest }
     }
 
+    /// Reads the calendar list for the settings screen, bringing the stored
+    /// preferences' identifiers along — EventKit may have reissued them.
+    public func loadCalendars() async {
+        guard let calendars = try? await calendarBridge.calendars() else { return }
+        timeline.calendars = calendars
+        Defaults[.calendarPreferences] = CalendarPreference.migrated(
+            Defaults[.calendarPreferences],
+            against: calendars
+        )
+    }
+
+    func isCalendarEnabled(_ calendar: PhoneCalendar) -> Bool {
+        Defaults[.calendarPreferences].first { $0.matches(calendar) }?.isEnabled ?? true
+    }
+
+    func setCalendarEnabled(_ calendar: PhoneCalendar, _ isEnabled: Bool) async {
+        var preferences = Defaults[.calendarPreferences]
+        if let index = preferences.firstIndex(where: { $0.matches(calendar) }) {
+            preferences[index].isEnabled = isEnabled
+            preferences[index].identifier = calendar.id
+        } else {
+            preferences.append(CalendarPreference(
+                identifier: calendar.id,
+                title: calendar.title,
+                sourceTitle: calendar.sourceTitle,
+                isEnabled: isEnabled
+            ))
+        }
+        Defaults[.calendarPreferences] = preferences
+        // The pins of a calendar just switched off vanish from the fetch, and
+        // vanishing is what queues their deletion.
+        await synchronizeCalendar()
+    }
+
+    public func setCalendarPinsEnabled(_ enabled: Bool) async {
+        Defaults[.calendarPinsEnabled] = enabled
+        await synchronizeCalendar()
+    }
+
+    public func setCalendarIncludesDeclined(_ included: Bool) async {
+        Defaults[.calendarIncludesDeclined] = included
+        await synchronizeCalendar()
+    }
+
     public func synchronizeCalendar() async {
         do {
-            let calendarPins = try await calendarBridge.timelinePins()
+            // The master switch empties the fetch rather than skipping the
+            // sync: absence is what queues the deletions, on the watch too.
+            let calendarPins: [TimelinePin]
+            if Defaults[.calendarPinsEnabled] {
+                // The list is read here and not only on the settings screen,
+                // because the disabled set has to be derived from what EventKit
+                // holds *now* — a sync running off a list nobody had opened yet
+                // would see no calendars and disable none.
+                let calendars = try await calendarBridge.calendars()
+                timeline.calendars = calendars
+                let disabled = Set(calendars.map(\.id)).subtracting(
+                    CalendarPreference.enabledIdentifiers(
+                        of: calendars,
+                        given: Defaults[.calendarPreferences]
+                    )
+                )
+                calendarPins = try await calendarBridge.timelinePins(
+                    disabledCalendarIdentifiers: disabled,
+                    includeDeclined: Defaults[.calendarIncludesDeclined]
+                )
+            } else {
+                calendarPins = []
+            }
             let oldCalendarPins = timeline.pins.filter { $0.parentApplicationID == CalendarBridge.calendarApplicationID }
+
             timeline.pins.removeAll { $0.parentApplicationID == CalendarBridge.calendarApplicationID }
             timeline.pins.append(contentsOf: calendarPins)
             try await timelineStore.save(timeline.pins)

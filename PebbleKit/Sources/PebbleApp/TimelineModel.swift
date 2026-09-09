@@ -8,6 +8,10 @@ public import Observation
 @Observable
 public final class TimelineModel {
     public internal(set) var pins: [TimelinePin] = []
+    /// The phone's calendars, for the per-calendar switches. Filled when the
+    /// calendar settings are opened; empty until then, so nothing prompts for
+    /// calendar access on behalf of a screen nobody visited.
+    var calendars: [PhoneCalendar] = []
     public internal(set) var reminders: [TimelinePin] = []
     /// Whether the watch shows its Reminders app at all. The firmware hides it
     /// unless the phone claims the capability and says the app is enabled.
