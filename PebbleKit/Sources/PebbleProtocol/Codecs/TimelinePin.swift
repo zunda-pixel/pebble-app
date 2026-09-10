@@ -49,7 +49,19 @@ public struct TimelinePin: Codable, Equatable, Identifiable, Sendable {
         if let subtitle { attributes.append(textAttribute(id: 0x02, value: subtitle, limit: 64)) }
         if let body { attributes.append(textAttribute(id: 0x03, value: body, limit: 512)) }
         let attributeBytes = attributes.flatMap { $0 }
-        guard let length = UInt16(exactly: attributeBytes.count) else { throw TimelinePinError.payloadTooLarge }
+        // A reminder with no action of its own has no menu on the watch at
+        // all: `notification_window.c` hides the popup's action button unless
+        // the item carries at least one, and Snooze — which the firmware adds
+        // by itself — only ever appears inside that menu. So every reminder
+        // carries a Dismiss (`SerializedActionHeader`: id, type 0x04, one
+        // attribute for the label).
+        let actionBytes: [UInt8] = kind == .reminder
+            ? [0x01, 0x04, 0x01] + textAttribute(id: 0x01, value: "Dismiss", limit: 64)
+            : []
+        let actionCount: UInt8 = kind == .reminder ? 1 : 0
+        guard let length = UInt16(exactly: attributeBytes.count + actionBytes.count) else {
+            throw TimelinePinError.payloadTooLarge
+        }
         let seconds = timestamp.timeIntervalSince1970.rounded()
         guard seconds >= 0, seconds <= Double(UInt32.max) else { throw TimelinePinError.invalidTimestamp }
         var bytes = BlobDBCodec.uuidBytes(id)
@@ -61,8 +73,9 @@ public struct TimelinePin: Codable, Equatable, Identifiable, Sendable {
         bytes.append(0x01)
         bytes += length.littleEndianBytes
         bytes.append(UInt8(attributes.count))
-        bytes.append(0)
+        bytes.append(actionCount)
         bytes += attributeBytes
+        bytes += actionBytes
         return bytes
     }
 

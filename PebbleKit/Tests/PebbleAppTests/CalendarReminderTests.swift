@@ -70,6 +70,32 @@ struct CalendarReminderTests {
         #expect(CalendarBridge.fireDate(of: absolute, eventStart: start) == Date(timeIntervalSince1970: 1_759_990_000))
     }
 
+    /// `notification_window.c` hides the popup's action button unless the item
+    /// carries an action of its own, and the firmware's Snooze only appears
+    /// inside that menu — a reminder with no actions can be neither dismissed
+    /// nor snoozed. So every reminder carries a Dismiss, and a pin carries
+    /// nothing new.
+    @Test func aReminderCarriesADismissSoTheWatchOffersItsMenu() throws {
+        let pin = eventPin()
+        let reminder = CalendarBridge.eventReminders(
+            for: pin,
+            occurrenceKey: "key",
+            fireDates: [pin.timestamp.addingTimeInterval(-15 * 60)]
+        )[0]
+
+        let bytes = try reminder.encoded()
+        // Byte 45 is the action count, after the attribute count at 44.
+        #expect(bytes[45] == 1)
+        // The action trails the attributes: `SerializedActionHeader` (id, type
+        // Dismiss = 0x04, one attribute), then the label as attribute 0x01.
+        let action = Array(bytes.suffix(13))
+        #expect(Array(action.prefix(3)) == [0x01, 0x04, 0x01])
+        #expect(Array(action[3..<6]) == [0x01, 7, 0])
+        #expect(String(decoding: action.suffix(7), as: UTF8.self) == "Dismiss")
+
+        #expect(try pin.encoded()[45] == 0)
+    }
+
     // MARK: The watch
 
     private func connectedModel(in directory: URL, client: MockWatchClient) async throws -> AppModel {
