@@ -107,17 +107,6 @@ struct ApplicationsView: View {
             await model.loadCatalog()
         }
         .toolbar {
-            #if os(macOS)
-            // Kept here alone: pulling to refresh is a gesture the phone has
-            // and a window does not, so dropping the button would leave the
-            // Mac with no way to ask for updates at all.
-            ToolbarItem(placement: .primaryAction) {
-                Button("Update All", systemImage: "arrow.down.app") {
-                    Task { await model.installCatalogUpdates() }
-                }
-                .disabled(model.isApplicationManagementBusy)
-            }
-            #endif
             ToolbarItem(placement: .primaryAction) {
                 NavigationLink {
                     CatalogView(

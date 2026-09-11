@@ -238,15 +238,6 @@ struct CatalogContent<Destination: View>: View {
                             .disabled(isImportDisabled)
                     }
                 }
-                #if os(macOS)
-                // Kept here alone: `refreshable` is a gesture the phone has
-                // and a window does not, so dropping the button would leave
-                // the Mac with no way to fetch the catalogue at all.
-                Button("Refresh", systemImage: "arrow.clockwise") {
-                    Task { await refresh() }
-                }
-                .disabled(isUpdating)
-                #endif
             }
         }
         #if os(iOS)
