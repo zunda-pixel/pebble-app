@@ -1,4 +1,4 @@
-public import Foundation
+import Foundation
 import HTTPTypes
 import HTTPTypesFoundation
 
@@ -16,23 +16,6 @@ public struct CatalogSearchPage: Equatable, Sendable {
 }
 
 extension AppCatalog {
-    /// The store's search index.
-    ///
-    /// The home feed is a shop window: fetching it shows the featured lists,
-    /// and this app's search box used to only sift those. The store's whole
-    /// inventory is reachable only through its Algolia index, which is what
-    /// the official application searches (`AppstoreService.search`). The
-    /// credentials are the search-only public pair shipped in the official
-    /// application's own binary (`AppstoreSources.kt`), tied to the same feed
-    /// `defaultSourceURL` names.
-    static var searchApplicationID: String { "GM3S9TRYO4" }
-    static var searchAPIKey: String { "0b83b4f8e4e8e9793d2f1f93c21894aa" }
-    static var searchIndexName: String { "apps" }
-
-    public static var searchQueryURL: URL {
-        URL(string: "https://\(searchApplicationID)-dsn.algolia.net/1/indexes/\(searchIndexName)/query")!
-    }
-
     /// Asks the store's index, one page at a time.
     ///
     /// Two round trips by design: the index answers with rankings but without
@@ -56,17 +39,24 @@ extension AppCatalog {
         _ query: String,
         kind: WatchApplicationKind? = nil,
         page: Int = 0,
-        preferredHardware: [String] = []
+        preferredHardware: [String] = [],
+        source: CatalogSource = .pebble
     ) async throws -> CatalogSearchPage {
+        // A source without an index cannot be searched past its shop window;
+        // refusing reads as the failure banner rather than as empty results.
+        guard let searchQueryURL = source.searchQueryURL,
+              let applicationID = source.searchApplicationID,
+              let apiKey = source.searchAPIKey
+        else { throw AppCatalogError.invalidResponse }
         var tags = ["ios"]
         if let kind { tags.append(kind == .watchface ? "watchface" : "watchapp") }
         let body = AlgoliaQuery(query: query, page: page, hitsPerPage: 20, tagFilters: tags)
         let request = HTTPRequest(
             method: .post,
-            url: searchURL,
+            url: searchURLOverride ?? searchQueryURL,
             headerFields: [
-                .init("X-Algolia-Application-Id")!: Self.searchApplicationID,
-                .init("X-Algolia-API-Key")!: Self.searchAPIKey,
+                .init("X-Algolia-Application-Id")!: applicationID,
+                .init("X-Algolia-API-Key")!: apiKey,
                 .contentType: "application/json",
                 .accept: "application/json",
             ]
@@ -86,7 +76,7 @@ extension AppCatalog {
             },
             uniquingKeysWith: { first, _ in first }
         )
-        let resolved = try await applications(ids: answer.hits.compactMap(\.id))
+        let resolved = try await applications(ids: answer.hits.compactMap(\.id), source: source)
             .map { application -> CatalogApplication in
                 guard let id = application.storeID,
                       let urls = Self.screenshotURLs(
@@ -125,11 +115,11 @@ extension AppCatalog {
     /// The full store entries for these identifiers, in the order they were
     /// asked for — which is the index's ranking. An identifier the feed does
     /// not answer for costs that row alone.
-    func applications(ids: [String]) async throws -> [CatalogApplication] {
+    func applications(ids: [String], source: CatalogSource = .pebble) async throws -> [CatalogApplication] {
         guard !ids.isEmpty else { return [] }
         let request = HTTPRequest(
             method: .post,
-            url: feedURL.appending(path: "v1/apps/bulk"),
+            url: (feedURLOverride ?? source.feedURL).appending(path: "v1/apps/bulk"),
             headerFields: [.contentType: "application/json", .accept: "application/json"]
         )
         let (data, response) = try await session.upload(
@@ -145,7 +135,8 @@ extension AppCatalog {
         let entries = try JSONDecoder().decode(OfficialCatalogLookup.self, from: data)
         let byID = Dictionary(
             entries.data.compactMap { entry -> (String, CatalogApplication)? in
-                guard let application = entry.application(kind: nil), let id = application.storeID
+                guard let application = entry.application(kind: nil, sourceID: source.id),
+                      let id = application.storeID
                 else { return nil }
                 return (id, application)
             },

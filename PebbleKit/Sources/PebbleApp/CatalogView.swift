@@ -55,6 +55,8 @@ struct CatalogView: View {
             isUpdating: model.catalog.isUpdating,
             feedback: model.catalog.feedback,
             importFeedback: model.applications.importFeedback,
+            selectedSourceID: model.selectedCatalogSource.id,
+            setSource: { id in await model.setCatalogSource(id) },
             searchResults: model.catalog.searchResults,
             searchQuery: model.catalog.searchQuery,
             hasMoreSearchResults: model.catalog.hasMoreSearchResults,
@@ -92,6 +94,10 @@ struct CatalogContent<Destination: View>: View {
     /// from `feedback`, which is the catalogue's: one is about the store, the
     /// other about a file from this phone.
     var importFeedback: FeatureFeedback?
+    /// Which store is being browsed, and the way to browse another. The titles
+    /// are the stores' own names, shown verbatim.
+    var selectedSourceID: String = CatalogSource.pebble.id
+    var setSource: @MainActor (String) async -> Void = { _ in }
     /// What the store's index answered, as against `applications`, the home
     /// feed the pickers sift. Nil until a search is submitted.
     var searchResults: [CatalogApplication]?
@@ -173,6 +179,14 @@ struct CatalogContent<Destination: View>: View {
                 }
             } else {
                 Section("Browse") {
+                    Picker("Store", selection: Binding(
+                        get: { selectedSourceID },
+                        set: { id in Task { await setSource(id) } }
+                    )) {
+                        ForEach(CatalogSource.builtIn) { source in
+                            Text(verbatim: source.title).tag(source.id)
+                        }
+                    }
                     Picker("Type", selection: $kind) {
                         ForEach(CatalogKindFilter.allCases) { Text($0.title).tag($0) }
                     }

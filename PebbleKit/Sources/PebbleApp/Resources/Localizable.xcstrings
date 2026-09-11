@@ -5142,6 +5142,16 @@
         }
       }
     },
+    "Store" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ストア"
+          }
+        }
+      }
+    },
     "Store Search" : {
       "localizations" : {
         "ja" : {

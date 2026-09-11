@@ -6,9 +6,27 @@ import SwiftUI
 
 /// The remote application catalog.
 extension AppModel {
+    /// The store being browsed. The chosen identifier survives launches; a
+    /// stored name no built-in matches falls back to the Pebble store.
+    var selectedCatalogSource: CatalogSource {
+        .named(Defaults[.catalogSourceID])
+    }
+
+    /// Switches the catalog to another store: its own cache, feed, index and
+    /// search, all at once. The search is cleared rather than re-run — the old
+    /// results were the other store's answers.
+    public func setCatalogSource(_ id: String) async {
+        guard Defaults[.catalogSourceID] != id else { return }
+        Defaults[.catalogSourceID] = id
+        clearCatalogSearch()
+        catalog.applications = []
+        await loadCatalog()
+        if catalog.applications.isEmpty { await refreshCatalog() }
+    }
+
     public func loadCatalog() async {
         do {
-            let snapshot = try await appCatalog.cachedSnapshot()
+            let snapshot = try await appCatalog.cachedSnapshot(source: selectedCatalogSource)
             catalog.applications = snapshot?.applications ?? []
             catalog.sourceURL = snapshot?.sourceURL
             catalog.lastUpdated = snapshot?.fetchedAt
@@ -21,7 +39,10 @@ extension AppModel {
         catalog.isUpdating = true
         defer { catalog.isUpdating = false }
         do {
-            let snapshot = try await appCatalog.update(model: connectedWatch?.model)
+            let snapshot = try await appCatalog.update(
+                model: connectedWatch?.model,
+                source: selectedCatalogSource
+            )
             catalog.applications = snapshot.applications
             catalog.sourceURL = snapshot.sourceURL
             catalog.lastUpdated = snapshot.fetchedAt
@@ -50,7 +71,8 @@ extension AppModel {
                 words,
                 kind: kind,
                 page: 0,
-                preferredHardware: connectedWatch?.model.compatibleApplicationVariants ?? []
+                preferredHardware: connectedWatch?.model.compatibleApplicationVariants ?? [],
+                source: selectedCatalogSource
             )
             catalog.searchResults = answer.applications
             catalog.searchQuery = words
@@ -78,7 +100,8 @@ extension AppModel {
                 catalog.searchQuery,
                 kind: catalog.searchKind,
                 page: catalog.searchPage,
-                preferredHardware: connectedWatch?.model.compatibleApplicationVariants ?? []
+                preferredHardware: connectedWatch?.model.compatibleApplicationVariants ?? [],
+                source: selectedCatalogSource
             )
             // Deduplicated on the identifier: the index can shift under the
             // pages, and the same application twice would be two rows with one

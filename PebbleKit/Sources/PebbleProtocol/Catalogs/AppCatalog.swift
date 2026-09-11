@@ -48,6 +48,9 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
     /// codes. Empty for a row that predates this field, and for one the store
     /// gave nothing for.
     public var capabilities: [String] = []
+    /// Which store listed it — `CatalogSource.id`. Nil for a row cached before
+    /// sources existed, which can only have come from the Pebble store.
+    public var sourceID: String? = nil
 
     public var declaredCapabilities: [WatchApplicationCapability] {
         WatchApplicationCapability.declared(in: capabilities)
@@ -56,7 +59,7 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case id, storeID, name, developer, version, downloadURL, supportedPlatforms
         case kind, category, summary, releaseNotes, iconURL, screenshotURLs, sha256
-        case capabilities
+        case capabilities, sourceID
     }
 
     public init(from decoder: any Decoder) throws {
@@ -84,6 +87,7 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
         // Absent from every cache written before this field existed, which is
         // why it decodes to empty rather than refusing the whole row.
         capabilities = try container.decodeIfPresent([String].self, forKey: .capabilities) ?? []
+        sourceID = try container.decodeIfPresent(String.self, forKey: .sourceID)
     }
 
     /// The store's own page for this application, where there is one.
@@ -111,9 +115,11 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
         guard let storeID, !storeID.isEmpty,
               let id = storeID.addingPercentEncoding(withAllowedCharacters: .alphanumerics)
         else { return nil }
-        // The bare identifier is where the store settles: its own
-        // `/en_US/application/…` redirects here.
-        return URL(string: "https://apps.repebble.com/\(id)")
+        // The page belongs to the store that listed the row: a Rebble row's
+        // identifier means nothing to the Pebble store's site. Joined as a
+        // string because `id` is already percent-encoded — `appending(path:)`
+        // would encode the escapes themselves.
+        return URL(string: CatalogSource.named(sourceID).storePageBaseURL.absoluteString + "/" + id)
     }
 
     public func supports(_ model: WatchModel) -> Bool {
@@ -152,19 +158,18 @@ public actor AppCatalog {
     /// Internal for the search extension beside this file, which posts to the
     /// store's index with the same session the feed is fetched with.
     let session: URLSession
-    /// Where `search` posts its queries, and the feed its bulk lookups go to.
-    /// Parameters only so a test can stand a stub at addresses of its own;
-    /// everything else uses the store's.
-    let searchURL: URL
-    let feedURL: URL
+    /// Overrides so a test can stand a stub at addresses of its own; nil
+    /// everywhere real, where the source names both.
+    let searchURLOverride: URL?
+    let feedURLOverride: URL?
 
     public init(directory: StorageDirectory = .applicationSupport, session: URLSession? = nil) {
         self.init(cacheURL: directory.file("catalog.json"), session: session)
     }
 
     public init(cacheURL: URL, session: URLSession? = nil, searchURL: URL? = nil, feedURL: URL? = nil) {
-        self.searchURL = searchURL ?? Self.searchQueryURL
-        self.feedURL = feedURL ?? Self.defaultSourceURL
+        self.searchURLOverride = searchURL
+        self.feedURLOverride = feedURL
         self.cacheURL = cacheURL
         if let session {
             self.session = session
@@ -175,7 +180,20 @@ public actor AppCatalog {
         }
     }
 
-    public func cachedSnapshot() throws -> CatalogSnapshot? {
+    /// The cache file for one source. The Pebble store keeps the name from
+    /// before sources existed, so nobody's cache is thrown away by the rename
+    /// that never happened; every other source gets a sibling of its own —
+    /// two stores sharing a file would answer each other's browsing.
+    private func cacheURL(for source: CatalogSource) -> URL {
+        guard source.id != CatalogSource.pebble.id else { return cacheURL }
+        let stem = cacheURL.deletingPathExtension().lastPathComponent
+        return cacheURL
+            .deletingLastPathComponent()
+            .appending(path: "\(stem)-\(source.id).json")
+    }
+
+    public func cachedSnapshot(source: CatalogSource = .pebble) throws -> CatalogSnapshot? {
+        let cacheURL = cacheURL(for: source)
         guard FileManager.default.fileExists(atPath: cacheURL.path) else { return nil }
         let data = try Data(contentsOf: cacheURL)
         if let snapshot = try? JSONDecoder().decode(CatalogSnapshot.self, from: data) { return snapshot }
@@ -188,17 +206,19 @@ public actor AppCatalog {
 
     public func cachedApplications() throws -> [CatalogApplication] { try cachedSnapshot()?.applications ?? [] }
 
-    public func update(model: WatchModel?) async throws -> CatalogSnapshot {
-        let sourceURL = Self.defaultSourceURL
-        async let watchapps = fetchOfficialHome(sourceURL, kind: .watchapp, model: model)
-        async let watchfaces = fetchOfficialHome(sourceURL, kind: .watchface, model: model)
+    public func update(model: WatchModel?, source: CatalogSource = .pebble) async throws -> CatalogSnapshot {
+        // The test override wins where one was injected; the source names the
+        // feed everywhere real.
+        let sourceURL = feedURLOverride ?? source.feedURL
+        async let watchapps = fetchOfficialHome(sourceURL, kind: .watchapp, model: model, source: source)
+        async let watchfaces = fetchOfficialHome(sourceURL, kind: .watchface, model: model, source: source)
         let applications = try await watchapps + watchfaces
         // Later entries win, so the newest description of an application is
         // the one kept.
         let unique = applications.reversed().uniqued(on: \.id)
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         let snapshot = CatalogSnapshot(sourceURL: sourceURL, applications: unique)
-        try PersistentJSON.save(snapshot, to: cacheURL)
+        try PersistentJSON.save(snapshot, to: cacheURL(for: source))
         return snapshot
     }
 
@@ -263,7 +283,8 @@ public actor AppCatalog {
     private func fetchOfficialHome(
         _ baseURL: URL,
         kind: WatchApplicationKind,
-        model: WatchModel?
+        model: WatchModel?,
+        source: CatalogSource
     ) async throws -> [CatalogApplication] {
         var url = baseURL.appending(path: "v1/home").appending(path: kind == .watchapp ? "watchapps" : "watchfaces")
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
@@ -272,7 +293,7 @@ public actor AppCatalog {
         components?.queryItems = queryItems
         if let value = components?.url { url = value }
         let response = try JSONDecoder().decode(OfficialCatalogHome.self, from: await responseData(from: url))
-        return response.applications.compactMap { $0.application(kind: kind) }
+        return response.applications.compactMap { $0.application(kind: kind, sourceID: source.id) }
     }
 
     /// Nil where the store said it has no such application.
@@ -375,7 +396,7 @@ struct OfficialCatalogApplication: Decodable {
 
     /// - Parameter kind: What the endpoint this came from was asked for, or nil
     ///   to take the entry's own word for it.
-    func application(kind: WatchApplicationKind?) -> CatalogApplication? {
+    func application(kind: WatchApplicationKind?, sourceID: String? = nil) -> CatalogApplication? {
         guard let kind = kind ?? declaredKind else { return nil }
         guard let uuid, let applicationID = UUID(uuidString: uuid),
               uuid.lowercased() != "00000000-0000-0000-0000-000000000000", let release = latestRelease,
@@ -402,7 +423,8 @@ struct OfficialCatalogApplication: Decodable {
             releaseNotes: release.releaseNotes,
             iconURL: iconImage?.values.compactMap(URL.init(string:)).first,
             screenshotURLs: screenshotImages?.flatMap { $0.values }.compactMap(URL.init(string:)) ?? [],
-            capabilities: capabilities ?? []
+            capabilities: capabilities ?? [],
+            sourceID: sourceID
         )
     }
 }
