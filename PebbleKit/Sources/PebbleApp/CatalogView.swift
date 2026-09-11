@@ -317,15 +317,24 @@ struct CatalogApplicationRow: View {
     var application: CatalogApplication
     var state: CatalogInstallationState
 
+    /// A watchface's first screenshot is the face itself, which no icon says
+    /// as well; a watch app's icon is its identity, so it stays first there.
+    private var imageURL: URL? {
+        application.kind == .watchface
+            ? application.screenshotURLs.first ?? application.iconURL
+            : application.iconURL ?? application.screenshotURLs.first
+    }
+
     var body: some View {
         HStack(spacing: 12) {
-            AsyncImage(url: application.iconURL) { image in
+            AsyncImage(url: imageURL) { image in
                 image.resizable().scaledToFit()
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
             } placeholder: {
                 Image(systemName: application.kind == .watchface ? "clock" : "square.grid.2x2")
                     .foregroundStyle(.secondary)
             }
-            .frame(width: 44, height: 44)
+            .frame(width: 44, height: 50)
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(application.name).font(.headline)
