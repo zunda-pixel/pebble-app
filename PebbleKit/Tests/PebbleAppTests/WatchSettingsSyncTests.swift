@@ -469,7 +469,9 @@ struct WatchBoardSettingsTests {
 /// whatever is added after it was written. Every setting has to be somewhere:
 /// in one of the four groups, or on the Backlight or Quiet Time screen.
 @Suite
+@MainActor
 struct WatchSettingGroupingTests {
+    // On the main actor because the grouping lists live on the view, which is.
     @Test func everySettingHasARowSomewhere() {
         let grouped = WatchSettingsContent.appearanceSettings
             + WatchSettingsContent.unitSettings

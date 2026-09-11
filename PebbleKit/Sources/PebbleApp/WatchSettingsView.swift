@@ -126,7 +126,11 @@ struct WatchSettingRow: View {
                 set: { setRawValue($0 ? 1 : 0) }
             ))
         case .choice, .duration:
-            Picker(setting.title, selection: Binding(get: { rawValue }, set: setRawValue)) {
+            // A closure literal rather than the function value: formed here it
+            // is isolated to the view's actor, which is what the binding's
+            // @isolated(any) setter wants; the bare reference is a non-Sendable
+            // function value and warns.
+            Picker(setting.title, selection: Binding(get: { rawValue }, set: { setRawValue($0) })) {
                 // Tagged by the value, not by where the option sits: a
                 // duration's value is its milliseconds.
                 ForEach(Array(zip(setting.optionRawValues, setting.optionTitles)), id: \.0) { option in
