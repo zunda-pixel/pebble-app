@@ -220,9 +220,11 @@ extension AppModel {
                     updateApplications(library)
                 }
             }
-            // The import speaks for itself when it went wrong; only the
-            // success is this screen's to word.
-            catalog.feedback = applications.libraryFeedback ?? .success("\(application.name) installed.")
+            // The import speaks for itself when it went wrong. Success is
+            // silent, the same bargain the file import struck (owner feedback,
+            // 2026-09-12): the row's state flipping to Installed says it, and
+            // setting nil is also what ends the Downloading banner above.
+            catalog.feedback = applications.libraryFeedback
         } catch {
             catalog.feedback = .failure("The catalog package was rejected: \(error.localizedDescription)")
         }
