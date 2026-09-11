@@ -211,10 +211,11 @@ extension AppModel {
                 expirePendingSnapshot(applicationID: application.id)
             }
             hasLoadedApplications = true
-            // Said rather than left silent, because the screen that asked is
-            // the catalogue and the library it landed in is behind it: the
-            // reader would otherwise watch a spinner stop and learn nothing.
-            applications.importFeedback = .success("\(application.displayName) was added.")
+            // Silent on success — the row appearing in the library says it,
+            // and the banner only repeated it (owner feedback, 2026-09-12).
+            // Cleared rather than left, so a stale failure does not outlive
+            // the import that succeeded after it. Failures still speak below.
+            applications.importFeedback = nil
         } catch {
             // The watch refused the registration, not the bytes, so nothing has been
             // transferred and the import stands.

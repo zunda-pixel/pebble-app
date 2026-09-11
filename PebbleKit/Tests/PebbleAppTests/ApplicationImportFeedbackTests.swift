@@ -58,7 +58,9 @@ struct ApplicationImportFeedbackTests {
     }
 
     /// The answer to importing goes where the import was asked for.
-    @Test func anImportThatWorkedSaysSoWhereTheButtonIs() async throws {
+    /// Success is silent: the row appearing in the library says it, and a
+    /// banner only repeated it. A failure is the one thing worth a banner.
+    @Test func anImportThatWorkedSaysNothing() async throws {
         let directory = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let client = MockWatchClient()
@@ -71,7 +73,7 @@ struct ApplicationImportFeedbackTests {
 
         await model.importApplication(from: package)
 
-        #expect(model.applications.importFeedback?.isFailure == false)
+        #expect(model.applications.importFeedback == nil)
     }
 
     @Test func anImportThatFailedSaysSoWhereTheButtonIs() async throws {
