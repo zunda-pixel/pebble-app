@@ -46,7 +46,10 @@ extension AppModel {
             catalog.applications = snapshot.applications
             catalog.sourceURL = snapshot.sourceURL
             catalog.lastUpdated = snapshot.fetchedAt
-            catalog.feedback = .success("App catalog updated with \(catalog.applications.count) apps.")
+            // Silent on success, like the installs (owner feedback,
+            // 2026-09-12): the refreshed rows say it. Cleared so a stale
+            // failure does not outlive the refresh that worked after it.
+            catalog.feedback = nil
         } catch {
             catalog.feedback = .failure(
                 catalog.applications.isEmpty

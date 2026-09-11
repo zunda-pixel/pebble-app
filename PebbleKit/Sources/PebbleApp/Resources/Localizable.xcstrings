@@ -864,6 +864,7 @@
       }
     },
     "App catalog updated with %lld apps." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
