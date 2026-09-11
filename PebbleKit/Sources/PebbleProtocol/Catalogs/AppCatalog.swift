@@ -152,16 +152,19 @@ public actor AppCatalog {
     /// Internal for the search extension beside this file, which posts to the
     /// store's index with the same session the feed is fetched with.
     let session: URLSession
-    /// Where `search` posts its queries. A parameter only so a test can stand
-    /// a stub at an address of its own; everything else uses the store's.
+    /// Where `search` posts its queries, and the feed its bulk lookups go to.
+    /// Parameters only so a test can stand a stub at addresses of its own;
+    /// everything else uses the store's.
     let searchURL: URL
+    let feedURL: URL
 
     public init(directory: StorageDirectory = .applicationSupport, session: URLSession? = nil) {
         self.init(cacheURL: directory.file("catalog.json"), session: session)
     }
 
-    public init(cacheURL: URL, session: URLSession? = nil, searchURL: URL? = nil) {
+    public init(cacheURL: URL, session: URLSession? = nil, searchURL: URL? = nil, feedURL: URL? = nil) {
         self.searchURL = searchURL ?? Self.searchQueryURL
+        self.feedURL = feedURL ?? Self.defaultSourceURL
         self.cacheURL = cacheURL
         if let session {
             self.session = session

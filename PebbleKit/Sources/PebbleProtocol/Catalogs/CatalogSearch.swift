@@ -35,11 +35,18 @@ extension AppCatalog {
 
     /// Asks the store's index, one page at a time.
     ///
+    /// Two round trips by design: the index answers with rankings but without
+    /// a hit's release — no `latest_release`, measured against the live index
+    /// (2026-09-11) — so a hit alone cannot become a row the install path can
+    /// use. The identifiers go back to the feed's own bulk endpoint, the way
+    /// the official application resolves hits (`fetchAppMetadataByIds`), and
+    /// come back as the same full entries the home feed is made of.
+    ///
     /// `kind` narrows by the index's own tags. The phone-platform tag `ios` is
     /// always sent, the way the official application sends it; the hardware
     /// platform deliberately is not — the index does not tag every compatible
     /// application with every board, so filtering there loses real results.
-    /// Compatibility is answered per row instead, by `supportedPlatforms`.
+    /// Compatibility is judged per row instead, by `supportedPlatforms`.
     public func search(
         _ query: String,
         kind: WatchApplicationKind? = nil,
@@ -67,11 +74,43 @@ extension AppCatalog {
         }
         let answer = try JSONDecoder().decode(AlgoliaSearchResponse.self, from: data)
         return CatalogSearchPage(
-            applications: answer.hits.compactMap { $0.application() },
+            applications: try await applications(ids: answer.hits.compactMap(\.id)),
             page: answer.page,
             pageCount: answer.nbPages,
             totalCount: answer.nbHits
         )
+    }
+
+    /// The full store entries for these identifiers, in the order they were
+    /// asked for — which is the index's ranking. An identifier the feed does
+    /// not answer for costs that row alone.
+    func applications(ids: [String]) async throws -> [CatalogApplication] {
+        guard !ids.isEmpty else { return [] }
+        let request = HTTPRequest(
+            method: .post,
+            url: feedURL.appending(path: "v1/apps/bulk"),
+            headerFields: [.contentType: "application/json", .accept: "application/json"]
+        )
+        let (data, response) = try await session.upload(
+            for: request,
+            from: try JSONEncoder().encode(BulkLookup(ids: ids))
+        )
+        guard response.status == .ok, data.count <= 20 * 1_024 * 1_024 else {
+            throw AppCatalogError.invalidResponse
+        }
+        // The same rows the feed itself is made of, so the same decoding. The
+        // answer's order is the server's own and is put back into the asked
+        // one, keyed by the store identifier both sides carry.
+        let entries = try JSONDecoder().decode(OfficialCatalogLookup.self, from: data)
+        let byID = Dictionary(
+            entries.data.compactMap { entry -> (String, CatalogApplication)? in
+                guard let application = entry.application(kind: nil), let id = application.storeID
+                else { return nil }
+                return (id, application)
+            },
+            uniquingKeysWith: { first, _ in first }
+        )
+        return ids.compactMap { byID[$0] }
     }
 }
 
@@ -82,6 +121,10 @@ private struct AlgoliaQuery: Encodable {
     var tagFilters: [String]
 }
 
+private struct BulkLookup: Encodable {
+    var ids: [String]
+}
+
 struct AlgoliaSearchResponse: Decodable {
     var hits: [CatalogSearchHit]
     var page: Int
@@ -89,76 +132,9 @@ struct AlgoliaSearchResponse: Decodable {
     var nbHits: Int
 }
 
-/// One hit as the index sends it (`StoreSearchResult` in the official
-/// application). Every field is optional but the ones a row cannot be shown or
-/// installed without, and those are checked in `application()` — so a hit this
-/// app cannot use costs that hit and not the page it arrived in, the same
-/// bargain `OfficialCatalogApplication` strikes.
+/// One hit as the index sends it. Only the store identifier is kept: the hit
+/// has no release to install from, so everything shown comes from the feed's
+/// own entry, fetched by this identifier.
 struct CatalogSearchHit: Decodable {
-    var author: String?
-    var category: String?
-    var description: String?
-    var title: String?
-    var type: String?
-    var uuid: String?
     var id: String?
-    var version: String?
-    var iconImage: String?
-    var screenshotImages: [String]?
-    var latestRelease: CatalogSearchRelease?
-    var compatibility: [String: CatalogSearchCompatibility]?
-
-    private enum CodingKeys: String, CodingKey {
-        case author, category, description, title, type, uuid, id, version, compatibility
-        case iconImage = "icon_image"
-        case screenshotImages = "screenshot_images"
-        case latestRelease = "latest_release"
-    }
-
-    /// The boards the store's own compatibility table names, which every entry
-    /// in the index carries. The watch platforms are the keys that are not
-    /// phone platforms.
-    private var supportedPlatforms: [String] {
-        let phones: Set<String> = ["ios", "android"]
-        let supported = (compatibility ?? [:])
-            .filter { !phones.contains($0.key) && $0.value.supported == true }
-            .keys
-        return supported.isEmpty
-            ? ["aplite", "basalt", "chalk", "diorite", "emery", "flint", "gabbro"]
-            : supported.sorted()
-    }
-
-    func application() -> CatalogApplication? {
-        guard let uuid, let applicationID = UUID(uuidString: uuid),
-              uuid.lowercased() != "00000000-0000-0000-0000-000000000000",
-              let pbwFile = latestRelease?.pbwFile,
-              let downloadURL = URL(string: pbwFile),
-              ["https", "http"].contains(downloadURL.scheme?.lowercased()),
-              let title, let author,
-              let kind = type.flatMap(WatchApplicationKind.init(rawValue:))
-        else { return nil }
-        return CatalogApplication(
-            id: applicationID,
-            storeID: id?.nilWhenEmpty,
-            name: title,
-            developer: author,
-            version: version?.nilWhenEmpty ?? "0",
-            downloadURL: downloadURL,
-            supportedPlatforms: supportedPlatforms,
-            kind: kind,
-            category: category?.nilWhenEmpty,
-            summary: description?.nilWhenEmpty,
-            iconURL: iconImage.flatMap(URL.init(string:)),
-            screenshotURLs: screenshotImages?.compactMap(URL.init(string:)) ?? []
-        )
-    }
-}
-
-struct CatalogSearchRelease: Decodable {
-    var pbwFile: String?
-    private enum CodingKeys: String, CodingKey { case pbwFile = "pbw_file" }
-}
-
-struct CatalogSearchCompatibility: Decodable {
-    var supported: Bool?
 }
