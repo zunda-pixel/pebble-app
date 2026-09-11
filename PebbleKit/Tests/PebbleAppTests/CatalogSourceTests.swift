@@ -23,7 +23,7 @@ struct CatalogSourceTests {
 
     /// The two home-feed addresses `update` asks, against a stubbed feed base.
     private static func answerHomeFeeds(base: URL, title: String) {
-        for kind in ["watchapps", "watchfaces"] {
+        for kind in ["apps", "faces"] {
             var components = URLComponents(
                 url: base.appending(path: "v1/home").appending(path: kind),
                 resolvingAgainstBaseURL: false

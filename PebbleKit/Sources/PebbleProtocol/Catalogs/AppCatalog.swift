@@ -286,7 +286,12 @@ public actor AppCatalog {
         model: WatchModel?,
         source: CatalogSource
     ) async throws -> [CatalogApplication] {
-        var url = baseURL.appending(path: "v1/home").appending(path: kind == .watchapp ? "watchapps" : "watchfaces")
+        // `apps` and `faces`, the official application's own spelling
+        // (`AppType.storeString()`): the Pebble store answers the longer
+        // `watchapps`/`watchfaces` as well, but the Rebble store answers only
+        // these — the other spelling is a 404 that cost the whole catalogue
+        // (measured 2026-09-12).
+        var url = baseURL.appending(path: "v1/home").appending(path: kind == .watchapp ? "apps" : "faces")
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
         var queryItems = [URLQueryItem(name: "platform", value: "ios"), URLQueryItem(name: "filter_hardware", value: "true")]
         if let model { queryItems.append(URLQueryItem(name: "hardware", value: model.compatibleApplicationVariants.first)) }
