@@ -198,7 +198,10 @@ public actor AppCatalog {
         let data = try Data(contentsOf: cacheURL)
         if let snapshot = try? JSONDecoder().decode(CatalogSnapshot.self, from: data) { return snapshot }
         if let applications = try? JSONDecoder().decode([CatalogApplication].self, from: data) {
-            return CatalogSnapshot(sourceURL: Self.defaultSourceURL, applications: applications)
+            // The array predates snapshots, and only the Pebble store ever
+            // wrote one — but the provenance is the asked-for source's, not
+            // hardcoded, or a misnamed legacy file would claim the wrong feed.
+            return CatalogSnapshot(sourceURL: source.feedURL, applications: applications)
         }
         try PersistentJSON.quarantine(cacheURL)
         return nil
@@ -266,7 +269,12 @@ public actor AppCatalog {
     ///   honours (measured 2026-09-12: `?hardware=aplite` answers aplite
     ///   screenshots where the default was basalt). Nil asks for the store's
     ///   default, which is right when no watch is connected.
-    public func application(uuid: UUID, from baseURL: URL, hardware: String? = nil) async throws -> CatalogApplication? {
+    public func application(
+        uuid: UUID,
+        from baseURL: URL,
+        hardware: String? = nil,
+        sourceID: String? = nil
+    ) async throws -> CatalogApplication? {
         var url = baseURL.appending(path: "v1/apps/uuid").appending(path: uuid.uuidString.lowercased())
         if let hardware {
             var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
@@ -277,7 +285,7 @@ public actor AppCatalog {
         let response = try JSONDecoder().decode(OfficialCatalogLookup.self, from: data)
         // The kind comes off the entry rather than the endpoint here: this one
         // is asked by identifier, so it answers with whatever that is.
-        return response.data.lazy.compactMap { $0.application(kind: nil) }.first
+        return response.data.lazy.compactMap { $0.application(kind: nil, sourceID: sourceID) }.first
     }
 
     private func fetchOfficialHome(

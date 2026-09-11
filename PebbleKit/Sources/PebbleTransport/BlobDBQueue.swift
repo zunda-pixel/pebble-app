@@ -47,10 +47,14 @@ final class BlobDBQueue {
 
     /// The link is gone: nobody's turn is coming. Whoever holds it is failed by
     /// the reply they are waiting on; these never got that far.
+    ///
+    /// The turn itself is left with its holder — their `finish` is what
+    /// releases it. Declaring the queue free here let a new caller in while
+    /// the failed holder was still unwinding, and the holder's own `finish`
+    /// then released the newcomer's turn to a third.
     func failAll(_ error: any Error) {
         let queued = waiting
         waiting.removeAll()
-        isBusy = false
         for continuation in queued {
             continuation.resume(throwing: error)
         }

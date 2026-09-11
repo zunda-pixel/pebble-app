@@ -90,6 +90,12 @@ struct BlobDBQueueTests {
         await #expect(throws: WatchConnectionError.disconnected) {
             try await second.value
         }
+        // The turn stays with its holder — the holder's own `finish` is what
+        // frees it. Freed here, a new caller could take the queue while the
+        // failed holder was still unwinding, and the holder's `finish` then
+        // handed the newcomer's turn to a third.
+        #expect(queue.isEngaged)
+        queue.finish()
         #expect(!queue.isEngaged)
     }
 }

@@ -17,6 +17,11 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
     private var locationHandler: () async throws -> CLLocation
     private var loadContinuation: CheckedContinuation<Void, any Error>?
     private var loadedApplicationID: UUID?
+    /// The load under way (or the finished one, which costs nothing to await).
+    /// A watch app sends a burst of messages on launch, and the second one used
+    /// to find the identifier already claimed, skip the wait, and be delivered
+    /// into a page whose script had not run — a NAK for nothing.
+    private var loadTask: Task<Void, any Error>?
     private let tokenStore = PebbleTokenStore()
 
     init(
@@ -58,7 +63,12 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
     }
 
     func load(source: String, application: WatchApplication) async throws {
-        if loadedApplicationID == application.id { return }
+        if loadedApplicationID == application.id {
+            // Claimed when the load starts, not when it finishes — so ride
+            // whatever load claimed it rather than answering "loaded".
+            try await loadTask?.value
+            return
+        }
         self.application = application
         let watch = activeWatchHandler()
         let sourceLiteral = try javaScriptLiteral(source)
@@ -130,17 +140,21 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
         """
         let webView = makeWebView(for: application)
         self.webView = webView
-        try await withCheckedThrowingContinuation { continuation in
-            loadContinuation?.resume(throwing: CancellationError())
-            loadContinuation = continuation
         loadedApplicationID = application.id
-        // A real origin rather than `about:blank`, which is what gives the
-        // script `localStorage` at all and lets it fetch across origins.
-        webView.loadHTMLString(
-            html,
-            baseURL: URL(string: "https://\(application.id.uuidString.lowercased()).pebble.local/")
-        )
+        let task = Task {
+            try await withCheckedThrowingContinuation { continuation in
+                loadContinuation?.resume(throwing: CancellationError())
+                loadContinuation = continuation
+                // A real origin rather than `about:blank`, which is what gives the
+                // script `localStorage` at all and lets it fetch across origins.
+                webView.loadHTMLString(
+                    html,
+                    baseURL: URL(string: "https://\(application.id.uuidString.lowercased()).pebble.local/")
+                )
+            }
         }
+        loadTask = task
+        try await task.value
     }
 
     func showConfiguration() async throws {
@@ -238,6 +252,16 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
     ) {
         loadedApplicationID = nil
         loadContinuation?.resume(throwing: error)
+        loadContinuation = nil
+    }
+
+    /// The third way a load ends: WebKit's content process dying delivers
+    /// neither `didFinish` nor `didFail…`, and a continuation resumed by
+    /// nobody would park every later message behind it for the life of the
+    /// app. The next message starts a fresh page.
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        loadedApplicationID = nil
+        loadContinuation?.resume(throwing: CompanionRuntimeError.pageWentAway)
         loadContinuation = nil
     }
 
@@ -369,4 +393,6 @@ private extension WatchModel {
 /// having nothing to say.
 enum CompanionRuntimeError: Error {
     case noApplicationLoaded
+    /// WebKit's content process went away mid-load.
+    case pageWentAway
 }

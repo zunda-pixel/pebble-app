@@ -86,6 +86,26 @@ extension AppModel {
     }
 
     public func synchronizeTimeline() async {
+        // Joining a pass already in flight is not enough: work queued after
+        // its read would sit until the next trigger. Wait it out, then run a
+        // pass of our own — which finds nothing left to do when the earlier
+        // one covered us, and costs one queue read to find that out.
+        while let running = timeline.synchronizationTask {
+            await running.value
+        }
+        // The task clears its own handle before finishing: awaiting a finished
+        // task need not suspend, so a waiter waking to a handle the claimant
+        // had not cleared yet would spin on the main actor without ever
+        // letting the claimant back on to clear it.
+        let task = Task {
+            await self.runTimelineSynchronization()
+            self.timeline.synchronizationTask = nil
+        }
+        timeline.synchronizationTask = task
+        await task.value
+    }
+
+    private func runTimelineSynchronization() async {
         await loadTimeline()
         guard !activeConnections.isEmpty else { return }
         let queued = (try? await pendingTimelineOperationStore.operations()) ?? []
@@ -93,6 +113,11 @@ extension AppModel {
             if case .upsert(let pin) = operation { return pin.id }
             return nil
         })
+        // One snapshot for the whole pass. The sends below suspend for as long
+        // as the slowest watch takes, and `timeline.pins` moves under them: a
+        // digest map computed from the live array afterwards records pins this
+        // pass never sent, and forgets pins it did.
+        let pins = timeline.pins
         // A watch that stopped part-way keeps the rest of the queue for its next
         // connection, and so does every other watch: whatever the least
         // finished one did not get is what is kept.
@@ -105,16 +130,29 @@ extension AppModel {
             // Derived per watch, because what each already holds is its own: the
             // queue is the durable work and goes first, so an index into it
             // keeps its meaning however many pins this watch still needs.
-            let derived = await upsertsStillNeeded(besides: queuedUpserts, on: connection)
+            let derived = await upsertsStillNeeded(besides: queuedUpserts, of: pins, on: connection)
             let stopped = await send(
                 queued + derived,
+                of: pins,
                 to: connection,
                 queuedCount: queued.count,
                 alreadyGone: alreadyGone
             )
             firstUnfinished = min(firstUnfinished, min(stopped, queued.count))
         }
-        try? await pendingTimelineOperationStore.save(Array(queued[firstUnfinished...]))
+        // Taken off the live queue by identity, not written over with this
+        // pass's leftovers: a delete queued while the sends above were in
+        // flight is not in `queued`, and saving `queued`'s suffix would erase
+        // it — the one operation `queueTimelineOperation`'s own comment says
+        // cannot be reconstructed.
+        let completed = queued[..<firstUnfinished]
+        var remaining = (try? await pendingTimelineOperationStore.operations()) ?? []
+        for operation in completed {
+            if let index = remaining.firstIndex(of: operation) {
+                remaining.remove(at: index)
+            }
+        }
+        try? await pendingTimelineOperationStore.save(remaining)
     }
 
     /// The pins this watch does not already hold, as upserts.
@@ -126,10 +164,11 @@ extension AppModel {
     /// survive a launch.
     private func upsertsStillNeeded(
         besides queuedUpserts: Set<UUID>,
+        of pins: [TimelinePin],
         on connection: WatchConnection
     ) async -> [PendingTimelineOperation] {
         let written = (try? await timelineStore.writtenPinDigests(watchID: connection.watch.id)) ?? [:]
-        return timeline.pins
+        return pins
             .filter { pin in
                 // A pin the watch made is already on the watch, with actions and
                 // an icon this app does not model: writing it back would replace
@@ -153,6 +192,7 @@ extension AppModel {
     /// the pin is off the watch, which is all the queue was asking for.
     private func send(
         _ operations: [PendingTimelineOperation],
+        of pins: [TimelinePin],
         to connection: WatchConnection,
         queuedCount: Int,
         alreadyGone: Set<UUID>
@@ -179,12 +219,16 @@ extension AppModel {
                 return index
             }
         }
-        // This watch now holds exactly what the app holds, which is what makes
-        // the reconciliation above possible next time — and, by the digests,
-        // what makes the next synchronization write only what changed.
+        // This watch now holds exactly the snapshot this pass sent from, which
+        // is what makes the reconciliation above possible next time — and, by
+        // the digests, what makes the next synchronization write only what
+        // changed. The snapshot, not the live array: a pin added during the
+        // sends was never written and must not be recorded as though it was,
+        // and one removed during them is on the watch until the next pass
+        // takes it off.
         try? await timelineStore.setWrittenPinDigests(
             Dictionary(
-                timeline.pins.map { ($0.id, $0.writtenDigest) },
+                pins.map { ($0.id, $0.writtenDigest) },
                 uniquingKeysWith: { _, latest in latest }
             ),
             watchID: connection.watch.id
@@ -194,7 +238,7 @@ extension AppModel {
         if taken + dropped > 0 {
             await PebbleDiagnostics.shared.record(
                 category: "timeline",
-                message: "\(connection.watch.name) took \(taken) of \(timeline.pins.count) pin(s)"
+                message: "\(connection.watch.name) took \(taken) of \(pins.count) pin(s)"
                     + " — \(takenFromQueue) queued, \(taken - takenFromQueue) derived"
                     + " — and dropped \(dropped)"
             )

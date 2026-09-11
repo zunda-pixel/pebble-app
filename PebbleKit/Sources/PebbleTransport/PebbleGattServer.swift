@@ -131,8 +131,25 @@ public final class PebbleGattServer: NSObject {
 
     // Removing and re-adding sends a service-changed indication. A watch that
     // inspected this phone before the service existed caches that result.
-    func republish() {
+    //
+    // `chasing` names the one watch the republish is for. The teardown is
+    // global — one peripheral manager, every subscriber — so while any *other*
+    // watch is subscribed and talking, cutting its transport to chase this one
+    // is the worse trade, and the stalled watch gets its retry on the next
+    // connect instead.
+    func republish(chasing centralID: String? = nil) {
         guard let manager = peripheralManager, manager.state == .poweredOn else {
+            return
+        }
+        let others = subscribedCentrals.keys.filter { $0 != centralID }
+        guard others.isEmpty else {
+            Task { [count = others.count] in
+                await PebbleDiagnostics.shared.record(
+                    .warning,
+                    category: "pairing",
+                    message: "Left the phone's protocol service alone: \(count) other watch(es) are subscribed to it"
+                )
+            }
             return
         }
         Task {
@@ -285,16 +302,20 @@ extension PebbleGattServer: CBPeripheralManagerDelegate {
         _ peripheral: CBPeripheralManager,
         didReceiveWrite requests: [CBATTRequest]
     ) {
+        // One delivery gets exactly one response, on its first request —
+        // answering a refused request in the loop and then the batch again
+        // was two responses to the same ATT transaction.
+        var result = CBATTError.Code.success
         for request in requests {
             guard request.characteristic.uuid == Self.dataCharacteristicUUID,
                   let value = request.value else {
-                peripheral.respond(to: request, withResult: .requestNotSupported)
+                result = .requestNotSupported
                 continue
             }
             registrations[request.central.identifier.uuidString]?.onReceive([UInt8](value))
         }
         if let first = requests.first {
-            peripheral.respond(to: first, withResult: .success)
+            peripheral.respond(to: first, withResult: result)
         }
     }
 

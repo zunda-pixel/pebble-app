@@ -34,6 +34,8 @@ final class MusicCoordinator {
     private let source: any SystemMusicSource
     private var lastSnapshot: MusicSnapshot?
     private var pushTask: Task<Void, Never>?
+    /// A change arrived while a push was already debouncing or sending.
+    private var pushAskedAgain = false
 
     /// How long a push waits for the changes behind it to settle.
     ///
@@ -95,13 +97,22 @@ final class MusicCoordinator {
             lastSnapshot = nil
         }
         guard pushTask == nil else {
+            // Remembered rather than raced: the task used to hand its slot
+            // back before its sends, so a change arriving mid-push started a
+            // second push whose frames could land behind the first's — the
+            // watch showed the previous track. The running push goes again
+            // instead, against whatever the source says by then.
+            pushAskedAgain = true
             return
         }
         pushTask = Task { [weak self, debounce] in
             await debounce(.seconds(1))
             guard let self, !Task.isCancelled else { return }
+            repeat {
+                self.pushAskedAgain = false
+                await self.pushChanges()
+            } while self.pushAskedAgain && !Task.isCancelled
             self.pushTask = nil
-            await self.pushChanges()
         }
     }
 

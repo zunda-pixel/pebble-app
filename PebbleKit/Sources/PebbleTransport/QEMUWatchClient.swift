@@ -74,57 +74,67 @@ public final class QEMUWatchClient: WatchClient {
         self.connection = connection
         connectionGeneration += 1
         let generation = connectionGeneration
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
-            openContinuation = continuation
-            connection.stateUpdateHandler = { [weak self] state in
-                Task { @MainActor in self?.handleConnectionState(state, from: generation) }
+        // Everything below can throw over a socket that stays healthy — the
+        // emulator answers TCP and then says nothing — and nothing else tears
+        // that socket down: `disconnect(from:)` needs the watch this never
+        // produced. Without the catch, every connect after a timeout answered
+        // "already in progress" until the app was relaunched.
+        do {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+                openContinuation = continuation
+                connection.stateUpdateHandler = { [weak self] state in
+                    Task { @MainActor in self?.handleConnectionState(state, from: generation) }
+                }
+                connection.start(queue: .global(qos: .userInitiated))
             }
-            connection.start(queue: .global(qos: .userInitiated))
-        }
-        receiveNextMessage(from: generation)
-        // The socket is the link and the transport at once here: there is no
-        // service discovery and no PPoG handshake, so both phases land
-        // together and the emulator's connect looks instantaneous.
-        reportingPhase(.linkOpen)
-        reportingPhase(.transportOpen)
-        let information = try await withCheckedThrowingContinuation { continuation in
-            versionContinuation = continuation
-            Task {
-                do {
-                    try await send(WatchVersionCodec.requestFrame())
-                } catch {
-                    finishVersion(throwing: error)
+            receiveNextMessage(from: generation)
+            // The socket is the link and the transport at once here: there is no
+            // service discovery and no PPoG handshake, so both phases land
+            // together and the emulator's connect looks instantaneous.
+            reportingPhase(.linkOpen)
+            reportingPhase(.transportOpen)
+            let information = try await withCheckedThrowingContinuation { continuation in
+                versionContinuation = continuation
+                Task {
+                    do {
+                        try await send(WatchVersionCodec.requestFrame())
+                    } catch {
+                        finishVersion(throwing: error)
+                    }
+                }
+                operationTimeoutTask = Task { [weak self] in
+                    try? await Task.sleep(for: .seconds(10))
+                    guard !Task.isCancelled else { return }
+                    self?.finishVersion(throwing: WatchConnectionError.connectionTimedOut)
                 }
             }
-            operationTimeoutTask = Task { [weak self] in
-                try? await Task.sleep(for: .seconds(10))
-                guard !Task.isCancelled else { return }
-                self?.finishVersion(throwing: WatchConnectionError.connectionTimedOut)
-            }
+            // Said out loud, as the Bluetooth transport does. It said nothing here,
+            // which is how a watch arriving with no board and no capabilities went
+            // unremarked in the one environment this project verifies in.
+            await PebbleDiagnostics.shared.record(
+                information.isRunningRecoveryFirmware ? .error : .info,
+                category: "connection",
+                message: "[qemu] \(information.diagnosticSummary)"
+                    + (information.isRunningRecoveryFirmware
+                        ? " (recovery firmware: only a firmware install will work)"
+                        : "")
+            )
+            try await synchronizeTime()
+            let device = ConnectedWatch(
+                id: device.id,
+                name: device.name,
+                model: WatchModel(hardwarePlatform: information.hardwarePlatform) ?? device.model,
+                batteryLevel: nil,
+                // One value, so this transport cannot arrive with half of what the
+                // watch said — which is exactly what it used to do.
+                version: information
+            )
+            connectedWatch = device
+            return device
+        } catch {
+            discardConnection()
+            throw error
         }
-        // Said out loud, as the Bluetooth transport does. It said nothing here,
-        // which is how a watch arriving with no board and no capabilities went
-        // unremarked in the one environment this project verifies in.
-        await PebbleDiagnostics.shared.record(
-            information.isRunningRecoveryFirmware ? .error : .info,
-            category: "connection",
-            message: "[qemu] \(information.diagnosticSummary)"
-                + (information.isRunningRecoveryFirmware
-                    ? " (recovery firmware: only a firmware install will work)"
-                    : "")
-        )
-        try await synchronizeTime()
-        let device = ConnectedWatch(
-            id: device.id,
-            name: device.name,
-            model: WatchModel(hardwarePlatform: information.hardwarePlatform) ?? device.model,
-            batteryLevel: nil,
-            // One value, so this transport cannot arrive with half of what the
-            // watch said — which is exactly what it used to do.
-            version: information
-        )
-        connectedWatch = device
-        return device
     }
 
     public func disconnect(from device: ConnectedWatch) async {
@@ -271,7 +281,12 @@ public final class QEMUWatchClient: WatchClient {
         guard let byteCount = UInt32(exactly: total) else { throw PutBytesTransferError.invalidConfiguration }
         waitingForFirmwareStart = true
         try await performOperation(frame: SystemMessageCodec.firmwareUpdateStartFrame(bytesToSend: byteCount), timeout: .seconds(10))
-        try await installApplicationObject([UInt8](package.firmware), objectType: package.manifest.firmware.type == "recovery" ? .recovery : .firmware, appBankID: UInt32(package.manifest.firmware.slot ?? 0))
+        // Bank 0, the way the Bluetooth transport and the official app send
+        // it: `put_bytes.c` uses the index only to name app and resource bank
+        // files, and `ObjectFirmware` writes to the scratch region whatever is
+        // here. The slot chooses which manifest entry to send, never a bank —
+        // and a slot number past MAX_APP_BANKS would be refused outright.
+        try await installApplicationObject([UInt8](package.firmware), objectType: package.manifest.firmware.type == "recovery" ? .recovery : .firmware, appBankID: 0)
         guard let firmwareCookie = completedTransferCookie else { throw PutBytesTransferError.invalidState }
         var cookies = [firmwareCookie]
         if let resources = package.resources {

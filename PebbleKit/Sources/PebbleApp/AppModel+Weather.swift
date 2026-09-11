@@ -102,6 +102,26 @@ extension AppModel {
     }
 
     public func refreshWeather() async {
+        // A caller who asked outright — a pull, a changed unit — is owed a
+        // round that saw their change, so a round already in flight is waited
+        // out rather than joined. The stale-gated callers join instead, in
+        // `refreshWeatherIfStale`; they are the ones that race.
+        while let running = weather.refreshTask {
+            await running.value
+        }
+        // The task clears its own handle before finishing: awaiting a finished
+        // task need not suspend, so a waiter waking to a handle the claimant
+        // had not cleared yet would spin on the main actor without ever
+        // letting the claimant back on to clear it.
+        let task = Task {
+            await self.runWeatherRefresh()
+            self.weather.refreshTask = nil
+        }
+        weather.refreshTask = task
+        await task.value
+    }
+
+    private func runWeatherRefresh() async {
         guard !weather.places.isEmpty else {
             weather.feedback = nil
             return
@@ -252,6 +272,15 @@ extension AppModel {
     /// interval to notice.
     func refreshWeatherIfStale(now: Date = .now) async {
         guard Defaults[.weatherAutoRefreshEnabled], !weather.places.isEmpty else { return }
+        // The staleness clock only moves when a round finishes, so two of
+        // these racing — the foreground handler and a fresh connection — both
+        // read "stale" while the first round is still in flight. WeatherKit is
+        // a per-device quota, and a second round would also write every watch
+        // its forecasts twice; the round under way is this caller's answer.
+        if let running = weather.refreshTask {
+            await running.value
+            return
+        }
         if let refreshed = Defaults[.weatherRefreshedAt],
            now.timeIntervalSince(refreshed) < Double(Defaults[.weatherRefreshMinutes]) * 60 {
             return

@@ -97,6 +97,7 @@ public struct WatchApplication: Identifiable, Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case id, shortName, longName, companyName, versionCode, versionLabel
         case capabilities, targetPlatforms, kind, appKeys, hasCompanionJavaScript
+        case storeVersion
     }
 
     public init(from decoder: any Decoder) throws {
@@ -115,6 +116,7 @@ public struct WatchApplication: Identifiable, Codable, Equatable, Sendable {
             Bool.self,
             forKey: .hasCompanionJavaScript
         ) ?? false
+        storeVersion = try container.decodeIfPresent(String.self, forKey: .storeVersion)
     }
 
     public func bestVariant(for model: WatchModel) -> String? {

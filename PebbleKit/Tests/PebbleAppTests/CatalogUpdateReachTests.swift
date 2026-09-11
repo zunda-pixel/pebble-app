@@ -258,4 +258,26 @@ struct CatalogUpdateLoopTests {
         #expect(decoded.first?.storeVersion == nil)
         #expect(decoded.first?.versionLabel == "1.0")
     }
+
+    /// The remembered store release has to survive the library file, or the
+    /// #117 fix lasts exactly one launch.
+    @Test func theRememberedStoreReleaseSurvivesARelaunch() throws {
+        var application = WatchApplication(
+            id: UUID(),
+            shortName: "Face",
+            longName: "Face",
+            companyName: "C",
+            versionCode: nil,
+            versionLabel: "1.2.5",
+            capabilities: [],
+            targetPlatforms: ["emery"],
+            kind: .watchface
+        )
+        application.storeVersion = "1.2.6"
+
+        let written = try JSONEncoder().encode([application])
+        let reopened = try JSONDecoder().decode([WatchApplication].self, from: written)
+
+        #expect(reopened.first?.storeVersion == "1.2.6")
+    }
 }

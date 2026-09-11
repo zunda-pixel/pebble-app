@@ -178,19 +178,16 @@ extension AppModel {
         firmware.journal = try await pendingFirmwareUpdateStore.journal()
         // One at a time. Two can be asked for at once — a staged update starting
         // itself as the watch reconnects, while the reader taps Install — and the
-        // second would take over the task and flags the first is using.
+        // second would take over the task and flags the first is using. The
+        // claim sits against the guard with no suspension between them: with a
+        // log line in the gap, both callers passed the guard and the loser's
+        // cleanup ended the winner's transfer (found in the 2026-09-12 audit).
         guard firmwareUpdateTask == nil else {
             firmware.feedback = .failure("This firmware is already being transferred.")
             return
         }
         firmware.feedback = .progress("Transferring verified firmware…")
         connection.beginTransfer(.firmware)
-        await PebbleDiagnostics.shared.record(
-            category: "firmware",
-            message: "sending \(package.manifest.firmware.versionTag ?? "firmware")"
-                + " to \(connection.watch.name)"
-                + (connection.watch.isRunningRecoveryFirmware ? " (recovery firmware)" : "")
-        )
         let client = connection.client
         let task = Task { try await client.installFirmware(package) }
         firmwareUpdateTask = task
@@ -198,6 +195,12 @@ extension AppModel {
             firmwareUpdateTask = nil
             connection.endTransfer()
         }
+        await PebbleDiagnostics.shared.record(
+            category: "firmware",
+            message: "sending \(package.manifest.firmware.versionTag ?? "firmware")"
+                + " to \(connection.watch.name)"
+                + (connection.watch.isRunningRecoveryFirmware ? " (recovery firmware)" : "")
+        )
         do {
             try await task.value
         } catch {

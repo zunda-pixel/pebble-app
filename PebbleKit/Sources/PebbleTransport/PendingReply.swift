@@ -39,7 +39,14 @@ final class PendingReply<Value: Sendable> {
         timedOut: any Error = WatchConnectionError.connectionTimedOut,
         send: () throws -> Void
     ) async throws -> Value {
-        try await withCheckedThrowingContinuation { continuation in
+        // A second waiter would silently overwrite the first continuation,
+        // whose caller then hangs for the life of the process — the callers
+        // are supposed to be serialized upstream, and a broken queue should
+        // read as this error, not as a hang.
+        guard continuation == nil else {
+            throw WatchConnectionError.connectionAlreadyInProgress
+        }
+        return try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
             do {
                 try send()

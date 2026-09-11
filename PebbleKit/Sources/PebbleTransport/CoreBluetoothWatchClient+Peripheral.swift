@@ -285,7 +285,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
                 category: "pairing",
                 message: "[\(tag)] the watch has not subscribed to the phone's service; publishing it again"
             )
-            PebbleGattServer.shared.republish()
+            PebbleGattServer.shared.republish(chasing: centralID)
         }
     }
 

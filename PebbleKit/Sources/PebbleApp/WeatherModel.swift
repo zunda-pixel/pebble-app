@@ -17,5 +17,9 @@ public final class WeatherModel {
     /// given: this decides which one that is.
     public internal(set) var usesFahrenheit = false
     public internal(set) var isRefreshing = false
+    /// The refresh in flight, if one is. The foreground handler, the periodic
+    /// loop and the screen's pull can all ask at once; the extras join this
+    /// instead of fetching every place again and writing every watch twice.
+    var refreshTask: Task<Void, Never>?
     public internal(set) var feedback: FeatureFeedback?
 }

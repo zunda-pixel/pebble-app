@@ -465,14 +465,25 @@ extension AppModel {
     }
 
     func flushPendingNotifications() async {
-        if let flush = pendingNotificationFlush {
+        // Waited out, then run again rather than joined: a joiner can arrive
+        // in the hop between the running flush's last delivery and the handle
+        // being cleared, and what it queued would then wait for the next
+        // trigger. The extra pass finds an empty queue when the earlier flush
+        // covered it, which costs no sends.
+        while let flush = pendingNotificationFlush {
             await flush.value
-            return
         }
-        let flush = Task { await self.deliverPendingNotifications() }
+        // The task clears its own handle before finishing. Cleared by the
+        // caller instead, a second waiter could wake first, find the handle
+        // still pointing at the finished task, and spin: awaiting a finished
+        // task need not suspend, so the loop above would never yield the main
+        // actor back to the caller that was going to clear it.
+        let flush = Task {
+            await self.deliverPendingNotifications()
+            self.pendingNotificationFlush = nil
+        }
         pendingNotificationFlush = flush
         await flush.value
-        pendingNotificationFlush = nil
     }
 
     private func deliverPendingNotifications() async {
@@ -544,14 +555,17 @@ extension AppModel {
     }
 
     func flushPendingAppMessages() async {
-        if let flush = pendingAppMessageFlush {
+        // The same wait-then-run as the notification flush, for the same hop —
+        // including the task clearing its own handle, for the same spin.
+        while let flush = pendingAppMessageFlush {
             await flush.value
-            return
         }
-        let flush = Task { await self.deliverPendingAppMessages() }
+        let flush = Task {
+            await self.deliverPendingAppMessages()
+            self.pendingAppMessageFlush = nil
+        }
         pendingAppMessageFlush = flush
         await flush.value
-        pendingAppMessageFlush = nil
     }
 
     private func deliverPendingAppMessages() async {

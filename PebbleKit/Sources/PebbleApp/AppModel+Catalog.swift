@@ -149,6 +149,11 @@ extension AppModel {
         // came from is what makes the comparison mean anything.
         let baseURL = catalog.sourceURL ?? AppCatalog.defaultSourceURL
         guard baseURL.scheme?.lowercased() == "https" else { return nil }
+        // The source that owns the feed being asked, so the entry's store page
+        // link points at the store that answered — a Rebble listing sent every
+        // reader to the Pebble store before this was carried through (found in
+        // the 2026-09-12 audit).
+        let source = CatalogSource.builtIn.first { $0.feedURL == baseURL } ?? selectedCatalogSource
         do {
             // The connected watch's board, so a colour watch is answered colour
             // screenshots. The answer is cached per identifier for the session,
@@ -158,7 +163,8 @@ extension AppModel {
             let entry = try await appCatalog.application(
                 uuid: applicationID,
                 from: baseURL,
-                hardware: connectedWatch?.model.compatibleApplicationVariants.first
+                hardware: connectedWatch?.model.compatibleApplicationVariants.first,
+                sourceID: source.id
             )
             if let entry { catalog.storeEntries[applicationID] = entry }
             // Recorded whichever way it went: "the store does not have this"
