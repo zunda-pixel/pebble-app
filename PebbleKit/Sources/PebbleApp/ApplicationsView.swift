@@ -58,6 +58,9 @@ struct ApplicationsView: View {
             isOperationInProgress: model.isApplicationManagementBusy,
             installingApplicationName: transfer?.name,
             installationProgress: transfer?.progress,
+            // The pull is the phone's Update All: check the store and install
+            // whatever is newer.
+            refresh: { await model.installCatalogUpdates() },
             // The store's picture of an installed application, the same way
             // the catalog rows choose theirs: a watchface is its screenshot,
             // an app its icon.
@@ -104,12 +107,17 @@ struct ApplicationsView: View {
             await model.loadCatalog()
         }
         .toolbar {
+            #if os(macOS)
+            // Kept here alone: pulling to refresh is a gesture the phone has
+            // and a window does not, so dropping the button would leave the
+            // Mac with no way to ask for updates at all.
             ToolbarItem(placement: .primaryAction) {
                 Button("Update All", systemImage: "arrow.down.app") {
                     Task { await model.installCatalogUpdates() }
                 }
                 .disabled(model.isApplicationManagementBusy)
             }
+            #endif
             ToolbarItem(placement: .primaryAction) {
                 NavigationLink {
                     CatalogView(
@@ -185,6 +193,7 @@ struct ApplicationsContent<Detail: View>: View {
     var isOperationInProgress: Bool
     var installingApplicationName: String?
     var installationProgress: PutBytesTransferProgress?
+    var refresh: @MainActor () async -> Void = {}
     var storeImageURL: (WatchApplication) async -> URL? = { _ in nil }
     var removeApplication: (UUID) -> Void
     var reorderApplications: (WatchApplicationKind, IndexSet, Int) -> Void
@@ -256,6 +265,9 @@ struct ApplicationsContent<Detail: View>: View {
                     }
                 }
                 .searchable(text: $query)
+                // Awaited so the indicator stays up until the store has been
+                // asked and any updates are on their way.
+                .refreshable { await refresh() }
                 // An alert, and one for the whole list rather than one per row.
                 // A confirmation dialog is anchored, and a swiped row is already
                 // gone by the time it would be asked about, so there is nothing
