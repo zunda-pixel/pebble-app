@@ -14,11 +14,14 @@ import Testing
 @MainActor
 @Suite
 struct CatalogSearchTests {
-    private static func hit(id: String) -> String { "{\"id\": \"\(id)\"}" }
+    private static func hit(id: String, collections: String? = nil) -> String {
+        collections.map { "{\"id\": \"\(id)\", \"asset_collections\": \($0)}" }
+            ?? "{\"id\": \"\(id)\"}"
+    }
 
     private static func searchPage(ids: [String], page: Int = 0, pages: Int = 1, total: Int? = nil) -> Data {
         Data("""
-        {"hits": [\(ids.map(hit(id:)).joined(separator: ","))],
+        {"hits": [\(ids.map { hit(id: $0) }.joined(separator: ","))],
          "page": \(page), "nbPages": \(pages), "nbHits": \(total ?? ids.count)}
         """.utf8)
     }
@@ -110,6 +113,41 @@ struct CatalogSearchTests {
         let answer = try await stub.catalog(in: directory).search("mario")
 
         #expect(answer.applications.map(\.name) == ["First", "Second"])
+    }
+
+    /// The bulk endpoint ignores its hardware parameter and answers each
+    /// application's default board, so the connected watch's screenshots come
+    /// from the hit's own per-board collections — and where they do not cover
+    /// this watch, the default stays.
+    @Test func theConnectedBoardsScreenshotsReplaceTheDefaultOnes() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let stub = Stub()
+        StoreStubURLProtocol.answer(stub.searchURL, with: Self.searchPage(ids: ["covered", "uncovered"]))
+        StoreStubURLProtocol.answer(stub.bulkURL, with: Self.bulk([
+            Self.entry(id: "covered", uuid: "A1A1A1A1-0000-0000-0000-000000000001"),
+            Self.entry(id: "uncovered", uuid: "A1A1A1A1-0000-0000-0000-000000000002"),
+        ]))
+        // Rebuild the search page with collections on the first hit only.
+        StoreStubURLProtocol.answer(stub.searchURL, with: Data("""
+        {"hits": [
+            \(Self.hit(id: "covered", collections: """
+            [{"hardware_platform": "aplite", "screenshots": ["https://store.example/aplite.png"]},
+             {"hardware_platform": "emery", "screenshots": ["https://store.example/emery-1.png", "https://store.example/emery-2.png"]}]
+            """)),
+            \(Self.hit(id: "uncovered"))
+        ], "page": 0, "nbPages": 1, "nbHits": 2}
+        """.utf8))
+
+        let answer = try await stub.catalog(in: directory)
+            .search("mario", preferredHardware: ["emery", "basalt"])
+
+        // The covered hit shows the watch's own board; the uncovered one keeps
+        // the bulk entry's default.
+        #expect(answer.applications[0].screenshotURLs.map(\.absoluteString)
+            == ["https://store.example/emery-1.png", "https://store.example/emery-2.png"])
+        #expect(answer.applications[1].screenshotURLs.map(\.absoluteString)
+            == ["https://store.example/one.png"])
     }
 
     @Test func moreResultsAppendWithoutDoublingARow() async throws {

@@ -46,7 +46,12 @@ extension AppModel {
         catalog.isSearching = true
         defer { catalog.isSearching = false }
         do {
-            let answer = try await appCatalog.search(words, kind: kind, page: 0)
+            let answer = try await appCatalog.search(
+                words,
+                kind: kind,
+                page: 0,
+                preferredHardware: connectedWatch?.model.compatibleApplicationVariants ?? []
+            )
             catalog.searchResults = answer.applications
             catalog.searchQuery = words
             catalog.searchKind = kind
@@ -72,7 +77,8 @@ extension AppModel {
             let answer = try await appCatalog.search(
                 catalog.searchQuery,
                 kind: catalog.searchKind,
-                page: catalog.searchPage
+                page: catalog.searchPage,
+                preferredHardware: connectedWatch?.model.compatibleApplicationVariants ?? []
             )
             // Deduplicated on the identifier: the index can shift under the
             // pages, and the same application twice would be two rows with one
@@ -118,7 +124,16 @@ extension AppModel {
         let baseURL = catalog.sourceURL ?? AppCatalog.defaultSourceURL
         guard baseURL.scheme?.lowercased() == "https" else { return nil }
         do {
-            let entry = try await appCatalog.application(uuid: applicationID, from: baseURL)
+            // The connected watch's board, so a colour watch is answered colour
+            // screenshots. The answer is cached per identifier for the session,
+            // so a watch swapped mid-session keeps the earlier board's images
+            // until the next launch — a smaller wrong than asking again on
+            // every visit.
+            let entry = try await appCatalog.application(
+                uuid: applicationID,
+                from: baseURL,
+                hardware: connectedWatch?.model.compatibleApplicationVariants.first
+            )
             if let entry { catalog.storeEntries[applicationID] = entry }
             // Recorded whichever way it went: "the store does not have this"
             // is an answer, and asking again on every visit will not change it.

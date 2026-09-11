@@ -47,10 +47,16 @@ extension AppCatalog {
     /// platform deliberately is not — the index does not tag every compatible
     /// application with every board, so filtering there loses real results.
     /// Compatibility is judged per row instead, by `supportedPlatforms`.
+    /// - Parameter preferredHardware: The connected watch's boards, most
+    ///   compatible first. The bulk endpoint ignores its hardware parameter
+    ///   (measured 2026-09-12) and answers each application's default board,
+    ///   so the screenshots come from the hit's own per-board collections
+    ///   instead, which the index does carry.
     public func search(
         _ query: String,
         kind: WatchApplicationKind? = nil,
-        page: Int = 0
+        page: Int = 0,
+        preferredHardware: [String] = []
     ) async throws -> CatalogSearchPage {
         var tags = ["ios"]
         if let kind { tags.append(kind == .watchface ? "watchface" : "watchapp") }
@@ -73,12 +79,47 @@ extension AppCatalog {
             throw AppCatalogError.invalidResponse
         }
         let answer = try JSONDecoder().decode(AlgoliaSearchResponse.self, from: data)
+        let collections = Dictionary(
+            answer.hits.compactMap { hit -> (String, [CatalogSearchAssetCollection])? in
+                guard let id = hit.id, let assetCollections = hit.assetCollections else { return nil }
+                return (id, assetCollections)
+            },
+            uniquingKeysWith: { first, _ in first }
+        )
+        let resolved = try await applications(ids: answer.hits.compactMap(\.id))
+            .map { application -> CatalogApplication in
+                guard let id = application.storeID,
+                      let urls = Self.screenshotURLs(
+                          from: collections[id] ?? [],
+                          preferred: preferredHardware
+                      )
+                else { return application }
+                var chosen = application
+                chosen.screenshotURLs = urls
+                return chosen
+            }
         return CatalogSearchPage(
-            applications: try await applications(ids: answer.hits.compactMap(\.id)),
+            applications: resolved,
             page: answer.page,
             pageCount: answer.nbPages,
             totalCount: answer.nbHits
         )
+    }
+
+    /// The screenshots for the most preferred board that has any, or nil to
+    /// keep the entry's own — the bulk answer's default board, better than
+    /// nothing where the collections do not cover this watch.
+    static func screenshotURLs(
+        from collections: [CatalogSearchAssetCollection],
+        preferred: [String]
+    ) -> [URL]? {
+        for board in preferred {
+            guard let collection = collections.first(where: { $0.hardwarePlatform == board })
+            else { continue }
+            let urls = (collection.screenshots ?? []).compactMap(URL.init(string:))
+            if !urls.isEmpty { return urls }
+        }
+        return nil
     }
 
     /// The full store entries for these identifiers, in the order they were
@@ -132,9 +173,26 @@ struct AlgoliaSearchResponse: Decodable {
     var nbHits: Int
 }
 
-/// One hit as the index sends it. Only the store identifier is kept: the hit
-/// has no release to install from, so everything shown comes from the feed's
-/// own entry, fetched by this identifier.
+/// One hit as the index sends it. The store identifier names the feed entry
+/// everything else comes from — the hit has no release to install from — and
+/// the per-board screenshot collections are kept because they are the one
+/// thing the feed's bulk answer cannot say for this watch.
 struct CatalogSearchHit: Decodable {
     var id: String?
+    var assetCollections: [CatalogSearchAssetCollection]?
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case assetCollections = "asset_collections"
+    }
+}
+
+struct CatalogSearchAssetCollection: Decodable {
+    var hardwarePlatform: String?
+    var screenshots: [String]?
+
+    private enum CodingKeys: String, CodingKey {
+        case hardwarePlatform = "hardware_platform"
+        case screenshots
+    }
 }

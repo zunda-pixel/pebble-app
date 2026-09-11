@@ -242,8 +242,17 @@ public actor AppCatalog {
     ///
     /// Nil where the store does not have it, which is an answer worth keeping:
     /// plenty of packages were never listed.
-    public func application(uuid: UUID, from baseURL: URL) async throws -> CatalogApplication? {
-        let url = baseURL.appending(path: "v1/apps/uuid").appending(path: uuid.uuidString.lowercased())
+    /// - Parameter hardware: The connected watch's board, which the endpoint
+    ///   honours (measured 2026-09-12: `?hardware=aplite` answers aplite
+    ///   screenshots where the default was basalt). Nil asks for the store's
+    ///   default, which is right when no watch is connected.
+    public func application(uuid: UUID, from baseURL: URL, hardware: String? = nil) async throws -> CatalogApplication? {
+        var url = baseURL.appending(path: "v1/apps/uuid").appending(path: uuid.uuidString.lowercased())
+        if let hardware {
+            var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            components?.queryItems = [URLQueryItem(name: "hardware", value: hardware)]
+            if let value = components?.url { url = value }
+        }
         guard let data = try await responseDataAllowingNotFound(from: url) else { return nil }
         let response = try JSONDecoder().decode(OfficialCatalogLookup.self, from: data)
         // The kind comes off the entry rather than the endpoint here: this one
