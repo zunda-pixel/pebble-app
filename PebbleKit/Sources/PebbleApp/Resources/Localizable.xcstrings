@@ -3223,6 +3223,16 @@
         }
       }
     },
+    "Licenses" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ライセンス"
+          }
+        }
+      }
+    },
     "Line" : {
       "localizations" : {
         "ja" : {
@@ -3942,6 +3952,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "プライバシー設定を開く"
+          }
+        }
+      }
+    },
+    "Open Repository" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リポジトリを開く"
           }
         }
       }

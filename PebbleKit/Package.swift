@@ -38,6 +38,9 @@ let package = Package(
     .package(url: "https://github.com/sindresorhus/Defaults.git", from: "9.0.0"),
     .package(url: "https://github.com/gohanlon/swift-memberwise-init-macro.git", from: "0.6.0"),
     .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.20"),
+    // Generates the dependency-license list the settings screen shows, from
+    // the package graph itself, so a new dependency cannot be forgotten.
+    .package(url: "https://github.com/zunda-pixel/LicenseProvider", from: "1.5.2"),
     // Speex, which no Apple framework decodes and the watch gives no
     // alternative to. See the note on `PebbleAudio` below.
     .package(
@@ -103,7 +106,10 @@ let package = Package(
         .product(name: "DMRetry", package: "swift-retry"),
         .product(name: "Valet", package: "Valet"),
       ],
-      swiftSettings: swiftSettings
+      swiftSettings: swiftSettings,
+      plugins: [
+        .plugin(name: "LicenseProviderPlugin", package: "LicenseProvider"),
+      ]
     ),
     .testTarget(
       name: "PebbleProtocolTests",

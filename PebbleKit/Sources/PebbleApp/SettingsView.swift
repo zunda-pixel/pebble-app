@@ -191,6 +191,9 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
                     }
                 }
             }
+            Section {
+                NavigationLink("Licenses") { LicensesView() }
+            }
         }
         .navigationTitle(Text("Settings"))
         // Any of these can be changed in the system settings while the app is in the
