@@ -4750,6 +4750,7 @@
       }
     },
     "Search the Whole Store" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {

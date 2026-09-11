@@ -171,19 +171,12 @@ struct CatalogContent<Destination: View>: View {
                         }
                     }
                 }
-            } else if !query.trimmingCharacters(in: .whitespaces).isEmpty {
-                // Typing no longer sifts anything here — the library's own
-                // screen does that — so the words wait for this button or the
-                // keyboard's submit, both of which ask the store.
+            } else if isSearching {
+                // The first page is still on its way; once it lands the
+                // Store Search section above takes over.
                 Section {
-                    if isSearching {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                    } else {
-                        Button("Search the Whole Store", systemImage: "magnifyingglass") {
-                            Task { await search(query, searchKind) }
-                        }
-                    }
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
                 }
             }
             Section("Applications") {
