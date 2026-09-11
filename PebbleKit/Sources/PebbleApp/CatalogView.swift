@@ -47,10 +47,17 @@ struct CatalogView: View {
             isUpdating: model.catalog.isUpdating,
             feedback: model.catalog.feedback,
             importFeedback: model.applications.importFeedback,
+            searchResults: model.catalog.searchResults,
+            searchQuery: model.catalog.searchQuery,
+            hasMoreSearchResults: model.catalog.hasMoreSearchResults,
+            isSearching: model.catalog.isSearching,
             importApplication: importApplication,
             // Awaited rather than launched, so that the pull-to-refresh
             // indicator stays up until the catalogue has actually been fetched.
             refresh: { await model.refreshCatalog() },
+            search: { query, kind in await model.searchCatalog(query, kind: kind) },
+            loadMoreResults: { await model.loadMoreCatalogSearchResults() },
+            clearSearch: { model.clearCatalogSearch() },
             destination: { application in
                 CatalogApplicationDetailView(
                     application: application,
@@ -77,8 +84,17 @@ struct CatalogContent<Destination: View>: View {
     /// from `feedback`, which is the catalogue's: one is about the store, the
     /// other about a file from this phone.
     var importFeedback: FeatureFeedback?
+    /// What the store's index answered, as against `applications`, the home
+    /// feed the pickers sift. Nil until a search is submitted.
+    var searchResults: [CatalogApplication]?
+    var searchQuery: String = ""
+    var hasMoreSearchResults: Bool = false
+    var isSearching: Bool = false
     var importApplication: (() -> Void)?
     var refresh: @MainActor () async -> Void
+    var search: @MainActor (String, WatchApplicationKind?) async -> Void = { _, _ in }
+    var loadMoreResults: @MainActor () async -> Void = {}
+    var clearSearch: @MainActor () -> Void = {}
     @ViewBuilder var destination: (CatalogApplication) -> Destination
 
     @State private var query = ""
@@ -130,6 +146,46 @@ struct CatalogContent<Destination: View>: View {
                     ForEach(CatalogSort.allCases) { Text($0.title).tag($0) }
                 }
             }
+            // The store's whole inventory, as against the home feed below it:
+            // the feed is a shop window, and the search box alone only sifts
+            // what the window happens to hold.
+            if let searchResults {
+                Section("Store Search") {
+                    if searchResults.isEmpty {
+                        Text("The store found nothing for \u{201C}\(searchQuery)\u{201D}.")
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(searchResults) { application in
+                        NavigationLink {
+                            destination(application)
+                        } label: {
+                            CatalogApplicationRow(application: application, state: state(application))
+                        }
+                    }
+                    if isSearching {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                    } else if hasMoreSearchResults {
+                        Button("Load More") {
+                            Task { await loadMoreResults() }
+                        }
+                    }
+                }
+            } else if !query.trimmingCharacters(in: .whitespaces).isEmpty {
+                // The way to say the search box has two jobs: it has been
+                // sifting the feed as the reader typed, and the whole store is
+                // one press away.
+                Section {
+                    if isSearching {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        Button("Search the Whole Store", systemImage: "magnifyingglass") {
+                            Task { await search(query, searchKind) }
+                        }
+                    }
+                }
+            }
             Section("Applications") {
                 ForEach(filteredApplications) { application in
                     NavigationLink {
@@ -141,6 +197,14 @@ struct CatalogContent<Destination: View>: View {
             }
         }
         .searchable(text: $query)
+        .onSubmit(of: .search) {
+            Task { await search(query, searchKind) }
+        }
+        .onChange(of: query) { _, changed in
+            // An emptied search box is the reader done with the results; typed
+            // words only sift the feed until they are submitted again.
+            if changed.trimmingCharacters(in: .whitespaces).isEmpty { clearSearch() }
+        }
         .navigationTitle(Text("Catalog"))
         // A second pull while one is running is the model's to ignore, which
         // it does — `updateCatalog` returns early when it is already updating.
@@ -176,7 +240,7 @@ struct CatalogContent<Destination: View>: View {
         .toolbarVisibility(.hidden, for: .tabBar)
         #endif
         .overlay {
-            if filteredApplications.isEmpty {
+            if filteredApplications.isEmpty && searchResults == nil {
                 // Two causes, and the screen cannot tell them apart: a filter
                 // that excludes everything, or a catalogue that was never
                 // fetched. Saying both beats naming the wrong one — and it
@@ -197,6 +261,16 @@ struct CatalogContent<Destination: View>: View {
 
     private var categories: [String] {
         CatalogFilter.categories(in: applications)
+    }
+
+    /// The kind picker's word for the index's tags. "All" is no tag: the index
+    /// is asked for both kinds rather than neither.
+    private var searchKind: WatchApplicationKind? {
+        switch kind {
+        case .all: nil
+        case .watchapps: .watchapp
+        case .watchfaces: .watchface
+        }
     }
 }
 

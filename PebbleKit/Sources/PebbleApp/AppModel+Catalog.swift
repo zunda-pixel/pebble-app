@@ -35,6 +35,68 @@ extension AppModel {
         }
     }
 
+    /// Asks the store's whole index, not the fetched home feed: the feed is a
+    /// shop window, and most of the store is only reachable this way (#97).
+    ///
+    /// A new search replaces the old results; the next page of the same one is
+    /// `loadMoreCatalogSearchResults`.
+    public func searchCatalog(_ query: String, kind: WatchApplicationKind? = nil) async {
+        let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !words.isEmpty, !catalog.isSearching else { return }
+        catalog.isSearching = true
+        defer { catalog.isSearching = false }
+        do {
+            let answer = try await appCatalog.search(words, kind: kind, page: 0)
+            catalog.searchResults = answer.applications
+            catalog.searchQuery = words
+            catalog.searchKind = kind
+            catalog.searchTotalCount = answer.totalCount
+            catalog.hasMoreSearchResults = answer.hasMore
+            catalog.searchPage = 1
+        } catch {
+            catalog.feedback = .failure("The store could not be searched.")
+            await PebbleDiagnostics.shared.record(
+                .error,
+                category: "catalog",
+                message: "store search failed: \(String(reflecting: error))"
+            )
+        }
+    }
+
+    public func loadMoreCatalogSearchResults() async {
+        guard let shown = catalog.searchResults, catalog.hasMoreSearchResults,
+              !catalog.isSearching else { return }
+        catalog.isSearching = true
+        defer { catalog.isSearching = false }
+        do {
+            let answer = try await appCatalog.search(
+                catalog.searchQuery,
+                kind: catalog.searchKind,
+                page: catalog.searchPage
+            )
+            // Deduplicated on the identifier: the index can shift under the
+            // pages, and the same application twice would be two rows with one
+            // BlobDB fate.
+            let known = Set(shown.map(\.id))
+            catalog.searchResults = shown + answer.applications.filter { !known.contains($0.id) }
+            catalog.searchTotalCount = answer.totalCount
+            catalog.hasMoreSearchResults = answer.hasMore
+            catalog.searchPage = answer.page + 1
+        } catch {
+            catalog.feedback = .failure("The store could not be searched.")
+        }
+    }
+
+    /// Back to the home feed alone, as when no search has been made.
+    public func clearCatalogSearch() {
+        catalog.searchResults = nil
+        catalog.searchQuery = ""
+        catalog.searchKind = nil
+        catalog.searchTotalCount = 0
+        catalog.hasMoreSearchResults = false
+        catalog.searchPage = 0
+    }
+
     /// What the store knows about something already in the library.
     ///
     /// Asked by the package's own UUID, so it works for an application however

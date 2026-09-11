@@ -3211,6 +3211,16 @@
         }
       }
     },
+    "Load More" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "さらに読み込む"
+          }
+        }
+      }
+    },
     "Loading applications" : {
       "localizations" : {
         "ja" : {
@@ -4729,6 +4739,16 @@
         }
       }
     },
+    "Search the Whole Store" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ストア全体を検索"
+          }
+        }
+      }
+    },
     "Send Test Notification" : {
       "localizations" : {
         "ja" : {
@@ -5055,6 +5075,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "有効期限を設ける"
+          }
+        }
+      }
+    },
+    "Store Search" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ストア検索"
           }
         }
       }
@@ -5562,6 +5592,26 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "選択したウォッチは利用できなくなりました。もう一度スキャンしてください。"
+          }
+        }
+      }
+    },
+    "The store could not be searched." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ストアを検索できませんでした。"
+          }
+        }
+      }
+    },
+    "The store found nothing for “%@”." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ストアに「%@」に一致するものはありませんでした。"
           }
         }
       }

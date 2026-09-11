@@ -29,4 +29,18 @@ public final class CatalogModel {
     /// store does not have, so that a package it never listed is not asked
     /// after again on every visit.
     public internal(set) var answeredStoreLookups: Set<UUID> = []
+
+    /// What the store's own index answered, as against `applications`, which
+    /// is the home feed. Nil until a search is submitted and after it is
+    /// cleared, so the screen can tell "no search" from "no results".
+    public internal(set) var searchResults: [CatalogApplication]?
+    /// The words the results answer, kept so a changed search box does not
+    /// silently relabel old results.
+    public internal(set) var searchQuery = ""
+    public internal(set) var searchTotalCount = 0
+    public internal(set) var hasMoreSearchResults = false
+    public internal(set) var isSearching = false
+    /// The next page to ask the index for.
+    var searchPage = 0
+    var searchKind: WatchApplicationKind?
 }
