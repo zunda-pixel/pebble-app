@@ -3534,6 +3534,7 @@
       }
     },
     "Name" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -5001,6 +5002,7 @@
       }
     },
     "Sort" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {

@@ -35,19 +35,6 @@ enum CatalogKindFilter: String, CaseIterable, Identifiable {
     }
 }
 
-enum CatalogSort: String, CaseIterable, Identifiable {
-    case name, category, version
-    var id: Self { self }
-
-    var title: LocalizedStringKey {
-        switch self {
-        case .name: "Name"
-        case .category: "Category"
-        case .version: "Version"
-        }
-    }
-}
-
 /// The app catalog, pushed from the Apps tab's plus button.
 struct CatalogView: View {
     var model: AppModel
@@ -132,7 +119,6 @@ struct CatalogContent<Destination: View>: View {
     /// translated, by `catalogCategoryText`.
     @State private var category: String?
     @State private var kind: CatalogKindFilter = .all
-    @State private var sort: CatalogSort = .name
 
     // Pushed onto the applications screen's stack rather than presented, so
     // there is no stack of its own to start and no size to ask for.
@@ -198,9 +184,6 @@ struct CatalogContent<Destination: View>: View {
                         ForEach(categories, id: \.self) {
                             catalogCategoryText($0).tag(String?.some($0))
                         }
-                    }
-                    Picker("Sort", selection: $sort) {
-                        ForEach(CatalogSort.allCases) { Text($0.title).tag($0) }
                     }
                 }
                 Section("Applications") {
@@ -273,8 +256,7 @@ struct CatalogContent<Destination: View>: View {
     }
 
     private var filteredApplications: [CatalogApplication] {
-        CatalogFilter(category: category, kind: kind, sort: sort)
-            .applied(to: applications)
+        CatalogFilter(category: category, kind: kind).applied(to: applications)
     }
 
     private var categories: [String] {
@@ -301,12 +283,14 @@ struct CatalogContent<Destination: View>: View {
 /// the "do not filter" mark all at once.
 ///
 /// No query: the search box above these pickers asks the store's index, and
-/// sifting what is already on the phone is the library screen's job.
+/// sifting what is already on the phone is the library screen's job. No sort
+/// either — name order is the only one that earned its place: version order
+/// compared numbers that mean nothing across applications, and category order
+/// repeated the category filter (removed 2026-09-12).
 struct CatalogFilter {
     /// Nil for every category.
     var category: String?
     var kind: CatalogKindFilter = .all
-    var sort: CatalogSort = .name
 
     /// What the store called the applications it sent, minus the ones it did
     /// not name. "Every category" is a row above these rather than one of them,
@@ -323,15 +307,8 @@ struct CatalogFilter {
                 || (kind == .watchfaces && application.kind == .watchface)
             return matchesCategory && matchesKind
         }
-        return filtered.sorted { lhs, rhs in
-            switch sort {
-            case .name: lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
-            // Uncategorised sort together, at the top, rather than being
-            // given a name so they can be sorted by it.
-            case .category: (lhs.category ?? "")
-                .localizedCaseInsensitiveCompare(rhs.category ?? "") == .orderedAscending
-            case .version: lhs.version.compare(rhs.version, options: .numeric) == .orderedDescending
-            }
+        return filtered.sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
     }
 }
