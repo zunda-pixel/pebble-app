@@ -58,6 +58,15 @@ struct ApplicationsView: View {
             isOperationInProgress: model.isApplicationManagementBusy,
             installingApplicationName: transfer?.name,
             installationProgress: transfer?.progress,
+            // The store's picture of an installed application, the same way
+            // the catalog rows choose theirs: a watchface is its screenshot,
+            // an app its icon.
+            storeImageURL: { application in
+                guard let entry = await model.storeEntry(for: application.id) else { return nil }
+                return application.kind == .watchface
+                    ? entry.screenshotURLs.first ?? entry.iconURL
+                    : entry.iconURL ?? entry.screenshotURLs.first
+            },
             removeApplication: { applicationID in
                 Task { await model.removeApplication(id: applicationID) }
             },
@@ -176,6 +185,7 @@ struct ApplicationsContent<Detail: View>: View {
     var isOperationInProgress: Bool
     var installingApplicationName: String?
     var installationProgress: PutBytesTransferProgress?
+    var storeImageURL: (WatchApplication) async -> URL? = { _ in nil }
     var removeApplication: (UUID) -> Void
     var reorderApplications: (WatchApplicationKind, IndexSet, Int) -> Void
     var configureApplication: (WatchApplication) -> Void
@@ -233,6 +243,7 @@ struct ApplicationsContent<Detail: View>: View {
                             // offsets in the whole one, and the launcher order
                             // is the whole one's.
                             isFiltering: !trimmedQuery.isEmpty,
+                            storeImageURL: storeImageURL,
                             requestRemoval: { applicationToRemove = $0 },
                             configureApplication: configureApplication,
                             editGlance: editGlance,
@@ -389,6 +400,7 @@ struct ApplicationSection<Detail: View>: View {
     /// Whether the rows on screen are a sifted subset, whose offsets say
     /// nothing about the launcher order underneath.
     var isFiltering: Bool = false
+    var storeImageURL: (WatchApplication) async -> URL? = { _ in nil }
     var requestRemoval: (WatchApplication) -> Void
     var configureApplication: (WatchApplication) -> Void
     var editGlance: (WatchApplication) -> Void
@@ -404,6 +416,7 @@ struct ApplicationSection<Detail: View>: View {
                     isActive: activeWatchfaceID == application.id,
                     isInstalled: installedApplicationIDs.map { $0.contains(application.id) },
                     isOperationInProgress: isOperationInProgress,
+                    storeImageURL: { await storeImageURL(application) },
                     requestRemoval: { requestRemoval(application) },
                     configureApplication: { configureApplication(application) },
                     editGlance: { editGlance(application) },
@@ -422,11 +435,14 @@ struct ApplicationListRow<Detail: View>: View {
     var isActive: Bool
     var isInstalled: Bool?
     var isOperationInProgress: Bool
+    var storeImageURL: () async -> URL? = { nil }
     var requestRemoval: () -> Void
     var configureApplication: () -> Void
     var editGlance: () -> Void
     var activateWatchface: () -> Void
     @ViewBuilder var detail: () -> Detail
+
+    @State private var imageURL: URL?
 
     var body: some View {
         NavigationLink {
@@ -438,9 +454,13 @@ struct ApplicationListRow<Detail: View>: View {
                 versionLabel: application.versionLabel,
                 kind: application.kind,
                 isActive: isActive,
-                isInstalled: isInstalled
+                isInstalled: isInstalled,
+                imageURL: imageURL
             )
         }
+        // Asked when the row first appears: the model remembers both answers
+        // and refusals, so a long list settles into cached lookups.
+        .task { imageURL = await storeImageURL() }
         // Red, but not `role: .destructive`: that role takes the row out of the
         // list by itself, and the library still had the application until the
         // alert was answered — a row deleted from under a count that had not
@@ -479,13 +499,24 @@ struct ApplicationRow: View {
     var isActive: Bool
     /// Nil when no watch is connected.
     var isInstalled: Bool?
+    /// The store's picture of this application — a watchface's first
+    /// screenshot, an app's icon — where the store has one. A package carries
+    /// no images of its own, so a side-loaded application the store never
+    /// listed keeps the symbol.
+    var imageURL: URL? = nil
 
     var body: some View {
         HStack(spacing: 16) {
-            Image(systemName: kind == .watchface ? "clock" : "square.grid.2x2")
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(.tint)
-                .accessibilityHidden(true)
+            AsyncImage(url: imageURL) { image in
+                image.resizable().scaledToFit()
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            } placeholder: {
+                Image(systemName: kind == .watchface ? "clock" : "square.grid.2x2")
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.tint)
+            }
+            .frame(width: 44, height: 50)
+            .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text(name)
                     .font(.headline)
