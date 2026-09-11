@@ -184,6 +184,9 @@ struct ApplicationsContent<Detail: View>: View {
     @ViewBuilder var detail: (WatchApplication) -> Detail
 
     @State private var applicationToRemove: WatchApplication?
+    /// Sifts the library in place. The catalog's search box asks the store;
+    /// this one only narrows what is already here.
+    @State private var query = ""
 
     var body: some View {
         if isLoading && watchApplications.isEmpty && watchfaces.isEmpty {
@@ -226,6 +229,10 @@ struct ApplicationsContent<Detail: View>: View {
                             activeWatchfaceID: activeWatchfaceID,
                             installedApplicationIDs: installedApplicationIDs,
                             isOperationInProgress: isOperationInProgress,
+                            // A row's offsets in a sifted list are not its
+                            // offsets in the whole one, and the launcher order
+                            // is the whole one's.
+                            isFiltering: !trimmedQuery.isEmpty,
                             requestRemoval: { applicationToRemove = $0 },
                             configureApplication: configureApplication,
                             editGlance: editGlance,
@@ -237,6 +244,7 @@ struct ApplicationsContent<Detail: View>: View {
                         )
                     }
                 }
+                .searchable(text: $query)
                 // An alert, and one for the whole list rather than one per row.
                 // A confirmation dialog is anchored, and a swiped row is already
                 // gone by the time it would be asked about, so there is nothing
@@ -263,12 +271,25 @@ struct ApplicationsContent<Detail: View>: View {
         }
     }
 
+    private var trimmedQuery: String {
+        query.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private var groups: [ApplicationGroup] {
         [
-            ApplicationGroup(kind: .watchapp, title: "Watch Apps", applications: watchApplications),
-            ApplicationGroup(kind: .watchface, title: "Watchfaces", applications: watchfaces),
+            ApplicationGroup(kind: .watchapp, title: "Watch Apps", applications: sifted(watchApplications)),
+            ApplicationGroup(kind: .watchface, title: "Watchfaces", applications: sifted(watchfaces)),
         ]
         .filter { !$0.applications.isEmpty }
+    }
+
+    private func sifted(_ applications: [WatchApplication]) -> [WatchApplication] {
+        let words = trimmedQuery
+        guard !words.isEmpty else { return applications }
+        return applications.filter {
+            $0.displayName.localizedCaseInsensitiveContains(words)
+                || $0.companyName.localizedCaseInsensitiveContains(words)
+        }
     }
 }
 
@@ -365,6 +386,9 @@ struct ApplicationSection<Detail: View>: View {
     var activeWatchfaceID: UUID?
     var installedApplicationIDs: Set<UUID>?
     var isOperationInProgress: Bool
+    /// Whether the rows on screen are a sifted subset, whose offsets say
+    /// nothing about the launcher order underneath.
+    var isFiltering: Bool = false
     var requestRemoval: (WatchApplication) -> Void
     var configureApplication: (WatchApplication) -> Void
     var editGlance: (WatchApplication) -> Void
@@ -388,7 +412,7 @@ struct ApplicationSection<Detail: View>: View {
                 )
             }
             .onMove(perform: moveApplications)
-            .moveDisabled(isOperationInProgress)
+            .moveDisabled(isOperationInProgress || isFiltering)
         }
     }
 }

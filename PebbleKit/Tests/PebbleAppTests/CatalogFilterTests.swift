@@ -81,18 +81,20 @@ struct CatalogFilterTests {
         #expect(CatalogFilter.categories(in: applications) == ["Games", "Tools & Utilities"])
     }
 
-    /// The other two pickers still work through the same predicate.
-    @Test func theCategoryFilterCombinesWithTheKindAndTheQuery() {
+    /// The two pickers work through the same predicate. No query here: the
+    /// catalog's search box asks the store's index (#97), and sifting a list
+    /// already on the phone is the library screen's job.
+    @Test func theCategoryFilterCombinesWithTheKind() {
         let applications = [
             application(name: "Orbit", category: "Games", kind: .watchapp),
             application(name: "Orbit Face", category: "Games", kind: .watchface),
-            application(name: "Tide", category: "Games", kind: .watchapp),
+            application(name: "Tide", category: "Tools", kind: .watchapp),
         ]
 
         let faces = CatalogFilter(category: "Games", kind: .watchfaces).applied(to: applications)
         #expect(faces.map(\.name) == ["Orbit Face"])
 
-        let searched = CatalogFilter(query: "orbit", category: "Games").applied(to: applications)
-        #expect(searched.map(\.name) == ["Orbit", "Orbit Face"])
+        let games = CatalogFilter(category: "Games").applied(to: applications)
+        #expect(games.map(\.name) == ["Orbit", "Orbit Face"])
     }
 }

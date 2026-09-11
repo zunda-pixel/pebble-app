@@ -172,9 +172,9 @@ struct CatalogContent<Destination: View>: View {
                     }
                 }
             } else if !query.trimmingCharacters(in: .whitespaces).isEmpty {
-                // The way to say the search box has two jobs: it has been
-                // sifting the feed as the reader typed, and the whole store is
-                // one press away.
+                // Typing no longer sifts anything here — the library's own
+                // screen does that — so the words wait for this button or the
+                // keyboard's submit, both of which ask the store.
                 Section {
                     if isSearching {
                         ProgressView()
@@ -196,7 +196,7 @@ struct CatalogContent<Destination: View>: View {
                 }
             }
         }
-        .searchable(text: $query)
+        .searchable(text: $query, prompt: Text("Search the Store"))
         .onSubmit(of: .search) {
             Task { await search(query, searchKind) }
         }
@@ -255,7 +255,7 @@ struct CatalogContent<Destination: View>: View {
     }
 
     private var filteredApplications: [CatalogApplication] {
-        CatalogFilter(query: query, category: category, kind: kind, sort: sort)
+        CatalogFilter(category: category, kind: kind, sort: sort)
             .applied(to: applications)
     }
 
@@ -281,8 +281,10 @@ struct CatalogContent<Destination: View>: View {
 /// the view, and what it did with a category named All could only be reasoned
 /// about — which is how `"All"` came to be the label, the initial selection and
 /// the "do not filter" mark all at once.
+///
+/// No query: the search box above these pickers asks the store's index, and
+/// sifting what is already on the phone is the library screen's job.
 struct CatalogFilter {
-    var query: String = ""
     /// Nil for every category.
     var category: String?
     var kind: CatalogKindFilter = .all
@@ -297,15 +299,11 @@ struct CatalogFilter {
 
     func applied(to applications: [CatalogApplication]) -> [CatalogApplication] {
         let filtered = applications.filter { application in
-            let matchesQuery = query.isEmpty
-                || application.name.localizedCaseInsensitiveContains(query)
-                || application.developer.localizedCaseInsensitiveContains(query)
-                || application.summary?.localizedCaseInsensitiveContains(query) == true
             let matchesCategory = category.map { application.category == $0 } ?? true
             let matchesKind = kind == .all
                 || (kind == .watchapps && application.kind == .watchapp)
                 || (kind == .watchfaces && application.kind == .watchface)
-            return matchesQuery && matchesCategory && matchesKind
+            return matchesCategory && matchesKind
         }
         return filtered.sorted { lhs, rhs in
             switch sort {

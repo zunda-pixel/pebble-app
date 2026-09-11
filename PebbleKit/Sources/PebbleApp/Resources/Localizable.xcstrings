@@ -4739,6 +4739,16 @@
         }
       }
     },
+    "Search the Store" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ストアを検索"
+          }
+        }
+      }
+    },
     "Search the Whole Store" : {
       "localizations" : {
         "ja" : {
