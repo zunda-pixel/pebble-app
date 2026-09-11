@@ -46,5 +46,13 @@ struct ConfirmingButton: View {
             explanation: "The watch is disconnected and removed from this phone. Its apps stay in the library.",
             confirmationTitle: "Forget Watch"
         ) {}
+        // Without an image the label is plain text — the button's one branch.
+        ConfirmingButton(
+            title: "Forget Watch",
+            role: .destructive,
+            question: "Forget \("Pebble 5209")?",
+            explanation: "Automatic reconnection information for this Pebble will be removed.",
+            confirmationTitle: "Forget Watch"
+        ) {}
     }
 }

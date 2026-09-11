@@ -290,6 +290,31 @@ enum PreviewSamples {
         )
     }
 
+    /// A dependency with a repository to link to, license text abridged: the
+    /// screen scrolls whatever it is given, and two lines preview the same as
+    /// two hundred.
+    static let remotePackage = Package(
+        name: "Defaults",
+        kind: .remoteSourceControl(location: URL(string: "https://github.com/sindresorhus/Defaults")!),
+        license: """
+        MIT License
+
+        Copyright (c) Sindre Sorhus
+
+        Permission is hereby granted, free of charge, to any person obtaining a copy \
+        of this software and associated documentation files (the "Software"), to deal \
+        in the Software without restriction…
+        """
+    )
+
+    /// A registry package has no repository URL, so its screen has no toolbar
+    /// button — the other side of the detail view's one branch.
+    static let registryPackage = Package(
+        name: "swift-numerics",
+        kind: .registry,
+        license: "Apache License 2.0"
+    )
+
     static let logLines: [WatchLogLine] = [
         WatchLogLine(date: .now, level: 100, file: "pebble_app.c", line: 412, message: "app launched"),
         WatchLogLine(date: .now, level: 1, file: "bt_conn_mgr.c", line: 88, message: "link lost, reason=0x08"),

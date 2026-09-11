@@ -115,3 +115,15 @@ struct CalendarSettingsContent: View {
         )
     }
 }
+
+#Preview("No calendars to offer") {
+    // What a phone that refused calendar access shows: the switches with
+    // nothing under them.
+    NavigationStack {
+        CalendarSettingsContent(
+            calendars: [],
+            isCalendarEnabled: { _ in true },
+            setCalendarEnabled: { _, _ in }
+        )
+    }
+}

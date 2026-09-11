@@ -60,14 +60,11 @@ struct ConfigurationWebView: View {
         self.closeHandler = closeHandler
     }
 
+
     var body: some View {
         Group {
             if let loadErrorMessage {
-                ContentUnavailableView(
-                    "Settings Unavailable",
-                    systemImage: "wifi.exclamationmark",
-                    description: Text(loadErrorMessage)
-                )
+                ConfigurationUnavailableView(message: loadErrorMessage)
             } else if let page {
                 WebView(page)
                     .webViewBackForwardNavigationGestures(.enabled)
@@ -140,6 +137,32 @@ struct ConfigurationWebView: View {
     }
 }
 
-#Preview {
-    ContentView(client: MockWatchClient())
+/// What the screen says when a settings page cannot be shown.
+struct ConfigurationUnavailableView: View {
+    var message: String
+
+    var body: some View {
+        ContentUnavailableView(
+            "Settings Unavailable",
+            systemImage: "wifi.exclamationmark",
+            description: Text(message)
+        )
+    }
+}
+
+#Preview("A page the application built") {
+    // The inline `data:` route, the way AgroWeatherApp hands its settings over.
+    ConfigurationWebView(
+        url: URL(
+            string: "data:text/html,<h1>Clock Settings</h1><p>Choose what the face shows.</p>"
+        )!
+    ) { _ in }
+}
+
+#Preview("A page that would not load") {
+    // Previewed on its own: from the whole screen this state is only reachable
+    // by a network failing, which a snapshot does not wait for.
+    ConfigurationUnavailableView(
+        message: "The watch app's settings service could not be found."
+    )
 }
