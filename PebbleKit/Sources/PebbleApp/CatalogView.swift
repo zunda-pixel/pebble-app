@@ -1,6 +1,27 @@
 import SwiftUI
 import PebbleProtocol
 
+/// The store's category, in the reader's language where this app knows the
+/// name and as the store said it where it does not — a category added upstream
+/// shows up untranslated rather than not at all. Filtering and sorting still
+/// use the store's own string; only the pixels change.
+///
+/// The known names are the store's current five (measured against both home
+/// feeds, 2026-09-11) and the classic store's Notifications and Remotes, which
+/// the Rebble feed still uses.
+func catalogCategoryText(_ category: String) -> Text {
+    switch category {
+    case "Daily": Text("Daily")
+    case "Faces": Text("Faces")
+    case "Games": Text("Games")
+    case "Health & Fitness": Text("Health & Fitness")
+    case "Tools & Utilities": Text("Tools & Utilities")
+    case "Notifications": Text("Notifications")
+    case "Remotes": Text("Remotes")
+    default: Text(verbatim: category)
+    }
+}
+
 enum CatalogKindFilter: String, CaseIterable, Identifiable {
     case all, watchapps, watchfaces
     var id: Self { self }
@@ -107,8 +128,8 @@ struct CatalogContent<Destination: View>: View {
     /// localize. And a category actually named All, which the store is free to
     /// send, would have been the one category impossible to filter by.
     ///
-    /// The categories themselves stay unlocalized on purpose: `Games` and
-    /// `Tools & Utilities` are the store's words, not this app's.
+    /// The value is always the store's own string; only the pixels are
+    /// translated, by `catalogCategoryText`.
     @State private var category: String?
     @State private var kind: CatalogKindFilter = .all
     @State private var sort: CatalogSort = .name
@@ -171,11 +192,12 @@ struct CatalogContent<Destination: View>: View {
                     }
                     .pickerStyle(.segmented)
                     Picker("Category", selection: $category) {
-                        // The one row here that is this app talking, so the one
-                        // row with a localized key. `String?.none` rather than a
-                        // word standing in for "no filter".
+                        // `String?.none` rather than a word standing in for
+                        // "no filter".
                         Text("All Categories").tag(String?.none)
-                        ForEach(categories, id: \.self) { Text($0).tag(String?.some($0)) }
+                        ForEach(categories, id: \.self) {
+                            catalogCategoryText($0).tag(String?.some($0))
+                        }
                     }
                     Picker("Sort", selection: $sort) {
                         ForEach(CatalogSort.allCases) { Text($0.title).tag($0) }
@@ -335,7 +357,7 @@ struct CatalogApplicationRow: View {
                 // screen already does. It used to draw the model's `"Other"`,
                 // which was this app putting a word in the store's mouth.
                 if let category = application.category {
-                    Text(category).font(.caption).foregroundStyle(.secondary)
+                    catalogCategoryText(category).font(.caption).foregroundStyle(.secondary)
                 }
             }
             Spacer()

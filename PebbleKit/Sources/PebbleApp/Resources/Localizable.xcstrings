@@ -1801,6 +1801,16 @@
         }
       }
     },
+    "Daily" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "日常"
+          }
+        }
+      }
+    },
     "Daily Average" : {
       "localizations" : {
         "ja" : {
@@ -2311,6 +2321,16 @@
         }
       }
     },
+    "Faces" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチフェイス"
+          }
+        }
+      }
+    },
     "Factory Reset" : {
       "localizations" : {
         "ja" : {
@@ -2541,6 +2561,16 @@
         }
       }
     },
+    "Games" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ゲーム"
+          }
+        }
+      }
+    },
     "Gather Watch Logs" : {
       "localizations" : {
         "ja" : {
@@ -2597,6 +2627,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ヘルスケア"
+          }
+        }
+      }
+    },
+    "Health & Fitness" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ヘルスケア/フィットネス"
           }
         }
       }
@@ -4495,6 +4535,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "リマインダーはウォッチのリマインダーアプリに送信され、時間になると振動でお知らせします。"
+          }
+        }
+      }
+    },
+    "Remotes" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リモコン"
           }
         }
       }
@@ -6484,6 +6534,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "今日"
+          }
+        }
+      }
+    },
+    "Tools & Utilities" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ツール＆ユーティリティ"
           }
         }
       }

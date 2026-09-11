@@ -172,7 +172,7 @@ struct ApplicationDetailContent: View {
                     LabeledContent("Developer", value: subject.developer)
                 }
                 if let category = subject.store?.category {
-                    LabeledContent("Category", value: category)
+                    LabeledContent("Category") { catalogCategoryText(category) }
                 }
                 if !subject.platforms.isEmpty {
                     LabeledContent("Built For") {
