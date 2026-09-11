@@ -130,25 +130,11 @@ struct CatalogContent<Destination: View>: View {
             // this one is pushed over: the spinner in the toolbar stopped and
             // a failure was left where the reader was not looking (#110).
             FeedbackBanner(feedback: importFeedback)
-            Section("Browse") {
-                Picker("Type", selection: $kind) {
-                    ForEach(CatalogKindFilter.allCases) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                Picker("Category", selection: $category) {
-                    // The one row here that is this app talking, so the one
-                    // row with a localized key. `String?.none` rather than a
-                    // word standing in for "no filter".
-                    Text("All Categories").tag(String?.none)
-                    ForEach(categories, id: \.self) { Text($0).tag(String?.some($0)) }
-                }
-                Picker("Sort", selection: $sort) {
-                    ForEach(CatalogSort.allCases) { Text($0.title).tag($0) }
-                }
-            }
-            // The store's whole inventory, as against the home feed below it:
-            // the feed is a shop window, and the search box alone only sifts
-            // what the window happens to hold.
+            // The store's whole inventory, as against the home feed: the feed
+            // is a shop window, and the search box alone only sifts what the
+            // window happens to hold. While a search is on screen the feed is
+            // not — the results are the answer to the question just asked, and
+            // the window would only bury them.
             if let searchResults {
                 Section("Store Search") {
                     if searchResults.isEmpty {
@@ -178,13 +164,30 @@ struct CatalogContent<Destination: View>: View {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                 }
-            }
-            Section("Applications") {
-                ForEach(filteredApplications) { application in
-                    NavigationLink {
-                        destination(application)
-                    } label: {
-                        CatalogApplicationRow(application: application, state: state(application))
+            } else {
+                Section("Browse") {
+                    Picker("Type", selection: $kind) {
+                        ForEach(CatalogKindFilter.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    Picker("Category", selection: $category) {
+                        // The one row here that is this app talking, so the one
+                        // row with a localized key. `String?.none` rather than a
+                        // word standing in for "no filter".
+                        Text("All Categories").tag(String?.none)
+                        ForEach(categories, id: \.self) { Text($0).tag(String?.some($0)) }
+                    }
+                    Picker("Sort", selection: $sort) {
+                        ForEach(CatalogSort.allCases) { Text($0.title).tag($0) }
+                    }
+                }
+                Section("Applications") {
+                    ForEach(filteredApplications) { application in
+                        NavigationLink {
+                            destination(application)
+                        } label: {
+                            CatalogApplicationRow(application: application, state: state(application))
+                        }
                     }
                 }
             }
@@ -233,7 +236,7 @@ struct CatalogContent<Destination: View>: View {
         .toolbarVisibility(.hidden, for: .tabBar)
         #endif
         .overlay {
-            if filteredApplications.isEmpty && searchResults == nil {
+            if filteredApplications.isEmpty && searchResults == nil && !isSearching {
                 // Two causes, and the screen cannot tell them apart: a filter
                 // that excludes everything, or a catalogue that was never
                 // fetched. Saying both beats naming the wrong one — and it
