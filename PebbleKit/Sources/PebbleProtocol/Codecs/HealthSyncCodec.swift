@@ -9,3 +9,13 @@ public enum HealthSyncCodec {
         return PebbleProtocolFrame(endpoint: endpoint, payload: [0x01] + seconds.littleEndianBytes)
     }
 }
+
+public enum HealthSyncResponseCodec {
+    public static func decode(_ frame: PebbleProtocolFrame) throws -> Bool {
+        guard frame.endpoint == HealthSyncCodec.endpoint, frame.payload.count >= 2, frame.payload[0] == 0x11 else {
+            throw HealthSyncResponseError.invalidPayload
+        }
+        return frame.payload[1] == 0x01
+    }
+}
+public enum HealthSyncResponseError: Error, Equatable, Sendable { case invalidPayload }

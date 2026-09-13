@@ -59,13 +59,3 @@ public enum TimelineActionCodec {
     }
 }
 public enum TimelineActionCodecError: Error, Equatable, Sendable { case invalidPayload }
-
-public enum HealthSyncResponseCodec {
-    public static func decode(_ frame: PebbleProtocolFrame) throws -> Bool {
-        guard frame.endpoint == HealthSyncCodec.endpoint, frame.payload.count >= 2, frame.payload[0] == 0x11 else {
-            throw HealthSyncResponseError.invalidPayload
-        }
-        return frame.payload[1] == 0x01
-    }
-}
-public enum HealthSyncResponseError: Error, Equatable, Sendable { case invalidPayload }

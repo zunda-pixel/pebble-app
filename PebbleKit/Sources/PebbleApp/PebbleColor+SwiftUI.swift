@@ -23,3 +23,27 @@ extension PebbleColor {
         )
     }
 }
+
+extension Color {
+    /// The backlight LED's colour, from the firmware's packed `0x00RRGGBB`.
+    init(packedRGB: Int) {
+        self.init(
+            red: Double((packedRGB >> 16) & 0xFF) / 255,
+            green: Double((packedRGB >> 8) & 0xFF) / 255,
+            blue: Double(packedRGB & 0xFF) / 255
+        )
+    }
+
+    /// The picked colour as the firmware packs it. Read back as sRGB rather
+    /// than the linear values `Color.Resolved` stores, for the same reason
+    /// `PebbleColor.init(nearest:in:)` does: the wire carries display values,
+    /// and rounding linear ones would darken the colour.
+    func packedRGB(in environment: EnvironmentValues) -> Int {
+        let resolved = resolveHDR(in: environment)
+        func channel(_ value: Float) -> Int {
+            min(255, max(0, Int((Double(value) * 255).rounded())))
+        }
+        return channel(resolved.red) << 16 | channel(resolved.green) << 8
+            | channel(resolved.blue)
+    }
+}
