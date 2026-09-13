@@ -10,17 +10,18 @@ targets iOS 27 and macOS 27; the app target also builds for visionOS.
 | `Pebble.xcodeproj` | The app project. One shared scheme, `Pebble`. |
 | `Pebble/` | App target: `MainApp.swift`, `Info.plist`, entitlements, app-level strings. |
 | `PebbleKit/` | Local Swift package with everything else. Its only product, `PebbleKit`, exports the `PebbleApp` target. |
-| `PebbleKit/Sources/PebbleProtocol` | What the watch says and what the phone says back. **Foundation only** — no CoreBluetooth, no SwiftUI, so it holds anywhere and a test of it needs no radio. Five folders, below. |
-| &nbsp;&nbsp;`Wire/` | The link itself: frames, PPoG, the advertisement, the pairing state, the `PebbleClient` protocol every transport implements, and the byte helpers. |
+| `PebbleKit/Sources/PebbleProtocol` | What the watch says and what the phone says back. **Foundation only** — no CoreBluetooth, no SwiftUI, so it holds anywhere and a test of it needs no radio. Six folders, below. |
+| &nbsp;&nbsp;`Wire/` | The link itself: frames, PPoG, the advertisement, the pairing state, the `WatchClient` protocol every transport implements, and the byte helpers. |
 | &nbsp;&nbsp;`Codecs/` | One endpoint codec per file, plus the values they carry over the wire. |
 | &nbsp;&nbsp;`Storage/` | The stores, one per file, all of them over `PersistentJSON`. |
 | &nbsp;&nbsp;`Catalogs/` | What is fetched from the network: apps, firmware, language packs, and the download and retry policy they share. |
 | &nbsp;&nbsp;`Packages/` | The package formats: `.pbw` and `.pbz`. |
+| &nbsp;&nbsp;`Diagnostics/` | `DiagnosticLog`, the app's own breadcrumb log and report writer — not a store, so not in `Storage/`. |
 | `PebbleKit/Sources/PebbleAudio` | What the watch's microphone sent, turned back into samples: the only place that imports `speex`. |
 | `PebbleKit/Sources/PebbleTransport` | How those bytes reach a watch: the CoreBluetooth client in both roles, the phone-hosted GATT server, the emulator socket, and the mock a test or a preview stands in. |
 | `PebbleKit/Sources/PebbleApp` | The app: `AppModel` (split across `AppModel+*.swift`), the screens, and the phone's own frameworks (HealthKit, EventKit, MediaPlayer, CallKit, WebKit). |
 | `PebbleKit/Tests/PebbleProtocolTests` | Swift Testing suites for the protocol and transport layers, grouped by what they exercise. |
-| `PebbleKit/Tests/PebbleAppTests` | Swift Testing suites for `AppModel` and the content views, against `MockPebbleClient`. |
+| `PebbleKit/Tests/PebbleAppTests` | Swift Testing suites for `AppModel` and the content views, against `MockWatchClient`. |
 | `AllTests.xctestplan` | Covers both test targets. |
 
 The three targets are split by what they are allowed to depend on, and the
@@ -32,7 +33,7 @@ library's public surface is only what the app target needs.
 One endpoint codec per file, named after the endpoint, and **nothing else in it**
 — a store that lived beside a codec was reached for by the app on the strength of
 having imported the module, and neither file could then be read on its own. One
-store per file too, under `Storage/`, named `…Store`. `PebbleApplicationLibrary`
+store per file too, under `Storage/`, named `…Store`. `WatchApplicationLibrary`
 is the exception: the reader's collection of watch apps really is a library, and
 that is what the screens call it.
 
@@ -171,7 +172,7 @@ code:
 
 - **Split each screen in two.** A thin `SomethingView` that reads `AppModel` and
   hands the pieces down, and a `SomethingContent` that takes plain values and
-  closures — `pins: [PebbleTimelinePin]`, `remove: ([PebbleTimelinePin]) -> Void`
+  closures — `pins: [TimelinePin]`, `remove: ([TimelinePin]) -> Void`
   — and holds the layout. The content view is what gets the previews, and what a
   test can construct.
 - **Never reach for `AppModel` from inside the layout.** A screen that loads its
