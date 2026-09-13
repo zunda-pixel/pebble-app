@@ -6,29 +6,29 @@ public struct PutBytesTransferProgress: Equatable, Sendable {
     public var totalBytes: Int
 }
 
-public enum PutBytesTransferAction: Equatable, Sendable {
+package enum PutBytesTransferAction: Equatable, Sendable {
     case send(PebbleProtocolFrame)
     case progress(PutBytesTransferProgress)
     case finished
 }
 
-public struct PutBytesTransferSession: Sendable {
-    public var bytes: [UInt8]
-    public var objectType: PutBytesObjectType
-    public var appBankID: UInt32
-    public var chunkSize: Int
+package struct PutBytesTransferSession: Sendable {
+    package var bytes: [UInt8]
+    package var objectType: PutBytesObjectType
+    package var appBankID: UInt32
+    package var chunkSize: Int
 
     /// Only a `file` object has one, and it is what tells the firmware that a
     /// language pack is a language pack rather than an unknown blob.
-    public var filename: String?
+    package var filename: String?
 
     private var state: State = .ready
     private var crc: UInt32
     private var usesApplicationInitialization: Bool
     private var sendsInstall: Bool
-    public private(set) var completedCookie: UInt32?
+    package private(set) var completedCookie: UInt32?
 
-    public init(
+    package init(
         bytes: [UInt8],
         objectType: PutBytesObjectType,
         appBankID: UInt32,
@@ -47,7 +47,7 @@ public struct PutBytesTransferSession: Sendable {
         self.sendsInstall = self.usesApplicationInitialization || filename != nil
     }
 
-    public mutating func start() throws -> PutBytesTransferAction {
+    package mutating func start() throws -> PutBytesTransferAction {
         guard state == .ready else {
             throw PutBytesTransferError.invalidState
         }
@@ -67,7 +67,7 @@ public struct PutBytesTransferSession: Sendable {
             : PutBytesCodec.systemInitializationFrame(objectSize: size, objectType: objectType, bank: UInt8(truncatingIfNeeded: appBankID)))
     }
 
-    public mutating func receive(_ response: PutBytesResponse) throws -> [PutBytesTransferAction] {
+    package mutating func receive(_ response: PutBytesResponse) throws -> [PutBytesTransferAction] {
         guard response.result == .acknowledgement else {
             state = .failed
             throw PutBytesTransferError.negativeAcknowledgement

@@ -22,7 +22,6 @@ struct ApplicationDetailSubjectTests {
             shortName: "Tools",
             longName: "Watch Tools",
             companyName: companyName,
-            versionCode: 1,
             versionLabel: "1.3.0",
             capabilities: [],
             targetPlatforms: platforms,

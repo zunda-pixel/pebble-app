@@ -2,19 +2,19 @@ import MemberwiseInit
 
 /// A watch that is not bonded yet reports `isPaired` false, and a bond the
 /// phone has forgotten shows as paired but unencrypted.
-@MemberwiseInit(.public)
-public struct PebbleConnectivityStatus: Equatable, Sendable {
-    public var isConnected: Bool
-    public var isPaired: Bool
-    public var isEncrypted: Bool
-    public var hasBondedGateway: Bool
-    public var supportsPinningWithoutSlaveSecurity: Bool
-    public var hasRemoteAttemptedToUseStalePairing: Bool
-    public var pairingError: UInt8
+@MemberwiseInit(.package)
+package struct PebbleConnectivityStatus: Equatable, Sendable {
+    package var isConnected: Bool
+    package var isPaired: Bool
+    package var isEncrypted: Bool
+    package var hasBondedGateway: Bool
+    package var supportsPinningWithoutSlaveSecurity: Bool
+    package var hasRemoteAttemptedToUseStalePairing: Bool
+    package var pairingError: UInt8
 
     // A healthy watch always reports four bytes: flags, two reserved bytes and a
     // pairing error code.
-    public init?(decoding bytes: [UInt8]) {
+    package init?(decoding bytes: [UInt8]) {
         guard bytes.count >= 4 else {
             return nil
         }
@@ -30,15 +30,15 @@ public struct PebbleConnectivityStatus: Equatable, Sendable {
         )
     }
 
-    public var isReadyForProtocol: Bool {
+    package var isReadyForProtocol: Bool {
         isPaired && isEncrypted
     }
 }
 
-public enum PebblePairingTrigger {
+package enum PebblePairingTrigger {
     /// The default asks the watch to start the security request itself, which is
     /// what makes iOS show its pairing prompt.
-    public static func value(
+    package static func value(
         pinAddress: Bool = false,
         noSecurityRequest: Bool = false,
         autoAcceptFuturePairing: Bool = false,

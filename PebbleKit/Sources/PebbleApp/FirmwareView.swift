@@ -9,10 +9,6 @@ struct FirmwareView: View {
         model.connections.first { $0.watch.id == watchID }
     }
 
-    private var savedWatch: SavedWatch? {
-        model.watches.saved.first { $0.id == watchID }
-    }
-
     private var journal: FirmwareUpdateJournal? {
         guard let journal = model.firmware.journal, journal.watchID == watchID else {
             return nil
@@ -21,12 +17,13 @@ struct FirmwareView: View {
     }
 
     var body: some View {
+        let summary = WatchSummary(watchID: watchID, model: model)
         FirmwareContent(
-            installedVersion: connection?.watch.firmwareVersion ?? savedWatch?.firmwareVersion,
-            board: connection?.watch.board ?? savedWatch?.board,
+            installedVersion: summary.firmwareVersion,
+            board: summary.board,
             runningSlot: connection?.watch.runningFirmwareSlot,
-            isConnected: connection?.isConnected == true,
-            isRunningRecoveryFirmware: connection?.watch.isRunningRecoveryFirmware == true,
+            isConnected: summary.isConnected,
+            isRunningRecoveryFirmware: summary.isRunningRecoveryFirmware,
             availableRelease: model.firmware.availableRelease,
             downloadedFirmware: model.firmware.downloaded,
             journal: journal,

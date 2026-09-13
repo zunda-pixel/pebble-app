@@ -442,11 +442,12 @@ extension AppModel {
                         given: Defaults[.calendarPreferences]
                     )
                 )
-                (calendarPins, calendarReminders) = try await calendarBridge.timelinePins(
+                let read = try await calendarBridge.timelinePins(
                     disabledCalendarIdentifiers: disabled,
                     includeDeclined: Defaults[.calendarIncludesDeclined],
                     remindersEnabled: Defaults[.calendarRemindersEnabled]
                 )
+                (calendarPins, calendarReminders) = (read.pins, read.reminders)
             } else {
                 calendarPins = []
                 calendarReminders = []

@@ -42,7 +42,7 @@ public enum WatchClientEvent: Equatable, Sendable {
     case timelineActionInvoked(TimelineActionInvocation)
     case appRunStateChanged(AppRunStateEvent)
     case imageRequested(WatchImageRequest)
-    case applicationLogReceived(applicationID: UUID, line: WatchLogLine)
+    case applicationLogReceived(ApplicationLogLine)
 }
 
 public enum WatchConnectionError: Error, Equatable, Sendable {

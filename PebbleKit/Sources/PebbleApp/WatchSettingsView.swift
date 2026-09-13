@@ -9,11 +9,11 @@ struct WatchSettingsView: View {
         model.connections.first { $0.watch.id == watchID }
     }
 
-    /// The connected watch's board, or the remembered one while it is away —
-    /// the same fallback the firmware screen uses. Nil for a watch neither
-    /// knows, which hides the rows only some boards have.
+    /// The connected watch's board, or the remembered one while it is away.
+    /// Nil for a watch neither knows, which hides the rows only some boards
+    /// have.
     private var board: WatchBoard? {
-        connection?.watch.board ?? model.watches.saved.first { $0.id == watchID }?.board
+        WatchSummary(watchID: watchID, model: model).board
     }
 
     var body: some View {
@@ -96,23 +96,28 @@ struct WatchSettingRow: View {
     }
 
     /// One end of a schedule as a `Date` today, for a `DatePicker` that only
-    /// shows the clock. Only the hour and minute survive the trip back.
+    /// shows the clock. Only the hour and minute survive the trip back. Key
+    /// paths rather than closures, so hour and minute cannot be swapped at a
+    /// call site without the compiler noticing.
     private func scheduleTimeBinding(
         _ schedule: QuietTimeSchedule,
-        get: @escaping (QuietTimeSchedule) -> (Int, Int),
-        set: @escaping (inout QuietTimeSchedule, Int, Int) -> Void
+        hour hourPath: WritableKeyPath<QuietTimeSchedule, Int>,
+        minute minutePath: WritableKeyPath<QuietTimeSchedule, Int>
     ) -> Binding<Date> {
         Binding(
             get: {
-                let (hour, minute) = get(schedule)
-                return Calendar.current.date(
-                    bySettingHour: hour, minute: minute, second: 0, of: Date()
+                Calendar.current.date(
+                    bySettingHour: schedule[keyPath: hourPath],
+                    minute: schedule[keyPath: minutePath],
+                    second: 0,
+                    of: Date()
                 ) ?? Date()
             },
             set: { date in
                 let components = Calendar.current.dateComponents([.hour, .minute], from: date)
                 var changed = schedule
-                set(&changed, components.hour ?? 0, components.minute ?? 0)
+                changed[keyPath: hourPath] = components.hour ?? 0
+                changed[keyPath: minutePath] = components.minute ?? 0
                 setRawValue(changed.rawValue)
             }
         )
@@ -174,20 +179,12 @@ struct WatchSettingRow: View {
             let schedule = QuietTimeSchedule(rawValue: rawValue)
             DatePicker(
                 "Start",
-                selection: scheduleTimeBinding(
-                    schedule,
-                    get: { ($0.fromHour, $0.fromMinute) },
-                    set: { $0.fromHour = $1; $0.fromMinute = $2 }
-                ),
+                selection: scheduleTimeBinding(schedule, hour: \.fromHour, minute: \.fromMinute),
                 displayedComponents: .hourAndMinute
             )
             DatePicker(
                 "End",
-                selection: scheduleTimeBinding(
-                    schedule,
-                    get: { ($0.toHour, $0.toMinute) },
-                    set: { $0.toHour = $1; $0.toMinute = $2 }
-                ),
+                selection: scheduleTimeBinding(schedule, hour: \.toHour, minute: \.toMinute),
                 displayedComponents: .hourAndMinute
             )
         case .color:

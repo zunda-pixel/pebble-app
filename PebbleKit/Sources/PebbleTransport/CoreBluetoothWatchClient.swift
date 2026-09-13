@@ -683,8 +683,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
             return fileBytes.take(frame)
 
         case AppLogCodec.endpoint:
-            let (applicationID, line) = try AppLogCodec.decode(frame)
-            eventContinuation?.yield(.applicationLogReceived(applicationID: applicationID, line: line))
+            eventContinuation?.yield(.applicationLogReceived(try AppLogCodec.decode(frame)))
 
         case ImagingCodec.endpoint:
             eventContinuation?.yield(.imageRequested(try ImagingCodec.decode(frame)))

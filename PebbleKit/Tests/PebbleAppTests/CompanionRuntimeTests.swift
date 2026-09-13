@@ -18,7 +18,6 @@ struct CompanionRuntimeTests {
             shortName: "Keeper",
             longName: "Keeper",
             companyName: "nobody",
-            versionCode: 1,
             versionLabel: "1.0",
             capabilities: ["configurable"],
             targetPlatforms: ["emery"],

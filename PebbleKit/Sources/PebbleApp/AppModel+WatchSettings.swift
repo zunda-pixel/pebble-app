@@ -9,10 +9,21 @@ extension AppModel {
         // under the same names. Read first so that anything already written in
         // the new shape wins, and left on disk rather than deleted: a reader
         // who moves back to an older build should still find their switches.
-        var values = Defaults[.watchSettings].mapValues { $0 ? 1 : 0 }
-        values.merge(Defaults[.watchSettingValues]) { _, stored in stored }
-        watchSettings.values = values
-        watchSettings.quickLaunch = Defaults[.quickLaunchAssignments]
+        var stored = Defaults[.watchSettings].mapValues { $0 ? 1 : 0 }
+        stored.merge(Defaults[.watchSettingValues]) { _, newer in newer }
+        // The disk keys these by the firmware's names; this is the one place
+        // that mapping happens, and a name this build does not know is left on
+        // disk for the build that does.
+        watchSettings.values = Dictionary(
+            uniqueKeysWithValues: stored.compactMap { key, value in
+                WatchSetting(rawValue: key).map { ($0, value) }
+            }
+        )
+        watchSettings.quickLaunch = Dictionary(
+            uniqueKeysWithValues: Defaults[.quickLaunchAssignments].compactMap { key, value in
+                QuickLaunchButton(rawValue: key).map { ($0, value) }
+            }
+        )
         watchSettings.activity = Defaults[.activitySettings]
         watchSettings.heartRate = Defaults[.heartRateSettings]
         watchSettings.heartRateZones = Defaults[.heartRateZonePreferences]
@@ -20,7 +31,7 @@ extension AppModel {
     }
 
     public func watchSettingValue(_ setting: WatchSetting) -> Int {
-        watchSettings.values[setting.rawValue] ?? setting.defaultRawValue
+        watchSettings.values[setting] ?? setting.defaultRawValue
     }
 
     public func isWatchSettingOn(_ setting: WatchSetting) -> Bool {
@@ -49,9 +60,9 @@ extension AppModel {
             : [:]
         let changed = implied.map { ($0.key, $0.value) } + [(setting, rawValue)]
         for (setting, rawValue) in changed {
-            watchSettings.values[setting.rawValue] = rawValue
+            watchSettings.values[setting] = rawValue
         }
-        Defaults[.watchSettingValues] = watchSettings.values
+        persistWatchSettingValues()
         for connection in activeConnections {
             for (setting, rawValue) in changed {
                 do {
@@ -89,9 +100,9 @@ extension AppModel {
         rawValue: Int,
         from connection: WatchConnection
     ) async -> Bool {
-        guard watchSettings.values[setting.rawValue] != rawValue else { return true }
-        watchSettings.values[setting.rawValue] = rawValue
-        Defaults[.watchSettingValues] = watchSettings.values
+        guard watchSettings.values[setting] != rawValue else { return true }
+        watchSettings.values[setting] = rawValue
+        persistWatchSettingValues()
         for other in activeConnections where other !== connection {
             try? await other.client.write(.watchSetting(setting, rawValue: rawValue))
         }
@@ -99,12 +110,12 @@ extension AppModel {
     }
 
     public func quickLaunchAssignment(for button: QuickLaunchButton) -> QuickLaunchAssignment {
-        watchSettings.quickLaunch[button.rawValue] ?? .firmwareDefault(for: button)
+        watchSettings.quickLaunch[button] ?? .firmwareDefault(for: button)
     }
 
     public func setQuickLaunch(_ button: QuickLaunchButton, to assignment: QuickLaunchAssignment) async {
-        watchSettings.quickLaunch[button.rawValue] = assignment
-        Defaults[.quickLaunchAssignments] = watchSettings.quickLaunch
+        watchSettings.quickLaunch[button] = assignment
+        persistQuickLaunchAssignments()
         for connection in activeConnections {
             do {
                 try await connection.client.write(.quickLaunch(button, assignment))
@@ -122,9 +133,9 @@ extension AppModel {
         assignment: QuickLaunchAssignment,
         from connection: WatchConnection
     ) async -> Bool {
-        guard watchSettings.quickLaunch[button.rawValue] != assignment else { return true }
-        watchSettings.quickLaunch[button.rawValue] = assignment
-        Defaults[.quickLaunchAssignments] = watchSettings.quickLaunch
+        guard watchSettings.quickLaunch[button] != assignment else { return true }
+        watchSettings.quickLaunch[button] = assignment
+        persistQuickLaunchAssignments()
         for other in activeConnections where other !== connection {
             try? await other.client.write(.quickLaunch(button, assignment))
         }
@@ -198,8 +209,7 @@ extension AppModel {
         // Only the buttons the reader has set. Writing the firmware default to
         // the rest would be harmless today, but a default written is a default
         // this app now owns, and it has no reason to own what nobody touched.
-        for (key, assignment) in watchSettings.quickLaunch {
-            guard let button = QuickLaunchButton(rawValue: key) else { continue }
+        for (button, assignment) in watchSettings.quickLaunch {
             try? await connection.client.write(.quickLaunch(button, assignment))
         }
         try? await connection.client.write(.activitySettings(watchSettings.activity))
@@ -296,6 +306,20 @@ extension AppModel {
                 typicalDeepSleepSeconds: typical?.deep
             )
         }
+    }
+
+    /// The disk keeps the firmware's names, so a build that gains or loses a
+    /// setting still reads the same file — the mirror of `loadWatchSettings`.
+    private func persistWatchSettingValues() {
+        Defaults[.watchSettingValues] = Dictionary(
+            uniqueKeysWithValues: watchSettings.values.map { ($0.key.rawValue, $0.value) }
+        )
+    }
+
+    private func persistQuickLaunchAssignments() {
+        Defaults[.quickLaunchAssignments] = Dictionary(
+            uniqueKeysWithValues: watchSettings.quickLaunch.map { ($0.key.rawValue, $0.value) }
+        )
     }
 
     private func settingsFailureMessage(

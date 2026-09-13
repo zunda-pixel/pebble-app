@@ -1,19 +1,19 @@
-public enum PPoGVersion: UInt8, Sendable {
+package enum PPoGVersion: UInt8, Sendable {
     case zero = 0
     case one = 1
 
-    public var supportsWindowNegotiation: Bool {
+    package var supportsWindowNegotiation: Bool {
         self == .one
     }
 }
 
-public enum PPoGPacket: Equatable, Sendable {
+package enum PPoGPacket: Equatable, Sendable {
     case data(sequence: Int, payload: [UInt8])
     case acknowledgement(sequence: Int)
     case resetRequest(sequence: Int, version: PPoGVersion)
     case resetComplete(sequence: Int, receiveWindow: UInt8, transmitWindow: UInt8)
 
-    public init(decoding bytes: [UInt8]) throws {
+    package init(decoding bytes: [UInt8]) throws {
         guard let header = bytes.first else {
             throw PPoGPacketError.emptyPacket
         }
@@ -44,7 +44,7 @@ public enum PPoGPacket: Equatable, Sendable {
         }
     }
 
-    public func encoded(for version: PPoGVersion) throws -> [UInt8] {
+    package func encoded(for version: PPoGVersion) throws -> [UInt8] {
         let sequence = try validatedSequence
         let sequenceBits = UInt8(sequence << 3)
 
@@ -82,7 +82,7 @@ public enum PPoGPacket: Equatable, Sendable {
     }
 }
 
-public enum PPoGPacketError: Error, Equatable, Sendable {
+package enum PPoGPacketError: Error, Equatable, Sendable {
     case emptyPacket
     case invalidSequence
     case invalidResetRequest

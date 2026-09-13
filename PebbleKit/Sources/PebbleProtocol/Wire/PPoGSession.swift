@@ -8,16 +8,16 @@ struct PPoGTransmission: Sendable {
     var attemptCount: Int
 }
 
-public enum PPoGSessionAction: Equatable, Sendable {
+package enum PPoGSessionAction: Equatable, Sendable {
     case send(PPoGPacket)
     case deliver([UInt8])
     case resetRequired
 }
 
-@MemberwiseInit(.public)
-public struct PPoGSession: Sendable {
-    public var receiveWindow: Int = 25
-    public var transmitWindow: Int = 25
+@MemberwiseInit(.package)
+package struct PPoGSession: Sendable {
+    package var receiveWindow: Int = 25
+    package var transmitWindow: Int = 25
 
     @Init(.ignore) private var nextOutboundSequence = 0
     @Init(.ignore) private var expectedInboundSequence = 0
@@ -35,11 +35,11 @@ public struct PPoGSession: Sendable {
     /// around.
     static let sequenceCount = 32
 
-    public var hasPendingAcknowledgements: Bool {
+    package var hasPendingAcknowledgements: Bool {
         !inFlightTransmissions.isEmpty
     }
 
-    public mutating func enqueue(
+    package mutating func enqueue(
         _ bytes: [UInt8],
         maximumPacketSize: Int
     ) throws -> [PPoGSessionAction] {
@@ -62,7 +62,7 @@ public struct PPoGSession: Sendable {
         return drainSendWindow()
     }
 
-    public mutating func receive(_ packet: PPoGPacket) throws -> [PPoGSessionAction] {
+    package mutating func receive(_ packet: PPoGPacket) throws -> [PPoGSessionAction] {
         switch packet {
         case .acknowledgement(let sequence):
             if lastReceivedAcknowledgementSequence == sequence {
@@ -97,7 +97,7 @@ public struct PPoGSession: Sendable {
         }
     }
 
-    public mutating func handleAcknowledgementTimeout() throws -> [PPoGSessionAction] {
+    package mutating func handleAcknowledgementTimeout() throws -> [PPoGSessionAction] {
         for index in inFlightTransmissions.indices {
             inFlightTransmissions[index].attemptCount += 1
             guard inFlightTransmissions[index].attemptCount <= 2 else {
@@ -119,7 +119,7 @@ public struct PPoGSession: Sendable {
     }
 }
 
-public extension PPoGPacket {
+package extension PPoGPacket {
     var sequence: Int {
         switch self {
         case .data(let sequence, _),
@@ -131,7 +131,7 @@ public extension PPoGPacket {
     }
 }
 
-public enum PPoGSessionError: Error, Equatable, Sendable {
+package enum PPoGSessionError: Error, Equatable, Sendable {
     case invalidMaximumPacketSize
     case maximumRetriesExceeded
 }

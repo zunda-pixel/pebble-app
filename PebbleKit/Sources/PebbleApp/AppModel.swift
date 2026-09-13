@@ -652,8 +652,8 @@ public final class AppModel {
                 await self.synchronizeTimeline()
                 self.timeline.feedback = .success("Timeline action completed.")
             }
-        case .applicationLogReceived(let applicationID, let line):
-            recordApplicationLogLine(line, from: applicationID)
+        case .applicationLogReceived(let logLine):
+            recordApplicationLogLine(logLine.line, from: logLine.applicationID)
         case .imageRequested(let request):
             Task { [weak self] in
                 await self?.answerImageRequest(request, on: connection)

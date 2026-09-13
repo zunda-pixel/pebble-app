@@ -16,7 +16,6 @@ struct ApplicationCapabilityTests {
             shortName: "Orbit",
             longName: "Orbit",
             companyName: "Pebble",
-            versionCode: nil,
             versionLabel: "1.0",
             capabilities: capabilities,
             targetPlatforms: ["emery"],

@@ -61,7 +61,6 @@ public struct WatchApplication: Identifiable, Codable, Equatable, Sendable {
     public var shortName: String
     public var longName: String
     public var companyName: String
-    public var versionCode: Double?
     public var versionLabel: String
     public var capabilities: [String]
     public var targetPlatforms: [String]
@@ -95,7 +94,7 @@ public struct WatchApplication: Identifiable, Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, shortName, longName, companyName, versionCode, versionLabel
+        case id, shortName, longName, companyName, versionLabel
         case capabilities, targetPlatforms, kind, appKeys, hasCompanionJavaScript
         case storeVersion
     }
@@ -106,7 +105,6 @@ public struct WatchApplication: Identifiable, Codable, Equatable, Sendable {
         shortName = try container.decode(String.self, forKey: .shortName)
         longName = try container.decode(String.self, forKey: .longName)
         companyName = try container.decode(String.self, forKey: .companyName)
-        versionCode = try container.decodeIfPresent(Double.self, forKey: .versionCode)
         versionLabel = try container.decode(String.self, forKey: .versionLabel)
         capabilities = try container.decode([String].self, forKey: .capabilities)
         targetPlatforms = try container.decode([String].self, forKey: .targetPlatforms)
@@ -135,7 +133,6 @@ public enum PBWApplicationDecoder {
             shortName: raw.shortName,
             longName: raw.longName ?? "",
             companyName: raw.companyName ?? "",
-            versionCode: raw.versionCode,
             versionLabel: raw.versionLabel,
             capabilities: raw.capabilities ?? [],
             targetPlatforms: raw.targetPlatforms ?? ["aplite"],
@@ -154,7 +151,6 @@ private struct RawAppInfo: Decodable {
     var shortName: String
     var longName: String?
     var companyName: String?
-    var versionCode: Double?
     var versionLabel: String
     var capabilities: [String]?
     var targetPlatforms: [String]?

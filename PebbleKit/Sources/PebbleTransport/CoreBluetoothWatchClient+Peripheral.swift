@@ -327,7 +327,10 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
         Task {
             await PebbleDiagnostics.shared.record(
                 category: "pairing",
-                message: "[\(clientTag)] connectivity paired=\(status.isPaired) encrypted=\(status.isEncrypted) error=\(status.pairingError)"
+                message: "[\(clientTag)] connectivity paired=\(status.isPaired) encrypted=\(status.isEncrypted)"
+                    + " connected=\(status.isConnected) bondedGateway=\(status.hasBondedGateway)"
+                    + " pinsWithoutSlaveSecurity=\(status.supportsPinningWithoutSlaveSecurity)"
+                    + " error=\(status.pairingError)"
             )
         }
         switch setup.apply(status) {

@@ -80,7 +80,6 @@ extension AppModel {
             catalog.searchResults = answer.applications
             catalog.searchQuery = words
             catalog.searchKind = kind
-            catalog.searchTotalCount = answer.totalCount
             catalog.hasMoreSearchResults = answer.hasMore
             catalog.searchPage = 1
         } catch {
@@ -111,7 +110,6 @@ extension AppModel {
             // BlobDB fate.
             let known = Set(shown.map(\.id))
             catalog.searchResults = shown + answer.applications.filter { !known.contains($0.id) }
-            catalog.searchTotalCount = answer.totalCount
             catalog.hasMoreSearchResults = answer.hasMore
             catalog.searchPage = answer.page + 1
         } catch {
@@ -124,7 +122,6 @@ extension AppModel {
         catalog.searchResults = nil
         catalog.searchQuery = ""
         catalog.searchKind = nil
-        catalog.searchTotalCount = 0
         catalog.hasMoreSearchResults = false
         catalog.searchPage = 0
     }

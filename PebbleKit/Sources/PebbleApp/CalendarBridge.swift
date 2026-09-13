@@ -62,6 +62,14 @@ struct CalendarPreference: Codable, Equatable, Sendable {
     }
 }
 
+/// What one read of the phone's calendars produces: the events as pins, and
+/// their alerts as reminders. Two lists of the same type — named so a caller
+/// cannot put the buzzing list on the timeline by swapping a tuple's halves.
+struct CalendarTimelineRead {
+    var pins: [TimelinePin]
+    var reminders: [TimelinePin]
+}
+
 @MainActor
 final class CalendarBridge {
     private var store = EKEventStore()
@@ -85,7 +93,7 @@ final class CalendarBridge {
         disabledCalendarIdentifiers: Set<String> = [],
         includeDeclined: Bool = false,
         remindersEnabled: Bool = false
-    ) async throws -> (pins: [TimelinePin], reminders: [TimelinePin]) {
+    ) async throws -> CalendarTimelineRead {
         guard try await store.requestFullAccessToEvents() else { throw CalendarBridgeError.accessDenied }
         let start = Date()
         let end = Calendar.current.date(byAdding: .day, value: 30, to: start) ?? start
@@ -123,9 +131,9 @@ final class CalendarBridge {
                 fireDates: (event.alarms ?? []).map { Self.fireDate(of: $0, eventStart: event.startDate) }
             )
         }
-        return (
-            pins.sorted { $0.timestamp < $1.timestamp },
-            reminders.sorted { $0.timestamp < $1.timestamp }
+        return CalendarTimelineRead(
+            pins: pins.sorted { $0.timestamp < $1.timestamp },
+            reminders: reminders.sorted { $0.timestamp < $1.timestamp }
         )
     }
 

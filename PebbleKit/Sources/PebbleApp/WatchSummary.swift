@@ -14,6 +14,9 @@ struct WatchSummary: Identifiable, Equatable {
     var serialNumber: String?
     /// Nil where no watch, connected or remembered, has one written.
     var hardwareRevision: String?
+    /// Nil until the watch has said once — firmware installs and per-board
+    /// settings both need it, and both used to re-derive it by hand.
+    var board: WatchBoard?
     var batteryLevel: Int?
     var firmwareVersion: String?
     var isRunningRecoveryFirmware: Bool = false
@@ -37,6 +40,7 @@ extension WatchSummary {
             model: connection?.watch.model ?? saved?.model,
             serialNumber: connection?.watch.serialNumber ?? saved?.serialNumber,
             hardwareRevision: connection?.watch.hardwareRevision ?? saved?.hardwareRevision,
+            board: connection?.watch.board ?? saved?.board,
             batteryLevel: connection?.watch.batteryLevel ?? saved?.lastBatteryLevel,
             firmwareVersion: connection?.watch.firmwareVersion ?? saved?.firmwareVersion,
             isRunningRecoveryFirmware: connection?.watch.isRunningRecoveryFirmware == true,

@@ -472,9 +472,10 @@ struct WatchDiagnosticsTests {
         payload += Array("a.c".utf8) + [UInt8](repeating: 0, count: 13)
         payload += Array("hi".utf8)
 
-        let (applicationID, line) = try AppLogCodec.decode(
+        let decoded = try AppLogCodec.decode(
             PebbleProtocolFrame(endpoint: 2_006, payload: payload)
         )
+        let (applicationID, line) = (decoded.applicationID, decoded.line)
 
         #expect(applicationID == id)
         #expect(line.date == Date(timeIntervalSince1970: 100))

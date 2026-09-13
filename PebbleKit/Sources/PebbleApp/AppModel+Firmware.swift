@@ -9,14 +9,24 @@ extension AppModel {
     /// choose a file in.
     public func installFirmware(from url: URL, watchID: WatchID? = nil) async {
         let connection = connection(for: watchID).flatMap { $0.isConnected ? $0 : nil }
-        let target: (id: WatchID, board: WatchBoard, firmwareVersion: String?, slot: Int?)
+        let target: FirmwareTarget
         if let connection, let board = connection.watch.board {
-            let device = connection.watch
-            target = (device.id, board, device.firmwareVersion, device.firmwareUpdateSlot)
+            let watch = connection.watch
+            target = FirmwareTarget(
+                watchID: watch.id,
+                board: board,
+                firmwareVersion: watch.firmwareVersion,
+                slot: watch.firmwareUpdateSlot
+            )
         } else if let saved = savedWatch(for: watchID), let board = saved.board {
             // The slot is only known while connected; without it any manifest for this
             // board is accepted and the watch has the last word.
-            target = (saved.id, board, saved.firmwareVersion, nil)
+            target = FirmwareTarget(
+                watchID: saved.id,
+                board: board,
+                firmwareVersion: saved.firmwareVersion,
+                slot: nil
+            )
         } else {
             firmware.feedback = .failure(
                 "Connect the target Pebble once so its board is known, then choose firmware."
@@ -33,7 +43,7 @@ extension AppModel {
             }.value
             try package.validateIntegrity()
             let journal = FirmwareUpdateJournal(
-                watchID: target.id,
+                watchID: target.watchID,
                 hardwareRevision: target.board.rawValue,
                 previousVersion: target.firmwareVersion,
                 targetVersion: package.manifest.firmware.versionTag,
@@ -391,4 +401,16 @@ extension AppModel {
             firmware.feedback = .failure("Firmware update stopped safely: \(error.localizedDescription)")
         }
     }
+}
+
+/// The watch a firmware install is aimed at: the connected one if possible,
+/// else the remembered one. The journal is written from this, so it carries
+/// everything the journal needs.
+struct FirmwareTarget {
+    var watchID: WatchID
+    var board: WatchBoard
+    var firmwareVersion: String?
+    /// Only known while connected; nil accepts any manifest for the board and
+    /// leaves the watch the last word.
+    var slot: Int?
 }

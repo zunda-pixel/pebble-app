@@ -37,7 +37,6 @@ public final class CatalogModel {
     /// The words the results answer, kept so a changed search box does not
     /// silently relabel old results.
     public internal(set) var searchQuery = ""
-    public internal(set) var searchTotalCount = 0
     public internal(set) var hasMoreSearchResults = false
     public internal(set) var isSearching = false
     /// The next page to ask the index for.

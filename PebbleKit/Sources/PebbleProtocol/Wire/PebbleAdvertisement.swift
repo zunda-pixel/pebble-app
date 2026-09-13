@@ -1,9 +1,9 @@
-public enum PebbleAdvertisement {
-    public static var vendorIdentifiers: Set<UInt16> { [0x0154, 0x0EEA] }
+package enum PebbleAdvertisement {
+    package static var vendorIdentifiers: Set<UInt16> { [0x0154, 0x0EEA] }
 
     /// The model is a best guess for display only: the real one arrives with the
     /// version response once connected.
-    public static func model(
+    package static func model(
         advertisesPebbleService: Bool,
         localName: String?,
         manufacturerData: [UInt8]
