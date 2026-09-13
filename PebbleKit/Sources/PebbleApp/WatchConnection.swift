@@ -76,7 +76,7 @@ public final class WatchConnection: Identifiable {
     init(
         client: any WatchClient,
         watch: ConnectedWatch,
-        voiceProvider: (any PebbleVoiceTranscriptionProvider)? = nil
+        voiceProvider: (any VoiceTranscriptionProvider)? = nil
     ) {
         self.client = client
         self.watch = watch

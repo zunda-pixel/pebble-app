@@ -88,7 +88,7 @@ struct ConfigurationWebView: View {
             // the app agreed to open and the web view then refused looked from
             // the outside exactly like one that worked.
             let inlineHTML = url.inlineHTML
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "configuration",
                 message: "[\(identity.uuidString.prefix(8))] "
                     + (inlineHTML.map { "loading \($0.utf8.count) byte(s) of page the application built" }
@@ -109,14 +109,14 @@ struct ConfigurationWebView: View {
                 // from a load that was given up on — 5.5 seconds before the one
                 // the reader actually saw, on the reader's phone.
                 guard !Task.isCancelled else {
-                    await PebbleDiagnostics.shared.record(
+                    await DiagnosticLog.shared.record(
                         category: "configuration",
                         message: "[\(identity.uuidString.prefix(8))]"
                             + " this view went before its page was up"
                     )
                     return
                 }
-                await PebbleDiagnostics.shared.record(
+                await DiagnosticLog.shared.record(
                     category: "configuration",
                     message: "[\(identity.uuidString.prefix(8))] the settings page is up"
                 )
@@ -126,7 +126,7 @@ struct ConfigurationWebView: View {
                 } else {
                     loadErrorMessage = "The watch app's settings page could not be loaded."
                 }
-                await PebbleDiagnostics.shared.record(
+                await DiagnosticLog.shared.record(
                     .error,
                     category: "configuration",
                     message: "[\(identity.uuidString.prefix(8))]"

@@ -22,19 +22,6 @@ func catalogCategoryText(_ category: String) -> Text {
     }
 }
 
-enum CatalogKindFilter: String, CaseIterable, Identifiable {
-    case all, watchapps, watchfaces
-    var id: Self { self }
-
-    var title: LocalizedStringKey {
-        switch self {
-        case .all: "All"
-        case .watchapps: "Watch Apps"
-        case .watchfaces: "Watchfaces"
-        }
-    }
-}
-
 /// The app catalog, pushed from the Apps tab's plus button.
 struct CatalogView: View {
     var model: AppModel
@@ -124,7 +111,7 @@ struct CatalogContent<Destination: View>: View {
     /// The value is always the store's own string; only the pixels are
     /// translated, by `catalogCategoryText`.
     @State private var category: String?
-    @State private var kind: CatalogKindFilter = .all
+    @State private var kind: CatalogFilter.Kind = .all
 
     // Pushed onto the applications screen's stack rather than presented, so
     // there is no stack of its own to start and no size to ask for.
@@ -188,7 +175,7 @@ struct CatalogContent<Destination: View>: View {
                         }
                     }
                     Picker("Type", selection: $kind) {
-                        ForEach(CatalogKindFilter.allCases) { Text($0.title).tag($0) }
+                        ForEach(CatalogFilter.Kind.allCases) { Text($0.title).tag($0) }
                     }
                     .pickerStyle(.segmented)
                     Picker("Category", selection: $category) {
@@ -293,9 +280,25 @@ struct CatalogContent<Destination: View>: View {
 /// compared numbers that mean nothing across applications, and category order
 /// repeated the category filter (removed 2026-09-12).
 struct CatalogFilter {
+    /// One of the two kinds, or both. Nested here because a bare
+    /// `CatalogFilter.Kind` beside `CatalogFilter` left a reader guessing which
+    /// was the general one.
+    enum Kind: String, CaseIterable, Identifiable {
+        case all, watchapps, watchfaces
+        var id: Self { self }
+
+        var title: LocalizedStringKey {
+            switch self {
+            case .all: "All"
+            case .watchapps: "Watch Apps"
+            case .watchfaces: "Watchfaces"
+            }
+        }
+    }
+
     /// Nil for every category.
     var category: String?
-    var kind: CatalogKindFilter = .all
+    var kind: Kind = .all
 
     /// What the store called the applications it sent, minus the ones it did
     /// not name. "Every category" is a row above these rather than one of them,

@@ -192,7 +192,7 @@ extension CoreBluetoothWatchClient {
                 // only reached the caller as an error value left the log showing a
                 // request answered in milliseconds and nothing else.
                 Task { [tag = clientTag, status = response.status] in
-                    await PebbleDiagnostics.shared.record(
+                    await DiagnosticLog.shared.record(
                         .warning,
                         category: "blobdb",
                         message: "[\(tag)] the watch refused the write: \(status)"

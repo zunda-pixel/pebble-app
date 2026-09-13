@@ -3,13 +3,13 @@ public import SwiftUI
 
 /// The model a window is showing is the message's subject, so a command only
 /// reaches the windows showing that model.
-public struct PebbleScanRequest: NotificationCenter.MainActorMessage {
+public struct ScanRequest: NotificationCenter.MainActorMessage {
     public typealias Subject = AppModel
 
     public init() {}
 }
 
-public struct PebbleSectionRequest: NotificationCenter.MainActorMessage {
+public struct SectionRequest: NotificationCenter.MainActorMessage {
     public typealias Subject = AppModel
 
     public var section: AppSection
@@ -20,16 +20,16 @@ public struct PebbleSectionRequest: NotificationCenter.MainActorMessage {
 }
 
 public extension View {
-    func onPebbleMessage<Message: NotificationCenter.MainActorMessage>(
+    func onWindowMessage<Message: NotificationCenter.MainActorMessage>(
         _ messageType: Message.Type,
         from model: AppModel,
         perform action: @escaping @MainActor (Message) -> Void
     ) -> some View where Message.Subject == AppModel {
-        modifier(PebbleMessageObserver(model: model, action: action))
+        modifier(MessageObserver(model: model, action: action))
     }
 }
 
-private struct PebbleMessageObserver<Message: NotificationCenter.MainActorMessage>: ViewModifier
+private struct MessageObserver<Message: NotificationCenter.MainActorMessage>: ViewModifier
 where Message.Subject == AppModel {
     var model: AppModel
     var action: @MainActor (Message) -> Void

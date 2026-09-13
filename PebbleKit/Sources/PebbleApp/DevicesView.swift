@@ -1,7 +1,7 @@
 import SwiftUI
 import PebbleProtocol
 
-struct DevicesView: View {
+struct WatchesView: View {
     var model: AppModel
     @State private var isAddingWatch = false
 
@@ -14,7 +14,7 @@ struct DevicesView: View {
     }
 
     var body: some View {
-        DevicesContent(
+        WatchesContent(
             watches: listedWatchIDs.map { WatchSummary(watchID: $0, model: model) },
             feedback: model.watches.feedback,
             addWatch: { isAddingWatch = true },
@@ -26,13 +26,13 @@ struct DevicesView: View {
         .sheet(isPresented: $isAddingWatch) {
             AddWatchSheet(model: model)
         }
-        .onPebbleMessage(PebbleScanRequest.self, from: model) { _ in
+        .onWindowMessage(ScanRequest.self, from: model) { _ in
             isAddingWatch = true
         }
     }
 }
 
-struct DevicesContent<Destination: View>: View {
+struct WatchesContent<Destination: View>: View {
     var watches: [WatchSummary]
     var feedback: FeatureFeedback?
     var addWatch: () -> Void
@@ -105,9 +105,9 @@ struct AddWatchSheet: View {
                 watchBeingAdded = watch.id
                 Task { await model.connect(to: watch) }
             },
-            connectDiscovered: { device in
-                watchBeingAdded = device.id
-                Task { await model.connect(to: device) }
+            connectDiscovered: { watch in
+                watchBeingAdded = watch.id
+                Task { await model.connect(to: watch) }
             },
             close: { dismiss() }
         )
@@ -165,9 +165,9 @@ struct AddWatchContent: View {
                 }
 
                 Section {
-                    ForEach(discoveredWatches) { device in
-                        DiscoveredDeviceRow(device: device) {
-                            connectDiscovered(device)
+                    ForEach(discoveredWatches) { watch in
+                        DiscoveredWatchRow(watch: watch) {
+                            connectDiscovered(watch)
                         }
                         .disabled(isConnecting)
                     }
@@ -249,20 +249,20 @@ struct WatchListRow: View {
     }
 }
 
-struct DiscoveredDeviceRow: View {
-    var device: DiscoveredWatch
+struct DiscoveredWatchRow: View {
+    var watch: DiscoveredWatch
     var connect: () -> Void
 
     var body: some View {
         Button(action: connect) {
             LabeledContent {
-                Text("\(device.signalStrength) dBm")
+                Text("\(watch.signalStrength) dBm")
                     .foregroundStyle(.secondary)
             } label: {
                 Label {
                     VStack(alignment: .leading) {
-                        Text(device.name)
-                        Text(device.model.displayName)
+                        Text(watch.name)
+                        Text(watch.model.displayName)
                             .foregroundStyle(.secondary)
                     }
                 } icon: {
@@ -278,7 +278,7 @@ struct DiscoveredDeviceRow: View {
 
 #Preview("One connected, one away") {
     NavigationStack {
-        DevicesContent(
+        WatchesContent(
             watches: [
                 PreviewSamples.connectedSummary,
                 PreviewSamples.recoverySummary,
@@ -293,7 +293,7 @@ struct DiscoveredDeviceRow: View {
 
 #Preview("No watches") {
     NavigationStack {
-        DevicesContent(
+        WatchesContent(
             watches: [],
             feedback: .failure("Bluetooth is off."),
             addWatch: {},

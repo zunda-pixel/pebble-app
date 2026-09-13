@@ -56,7 +56,7 @@ struct WatchSettingsSyncTests {
     /// What the watch says lands here, and goes on to the other watch.
     ///
     /// Not back to the one that sent it — it already has the value, and
-    /// answering a push with a write is how two devices talk each other into a
+    /// answering a push with a write is how two watches talk each other into a
     /// loop. To the other one because this app keeps one set of settings and
     /// writes it to every watch, which is the shape the notification-app
     /// database already had for a record arriving from one of them.
@@ -77,9 +77,9 @@ struct WatchSettingsSyncTests {
             }
         )
         await model.scan()
-        let devices = model.discoveredWatches
-        let first = try #require(devices.first)
-        let second = try #require(devices.dropFirst().first)
+        let watches = model.discoveredWatches
+        let first = try #require(watches.first)
+        let second = try #require(watches.dropFirst().first)
         await model.connect(to: first)
         await model.connect(to: second)
 

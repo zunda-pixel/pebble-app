@@ -3,7 +3,7 @@ import MemberwiseInit
 /// A watch that is not bonded yet reports `isPaired` false, and a bond the
 /// phone has forgotten shows as paired but unencrypted.
 @MemberwiseInit(.package)
-package struct PebbleConnectivityStatus: Equatable, Sendable {
+package struct ConnectivityStatus: Equatable, Sendable {
     package var isConnected: Bool
     package var isPaired: Bool
     package var isEncrypted: Bool
@@ -35,7 +35,7 @@ package struct PebbleConnectivityStatus: Equatable, Sendable {
     }
 }
 
-package enum PebblePairingTrigger {
+package enum PairingTrigger {
     /// The default asks the watch to start the security request itself, which is
     /// what makes iOS show its pairing prompt.
     package static func value(

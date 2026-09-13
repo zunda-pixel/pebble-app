@@ -19,7 +19,7 @@ final class SuspendingWatchClient: WatchClient {
     var appMessageFailure: (any Error)?
     var transferFailure: (any Error)?
 
-    private(set) var sentNotifications: [PebbleTimelineNotification] = []
+    private(set) var sentNotifications: [TimelineNotification] = []
     private(set) var sentAppMessages: [(applicationID: UUID, tuples: [AppMessageTuple])] = []
     private(set) var installedObjects: [(objectType: PutBytesObjectType, appBankID: UInt32)] = []
     private(set) var appFetchResponses: [AppFetchResponseStatus] = []
@@ -44,13 +44,13 @@ final class SuspendingWatchClient: WatchClient {
     /// No phases: these tests are about the queues, and a connect that reports
     /// nothing between the link and the answer is what the protocol allows.
     func connect(
-        to device: DiscoveredWatch,
+        to watch: DiscoveredWatch,
         reportingPhase: @escaping @MainActor (WatchHandshakePhase) -> Void
     ) async throws -> ConnectedWatch {
         ConnectedWatch(
-            id: device.id,
-            name: device.name,
-            model: device.model,
+            id: watch.id,
+            name: watch.name,
+            model: watch.model,
             batteryLevel: 70,
             version: WatchVersionInformation(
                 firmwareVersion: "v5.0.0-test",
@@ -60,8 +60,8 @@ final class SuspendingWatchClient: WatchClient {
         )
     }
 
-    func disconnect(from device: ConnectedWatch) async {
-        disconnectedWatches.append(device)
+    func disconnect(from watch: ConnectedWatch) async {
+        disconnectedWatches.append(watch)
     }
 
     func send(_ frame: PebbleProtocolFrame) async throws {

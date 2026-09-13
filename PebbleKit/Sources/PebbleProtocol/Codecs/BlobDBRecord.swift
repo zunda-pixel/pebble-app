@@ -26,8 +26,8 @@ public struct BlobDBWrite: Sendable {
 /// sent seven of these without reading the reply at all, and refused an
 /// application whose record the watch already held.
 public enum BlobDBRecord: Equatable, Sendable {
-    case application(PebbleAppMetadata)
-    case notification(PebbleTimelineNotification)
+    case application(ApplicationMetadata)
+    case notification(TimelineNotification)
     case timelinePin(TimelinePin)
     case timelineReminder(TimelinePin)
     case notificationSourceApp(NotificationSourceApp)
@@ -45,7 +45,7 @@ public enum BlobDBRecord: Equatable, Sendable {
     /// The thirty-day averages, sent as a pair because the watch shows them
     /// side by side and half a comparison is worse than none.
     case healthAverages(steps: UInt32, sleepSeconds: UInt32)
-    case reminderAppState(PebbleReminderAppState)
+    case reminderAppState(RemindersAppState)
 
     /// The frames this record turns into, in the order they must be sent.
     public var writes: [BlobDBWrite] {

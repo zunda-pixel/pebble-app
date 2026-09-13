@@ -30,7 +30,7 @@ extension AppModel {
             await refreshWeather()
         } catch {
             weather.feedback = .failure("The phone's position could not be read.")
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 .error,
                 category: "weather",
                 message: "the phone's position: \(String(reflecting: error))"
@@ -149,7 +149,7 @@ extension AppModel {
                 weather.feedback = .failure(weatherFailureMessage(for: error, place: place.name))
                 // `localizedDescription` on a WeatherKit failure is usually "The operation
                 // couldn't be completed", which says nothing; the domain and code do.
-                await PebbleDiagnostics.shared.record(
+                await DiagnosticLog.shared.record(
                     .error,
                     category: "weather",
                     message: "\(place.name): \(String(reflecting: error))"
@@ -189,7 +189,7 @@ extension AppModel {
             weather.feedback = .failure(
                 "\(connection.watch.name) did not accept the list of places. \(Text(refusalReason(for: error)))"
             )
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 .error,
                 category: "weather",
                 message: "\(connection.watch.name) rejected the location order: \(String(reflecting: error))"
@@ -205,7 +205,7 @@ extension AppModel {
                 weather.feedback = .failure(
                     "\(connection.watch.name) did not accept the forecast. \(Text(refusalReason(for: error)))"
                 )
-                await PebbleDiagnostics.shared.record(
+                await DiagnosticLog.shared.record(
                     .error,
                     category: "weather",
                     message: "\(connection.watch.name) rejected \(report.locationName): \(String(reflecting: error))"
@@ -215,7 +215,7 @@ extension AppModel {
         }
         // Said out loud because a refusal is the only other thing recorded here,
         // and silence alone cannot tell "the watch took it" from "nothing ran".
-        await PebbleDiagnostics.shared.record(
+        await DiagnosticLog.shared.record(
             category: "weather",
             message: "\(connection.watch.name) took \(weather.reports.count) forecast(s) and their order"
         )
@@ -275,7 +275,7 @@ extension AppModel {
         // The staleness clock only moves when a round finishes, so two of
         // these racing — the foreground handler and a fresh connection — both
         // read "stale" while the first round is still in flight. WeatherKit is
-        // a per-device quota, and a second round would also write every watch
+        // a per-watch quota, and a second round would also write every watch
         // its forecasts twice; the round under way is this caller's answer.
         if let running = weather.refreshTask {
             await running.value

@@ -2,7 +2,7 @@ import Defaults
 public import SwiftUI
 import PebbleProtocol
 
-public struct PebbleSettingsView: View {
+public struct SettingsRootView: View {
     var model: AppModel
 
     public init(model: AppModel) {
@@ -24,7 +24,7 @@ struct SettingsView: View {
         SettingsContent(
             weatherPlaceNames: model.weather.places.map(\.name),
             notificationSourceAppCount: model.notifications.sourceApps.count,
-            companionNotificationsEnabled: model.notifications.companionEnabled,
+            areCompanionNotificationsEnabled: model.notifications.companionEnabled,
             notificationPreferences: model.notifications.preferences,
             applications: model.applications.apps + model.applications.watchfaces,
             diagnosticReportURL: model.diagnostics.reportURL,
@@ -51,7 +51,7 @@ struct SettingsView: View {
             weatherDestination: { WeatherView(model: model) },
             notificationSettingsDestination: {
                 NotificationSettingsContent(
-                    companionNotificationsEnabled: model.notifications.companionEnabled,
+                    areCompanionNotificationsEnabled: model.notifications.companionEnabled,
                     notificationPreferences: model.notifications.preferences,
                     applications: model.applications.apps + model.applications.watchfaces,
                     notificationSourceAppCount: model.notifications.sourceApps.count,
@@ -76,7 +76,7 @@ struct SettingsView: View {
 struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination: View>: View {
     var weatherPlaceNames: [String]
     var notificationSourceAppCount: Int
-    var companionNotificationsEnabled: Bool
+    var areCompanionNotificationsEnabled: Bool
     var notificationPreferences: NotificationDeliveryPreferences
     var applications: [WatchApplication]
     var diagnosticReportURL: URL?
@@ -129,7 +129,7 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
                     // Said here because it is the one thing on that screen
                     // worth knowing without opening it: nothing a watch
                     // app raises will arrive.
-                    if !companionNotificationsEnabled { Text("Off") }
+                    if !areCompanionNotificationsEnabled { Text("Off") }
                 }
             }
             Section {
@@ -210,7 +210,7 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
         SettingsContent(
             weatherPlaceNames: PreviewSamples.weatherPlaces.map(\.name),
             notificationSourceAppCount: PreviewSamples.notificationApps.count,
-            companionNotificationsEnabled: true,
+            areCompanionNotificationsEnabled: true,
             notificationPreferences: NotificationDeliveryPreferences(),
             applications: PreviewSamples.watchApplications + PreviewSamples.watchfaces,
             diagnosticReportURL: nil,
@@ -232,7 +232,7 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
         SettingsContent(
             weatherPlaceNames: PreviewSamples.weatherPlaces.map(\.name),
             notificationSourceAppCount: PreviewSamples.notificationApps.count,
-            companionNotificationsEnabled: true,
+            areCompanionNotificationsEnabled: true,
             notificationPreferences: NotificationDeliveryPreferences(),
             applications: PreviewSamples.watchApplications,
             // Nil alongside the failure: an earlier report is not offered for
@@ -256,9 +256,9 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
         SettingsContent(
             weatherPlaceNames: [],
             notificationSourceAppCount: 0,
-            companionNotificationsEnabled: false,
+            areCompanionNotificationsEnabled: false,
             notificationPreferences: NotificationDeliveryPreferences(
-                quietHoursEnabled: true,
+                areQuietHoursEnabled: true,
                 quietHoursStart: 22,
                 quietHoursEnd: 7
             ),

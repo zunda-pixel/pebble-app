@@ -24,7 +24,7 @@ extension AppModel {
     }
 
     public func setQuietHours(enabled: Bool, start: Int? = nil, end: Int? = nil) async {
-        notifications.preferences.quietHoursEnabled = enabled
+        notifications.preferences.areQuietHoursEnabled = enabled
         if let start { notifications.preferences.quietHoursStart = min(23, max(0, start)) }
         if let end { notifications.preferences.quietHoursEnd = min(23, max(0, end)) }
         await savePreferences(saying: .success("Quiet hours updated."))
@@ -46,7 +46,7 @@ extension AppModel {
             notifications.settingsFeedback = .failure(
                 "This change could not be saved. It works now, but the app will forget it when it next starts."
             )
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 .error,
                 category: "notification",
                 message: "the notification preferences could not be saved: \(String(reflecting: error))"
@@ -59,7 +59,7 @@ extension AppModel {
             notifications.feedback = .failure("Connect a Pebble before sending a test notification.")
             return
         }
-        let notification = PebbleTimelineNotification(
+        let notification = TimelineNotification(
             parentApplicationID: UUID(),
             title: "Pebble Test",
             body: "Notifications are reaching your watch.",
@@ -69,13 +69,13 @@ extension AppModel {
             try await connection.client.write(.notification(notification))
             notifications.feedback = .success("Test notification sent.")
             await record(notification, sentTo: [connection.watch.name])
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "notification",
                 message: "Test notification sent"
             )
         } catch {
             notifications.feedback = .failure("The test notification could not be sent.")
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 .error,
                 category: "notification",
                 message: "Test notification delivery failed"
@@ -105,7 +105,7 @@ extension AppModel {
     ) async throws {
         guard notifications.companionEnabled else { return }
         guard notifications.preferences.permits(applicationID: application.id, at: Date()) else {
-            await PebbleDiagnostics.shared.record(category: "notification", message: "Notification suppressed by delivery preferences")
+            await DiagnosticLog.shared.record(category: "notification", message: "Notification suppressed by delivery preferences")
             return
         }
         let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -118,7 +118,7 @@ extension AppModel {
         let fingerprint = "\(application.id.uuidString)|\(normalizedTitle)|\(normalizedBody)"
         guard recentNotificationFingerprints[fingerprint] == nil else { return }
         recentNotificationFingerprints[fingerprint] = now
-        let notification = PebbleTimelineNotification(
+        let notification = TimelineNotification(
             parentApplicationID: application.id,
             title: normalizedTitle,
             body: normalizedBody,
@@ -156,13 +156,13 @@ extension AppModel {
             )
             return
         }
-        await PebbleDiagnostics.shared.record(
+        await DiagnosticLog.shared.record(
             category: "notification",
             message: "Watch app notification sent"
         )
     }
 
-    func record(_ notification: PebbleTimelineNotification, sentTo watchNames: [String]) async {
+    func record(_ notification: TimelineNotification, sentTo watchNames: [String]) async {
         let sent = SentNotification(
             appName: notification.appName ?? "",
             title: notification.title,
@@ -188,7 +188,7 @@ extension AppModel {
             notifications.historyFeedback = nil
         } catch {
             notifications.historyFeedback = .failure("The history could not be cleared.")
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 .error,
                 category: "notification",
                 message: "the sent-notification history could not be cleared: \(String(reflecting: error))"
@@ -196,13 +196,13 @@ extension AppModel {
         }
     }
 
-    private func queue(_ notification: PendingDelivery<PebbleTimelineNotification>, reason: String) async {
+    private func queue(_ notification: PendingDelivery<TimelineNotification>, reason: String) async {
         pendingNotifications.append(notification)
         if pendingNotifications.count > 20 {
             pendingNotifications.removeFirst(pendingNotifications.count - 20)
         }
         try? await pendingNotificationStore.save(pendingNotifications)
-        await PebbleDiagnostics.shared.record(
+        await DiagnosticLog.shared.record(
             category: "notification",
             message: "Watch app notification queued: \(reason)"
         )
@@ -277,7 +277,7 @@ extension AppModel {
                     // makes the watch do next was not measured. Said out loud
                     // so it is not simply swallowed.
                     succeeded = true
-                    await PebbleDiagnostics.shared.record(
+                    await DiagnosticLog.shared.record(
                         category: "settings",
                         message: "\(connection.watch.name) synced a setting this app does not have: "
                             + String(decoding: write.key.prefix { $0 != 0 }, as: UTF8.self)
@@ -334,7 +334,7 @@ extension AppModel {
                 try await connection.client.write(.notificationSourceApp(record))
                 connection.synchronizedNotificationAppRecords[app.bundleID] = value
             } catch {
-                await PebbleDiagnostics.shared.record(
+                await DiagnosticLog.shared.record(
                     .error,
                     category: "notification",
                     message: "\(connection.watch.name) rejected the setting for \(app.displayName): "
@@ -345,7 +345,7 @@ extension AppModel {
         }
     }
 
-    public func setNotificationSourceAppIcon(bundleID: String, icon: PebbleTimelineIcon?) async {
+    public func setNotificationSourceAppIcon(bundleID: String, icon: TimelineIcon?) async {
         guard var app = notifications.sourceApps.first(where: { $0.bundleID == bundleID }) else {
             return
         }
@@ -418,7 +418,7 @@ extension AppModel {
                 do {
                     try await connection.client.remove(.notificationSourceApp(bundleID: app.bundleID))
                 } catch {
-                    await PebbleDiagnostics.shared.record(
+                    await DiagnosticLog.shared.record(
                         .error,
                         category: "notification",
                         message: "\(connection.watch.name) kept \(app.displayName): "
@@ -456,7 +456,7 @@ extension AppModel {
                 transactionID: message.transactionID,
                 acknowledged: false
             )
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 .error,
                 category: "appmessage",
                 message: "Incoming AppMessage delivery failed"
@@ -524,7 +524,7 @@ extension AppModel {
         }
         try? await pendingNotificationStore.save(pendingNotifications)
         if pendingNotifications.isEmpty {
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "notification",
                 message: "Queued watch app notifications delivered"
             )

@@ -23,7 +23,7 @@ extension AppModel {
         do {
             try await speechBridge.installAssets()
         } catch {
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "voice",
                 message: "Could not install the recognizer: \(error)"
             )

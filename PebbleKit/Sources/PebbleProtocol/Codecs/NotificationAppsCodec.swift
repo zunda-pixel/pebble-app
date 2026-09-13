@@ -74,7 +74,13 @@ public struct NotificationFilterRule: Codable, Equatable, Sendable, Identifiable
     public var id: UUID = UUID()
     public var pattern: String
     public var field: NotificationRuleField = .anywhere
-    public var caseSensitive: Bool = false
+    public var isCaseSensitive: Bool = false
+
+    // The file on disk keeps the name the field was first written under.
+    private enum CodingKeys: String, CodingKey {
+        case id, pattern, field
+        case isCaseSensitive = "caseSensitive"
+    }
 }
 
 /// The watch inserts a record for every app it sees sending notifications; the
@@ -87,7 +93,7 @@ public struct NotificationSourceApp: Codable, Equatable, Sendable, Identifiable 
     public var muteExpiration: Date? = nil
     public var stateUpdated: Date = .now
     /// Nil leaves the choice of icon to the watch.
-    public var icon: PebbleTimelineIcon? = nil
+    public var icon: TimelineIcon? = nil
     public var backgroundColor: PebbleColor? = nil
     public var foregroundColor: PebbleColor? = nil
     /// Nil leaves the watch its own vibration setting.
@@ -256,7 +262,7 @@ public enum NotificationAppsCodec {
         for rule in rules {
             let pattern = Array(rule.pattern.utf8)
             guard !pattern.isEmpty, !pattern.contains(0) else { continue }
-            let body = [0x00, rule.field.rawValue, rule.caseSensitive ? 1 : 0] + pattern + [0x00]
+            let body = [0x00, rule.field.rawValue, rule.isCaseSensitive ? 1 : 0] + pattern + [0x00]
             guard length + body.count <= maximumRulesLength, bodies.count < 255 else { break }
             length += body.count
             bodies.append(body)

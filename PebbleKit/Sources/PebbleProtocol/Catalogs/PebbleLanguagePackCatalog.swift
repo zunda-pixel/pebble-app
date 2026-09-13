@@ -3,7 +3,7 @@ import MemberwiseInit
 import Retry
 
 @MemberwiseInit(.public)
-public struct PebbleLanguagePack: Equatable, Identifiable, Sendable {
+public struct LanguagePack: Equatable, Identifiable, Sendable {
     /// As the firmware spells it, which is also what a watch reports back once
     /// the pack is installed: `fr_FR`, `en_CN`.
     public var locale: String
@@ -19,7 +19,7 @@ public struct PebbleLanguagePack: Equatable, Identifiable, Sendable {
 
 /// There is no service to ask: the official app carries the same list compiled
 /// in, pointing at Rebble's public binaries.
-public struct PebbleLanguagePackCatalog: Sendable {
+public struct LanguagePackCatalog: Sendable {
     private let session: URLSession
 
     public init(session: URLSession? = nil) {
@@ -34,7 +34,7 @@ public struct PebbleLanguagePackCatalog: Sendable {
 
     /// Only Arabic is built for the current boards; every other language comes
     /// from a pack built for any board or from the Pebble 2's.
-    public static func packs(for board: WatchBoard) -> [PebbleLanguagePack] {
+    public static func packs(for board: WatchBoard) -> [LanguagePack] {
         let exact = all.filter { $0.boardName == board.rawValue }
         let exactLocales = Set(exact.map(\.locale))
         let fallback = all.filter { pack in
@@ -44,23 +44,23 @@ public struct PebbleLanguagePackCatalog: Sendable {
         return (exact + fallback).sorted { $0.localName < $1.localName }
     }
 
-    public func download(_ pack: PebbleLanguagePack) async throws -> Data {
+    public func download(_ pack: LanguagePack) async throws -> Data {
         let url = try await retry(with: .networkFetch) {
             do {
                 return try await downloadFile(from: pack.url, using: session)
             } catch HTTPFileDownloadError.insecureURL {
-                throw NotRetryable(PebbleLanguagePackError.insecureURL)
+                throw NotRetryable(LanguagePackError.insecureURL)
             } catch let error as HTTPFileDownloadError {
                 throw error.isWorthAnotherAttempt
-                    ? PebbleLanguagePackError.unavailable
-                    : NotRetryable(PebbleLanguagePackError.unavailable)
+                    ? LanguagePackError.unavailable
+                    : NotRetryable(LanguagePackError.unavailable)
             } catch {
-                throw PebbleLanguagePackError.unavailable
+                throw LanguagePackError.unavailable
             }
         }
         defer { try? FileManager.default.removeItem(at: url) }
         let data = try Data(contentsOf: url, options: .mappedIfSafe)
-        guard !data.isEmpty else { throw PebbleLanguagePackError.unavailable }
+        guard !data.isEmpty else { throw LanguagePackError.unavailable }
         return data
     }
 
@@ -69,7 +69,7 @@ public struct PebbleLanguagePackCatalog: Sendable {
 
     static let silkBoardName = "silk"
 
-    static let all: [PebbleLanguagePack] = {
+    static let all: [LanguagePack] = {
         // The one language built for the current boards, and the same package covers
         // all of them.
         let arabic = URL(string: "https://github.com/kaluaim/PebbleOS/releases/download/ar_SA-v1/ar_SA.pbl")!
@@ -97,7 +97,7 @@ public struct PebbleLanguagePackCatalog: Sendable {
             ("en_MY", "မြန်မာစာ", 1, "myanmar.pbl"),
         ]
         return arabicBoards.map { board in
-            PebbleLanguagePack(
+            LanguagePack(
                 locale: "ar_SA",
                 localName: "العربية",
                 boardName: board.rawValue,
@@ -105,7 +105,7 @@ public struct PebbleLanguagePackCatalog: Sendable {
                 url: arabic
             )
         } + anyBoard.map { locale, name, version, url in
-            PebbleLanguagePack(
+            LanguagePack(
                 locale: locale,
                 localName: name,
                 boardName: nil,
@@ -113,7 +113,7 @@ public struct PebbleLanguagePackCatalog: Sendable {
                 url: URL(string: url)!
             )
         } + silk.map { locale, name, version, file in
-            PebbleLanguagePack(
+            LanguagePack(
                 locale: locale,
                 localName: name,
                 boardName: silkBoardName,
@@ -124,7 +124,7 @@ public struct PebbleLanguagePackCatalog: Sendable {
     }()
 }
 
-public enum PebbleLanguagePackError: Error, Equatable, Sendable {
+public enum LanguagePackError: Error, Equatable, Sendable {
     case unavailable
     case insecureURL
     case unsupportedByWatch

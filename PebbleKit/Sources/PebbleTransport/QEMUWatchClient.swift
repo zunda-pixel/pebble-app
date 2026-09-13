@@ -52,16 +52,16 @@ public final class QEMUWatchClient: WatchClient {
     }
 
     public func connect(
-        to device: DiscoveredWatch,
+        to watch: DiscoveredWatch,
         reportingPhase: @escaping @MainActor (WatchHandshakePhase) -> Void
     ) async throws -> ConnectedWatch {
-        reconnectWatch = device
+        reconnectWatch = watch
         isManualDisconnect = false
-        return try await establishConnection(to: device, reportingPhase: reportingPhase)
+        return try await establishConnection(to: watch, reportingPhase: reportingPhase)
     }
 
     private func establishConnection(
-        to device: DiscoveredWatch,
+        to watch: DiscoveredWatch,
         reportingPhase: @MainActor (WatchHandshakePhase) -> Void = { _ in }
     ) async throws -> ConnectedWatch {
         guard connection == nil else { throw WatchConnectionError.connectionAlreadyInProgress }
@@ -111,7 +111,7 @@ public final class QEMUWatchClient: WatchClient {
             // Said out loud, as the Bluetooth transport does. It said nothing here,
             // which is how a watch arriving with no board and no capabilities went
             // unremarked in the one environment this project verifies in.
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 information.isRunningRecoveryFirmware ? .error : .info,
                 category: "connection",
                 message: "[qemu] \(information.diagnosticSummary)"
@@ -120,24 +120,24 @@ public final class QEMUWatchClient: WatchClient {
                         : "")
             )
             try await synchronizeTime()
-            let device = ConnectedWatch(
-                id: device.id,
-                name: device.name,
-                model: WatchModel(hardwarePlatform: information.hardwarePlatform) ?? device.model,
+            let watch = ConnectedWatch(
+                id: watch.id,
+                name: watch.name,
+                model: WatchModel(hardwarePlatform: information.hardwarePlatform) ?? watch.model,
                 batteryLevel: nil,
                 // One value, so this transport cannot arrive with half of what the
                 // watch said — which is exactly what it used to do.
                 version: information
             )
-            connectedWatch = device
-            return device
+            connectedWatch = watch
+            return watch
         } catch {
             discardConnection()
             throw error
         }
     }
 
-    public func disconnect(from device: ConnectedWatch) async {
+    public func disconnect(from watch: ConnectedWatch) async {
         isManualDisconnect = true
         reconnectTask?.cancel()
         reconnectTask = nil
@@ -149,7 +149,7 @@ public final class QEMUWatchClient: WatchClient {
 
     public func send(_ frame: PebbleProtocolFrame) async throws {
         guard let connection else { throw WatchConnectionError.disconnected }
-        await PebbleDiagnostics.shared.recordFrame(direction: "out", frame: frame)
+        await DiagnosticLog.shared.recordFrame(direction: "out", frame: frame)
         let frameBytes = try frame.encoded()
         guard frameBytes.count <= 2_048 else { throw QEMUTransportError.messageTooLarge }
         var bytes: [UInt8] = [0xFE, 0xED, 0x00, 0x01]
@@ -379,9 +379,9 @@ public final class QEMUWatchClient: WatchClient {
                 try? await Task.sleep(for: .seconds(delay))
                 guard !Task.isCancelled, !self.isManualDisconnect else { return }
                 do {
-                    let device = try await self.establishConnection(to: reconnectWatch)
+                    let watch = try await self.establishConnection(to: reconnectWatch)
                     self.reconnectTask = nil
-                    self.eventContinuation?.yield(.watchUpdated(device))
+                    self.eventContinuation?.yield(.watchUpdated(watch))
                     return
                 } catch {
                     self.discardConnection()
@@ -462,7 +462,7 @@ public final class QEMUWatchClient: WatchClient {
     }
 
     private func process(_ frame: PebbleProtocolFrame) throws {
-        Task { await PebbleDiagnostics.shared.recordFrame(direction: "in", frame: frame) }
+        Task { await DiagnosticLog.shared.recordFrame(direction: "in", frame: frame) }
         if frame.endpoint == WatchVersionCodec.endpoint, versionContinuation != nil {
             finishVersion(returning: try WatchVersionCodec.decode(frame))
         } else if frame.endpoint == PingPongCodec.endpoint {

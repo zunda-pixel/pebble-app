@@ -4,7 +4,7 @@ import MemberwiseInit
 
 /// The number decides how the watch presents the item, and has to agree with
 /// the database it is filed in.
-public enum TimelineItemType: UInt8, Codable, Equatable, Sendable {
+public enum TimelineItemKind: UInt8, Codable, Equatable, Sendable {
     case notification = 1
     case pin = 2
     case reminder = 3
@@ -20,7 +20,7 @@ public struct TimelinePin: Codable, Equatable, Identifiable, Sendable {
     public var subtitle: String?
     public var body: String?
     public var isAllDay: Bool = false
-    public var kind: TimelineItemType = .pin
+    public var kind: TimelineItemKind = .pin
     /// Whether the watch made this one rather than the app.
     ///
     /// Such an item has actions and an icon the watch chose and this app does
@@ -95,7 +95,7 @@ public struct TimelinePin: Codable, Equatable, Identifiable, Sendable {
         guard bytes.count >= Self.headerLength else {
             throw TimelinePinError.malformedItem
         }
-        guard let kind = TimelineItemType(rawValue: bytes[38]) else {
+        guard let kind = TimelineItemKind(rawValue: bytes[38]) else {
             throw TimelinePinError.malformedItem
         }
         id = try Self.uuid(bytes[0..<16])

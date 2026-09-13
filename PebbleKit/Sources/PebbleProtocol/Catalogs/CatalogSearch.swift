@@ -15,7 +15,7 @@ public struct CatalogSearchPage: Equatable, Sendable {
     public var hasMore: Bool { page + 1 < pageCount }
 }
 
-extension AppCatalog {
+extension ApplicationCatalog {
     /// Asks the store's index, one page at a time.
     ///
     /// Two round trips by design: the index answers with rankings but without
@@ -47,7 +47,7 @@ extension AppCatalog {
         guard let searchQueryURL = source.searchQueryURL,
               let applicationID = source.searchApplicationID,
               let apiKey = source.searchAPIKey
-        else { throw AppCatalogError.invalidResponse }
+        else { throw ApplicationCatalogError.invalidResponse }
         var tags = ["ios"]
         if let kind { tags.append(kind == .watchface ? "watchface" : "watchapp") }
         let body = AlgoliaQuery(query: query, page: page, hitsPerPage: 20, tagFilters: tags)
@@ -66,7 +66,7 @@ extension AppCatalog {
             from: try JSONEncoder().encode(body)
         )
         guard response.status == .ok, data.count <= 20 * 1_024 * 1_024 else {
-            throw AppCatalogError.invalidResponse
+            throw ApplicationCatalogError.invalidResponse
         }
         let answer = try JSONDecoder().decode(AlgoliaSearchResponse.self, from: data)
         let collections = Dictionary(
@@ -127,7 +127,7 @@ extension AppCatalog {
             from: try JSONEncoder().encode(BulkLookup(ids: ids))
         )
         guard response.status == .ok, data.count <= 20 * 1_024 * 1_024 else {
-            throw AppCatalogError.invalidResponse
+            throw ApplicationCatalogError.invalidResponse
         }
         // The same rows the feed itself is made of, so the same decoding. The
         // answer's order is the server's own and is put back into the asked

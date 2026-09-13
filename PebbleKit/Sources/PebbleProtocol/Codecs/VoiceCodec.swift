@@ -360,7 +360,7 @@ public enum VoiceTranscriptionOutcome: Equatable, Sendable {
     case failed(VoiceSessionResult)
 }
 
-public protocol PebbleVoiceTranscriptionProvider: Sendable {
+public protocol VoiceTranscriptionProvider: Sendable {
     /// Whether this kind of session can be served at all. A phone that can turn
     /// speech into words may still have no way to read a reminder out of them.
     func canServeSession(_ sessionType: VoiceSessionType) async -> Bool
@@ -368,7 +368,7 @@ public protocol PebbleVoiceTranscriptionProvider: Sendable {
     func interpretReminder(_ words: [VoiceTranscriptionWord]) async -> VoiceReminderOutcome
 }
 
-extension PebbleVoiceTranscriptionProvider {
+extension VoiceTranscriptionProvider {
     public func interpretReminder(_ words: [VoiceTranscriptionWord]) async -> VoiceReminderOutcome {
         .failed(.serviceUnavailable)
     }
@@ -382,12 +382,12 @@ public final class VoiceSessionCoordinator {
     }
 
     private let send: (PebbleProtocolFrame) async throws -> Void
-    private let provider: (any PebbleVoiceTranscriptionProvider)?
+    private let provider: (any VoiceTranscriptionProvider)?
     private var activeSession: ActiveSession?
     private var transcriptionTask: Task<Void, Never>?
 
     public init(
-        provider: (any PebbleVoiceTranscriptionProvider)?,
+        provider: (any VoiceTranscriptionProvider)?,
         send: @escaping (PebbleProtocolFrame) async throws -> Void
     ) {
         self.provider = provider
@@ -491,7 +491,7 @@ public final class VoiceSessionCoordinator {
     private static func reminderFrame(
         for outcome: VoiceTranscriptionOutcome,
         request: VoiceSessionSetupRequest,
-        provider: any PebbleVoiceTranscriptionProvider
+        provider: any VoiceTranscriptionProvider
     ) async -> PebbleProtocolFrame {
         let interpretation: VoiceReminderOutcome = switch outcome {
         case .transcribed(let words): await provider.interpretReminder(words)

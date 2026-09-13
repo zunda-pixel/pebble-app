@@ -42,7 +42,7 @@ extension AppModel {
                 timeline.reminderFeedback = .failure(
                     "\(connection.watch.name) did not accept the reminder. \(Text(refusalReason(for: error)))"
                 )
-                await PebbleDiagnostics.shared.record(
+                await DiagnosticLog.shared.record(
                     .error,
                     category: "timeline",
                     message: "\(connection.watch.name) refused a reminder: \(String(reflecting: error))"
@@ -92,7 +92,7 @@ extension AppModel {
                 removed.insert(id)
             } catch {
                 // Kept in the record, so the next connection asks again.
-                await PebbleDiagnostics.shared.record(
+                await DiagnosticLog.shared.record(
                     .error,
                     category: "timeline",
                     message: "\(connection.watch.name) kept a reminder that is gone here: "
@@ -105,8 +105,8 @@ extension AppModel {
         // Said whichever way it went, the way the pins are: BlobDB cannot be
         // listed, so this line is the only account of what left the watch. Only
         // a failure used to be recorded, which left two of six removes in one
-        // on-device log belonging to nobody.
-        await PebbleDiagnostics.shared.record(
+        // on-watch log belonging to nobody.
+        await DiagnosticLog.shared.record(
             category: "timeline",
             message: "\(connection.watch.name): removed \(removed.count)"
                 + " of \(forgotten.count) reminder(s) the app no longer has"
@@ -126,7 +126,7 @@ extension AppModel {
                 try await connection.client.write(.timelineReminder(reminder))
                 written.insert(reminder.id)
             } catch {
-                await PebbleDiagnostics.shared.record(
+                await DiagnosticLog.shared.record(
                     .error,
                     category: "timeline",
                     message: "\(connection.watch.name) rejected a reminder: \(String(reflecting: error))"

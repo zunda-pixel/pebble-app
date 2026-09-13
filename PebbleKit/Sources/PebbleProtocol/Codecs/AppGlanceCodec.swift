@@ -16,7 +16,7 @@ public struct AppGlanceSlice: Codable, Equatable, Sendable, Identifiable {
     public var id: UUID = UUID()
     public var subtitleTemplate: String = ""
     /// Nil leaves the watch its own icon for the app.
-    public var icon: PebbleTimelineIcon? = nil
+    public var icon: TimelineIcon? = nil
     /// When this line stops being true. Nil for one that always is.
     ///
     /// The watch shows whichever slice expires soonest among those that have

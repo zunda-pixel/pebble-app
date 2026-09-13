@@ -35,7 +35,7 @@ struct AppGlanceContent: View {
     var cancel: () -> Void
 
     @State private var subtitle = ""
-    @State private var icon: PebbleTimelineIcon?
+    @State private var icon: TimelineIcon?
     @State private var expires = false
     @State private var expiry = Date()
 
@@ -68,9 +68,9 @@ struct AppGlanceContent: View {
 
                 Section {
                     Picker("Icon", selection: $icon) {
-                        Text("The App's Own").tag(PebbleTimelineIcon?.none)
-                        ForEach(PebbleTimelineIcon.choosable, id: \.self) { icon in
-                            Text(icon.title).tag(PebbleTimelineIcon?.some(icon))
+                        Text("The App's Own").tag(TimelineIcon?.none)
+                        ForEach(TimelineIcon.choosable, id: \.self) { icon in
+                            Text(icon.title).tag(TimelineIcon?.some(icon))
                         }
                     }
                 }

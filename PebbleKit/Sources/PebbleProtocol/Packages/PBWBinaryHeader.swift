@@ -13,8 +13,8 @@ public struct PBWBinaryHeader: Equatable, Sendable {
     public var flags: UInt32
     public var applicationID: UUID
 
-    public func appMetadata(name: String) -> PebbleAppMetadata {
-        PebbleAppMetadata(
+    public func appMetadata(name: String) -> ApplicationMetadata {
+        ApplicationMetadata(
             applicationID: applicationID,
             flags: flags,
             iconResourceID: iconResourceID,

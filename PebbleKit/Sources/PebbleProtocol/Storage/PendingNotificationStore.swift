@@ -12,11 +12,11 @@ public actor PendingNotificationStore {
         self.fileURL = fileURL
     }
 
-    public func notifications() throws -> [PendingDelivery<PebbleTimelineNotification>] {
-        try loadQueue(PebbleTimelineNotification.self, from: fileURL)
+    public func notifications() throws -> [PendingDelivery<TimelineNotification>] {
+        try loadQueue(TimelineNotification.self, from: fileURL)
     }
 
-    public func save(_ notifications: [PendingDelivery<PebbleTimelineNotification>]) throws {
+    public func save(_ notifications: [PendingDelivery<TimelineNotification>]) throws {
         try PersistentJSON.save(notifications, to: fileURL)
     }
 }

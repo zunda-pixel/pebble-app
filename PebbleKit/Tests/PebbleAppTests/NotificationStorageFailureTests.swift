@@ -48,7 +48,7 @@ struct NotificationStorageFailureTests {
 
         #expect(model.notifications.settingsFeedback?.isFailure == true)
         // In force for this run: the delivery path reads the model, not the file.
-        #expect(model.notifications.preferences.quietHoursEnabled)
+        #expect(model.notifications.preferences.areQuietHoursEnabled)
         #expect(model.notifications.preferences.quietHoursStart == 22)
     }
 

@@ -7,11 +7,11 @@ import Testing
 /// and which side is hosting the transport.
 @Suite
 struct LinkSetupTests {
-    private func status(paired: Bool, encrypted: Bool) -> PebbleConnectivityStatus {
+    private func status(paired: Bool, encrypted: Bool) -> ConnectivityStatus {
         var flags: UInt8 = 0b1
         if paired { flags |= 0b10 }
         if encrypted { flags |= 0b100 }
-        return PebbleConnectivityStatus(decoding: [flags, 0, 0, 0])!
+        return ConnectivityStatus(decoding: [flags, 0, 0, 0])!
     }
 
     @Test
@@ -139,7 +139,7 @@ struct LinkSetupTests {
     /// The watch sends one when its acknowledgement timeouts have run out, and
     /// what it is asking for is the transport reopened. The link used to be
     /// dropped under it, which cost a reconnect, the bond check and several
-    /// seconds of handshake — twice in one on-device session, taking a weather
+    /// seconds of handshake — twice in one on-watch session, taking a weather
     /// write and a glance with it each time.
     ///
     /// There is no waiting for a real watch to do this, and no `CBPeripheral` a

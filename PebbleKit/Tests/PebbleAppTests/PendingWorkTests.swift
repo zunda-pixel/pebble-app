@@ -34,7 +34,7 @@ struct PendingWorkTests {
         await model.connect(to: discovered)
 
         let queued = (0..<3).map { index in
-            PebbleTimelineNotification(
+            TimelineNotification(
                 parentApplicationID: UUID(),
                 title: "Queued \(index)",
                 body: "While the watch was away",
@@ -75,15 +75,15 @@ struct PendingWorkTests {
         )
         try await model.pendingNotificationStore.save([])
         await model.scan()
-        let devices = model.discoveredWatches
-        let first = try #require(devices.first)
-        let second = try #require(devices.dropFirst().first)
+        let watches = model.discoveredWatches
+        let first = try #require(watches.first)
+        let second = try #require(watches.dropFirst().first)
         await model.connect(to: first)
         await model.connect(to: second)
         let refusing = try #require(clients[second.id])
         refusing.notificationFailure = WatchConnectionError.disconnected
 
-        let notification = PebbleTimelineNotification(
+        let notification = TimelineNotification(
             parentApplicationID: UUID(),
             title: "Queued",
             body: "One watch took it",
@@ -97,7 +97,7 @@ struct PendingWorkTests {
 
         // The watch that took it first used to be shown it again every time the
         // other one refused: two notifications, two buzzes, one message.
-        #expect(clients[first.id]?.sentNotifications.map(\PebbleTimelineNotification.id) == [notification.id])
+        #expect(clients[first.id]?.sentNotifications.map(\TimelineNotification.id) == [notification.id])
         #expect(refusing.sentNotifications.map(\.id) == [notification.id])
         #expect(model.pendingNotifications.isEmpty)
     }

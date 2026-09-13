@@ -6,8 +6,8 @@ import Foundation
 /// publish one of its own — a freshly reset one, or any watch running recovery
 /// firmware — connects to as a GATT client.
 @MainActor
-public final class PebbleGattServer: NSObject {
-    public static let shared = PebbleGattServer()
+public final class GATTServer: NSObject {
+    public static let shared = GATTServer()
 
     public static var serviceUUID: CBUUID { CBUUID(string: "10000000-328E-0FBB-C642-1AA6699BDADA") }
     public static var dataCharacteristicUUID: CBUUID { CBUUID(string: "10000001-328E-0FBB-C642-1AA6699BDADA") }
@@ -144,7 +144,7 @@ public final class PebbleGattServer: NSObject {
         let others = subscribedCentrals.keys.filter { $0 != centralID }
         guard others.isEmpty else {
             Task { [count = others.count] in
-                await PebbleDiagnostics.shared.record(
+                await DiagnosticLog.shared.record(
                     .warning,
                     category: "pairing",
                     message: "Left the phone's protocol service alone: \(count) other watch(es) are subscribed to it"
@@ -153,7 +153,7 @@ public final class PebbleGattServer: NSObject {
             return
         }
         Task {
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "pairing",
                 message: "Re-publishing the phone's protocol service"
             )
@@ -193,7 +193,7 @@ public final class PebbleGattServer: NSObject {
         }
         guard !isBacklogged else {
             Task {
-                await PebbleDiagnostics.shared.record(
+                await DiagnosticLog.shared.record(
                     .warning,
                     category: "pairing",
                     message: "The phone's protocol service has \(Self.maximumBacklog) packets waiting; the watch is not reading"
@@ -227,7 +227,7 @@ public final class PebbleGattServer: NSObject {
                 // retransmitting into a watch that is no longer there.
                 pendingNotifications.removeFirst()
                 Task { [centralID = pending.centralID] in
-                    await PebbleDiagnostics.shared.record(
+                    await DiagnosticLog.shared.record(
                         .warning,
                         category: "pairing",
                         message: "Dropped a packet for a watch that unsubscribed (\(centralID))"
@@ -247,7 +247,7 @@ public final class PebbleGattServer: NSObject {
     }
 }
 
-extension PebbleGattServer: CBPeripheralManagerDelegate {
+extension GATTServer: CBPeripheralManagerDelegate {
     public func peripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
         guard peripheral.state == .poweredOn else {
             return
@@ -284,7 +284,7 @@ extension PebbleGattServer: CBPeripheralManagerDelegate {
         error: (any Error)?
     ) {
         Task { [uuid = service.uuid.uuidString, message = error?.localizedDescription] in
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 message == nil ? .info : .error,
                 category: "pairing",
                 message: message == nil
@@ -324,7 +324,7 @@ extension PebbleGattServer: CBPeripheralManagerDelegate {
         didReceiveRead request: CBATTRequest
     ) {
         Task { [uuid = request.characteristic.uuid.uuidString] in
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "pairing",
                 message: "Watch read \(uuid) from the phone's server"
             )
@@ -344,7 +344,7 @@ extension PebbleGattServer: CBPeripheralManagerDelegate {
         let centralID = central.identifier.uuidString
         subscribedCentrals[centralID] = central
         Task { [isClaimed = registrations[centralID] != nil] in
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "pairing",
                 message: isClaimed
                     ? "Watch subscribed to the phone's protocol service"

@@ -8,7 +8,7 @@ struct PebbleTokenStore {
     private let valet: Valet
 
     init(identifier: String = "dev.pebble.companion.tokens") {
-        // A token that survived to a restored device would identify the old install.
+        // A token that survived to a restored watch would identify the old install.
         valet = Valet.valet(
             with: Identifier(nonEmpty: identifier)!,
             accessibility: .whenUnlockedThisDeviceOnly

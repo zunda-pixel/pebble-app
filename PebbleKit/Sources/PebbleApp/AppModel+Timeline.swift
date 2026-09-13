@@ -23,7 +23,7 @@ extension AppModel {
                 // Written back so the file stops holding them: otherwise every
                 // load repairs the same thing again and the warning never stops.
                 try? await timelineStore.save(timeline.pins)
-                await PebbleDiagnostics.shared.record(
+                await DiagnosticLog.shared.record(
                     .warning,
                     category: "timeline",
                     message: "\(collapsed) of \(stored.count) pin(s) shared an identifier with another;"
@@ -236,7 +236,7 @@ extension AppModel {
         // Nothing to say when there was nothing to send: this runs on every
         // connection.
         if taken + dropped > 0 {
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "timeline",
                 message: "\(connection.watch.name) took \(taken) of \(pins.count) pin(s)"
                     + " — \(takenFromQueue) queued, \(taken - takenFromQueue) derived"
@@ -277,7 +277,7 @@ extension AppModel {
             written.filter { !removed.contains($0.key) },
             watchID: watchID
         )
-        await PebbleDiagnostics.shared.record(
+        await DiagnosticLog.shared.record(
             category: "timeline",
             message: "\(connection.watch.name): removed \(removed.count)"
                 + " of \(forgotten.count) pin(s) the app no longer has"
@@ -305,7 +305,7 @@ extension AppModel {
             return
         }
         try? await timelineStore.forgetWrittenPinIDs(watchID: connection.watch.id)
-        await PebbleDiagnostics.shared.record(
+        await DiagnosticLog.shared.record(
             .warning,
             category: "timeline",
             message: "\(connection.watch.name): cleared the pin database"
@@ -357,7 +357,7 @@ extension AppModel {
     /// The queue carries a change and `synchronizeTimeline` does not second-guess
     /// what is in it, so queueing every pin on every calendar read put all of
     /// them past the comparison that would otherwise have skipped them: an
-    /// on-device synchronization wrote 32 unchanged pins that way, once per
+    /// on-watch synchronization wrote 32 unchanged pins that way, once per
     /// `EKEventStoreChanged`, which one edited event is enough to raise.
     ///
     /// What the watch is missing is not this decision's business — the pins are
@@ -509,7 +509,7 @@ extension AppModel {
         } catch {
             // The digests written below only claim what got through; the next
             // connection picks up the rest.
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 .error,
                 category: "timeline",
                 message: "\(connection.watch.name) refused a calendar reminder: \(String(reflecting: error))"
@@ -517,7 +517,7 @@ extension AppModel {
         }
         try? await calendarReminderStore.setWrittenPinDigests(digests, watchID: watchID)
         if removed + written > 0 {
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "timeline",
                 message: "\(connection.watch.name) took \(written) calendar reminder(s) and dropped \(removed)"
             )

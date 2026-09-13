@@ -10,7 +10,7 @@ import PebbleProtocol
 /// without passing through here at all, so that row leads to the watch's own
 /// settings for them.
 struct NotificationSettingsContent<PhoneAppsDestination: View>: View {
-    var companionNotificationsEnabled: Bool
+    var areCompanionNotificationsEnabled: Bool
     var notificationPreferences: NotificationDeliveryPreferences
     var applications: [WatchApplication]
     var notificationSourceAppCount: Int
@@ -28,14 +28,14 @@ struct NotificationSettingsContent<PhoneAppsDestination: View>: View {
             FeedbackBanner(feedback: feedback)
             Section {
                 Toggle("Watch App Notifications", isOn: Binding(
-                    get: { companionNotificationsEnabled },
+                    get: { areCompanionNotificationsEnabled },
                     set: { setCompanionNotificationsEnabled($0) }
                 ))
                 Toggle("Quiet Hours", isOn: Binding(
-                    get: { notificationPreferences.quietHoursEnabled },
+                    get: { notificationPreferences.areQuietHoursEnabled },
                     set: { value in setQuietHours(value, nil, nil) }
                 ))
-                if notificationPreferences.quietHoursEnabled {
+                if notificationPreferences.areQuietHoursEnabled {
                     Stepper(
                         "Starts at \(notificationPreferences.quietHoursStart):00",
                         value: Binding(
@@ -90,7 +90,7 @@ struct NotificationSettingsContent<PhoneAppsDestination: View>: View {
 #Preview("On, with apps installed") {
     NavigationStack {
         NotificationSettingsContent(
-            companionNotificationsEnabled: true,
+            areCompanionNotificationsEnabled: true,
             notificationPreferences: NotificationDeliveryPreferences(),
             applications: PreviewSamples.watchApplications + PreviewSamples.watchfaces,
             notificationSourceAppCount: PreviewSamples.notificationApps.count,
@@ -106,9 +106,9 @@ struct NotificationSettingsContent<PhoneAppsDestination: View>: View {
 #Preview("Quiet hours on, nothing installed") {
     NavigationStack {
         NotificationSettingsContent(
-            companionNotificationsEnabled: false,
+            areCompanionNotificationsEnabled: false,
             notificationPreferences: NotificationDeliveryPreferences(
-                quietHoursEnabled: true,
+                areQuietHoursEnabled: true,
                 quietHoursStart: 22,
                 quietHoursEnd: 7
             ),

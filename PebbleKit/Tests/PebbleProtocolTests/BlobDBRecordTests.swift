@@ -14,8 +14,8 @@ struct BlobDBRecordTests {
     private let itemID = UUID(uuidString: "FFEEDDCC-BBAA-9988-7766-554433221100")!
     private let timestamp = Date(timeIntervalSince1970: 1_788_393_600)
 
-    private var metadata: PebbleAppMetadata {
-        PebbleAppMetadata(
+    private var metadata: ApplicationMetadata {
+        ApplicationMetadata(
             applicationID: applicationID,
             flags: 0,
             iconResourceID: 0,
@@ -38,8 +38,8 @@ struct BlobDBRecordTests {
         )
     }
 
-    private var notification: PebbleTimelineNotification {
-        PebbleTimelineNotification(
+    private var notification: TimelineNotification {
+        TimelineNotification(
             id: itemID,
             parentApplicationID: applicationID,
             timestamp: timestamp,

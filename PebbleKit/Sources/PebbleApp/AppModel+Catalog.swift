@@ -84,7 +84,7 @@ extension AppModel {
             catalog.searchPage = 1
         } catch {
             catalog.feedback = .failure("The store could not be searched.")
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 .error,
                 category: "catalog",
                 message: "store search failed: \(String(reflecting: error))"
@@ -144,7 +144,7 @@ extension AppModel {
         // The store the loaded catalogue came from, which for a cache written
         // before the store moved is not today's. Asking the one the listing
         // came from is what makes the comparison mean anything.
-        let baseURL = catalog.sourceURL ?? AppCatalog.defaultSourceURL
+        let baseURL = catalog.sourceURL ?? ApplicationCatalog.defaultSourceURL
         guard baseURL.scheme?.lowercased() == "https" else { return nil }
         // The source that owns the feed being asked, so the entry's store page
         // link points at the store that answered — a Rebble listing sent every
@@ -210,7 +210,7 @@ extension AppModel {
             catalog.feedback = .progress("Downloading \(application.name)…")
             let packageURL = try await appCatalog.download(application)
             let decoded = try await Task.detached { try PBWPackageImporter.application(from: packageURL) }.value
-            guard decoded.id == application.id else { throw AppCatalogError.applicationIDMismatch }
+            guard decoded.id == application.id else { throw ApplicationCatalogError.applicationIDMismatch }
             applications.libraryFeedback = nil
             await importApplication(from: packageURL)
             try? FileManager.default.removeItem(at: packageURL)

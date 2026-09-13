@@ -29,7 +29,7 @@ struct LanguageView: View {
 }
 
 struct LanguageContent: View {
-    var packs: [PebbleLanguagePack]
+    var packs: [LanguagePack]
     /// Empty is the firmware's built-in English; nil is a watch that has not
     /// said.
     var installedLocale: String?
@@ -38,7 +38,7 @@ struct LanguageContent: View {
     var isInstalling: Bool
     var progress: PutBytesTransferProgress?
     var feedback: FeatureFeedback?
-    var install: (PebbleLanguagePack) -> Void
+    var install: (LanguagePack) -> Void
     var installFile: (URL) -> Void
 
     @State private var isChoosingFile = false
@@ -130,7 +130,7 @@ struct LanguageContent: View {
 #Preview("Japanese installed") {
     NavigationStack {
         LanguageContent(
-            packs: PebbleLanguagePackCatalog.packs(for: .obelixPVT),
+            packs: LanguagePackCatalog.packs(for: .obelixPVT),
             installedLocale: "ja_JP",
             installedVersion: 1,
             isConnected: true,
@@ -146,7 +146,7 @@ struct LanguageContent: View {
 #Preview("Installing, watch away") {
     NavigationStack {
         LanguageContent(
-            packs: PebbleLanguagePackCatalog.packs(for: .obelixPVT),
+            packs: LanguagePackCatalog.packs(for: .obelixPVT),
             installedLocale: "",
             installedVersion: 0,
             isConnected: false,

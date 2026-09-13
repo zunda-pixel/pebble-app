@@ -46,7 +46,7 @@ enum ReminderReading {
             // Which reader answered is the first thing to know when a reminder
             // comes out as the whole sentence: the detector cuts a time and
             // nothing else.
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "voice",
                 message: "no language model on this phone (\(reason)); the date detector read the reminder alone"
             )
@@ -64,7 +64,7 @@ enum ReminderReading {
         }
         guard case .read(let understood) = answer else {
             if case .tooSlow = answer {
-                await PebbleDiagnostics.shared.record(
+                await DiagnosticLog.shared.record(
                     category: "voice",
                     message: "the model was still reading the reminder after \(modelDeadline);"
                         + " the date detector answered instead"
@@ -78,7 +78,7 @@ enum ReminderReading {
         // して」 came back untouched where the detector had 「起こして」.
         let shortened = !title.isEmpty && title != spoken.trimmingCharacters(in: .whitespacesAndNewlines)
         if !shortened {
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "voice",
                 message: "the model found nothing to cut out of the reminder"
             )
@@ -238,7 +238,7 @@ enum ReminderReading {
             // and it throws on the way out. That is the deadline's news to
             // report, not a model that refused.
             if !Task.isCancelled {
-                await PebbleDiagnostics.shared.record(
+                await DiagnosticLog.shared.record(
                     category: "voice",
                     message: "The model would not read the reminder: \(error)"
                 )

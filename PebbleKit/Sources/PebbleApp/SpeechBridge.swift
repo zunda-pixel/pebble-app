@@ -28,7 +28,7 @@ enum SpeechBridgeFailure: Error, Equatable, Sendable {
 /// but it wants one answer at the end, so the frames are decoded and analysed
 /// in one go here. Everything stays on the phone: `SpeechAnalyzer` sends no
 /// audio to a server.
-actor SpeechBridge: PebbleVoiceTranscriptionProvider {
+actor SpeechBridge: VoiceTranscriptionProvider {
     private var installation: Task<Void, any Error>?
     private var hasInstalledAssets = false
 
@@ -91,7 +91,7 @@ actor SpeechBridge: PebbleVoiceTranscriptionProvider {
         do {
             samples = try decode(audioFrames, encoderInfo: encoderInfo)
         } catch {
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "voice",
                 message: "Could not decode the watch's audio: \(error)"
             )
@@ -109,7 +109,7 @@ actor SpeechBridge: PebbleVoiceTranscriptionProvider {
             // dictation shorter than a second as "0 s" — which is most of
             // them, and looks exactly like no audio arriving at all.
             let seconds = Double(samples.count) / Double(max(1, encoderInfo.sampleRate))
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "voice",
                 message: "heard \(audioFrames.count) frames"
                     + ", \(seconds.formatted(.number.precision(.fractionLength(1)))) s"
@@ -118,7 +118,7 @@ actor SpeechBridge: PebbleVoiceTranscriptionProvider {
             guard !words.isEmpty else { return .failed(.recognizerError) }
             return .transcribed(words)
         } catch {
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "voice",
                 message: "The recognizer gave up: \(error)"
             )

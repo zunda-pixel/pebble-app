@@ -28,40 +28,40 @@ struct ApplicationDetailSubject: Equatable, Sendable {
     var installed: WatchApplication?
     /// The store's copy. Absent for a package the store never listed, and
     /// absent until the lookup answers.
-    var store: CatalogApplication?
+    var catalogEntry: CatalogApplication?
 
-    init(installed: WatchApplication, store: CatalogApplication?) {
+    init(installed: WatchApplication, catalogEntry: CatalogApplication?) {
         self.id = installed.id
         self.name = installed.displayName
         // The package may leave these out; the store's row then says it
         // instead, which beats an empty row.
-        self.developer = installed.companyName.isEmpty ? store?.developer ?? "" : installed.companyName
+        self.developer = installed.companyName.isEmpty ? catalogEntry?.developer ?? "" : installed.companyName
         self.version = installed.versionLabel
         self.kind = installed.kind
         self.platforms = installed.targetPlatforms.isEmpty
-            ? store?.supportedPlatforms ?? []
+            ? catalogEntry?.supportedPlatforms ?? []
             : installed.targetPlatforms
         self.capabilities = installed.declaredCapabilities.isEmpty
-            ? store?.declaredCapabilities ?? []
+            ? catalogEntry?.declaredCapabilities ?? []
             : installed.declaredCapabilities
         self.installed = installed
-        self.store = store
+        self.catalogEntry = catalogEntry
     }
 
-    init(store: CatalogApplication, installed: WatchApplication?) {
+    init(catalogEntry: CatalogApplication, installed: WatchApplication?) {
         // Installed wins wherever it is there, so the two ways in agree.
         if let installed {
-            self = Self(installed: installed, store: store)
+            self = Self(installed: installed, catalogEntry: catalogEntry)
         } else {
-            self.id = store.id
-            self.name = store.name
-            self.developer = store.developer
-            self.version = store.version
-            self.kind = store.kind
-            self.platforms = store.supportedPlatforms
-            self.capabilities = store.declaredCapabilities
+            self.id = catalogEntry.id
+            self.name = catalogEntry.name
+            self.developer = catalogEntry.developer
+            self.version = catalogEntry.version
+            self.kind = catalogEntry.kind
+            self.platforms = catalogEntry.supportedPlatforms
+            self.capabilities = catalogEntry.declaredCapabilities
             self.installed = nil
-            self.store = store
+            self.catalogEntry = catalogEntry
         }
     }
 }
@@ -128,7 +128,7 @@ struct ApplicationDetailContent: View {
                 FeedbackBanner(feedback: feedback)
             }
             
-            if let releaseNotes = subject.store?.releaseNotes {
+            if let releaseNotes = subject.catalogEntry?.releaseNotes {
                 Section("Release Notes") { Text(releaseNotes) }
             }
 
@@ -139,7 +139,7 @@ struct ApplicationDetailContent: View {
                 }
             }
             
-            if let screenshots = subject.store?.screenshotURLs, !screenshots.isEmpty {
+            if let screenshots = subject.catalogEntry?.screenshotURLs, !screenshots.isEmpty {
                 Section("Screenshots") {
                     ScrollView(.horizontal) {
                         HStack {
@@ -157,7 +157,7 @@ struct ApplicationDetailContent: View {
                 }
             }
             
-            if let summary = subject.store?.summary {
+            if let summary = subject.catalogEntry?.summary {
                 Section {
                     Text(summary)
                 }
@@ -171,7 +171,7 @@ struct ApplicationDetailContent: View {
                 if !subject.developer.isEmpty {
                     LabeledContent("Developer", value: subject.developer)
                 }
-                if let category = subject.store?.category {
+                if let category = subject.catalogEntry?.category {
                     LabeledContent("Category") { catalogCategoryText(category) }
                 }
                 if !subject.platforms.isEmpty {
@@ -257,7 +257,7 @@ struct ApplicationDetailContent: View {
         }
         // The feed carries a summary and a few screenshots; the store page has
         // the rest — every screenshot, the whole changelog, and the hearts.
-        if let storePageURL = subject.store?.storePageURL {
+        if let storePageURL = subject.catalogEntry?.storePageURL {
             Link(destination: storePageURL) {
                 Label("View in Store", systemImage: "safari")
             }
@@ -322,7 +322,7 @@ struct ApplicationDetailContent: View {
     @ViewBuilder private var icon: some View {
         // The store has a real icon; a package installed from a file has only
         // what its kind suggests.
-        if let iconURL = subject.store?.iconURL {
+        if let iconURL = subject.catalogEntry?.iconURL {
             AsyncImage(url: iconURL) { image in
                 image.resizable().scaledToFit()
             } placeholder: {
@@ -393,7 +393,7 @@ struct ApplicationDetailView: View {
         Group {
             if let current {
                 ApplicationDetailContent(
-                    subject: ApplicationDetailSubject(installed: current, store: storeEntry),
+                    subject: ApplicationDetailSubject(installed: current, catalogEntry: storeEntry),
                     isActive: model.applications.activeWatchfaceID == current.id,
                     isInstalled: watchID.map { model.installedApplicationIDs(on: $0).contains(current.id) },
                     installationState: storeEntry.map { model.catalogInstallationState(for: $0) },
@@ -457,7 +457,7 @@ struct CatalogApplicationDetailView: View {
 
     var body: some View {
         ApplicationDetailContent(
-            subject: ApplicationDetailSubject(store: application, installed: installed),
+            subject: ApplicationDetailSubject(catalogEntry: application, installed: installed),
             isActive: model.applications.activeWatchfaceID == application.id,
             isInstalled: nil,
             installationState: model.catalogInstallationState(for: application),
@@ -491,7 +491,7 @@ struct CatalogApplicationDetailView: View {
         ApplicationDetailContent(
             subject: ApplicationDetailSubject(
                 installed: PreviewSamples.watchApplications[0],
-                store: PreviewSamples.catalogApplication
+                catalogEntry: PreviewSamples.catalogApplication
             ),
             isActive: false,
             isInstalled: true,
@@ -512,7 +512,7 @@ struct CatalogApplicationDetailView: View {
 #Preview("On its way to two watches") {
     NavigationStack {
         ApplicationDetailContent(
-            subject: ApplicationDetailSubject(store: PreviewSamples.catalogApplication, installed: nil),
+            subject: ApplicationDetailSubject(catalogEntry: PreviewSamples.catalogApplication, installed: nil),
             isActive: false,
             isInstalled: nil,
             installationState: .available,
@@ -546,7 +546,7 @@ struct CatalogApplicationDetailView: View {
 #Preview("Fetching the package, no watch written to yet") {
     NavigationStack {
         ApplicationDetailContent(
-            subject: ApplicationDetailSubject(store: PreviewSamples.catalogApplication, installed: nil),
+            subject: ApplicationDetailSubject(catalogEntry: PreviewSamples.catalogApplication, installed: nil),
             isActive: false,
             isInstalled: nil,
             installationState: .available,
@@ -572,7 +572,7 @@ struct CatalogApplicationDetailView: View {
 #Preview("In the store only") {
     NavigationStack {
         ApplicationDetailContent(
-            subject: ApplicationDetailSubject(store: PreviewSamples.catalogApplication, installed: nil),
+            subject: ApplicationDetailSubject(catalogEntry: PreviewSamples.catalogApplication, installed: nil),
             isActive: false,
             isInstalled: nil,
             installationState: .available,
@@ -592,7 +592,7 @@ struct CatalogApplicationDetailView: View {
 #Preview("Installed, the store does not have it") {
     NavigationStack {
         ApplicationDetailContent(
-            subject: ApplicationDetailSubject(installed: PreviewSamples.watchfaces[0], store: nil),
+            subject: ApplicationDetailSubject(installed: PreviewSamples.watchfaces[0], catalogEntry: nil),
             isActive: true,
             isInstalled: false,
             installationState: nil,
@@ -620,7 +620,7 @@ struct CatalogApplicationDetailView: View {
                     declaring.capabilities = ["health", "configurable", "location", "timeline", "sport"]
                     return declaring
                 }(),
-                store: PreviewSamples.catalogApplication
+                catalogEntry: PreviewSamples.catalogApplication
             ),
             isActive: false,
             isInstalled: true,
@@ -642,7 +642,7 @@ struct CatalogApplicationDetailView: View {
     NavigationStack {
         ApplicationDetailContent(
             subject: ApplicationDetailSubject(
-                store: {
+                catalogEntry: {
                     var listed = PreviewSamples.catalogApplication
                     listed.capabilities = ["location"]
                     return listed

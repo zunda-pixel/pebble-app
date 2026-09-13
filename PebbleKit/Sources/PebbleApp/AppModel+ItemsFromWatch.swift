@@ -28,7 +28,7 @@ extension AppModel {
             try? await timelineStore.save(timeline.pins)
             await noteHeld(item.id, by: connection, in: timelineStore)
         }
-        await PebbleDiagnostics.shared.record(
+        await DiagnosticLog.shared.record(
             category: "timeline",
             message: "kept a \(item.kind) the watch made, for \(item.timestamp)"
         )

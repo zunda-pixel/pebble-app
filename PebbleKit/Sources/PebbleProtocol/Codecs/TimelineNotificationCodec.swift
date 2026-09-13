@@ -2,7 +2,7 @@ public import Foundation
 import MemberwiseInit
 
 @MemberwiseInit(.public)
-public struct PebbleTimelineNotification: Codable, Equatable, Sendable {
+public struct TimelineNotification: Codable, Equatable, Sendable {
     public var id: UUID = UUID()
     public var parentApplicationID: UUID
     public var timestamp: Date = Date()
@@ -54,7 +54,7 @@ public enum TimelineNotificationCodec {
     public static var databaseID: UInt8 { 0x04 }
 
     public static func insertFrame(
-        _ notification: PebbleTimelineNotification,
+        _ notification: TimelineNotification,
         token: UInt16
     ) throws -> PebbleProtocolFrame {
         BlobDBCodec.insertFrame(

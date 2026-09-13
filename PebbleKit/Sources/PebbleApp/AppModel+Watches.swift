@@ -28,7 +28,7 @@ extension AppModel {
     /// A watch that has been set up does not advertise and does not wait to be
     /// found: it reconnects and subscribes to the phone's protocol service.
     func observeWatchesReconnectingThemselves() {
-        PebbleGattServer.shared.onUnclaimedWatch = { [weak self] centralID in
+        GATTServer.shared.onUnclaimedWatch = { [weak self] centralID in
             guard let self else { return }
             // A watch is a central to the phone-hosted service, and iOS gives the
             // same identifier for it in both roles.
@@ -38,7 +38,7 @@ extension AppModel {
 
     func noteWatchThatReconnectedItself(watchID: WatchID) async {
         if let watch = watches.saved.first(where: { $0.id == watchID }) {
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "connection",
                 message: "\(watch.name) reconnected on its own; opening a link to it"
             )
@@ -52,7 +52,7 @@ extension AppModel {
         }
         let watch = UnknownBondedWatch(id: watchID, name: await bondedWatchName(watchID: watchID))
         watches.unknownBonded.append(watch)
-        await PebbleDiagnostics.shared.record(
+        await DiagnosticLog.shared.record(
             category: "connection",
             message: "\(watch.name) is paired with this phone but not added; offering it"
         )
@@ -123,8 +123,8 @@ extension AppModel {
 
     public func prepareDiagnosticReport() async {
         do {
-            diagnostics.reportURL = try await PebbleDiagnostics.shared.exportReport(
-                device: connectedWatch,
+            diagnostics.reportURL = try await DiagnosticLog.shared.exportReport(
+                watch: connectedWatch,
                 applications: applications.apps + applications.watchfaces
             )
             // Nothing to say on success: the Share row appearing is the answer,
@@ -145,19 +145,19 @@ extension AppModel {
     }
 
     // The watch reboots without answering, so the connection is closed locally.
-    public func resetWatch(_ kind: PebbleResetKind, watchID: WatchID? = nil) async {
+    public func resetWatch(_ kind: ResetKind, watchID: WatchID? = nil) async {
         guard let connection = connection(for: watchID), connection.isConnected else {
             watches.feedback = .failure("Connect the watch before resetting it.")
             return
         }
-        let device = connection.watch
+        let watch = connection.watch
         do {
             try await connection.client.send(ResetCodec.frame(kind))
             if kind == .factoryReset {
-                try? await applicationLibrary.setSynchronizedApplicationIDs([], watchID: device.id)
-                applications.installedIDsByWatch[device.id] = []
+                try? await applicationLibrary.setSynchronizedApplicationIDs([], watchID: watch.id)
+                applications.installedIDsByWatch[watch.id] = []
             }
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 .warning,
                 category: "reset",
                 message: "Sent reset command \(kind) to the watch"
@@ -172,20 +172,20 @@ extension AppModel {
             }
             // Progress, not success: the watch has gone away to do it, and the
             // only news afterwards is the link returning.
-            watches.resetFeedback[device.id] = .progress(message)
+            watches.resetFeedback[watch.id] = .progress(message)
         } catch {
-            watches.resetFeedback[device.id] = nil
+            watches.resetFeedback[watch.id] = nil
             watches.feedback = .failure("The reset command could not be sent.")
         }
     }
 
-    func recordConnectedWatch(_ device: ConnectedWatch) async {
+    func recordConnectedWatch(_ watch: ConnectedWatch) async {
         // A watch that is talking again has finished restarting, whoever opened
         // the link. Every way back in passes through here.
-        watches.resetFeedback[device.id] = nil
-        noteFirmwareUpdateFinished(on: device)
+        watches.resetFeedback[watch.id] = nil
+        noteFirmwareUpdateFinished(on: watch)
         do {
-            watches.saved = try await watchStore.record(device)
+            watches.saved = try await watchStore.record(watch)
             watches.feedback = nil
         } catch {
             watches.feedback = .failure("The watch connection history could not be saved.")
@@ -201,20 +201,20 @@ extension AppModel {
     /// says nothing — its first reading has no earlier one to climb from. One
     /// notification per charge: the latch opens again only when the level
     /// falls to 97% or below, so the wobble around full does not ring twice.
-    func trackChargeLevel(of device: ConnectedWatch) async {
-        guard let level = device.batteryLevel else { return }
-        let previous = chargeLevels[device.id]
-        chargeLevels[device.id] = level
-        if level <= 97 { chargeNotified.remove(device.id) }
+    func trackChargeLevel(of watch: ConnectedWatch) async {
+        guard let level = watch.batteryLevel else { return }
+        let previous = chargeLevels[watch.id]
+        chargeLevels[watch.id] = level
+        if level <= 97 { chargeNotified.remove(watch.id) }
         guard notifyWhenFullyChargedEnabled,
               level >= 100,
               let previous, previous < 100,
-              !chargeNotified.contains(device.id) else { return }
-        chargeNotified.insert(device.id)
+              !chargeNotified.contains(watch.id) else { return }
+        chargeNotified.insert(watch.id)
         await localNotifier.post(
-            identifier: "fully-charged-\(device.id.rawValue)",
+            identifier: "fully-charged-\(watch.id.rawValue)",
             title: String(localized: "Fully Charged", bundle: .module),
-            body: String(localized: "\(device.name) is fully charged.", bundle: .module)
+            body: String(localized: "\(watch.name) is fully charged.", bundle: .module)
         )
     }
 

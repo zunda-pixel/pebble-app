@@ -68,7 +68,7 @@ struct LinkSetup: Equatable {
         pairing = .ready
     }
 
-    mutating func apply(_ status: PebbleConnectivityStatus) -> ConnectivityDecision {
+    mutating func apply(_ status: ConnectivityStatus) -> ConnectivityDecision {
         guard pairing != .ready else { return .wait }
         if status.isReadyForProtocol {
             let wasPairing = pairing == .pairing

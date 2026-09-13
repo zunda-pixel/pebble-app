@@ -31,7 +31,7 @@ struct MainApp: App {
     .commands {
       CommandMenu("Pebble") {
         Button("Scan for Watches") {
-          NotificationCenter.default.post(PebbleScanRequest(), subject: model)
+          NotificationCenter.default.post(ScanRequest(), subject: model)
         }
         .keyboardShortcut("r", modifiers: .command)
         .disabled(model.isScanningOrConnecting)
@@ -40,7 +40,7 @@ struct MainApp: App {
 
         ForEach(AppSection.windowSections) { section in
           Button(section.title) {
-            NotificationCenter.default.post(PebbleSectionRequest(section: section), subject: model)
+            NotificationCenter.default.post(SectionRequest(section: section), subject: model)
           }
           .keyboardShortcut(section.keyboardShortcut, modifiers: .command)
         }
@@ -49,7 +49,7 @@ struct MainApp: App {
     }
 
     Settings {
-      PebbleSettingsView(model: model)
+      SettingsRootView(model: model)
         .frame(width: 620, height: 680)
     }
 #else

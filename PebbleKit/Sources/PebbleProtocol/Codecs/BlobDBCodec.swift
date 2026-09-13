@@ -22,7 +22,7 @@ public struct BlobDBResponse: Equatable, Sendable {
 }
 
 @MemberwiseInit(.public)
-public struct PebbleAppMetadata: Equatable, Sendable {
+public struct ApplicationMetadata: Equatable, Sendable {
     public var applicationID: UUID
     public var flags: UInt32
     public var iconResourceID: UInt32
@@ -64,7 +64,7 @@ public enum BlobDBCodec {
     public static var applicationDatabaseID: UInt8 { 0x02 }
 
     public static func insertApplicationFrame(
-        metadata: PebbleAppMetadata,
+        metadata: ApplicationMetadata,
         token: UInt16
     ) -> PebbleProtocolFrame {
         insertFrame(

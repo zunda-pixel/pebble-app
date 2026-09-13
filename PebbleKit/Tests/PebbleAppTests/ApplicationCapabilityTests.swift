@@ -64,7 +64,7 @@ struct ApplicationCapabilityTests {
     @Test func thePackageWinsOverTheStoreRow() {
         let subject = ApplicationDetailSubject(
             installed: application(capabilities: ["health"]),
-            store: storeRow(capabilities: ["location", "timeline"])
+            catalogEntry: storeRow(capabilities: ["location", "timeline"])
         )
 
         #expect(subject.capabilities == [.health])
@@ -73,7 +73,7 @@ struct ApplicationCapabilityTests {
     /// Until there is a package, the store's row is all there is.
     @Test func theStoreRowIsUsedForSomethingNotInstalled() {
         let subject = ApplicationDetailSubject(
-            store: storeRow(capabilities: ["location"]),
+            catalogEntry: storeRow(capabilities: ["location"]),
             installed: nil
         )
 
@@ -85,7 +85,7 @@ struct ApplicationCapabilityTests {
     @Test func aPackageThatDeclaresNothingLetsTheStoreSpeak() {
         let subject = ApplicationDetailSubject(
             installed: application(capabilities: ["configurable"]),
-            store: storeRow(capabilities: ["timeline"])
+            catalogEntry: storeRow(capabilities: ["timeline"])
         )
 
         #expect(subject.capabilities == [.timeline])

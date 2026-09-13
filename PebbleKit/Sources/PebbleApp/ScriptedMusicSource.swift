@@ -193,7 +193,7 @@ final class ScriptedMusicSource: SystemMusicSource {
         }
         if wasRefused {
             wasRefused = false
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "music",
                 message: "Music is answering again"
             )
@@ -215,7 +215,7 @@ final class ScriptedMusicSource: SystemMusicSource {
     private func sayItWasRefused(_ error: any Error, doing what: String) async {
         guard !wasRefused else { return }
         wasRefused = true
-        await PebbleDiagnostics.shared.record(
+        await DiagnosticLog.shared.record(
             .error,
             category: "music",
             message: "Music refused \(what): \(String(reflecting: error))"

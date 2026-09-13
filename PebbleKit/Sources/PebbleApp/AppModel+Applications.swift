@@ -45,7 +45,7 @@ extension AppModel {
             ] in
                 // Which rule it broke, not the URL: a settings page's query
                 // string carries the watch token and the reader's account.
-                await PebbleDiagnostics.shared.record(
+                await DiagnosticLog.shared.record(
                     .warning,
                     category: "configuration",
                     message: "Rejected a configuration URL: scheme=\(scheme)"
@@ -63,7 +63,7 @@ extension AppModel {
             // rather than the URL — a settings page's query string carries the
             // watch token and the reader's account, which is the same reason a
             // refusal names the rule it broke and not the address.
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "configuration",
                 message: isReplacing
                     ? "a settings page \(fingerprint) replaced the one already showing"
@@ -107,7 +107,7 @@ extension AppModel {
             applications.configurationURL = nil
             try await companionRuntime.load(source: source, application: application)
             try await companionRuntime.showConfiguration()
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "configuration",
                 message: "Requested configuration for \(application.displayName)"
             )
@@ -336,10 +336,10 @@ extension AppModel {
     }
 
     func performApplicationSynchronization(on connection: WatchConnection) async throws {
-        let device = connection.watch
+        let watch = connection.watch
         let installed = try await applicationLibrary.applications()
-        let synchronizedIDs = try await applicationLibrary.synchronizedApplicationIDs(watchID: device.id)
-        let compatibleApplications = compatibleApplications(installed, with: device.model)
+        let synchronizedIDs = try await applicationLibrary.synchronizedApplicationIDs(watchID: watch.id)
+        let compatibleApplications = compatibleApplications(installed, with: watch.model)
         let localIDs = Set(compatibleApplications.map(\.id))
         var dropped = 0
         for applicationID in synchronizedIDs where !localIDs.contains(applicationID) {
@@ -349,7 +349,7 @@ extension AppModel {
         // Reading and unzipping a package is disk work with nothing to do with the
         // watch, so a few run at once while `asyncMap` keeps them in library order.
         let library = applicationLibrary
-        let watchModel = device.model
+        let watchModel = watch.model
         let packages = try await compatibleApplications
             .asyncMap(numberOfConcurrentTasks: 4) { application in
                 guard let packageURL = await library.storedPackageURL(applicationID: application.id) else {
@@ -361,13 +361,13 @@ extension AppModel {
             try await connection.client.write(.application(package.appMetadata))
         }
         try await connection.client.reorderApplications(compatibleApplications.map(\.id))
-        try await recordSynchronizedApplications(installed, device: device)
+        try await recordSynchronizedApplications(installed, watch: watch)
         updateApplications(installed)
         // The whole compatible library is registered on every synchronization, so
         // the count is the library as this watch now sees it, not a delta.
-        await PebbleDiagnostics.shared.record(
+        await DiagnosticLog.shared.record(
             category: "application",
-            message: "\(device.name) took \(packages.count) registration(s) and dropped \(dropped)"
+            message: "\(watch.name) took \(packages.count) registration(s) and dropped \(dropped)"
         )
     }
 
@@ -377,14 +377,14 @@ extension AppModel {
 
     func recordSynchronizedApplications(
         _ library: [WatchApplication],
-        device: ConnectedWatch
+        watch: ConnectedWatch
     ) async throws {
-        let synchronizedIDs = compatibleApplications(library, with: device.model).map(\.id)
+        let synchronizedIDs = compatibleApplications(library, with: watch.model).map(\.id)
         try await applicationLibrary.setSynchronizedApplicationIDs(
             synchronizedIDs,
-            watchID: device.id
+            watchID: watch.id
         )
-        applications.installedIDsByWatch[device.id] = Set(synchronizedIDs)
+        applications.installedIDsByWatch[watch.id] = Set(synchronizedIDs)
     }
 
     func compatibleApplications(
@@ -407,7 +407,7 @@ extension AppModel {
         do {
             updateApplications(try await applicationLibrary.restore(snapshot))
         } catch {
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 .error,
                 category: "application",
                 message: "Could not restore the application library after a failed transfer: "
@@ -550,12 +550,12 @@ extension AppModel {
             // The watch installs the binary itself once the transfer commits;
             // re-registering or reordering here only risks undoing it.
             let library = try await applicationLibrary.applications()
-            try await recordSynchronizedApplications(library, device: connection.watch)
+            try await recordSynchronizedApplications(library, watch: connection.watch)
             pendingImportSnapshots[request.applicationID] = nil
             applications.libraryFeedback = nil
             // The only record that a transfer finished: the watch commits and
             // installs the binary itself, and says nothing back about it.
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "application",
                 message: "\(connection.watch.name) took \(package.objects.count) object(s)"
                     + " of \(package.application.displayName)"

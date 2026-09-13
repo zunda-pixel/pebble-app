@@ -72,7 +72,7 @@ struct WatchDetailContent<
     var setAutomaticallyConnects: (Bool) -> Void
     var disconnect: () -> Void
     var sendTestNotification: () -> Void
-    var reset: (PebbleResetKind) -> Void
+    var reset: (ResetKind) -> Void
     var forget: () -> Void
     @ViewBuilder var firmwareDestination: () -> FirmwareDestination
     @ViewBuilder var languageDestination: () -> LanguageDestination

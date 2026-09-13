@@ -13,7 +13,7 @@ struct AppModelTests {
     func mockTransportCompletesCompanionLifecycle() async throws {
         let client = MockWatchClient()
         let applicationID = UUID()
-        let metadata = PebbleAppMetadata(
+        let metadata = ApplicationMetadata(
             applicationID: applicationID,
             flags: 0,
             iconResourceID: 0,
@@ -33,12 +33,12 @@ struct AppModelTests {
         )
 
         let discovered = try #require(try await client.scan().first)
-        let device = try await client.connect(to: discovered)
+        let watch = try await client.connect(to: discovered)
         try await client.write(.application(metadata))
         try await client.sendAppMessage(applicationID: applicationID, tuples: [])
         try await client.write(.timelinePin(pin))
         try await client.remove(.application(applicationID))
-        await client.disconnect(from: device)
+        await client.disconnect(from: watch)
 
         #expect(client.sentAppMessages.map(\.applicationID) == [applicationID])
         #expect(client.timelinePins.map(\.id) == [pin.id])
@@ -52,9 +52,9 @@ struct AppModelTests {
         guard ProcessInfo.processInfo.environment["PEBBLE_QEMU_E2E"] == "1" else { return }
         let client = QEMUWatchClient()
         let discovered = try #require(try await client.scan().first)
-        let device = try await client.connect(to: discovered)
+        let watch = try await client.connect(to: discovered)
         try await client.synchronizeTime()
-        await client.disconnect(from: device)
+        await client.disconnect(from: watch)
     }
 #endif
 
@@ -290,9 +290,9 @@ struct AppModelTests {
         )
 
         await model.scan()
-        let devices = model.discoveredWatches
-        let first = try #require(devices.first)
-        let second = try #require(devices.dropFirst().first)
+        let watches = model.discoveredWatches
+        let first = try #require(watches.first)
+        let second = try #require(watches.dropFirst().first)
         await model.connect(to: first)
         await model.connect(to: second)
 
@@ -469,9 +469,9 @@ struct AppModelTests {
         )
 
         await model.scan()
-        let devices = model.discoveredWatches
-        let first = try #require(devices.first)
-        let second = try #require(devices.dropFirst().first)
+        let watches = model.discoveredWatches
+        let first = try #require(watches.first)
+        let second = try #require(watches.dropFirst().first)
         await model.connect(to: first)
         await model.connect(to: second)
         let firstConnection = try #require(model.connections.first { $0.watch.id == first.id })
@@ -515,9 +515,9 @@ struct AppModelTests {
         )
 
         await model.scan()
-        let devices = model.discoveredWatches
-        let first = try #require(devices.first)
-        let second = try #require(devices.dropFirst().first)
+        let watches = model.discoveredWatches
+        let first = try #require(watches.first)
+        let second = try #require(watches.dropFirst().first)
         await model.connect(to: first)
         await model.connect(to: second)
 
@@ -590,9 +590,9 @@ struct AppModelTests {
         )
 
         await model.scan()
-        let devices = model.discoveredWatches
-        let first = try #require(devices.first)
-        let second = try #require(devices.dropFirst().first)
+        let watches = model.discoveredWatches
+        let first = try #require(watches.first)
+        let second = try #require(watches.dropFirst().first)
         await model.connect(to: first)
         await model.connect(to: second)
 

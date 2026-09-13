@@ -237,7 +237,6 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
         }
     }
 
-    public var defaultValue: Bool { defaultRawValue != 0 }
 
     /// Every value this setting can hold, in the order they should be offered.
     ///
@@ -763,7 +762,7 @@ public enum HealthStatsCodec {
     }
 }
 
-public enum PebbleReminderAppState: UInt8, Codable, Equatable, Sendable {
+public enum RemindersAppState: UInt8, Codable, Equatable, Sendable {
     case notEnabled = 0
     case notConfigured = 1
     case enabled = 2
@@ -771,7 +770,7 @@ public enum PebbleReminderAppState: UInt8, Codable, Equatable, Sendable {
 
 public extension WeatherCodec {
     static func reminderAppFrame(
-        state: PebbleReminderAppState,
+        state: RemindersAppState,
         token: UInt16
     ) -> PebbleProtocolFrame {
         BlobDBCodec.insertFrame(

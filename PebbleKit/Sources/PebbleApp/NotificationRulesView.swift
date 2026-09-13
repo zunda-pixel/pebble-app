@@ -37,7 +37,7 @@ struct NotificationRulesContent: View {
 
     @State private var pattern = ""
     @State private var field = NotificationRuleField.anywhere
-    @State private var caseSensitive = false
+    @State private var isCaseSensitive = false
 
     private var trimmedPattern: String {
         pattern.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -56,7 +56,7 @@ struct NotificationRulesContent: View {
                         Text(rule.field.title)
                     } label: {
                         Text(verbatim: rule.pattern)
-                        if rule.caseSensitive {
+                        if rule.isCaseSensitive {
                             Text("Upper and lower case must match")
                         }
                     }
@@ -84,16 +84,16 @@ struct NotificationRulesContent: View {
                         Text(field.title).tag(field)
                     }
                 }
-                Toggle("Match Upper and Lower Case", isOn: $caseSensitive)
+                Toggle("Match Upper and Lower Case", isOn: $isCaseSensitive)
                 Button("Add Rule") {
                     setRules(rules + [NotificationFilterRule(
                         pattern: trimmedPattern,
                         field: field,
-                        caseSensitive: caseSensitive
+                        isCaseSensitive: isCaseSensitive
                     )])
                     pattern = ""
                     field = .anywhere
-                    caseSensitive = false
+                    isCaseSensitive = false
                 }
                 .disabled(trimmedPattern.isEmpty)
             } header: {
@@ -125,7 +125,7 @@ extension NotificationRuleField {
             appName: "Gmail",
             rules: [
                 NotificationFilterRule(pattern: "Promotion"),
-                NotificationFilterRule(pattern: "Newsletter", field: .title, caseSensitive: true),
+                NotificationFilterRule(pattern: "Newsletter", field: .title, isCaseSensitive: true),
             ],
             setRules: { _ in }
         )

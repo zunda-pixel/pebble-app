@@ -63,7 +63,7 @@ public struct ContentView: View {
 }
 
 public enum AppSection: String, CaseIterable, Identifiable {
-    case devices
+    case watches
     case apps
     case timeline
     case health
@@ -77,7 +77,7 @@ public enum AppSection: String, CaseIterable, Identifiable {
 
     public var title: LocalizedStringKey {
         switch self {
-        case .devices:
+        case .watches:
             "Devices"
         case .apps:
             "Apps"
@@ -92,7 +92,7 @@ public enum AppSection: String, CaseIterable, Identifiable {
 
     public var keyboardShortcut: KeyEquivalent {
         switch self {
-        case .devices: "1"
+        case .watches: "1"
         case .apps: "2"
         case .timeline: "3"
         case .health: "4"
@@ -102,7 +102,7 @@ public enum AppSection: String, CaseIterable, Identifiable {
 
     public var systemImage: String {
         switch self {
-        case .devices:
+        case .watches:
             "applewatch"
         case .apps:
             "square.grid.2x2"
@@ -150,7 +150,7 @@ struct AppRootView: View {
 #if os(macOS)
 struct MacRootView: View {
     var model: AppModel
-    @State private var selection: AppSection? = .devices
+    @State private var selection: AppSection? = .watches
 
     var body: some View {
         NavigationSplitView {
@@ -165,15 +165,15 @@ struct MacRootView: View {
                     ConnectionStatusBanner(state: model.connectionState) {
                         Task { await model.disconnect() }
                     }
-                    SectionContent(section: selection ?? .devices, model: model)
+                    SectionContent(section: selection ?? .watches, model: model)
                 }
             }
         }
         .frame(minWidth: 680, minHeight: 480)
-        .onPebbleMessage(PebbleScanRequest.self, from: model) { _ in
-            selection = .devices
+        .onWindowMessage(ScanRequest.self, from: model) { _ in
+            selection = .watches
         }
-        .onPebbleMessage(PebbleSectionRequest.self, from: model) { message in
+        .onWindowMessage(SectionRequest.self, from: model) { message in
             selection = message.section
         }
     }
@@ -238,7 +238,7 @@ struct ConnectionStatusBanner: View {
         case .scanning: Text("Scanning for watches…")
         case .connecting: Text("Connecting…")
         case .negotiating: Text("Setting up connection…")
-        case .connected(let device): Text("Connected to \(device.name)")
+        case .connected(let watch): Text("Connected to \(watch.name)")
         case .reconnecting: Text("Connection lost — reconnecting…")
         case .failed(let error): Text("Connection failed. \(Text(error.message))")
         }
@@ -260,8 +260,8 @@ struct SectionContent: View {
 
     var body: some View {
         switch section {
-        case .devices:
-            DevicesView(model: model)
+        case .watches:
+            WatchesView(model: model)
         case .apps:
             ApplicationsView(model: model)
         case .timeline:

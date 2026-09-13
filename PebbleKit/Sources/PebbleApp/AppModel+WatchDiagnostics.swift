@@ -17,7 +17,7 @@ extension AppModel {
             diagnostics.feedback[.screenshot] = nil
         } catch {
             diagnostics.feedback[.screenshot] = .failure("The watch would not send a screenshot.")
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 .error,
                 category: "screenshot",
                 message: "\(connection.watch.name): \(String(reflecting: error))"
@@ -48,7 +48,7 @@ extension AppModel {
             // A log that stops halfway is more use than none.
             diagnostics.watchLogsURL = try? writeWatchLogs(name: connection.watch.name)
             diagnostics.feedback[.watchLogs] = .failure("The watch stopped part way through its logs.")
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 .error,
                 category: "watchlog",
                 message: "\(connection.watch.name): \(String(reflecting: error))"
@@ -105,7 +105,7 @@ extension AppModel {
             diagnostics.feedback[.coredump] = .success("The watch has no crash report.")
         } catch {
             diagnostics.feedback[.coredump] = .failure("The crash report could not be read.")
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 .error,
                 category: "coredump",
                 message: "\(connection.watch.name): \(String(reflecting: error))"
@@ -128,7 +128,7 @@ extension AppModel {
     }
 
     private func write(_ bytes: [UInt8], name: String) throws -> URL {
-        let directory = URL.temporaryDirectory.appending(path: "PebbleDiagnostics")
+        let directory = URL.temporaryDirectory.appending(path: "DiagnosticLog")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let url = directory.appending(path: name.replacingOccurrences(of: "/", with: "-"))
         try Data(bytes).write(to: url, options: .atomic)

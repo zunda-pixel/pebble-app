@@ -44,7 +44,7 @@ struct CatalogSourceTests {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let feedURL = URL(string: "https://stub.example/\(UUID().uuidString)/api")!
-        let catalog = AppCatalog(
+        let catalog = ApplicationCatalog(
             cacheURL: directory.appending(path: "catalog.json"),
             session: StoreStubURLProtocol.session(),
             feedURL: feedURL
@@ -76,7 +76,7 @@ struct CatalogSourceTests {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let feedURL = URL(string: "https://stub.example/\(UUID().uuidString)/api")!
-        let catalog = AppCatalog(
+        let catalog = ApplicationCatalog(
             cacheURL: directory.appending(path: "catalog.json"),
             session: StoreStubURLProtocol.session(),
             feedURL: feedURL
@@ -103,7 +103,7 @@ struct CatalogSourceTests {
     @Test func aSourceWithoutAnIndexRefusesToSearch() async throws {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
-        let catalog = AppCatalog(
+        let catalog = ApplicationCatalog(
             cacheURL: directory.appending(path: "catalog.json"),
             session: StoreStubURLProtocol.session()
         )
@@ -117,7 +117,7 @@ struct CatalogSourceTests {
             storePageBaseURL: URL(string: "https://store.example")!
         )
 
-        await #expect(throws: AppCatalogError.invalidResponse) {
+        await #expect(throws: ApplicationCatalogError.invalidResponse) {
             _ = try await catalog.search("mario", source: indexless)
         }
     }

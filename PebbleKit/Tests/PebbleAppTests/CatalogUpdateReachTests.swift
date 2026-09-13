@@ -111,7 +111,7 @@ struct CatalogUpdateReachTests {
             client: MockWatchClient(),
             storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: library,
-            appCatalog: AppCatalog(cacheURL: cacheURL, session: StoreStubURLProtocol.session())
+            appCatalog: ApplicationCatalog(cacheURL: cacheURL, session: StoreStubURLProtocol.session())
         )
         await model.loadApplications()
         await model.loadCatalog()

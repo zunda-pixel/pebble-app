@@ -84,7 +84,7 @@ extension AppModel {
     /// toggles here could drift from the watch with nothing to say so.
     ///
     /// Not written back to the watch it came from: it already has the value,
-    /// and answering a push with a write is how two devices talk each other
+    /// and answering a push with a write is how two watches talk each other
     /// into a loop. Written to every *other* connected watch, because the app's
     /// settings are one set written to all of them — the same shape
     /// `synchronizeNotificationSourceApps` uses for a record from one watch.
@@ -228,7 +228,7 @@ extension AppModel {
             do {
                 try await connection.client.write(.healthDay(day))
             } catch {
-                await PebbleDiagnostics.shared.record(
+                await DiagnosticLog.shared.record(
                     .error,
                     category: "health",
                     message: "\(connection.watch.name) rejected a day: \(String(reflecting: error))"
@@ -255,7 +255,7 @@ extension AppModel {
             days.contains { $0.distanceMetres > 0 } ? "distance" : nil,
             days.contains { $0.activeSeconds > 0 } ? "exercise" : nil,
         ].compactMap { $0 }
-        await PebbleDiagnostics.shared.record(
+        await DiagnosticLog.shared.record(
             category: "health",
             message: "\(connection.watch.name) took \(days.count) day(s) of "
                 + (measured.isEmpty ? "nothing but zeroes" : measured.joined(separator: ", "))

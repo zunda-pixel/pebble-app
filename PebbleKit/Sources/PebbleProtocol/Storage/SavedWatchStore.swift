@@ -42,25 +42,25 @@ public actor SavedWatchStore {
     }
 
     @discardableResult
-    public func record(_ device: ConnectedWatch) throws -> [SavedWatch] {
+    public func record(_ watch: ConnectedWatch) throws -> [SavedWatch] {
         try loadIfNeeded()
         var updated = watches ?? []
-        let previous = updated.first { $0.id == device.id }
+        let previous = updated.first { $0.id == watch.id }
         let watch = SavedWatch(
-            id: device.id,
-            name: device.name,
-            model: device.model,
-            firmwareVersion: device.firmwareVersion,
-            serialNumber: device.serialNumber,
-            lastBatteryLevel: device.batteryLevel,
+            id: watch.id,
+            name: watch.name,
+            model: watch.model,
+            firmwareVersion: watch.firmwareVersion,
+            serialNumber: watch.serialNumber,
+            lastBatteryLevel: watch.batteryLevel,
             lastConnectedAt: Date(),
             automaticallyConnects: previous?.automaticallyConnects ?? true,
-            board: device.board ?? previous?.board,
+            board: watch.board ?? previous?.board,
             // Kept from the last connection that knew it, the way the board is:
             // a connection that does not say should not erase what is known.
-            hardwareRevision: device.hardwareRevision ?? previous?.hardwareRevision
+            hardwareRevision: watch.hardwareRevision ?? previous?.hardwareRevision
         )
-        updated.removeAll { $0.id == device.id }
+        updated.removeAll { $0.id == watch.id }
         updated.insert(watch, at: 0)
         try persist(updated)
         return updated

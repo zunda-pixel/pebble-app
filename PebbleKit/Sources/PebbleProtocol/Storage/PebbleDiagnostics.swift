@@ -2,34 +2,34 @@ public import Foundation
 import MemberwiseInit
 import OSLog
 
-public enum PebbleDiagnosticLevel: String, Codable, Sendable {
+public enum DiagnosticLevel: String, Codable, Sendable {
     case info
     case warning
     case error
 }
 
 @MemberwiseInit(.public)
-public struct PebbleDiagnosticEntry: Identifiable, Codable, Equatable, Sendable {
+public struct DiagnosticEntry: Identifiable, Codable, Equatable, Sendable {
     public var id: UUID = UUID()
     public var timestamp: Date = Date()
-    public var level: PebbleDiagnosticLevel
+    public var level: DiagnosticLevel
     public var category: String
     public var message: String
 }
 
 @MemberwiseInit(.public)
-public struct PebbleDiagnosticReport: Encodable, Sendable {
+public struct DiagnosticReport: Encodable, Sendable {
     public var generatedAt: Date
     public var operatingSystem: String
-    public var deviceDescription: String?
+    public var watchDescription: String?
     public var applications: [WatchApplication]
-    public var entries: [PebbleDiagnosticEntry]
+    public var entries: [DiagnosticEntry]
 }
 
-public actor PebbleDiagnostics {
-    public static let shared = PebbleDiagnostics()
+public actor DiagnosticLog {
+    public static let shared = DiagnosticLog()
 
-    private var entries: [PebbleDiagnosticEntry] = []
+    private var entries: [DiagnosticEntry] = []
     private var maximumEntryCount: Int
     private var logger = Logger(subsystem: "dev.pebble.app", category: "diagnostics")
     /// Every frame that crosses the link, on its own channel.
@@ -47,11 +47,11 @@ public actor PebbleDiagnostics {
     }
 
     public func record(
-        _ level: PebbleDiagnosticLevel = .info,
+        _ level: DiagnosticLevel = .info,
         category: String,
         message: String
     ) {
-        let entry = PebbleDiagnosticEntry(level: level, category: category, message: message)
+        let entry = DiagnosticEntry(level: level, category: category, message: message)
         entries.append(entry)
         if entries.count > maximumEntryCount {
             entries.removeFirst(entries.count - maximumEntryCount)
@@ -59,7 +59,7 @@ public actor PebbleDiagnostics {
         logger.log(level: logType(for: level), "[\(category, privacy: .public)] \(message, privacy: .public)")
     }
 
-    public func snapshot() -> [PebbleDiagnosticEntry] {
+    public func snapshot() -> [DiagnosticEntry] {
         entries
     }
 
@@ -80,11 +80,11 @@ public actor PebbleDiagnostics {
     }
 
     public func exportReport(
-        device: ConnectedWatch?,
+        watch: ConnectedWatch?,
         applications: [WatchApplication],
         directory: URL = .temporaryDirectory
     ) throws -> URL {
-        let report = PebbleDiagnosticReport(
+        let report = DiagnosticReport(
             generatedAt: Date(),
             operatingSystem: ProcessInfo.processInfo.operatingSystemVersionString,
             // The board and the manufacturing revision are here because a
@@ -93,13 +93,13 @@ public actor PebbleDiagnostics {
             // rather than being left out: their absence is itself worth
             // knowing, since an unrecognised board is why some watches have no
             // firmware screen.
-            deviceDescription: device.map { device in
+            watchDescription: watch.map { watch in
                 [
-                    device.name,
-                    device.model.displayName,
-                    device.board?.rawValue ?? "unknown board",
-                    device.hardwareRevision ?? "unknown revision",
-                    device.firmwareVersion ?? "unknown",
+                    watch.name,
+                    watch.model.displayName,
+                    watch.board?.rawValue ?? "unknown board",
+                    watch.hardwareRevision ?? "unknown revision",
+                    watch.firmwareVersion ?? "unknown",
                 ].joined(separator: " / ")
             },
             applications: applications,
@@ -117,7 +117,7 @@ public actor PebbleDiagnostics {
         return url
     }
 
-    private func logType(for level: PebbleDiagnosticLevel) -> OSLogType {
+    private func logType(for level: DiagnosticLevel) -> OSLogType {
         switch level {
         case .info: .info
         case .warning: .default

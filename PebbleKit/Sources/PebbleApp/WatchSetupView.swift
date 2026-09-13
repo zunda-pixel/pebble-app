@@ -30,7 +30,7 @@ enum WatchSetupStep: String, Equatable, Identifiable, CaseIterable {
 
 extension PhonePermissionKind {
     /// Leaves out what is settled and what no answer here could change: a phone
-    /// with no health data, or a refusal a device policy made.
+    /// with no health data, or a refusal a watch policy made.
     func isWorthAsking(in permissions: PhonePermissions) -> Bool {
         switch state(in: permissions) {
         case .allowed, .unavailable, .restricted: false

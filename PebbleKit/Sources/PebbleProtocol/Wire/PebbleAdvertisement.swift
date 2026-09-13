@@ -1,4 +1,4 @@
-package enum PebbleAdvertisement {
+package enum WatchAdvertisement {
     package static var vendorIdentifiers: Set<UInt16> { [0x0154, 0x0EEA] }
 
     /// The model is a best guess for display only: the real one arrives with the

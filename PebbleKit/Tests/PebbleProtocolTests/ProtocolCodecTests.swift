@@ -87,7 +87,7 @@ struct ProtocolCodecTests {
 
     @Test func blobDBApplicationMetadataUsesPebbleWireLayout() throws {
         let applicationID = try #require(UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF"))
-        let metadata = PebbleAppMetadata(
+        let metadata = ApplicationMetadata(
             applicationID: applicationID,
             flags: 0x12345678,
             iconResourceID: 0x90ABCDEF,
@@ -113,7 +113,7 @@ struct ProtocolCodecTests {
 
     @Test func blobDBBuildsApplicationInsertAndDeleteFrames() throws {
         let applicationID = try #require(UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF"))
-        let metadata = PebbleAppMetadata(
+        let metadata = ApplicationMetadata(
             applicationID: applicationID,
             flags: 0,
             iconResourceID: 0,
@@ -146,7 +146,7 @@ struct ProtocolCodecTests {
             endpoint: BlobDBCodec.endpoint,
             payload: [0x12, 0x34, 0x0B]
         ))
-        let metadata = PebbleAppMetadata(
+        let metadata = ApplicationMetadata(
             applicationID: UUID(),
             flags: 0,
             iconResourceID: 0,
@@ -576,7 +576,7 @@ struct ProtocolCodecTests {
     func timelineNotificationUsesOfficialBlobDBLayout() throws {
         let itemID = try #require(UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF"))
         let parentID = try #require(UUID(uuidString: "FFEEDDCC-BBAA-9988-7766-554433221100"))
-        let notification = PebbleTimelineNotification(
+        let notification = TimelineNotification(
             id: itemID,
             parentApplicationID: parentID,
             timestamp: Date(timeIntervalSince1970: 1_700_000_000),
@@ -614,7 +614,7 @@ struct ProtocolCodecTests {
 
     @Test
     func timelineNotificationTrimsTextWithoutSplittingUTF8() throws {
-        let notification = PebbleTimelineNotification(
+        let notification = TimelineNotification(
             parentApplicationID: UUID(),
             title: String(repeating: "石", count: 30),
             body: "Body",

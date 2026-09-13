@@ -8,7 +8,7 @@ public final class MockWatchClient: WatchClient {
     public private(set) var appMessageResponses: [(transactionID: UInt8, acknowledged: Bool)] = []
     public private(set) var appFetchResponses: [AppFetchResponseStatus] = []
     public private(set) var reorderedApplicationIDs: [[UUID]] = []
-    public private(set) var sentNotifications: [PebbleTimelineNotification] = []
+    public private(set) var sentNotifications: [TimelineNotification] = []
     public private(set) var timelinePins: [TimelinePin] = []
     /// Every pin write in the order it was made, including the ones that
     /// replaced a pin already here. `timelinePins` keeps one entry per pin the
@@ -35,7 +35,7 @@ public final class MockWatchClient: WatchClient {
     public private(set) var writtenHeartRateZones: HeartRateZonePreferences?
     public private(set) var writtenHealthAverages: (steps: UInt32, sleepSeconds: UInt32)?
     public private(set) var writtenHealthDays: [WatchHealthDay] = []
-    public private(set) var writtenReminderAppState: PebbleReminderAppState?
+    public private(set) var writtenReminderAppState: RemindersAppState?
     public private(set) var sentImages: [(token: UInt8, kindValue: UInt8, image: EncodedImage?)] = []
     public private(set) var declinedImageKinds: [UInt8] = []
     public private(set) var screenshotRequestCount = 0
@@ -53,7 +53,7 @@ public final class MockWatchClient: WatchClient {
     /// the watch does, so it cannot say how often the same one was sent.
     public private(set) var appGlanceWrites: [UUID] = []
     public private(set) var deletedTimelineReminderIDs: [UUID] = []
-    public private(set) var registeredApplications: [PebbleAppMetadata] = []
+    public private(set) var registeredApplications: [ApplicationMetadata] = []
     public private(set) var unregisteredApplicationIDs: [UUID] = []
     public private(set) var disconnectedWatches: [ConnectedWatch] = []
     private var nextTransactionID: UInt8 = 0
@@ -110,7 +110,7 @@ public final class MockWatchClient: WatchClient {
     /// Reports both handshake phases, so a test can see the states a real
     /// connect passes through rather than only its result.
     public func connect(
-        to device: DiscoveredWatch,
+        to watch: DiscoveredWatch,
         reportingPhase: @escaping @MainActor (WatchHandshakePhase) -> Void
     ) async throws -> ConnectedWatch {
         try await Task.sleep(for: .milliseconds(250))
@@ -126,23 +126,23 @@ public final class MockWatchClient: WatchClient {
         afterReportingPhase?(.transportOpen)
 
         return ConnectedWatch(
-            id: device.id,
-            name: device.name,
-            model: device.model,
+            id: watch.id,
+            name: watch.name,
+            model: watch.model,
             batteryLevel: 84,
             version: WatchVersionInformation(
                 firmwareVersion: "v5.0.0-mock",
                 serialNumber: "MOCK00000001",
                 // The platform this mock's model would report, so the board and
                 // the model agree the way they do on a real watch.
-                hardwarePlatform: device.model == .pebble2Duo ? 15 : 18,
+                hardwarePlatform: watch.model == .pebble2Duo ? 15 : 18,
                 isRunningRecoveryFirmware: connectsAsRecoveryFirmware
             )
         )
     }
 
-    public func disconnect(from device: ConnectedWatch) async {
-        disconnectedWatches.append(device)
+    public func disconnect(from watch: ConnectedWatch) async {
+        disconnectedWatches.append(watch)
         await Task.yield()
     }
 

@@ -286,7 +286,7 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
                         : "Your position could not be found.",
                 ]
             )
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 .warning,
                 category: "configuration",
                 message: "an application asked for a position and did not get one:"

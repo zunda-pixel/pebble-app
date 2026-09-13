@@ -193,7 +193,7 @@ public extension NotificationVibePattern {
     }
 }
 
-public extension PebbleTimelineIcon {
+public extension TimelineIcon {
     var title: LocalizedStringKey {
         switch self {
         case .generic: "Notification"

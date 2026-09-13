@@ -27,10 +27,10 @@ extension CoreBluetoothWatchClient: CBCentralManagerDelegate {
                 reconnects.cancelSchedule()
                 connectionTimeoutTask?.cancel()
                 connectionTimeoutTask = nil
-                pendingDevice = nil
+                pendingWatch = nil
                 clearTransportState()
-                if let device = reconnects.watch {
-                    eventContinuation?.yield(.reconnecting(watchID: device.id))
+                if let watch = reconnects.watch {
+                    eventContinuation?.yield(.reconnecting(watchID: watch.id))
                 }
             }
         case .unknown:
@@ -62,7 +62,7 @@ extension CoreBluetoothWatchClient: CBCentralManagerDelegate {
     }
 
     public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        guard pendingDevice?.id == peripheral.watchID else {
+        guard pendingWatch?.id == peripheral.watchID else {
             // A connect request that already timed out or was abandoned; do
             // not let it become a session the app does not know about.
             cancelLink(peripheral, reason: "no connect request was waiting for this link")
@@ -75,7 +75,7 @@ extension CoreBluetoothWatchClient: CBCentralManagerDelegate {
         // seconds go.
         handshakePhaseReporter?(.linkOpen)
         Task { [tag = clientTag] in
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "pairing",
                 message: "[\(tag)] link established, discovering services"
             )
@@ -90,7 +90,7 @@ extension CoreBluetoothWatchClient: CBCentralManagerDelegate {
     ) {
         let reason = Self.connectionError(from: error)
         Task { [tag = clientTag, described = error.map { String(describing: $0) } ?? "none"] in
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 .warning,
                 category: "pairing",
                 message: "[\(tag)] the connect attempt was refused: \(described)"
@@ -106,9 +106,9 @@ extension CoreBluetoothWatchClient: CBCentralManagerDelegate {
         if retryWithoutNotificationAccess(peripheral) {
             return
         }
-        if reconnects.isAutomatic, let device = reconnects.watch {
-            pendingDevice = nil
-            scheduleReconnect(to: device, using: peripheral)
+        if reconnects.isAutomatic, let watch = reconnects.watch {
+            pendingWatch = nil
+            scheduleReconnect(to: watch, using: peripheral)
             return
         }
         failConnection(reason)
@@ -134,9 +134,9 @@ extension CoreBluetoothWatchClient: CBCentralManagerDelegate {
         isReconnecting: Bool,
         error: (any Error)?
     ) {
-        PebbleGattServer.shared.unregister(centralID: peripheral.identifier.uuidString)
+        GATTServer.shared.unregister(centralID: peripheral.identifier.uuidString)
         Task { [tag = clientTag, reconnecting = isReconnecting, message = error?.localizedDescription] in
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "pairing",
                 message: "[\(tag)] link dropped reconnecting=\(reconnecting) error=\(message ?? "none")"
             )
@@ -145,26 +145,26 @@ extension CoreBluetoothWatchClient: CBCentralManagerDelegate {
         let identifier = peripheral.watchID
         let wasConnected = connectedWatch != nil
         let wasIntentional = reconnects.wasExpected(identifier)
-        let deviceToReconnect = reconnects.watch
+        let watchToReconnect = reconnects.watch
         let wasAutomatic = reconnects.isAutomatic
-        if pendingDevice?.id == peripheral.watchID, !wasAutomatic {
+        if pendingWatch?.id == peripheral.watchID, !wasAutomatic {
             failConnection(.disconnected)
         }
-        pendingDevice = nil
+        pendingWatch = nil
         clearTransportState()
         if wasIntentional {
             reconnects.stop()
             return
         }
-        if (wasConnected || wasAutomatic), let deviceToReconnect {
+        if (wasConnected || wasAutomatic), let watchToReconnect {
             if wasConnected {
-                reconnect(to: deviceToReconnect, using: peripheral)
+                reconnect(to: watchToReconnect, using: peripheral)
             } else if reconnects.noteHandshakeFailed() {
                 // The link came up and died before a session: worth another go,
                 // but not forever.
-                scheduleReconnect(to: deviceToReconnect, using: peripheral)
+                scheduleReconnect(to: watchToReconnect, using: peripheral)
             } else {
-                giveUpReconnecting(to: deviceToReconnect)
+                giveUpReconnecting(to: watchToReconnect)
             }
             return
         }
@@ -182,7 +182,7 @@ extension CoreBluetoothWatchClient: CBCentralManagerDelegate {
         didUpdateANCSAuthorizationFor peripheral: CBPeripheral
     ) {
         Task { [tag = clientTag, allowed = peripheral.ancsAuthorized] in
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "pairing",
                 message: "[\(tag)] notification sharing \(allowed ? "allowed" : "refused")"
             )

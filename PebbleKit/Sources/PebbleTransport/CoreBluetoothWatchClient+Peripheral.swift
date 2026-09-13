@@ -9,12 +9,12 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
         _ peripheral: CBPeripheral,
         didModifyServices invalidatedServices: [CBService]
     ) {
-        guard pendingDevice?.id == peripheral.watchID
+        guard pendingWatch?.id == peripheral.watchID
             || connectedPeripheral?.identifier == peripheral.identifier else {
             return
         }
         Task { [tag = clientTag, uuids = invalidatedServices.map(\.uuid.uuidString)] in
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "pairing",
                 message: "[\(tag)] watch invalidated [\(uuids.joined(separator: ","))]"
             )
@@ -33,7 +33,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
         }
         let services = peripheral.services ?? []
         Task { [tag = clientTag, uuids = services.map(\.uuid.uuidString)] in
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "pairing",
                 message: "[\(tag)] discovered services [\(uuids.joined(separator: ","))]"
             )
@@ -45,7 +45,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
             if let pairingService = services.first(where: { $0.uuid == Self.pairingService }) {
                 setup.noteCheckingPairing()
                 Task { [tag = clientTag] in
-                    await PebbleDiagnostics.shared.record(
+                    await DiagnosticLog.shared.record(
                         category: "pairing",
                         message: "[\(tag)] asking the pairing service what it has"
                     )
@@ -60,7 +60,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
                 )
             } else {
                 Task { [tag = clientTag] in
-                    await PebbleDiagnostics.shared.record(
+                    await DiagnosticLog.shared.record(
                         category: "pairing",
                         message: "[\(tag)] no pairing service; taking the link as bonded"
                     )
@@ -120,7 +120,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
                 uuids = (service.characteristics ?? []).map(\.uuid.uuidString),
                 described = error.map { String(describing: $0) } ?? "none"
             ] in
-                await PebbleDiagnostics.shared.record(
+                await DiagnosticLog.shared.record(
                     category: "pairing",
                     message: "[\(tag)] the pairing service has [\(uuids.joined(separator: ","))] error=\(described)"
                 )
@@ -129,7 +129,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
                   let characteristics = service.characteristics,
                   let connectivity = characteristics.first(where: { $0.uuid == Self.connectivityCharacteristic }) else {
                 Task { [tag = clientTag] in
-                    await PebbleDiagnostics.shared.record(
+                    await DiagnosticLog.shared.record(
                         .warning,
                         category: "pairing",
                         message: "[\(tag)] no connectivity characteristic; taking the link as bonded"
@@ -160,7 +160,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
             // `handleConnectivity`. Nothing between the two is the watch not
             // answering, or the system not asking.
             Task { [tag = clientTag] in
-                await PebbleDiagnostics.shared.record(
+                await DiagnosticLog.shared.record(
                     category: "pairing",
                     message: "[\(tag)] reading the watch's pairing state"
                 )
@@ -208,7 +208,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
             ppogNotifyCharacteristicToSubscribe = nil
             peripheral.setNotifyValue(true, for: notifyCharacteristic)
         case .forward:
-            guard PebbleGattServer.shared.isSubscribed(centralID: peripheral.identifier.uuidString) else {
+            guard GATTServer.shared.isSubscribed(centralID: peripheral.identifier.uuidString) else {
                 waitForTheWatchToSubscribe(on: peripheral)
                 return
             }
@@ -221,13 +221,13 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
             return
         }
         Task { [tag = clientTag] in
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "pairing",
                 message: "[\(tag)] serving the protocol from the phone: \(reason)"
             )
         }
-        PebbleGattServer.shared.start()
-        PebbleGattServer.shared.register(
+        GATTServer.shared.start()
+        GATTServer.shared.register(
             centralID: peripheral.identifier.uuidString,
             onReceive: { [weak self] bytes in
                 self?.handleIncomingProtocolBytes(bytes, from: peripheral)
@@ -249,9 +249,9 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
         guard ppogSession == nil, setup.handTransportBackToWatch() else {
             return
         }
-        PebbleGattServer.shared.unregister(centralID: peripheral.identifier.uuidString)
+        GATTServer.shared.unregister(centralID: peripheral.identifier.uuidString)
         Task { [tag = clientTag] in
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "pairing",
                 message: "[\(tag)] the watch published its own protocol service; using that instead"
             )
@@ -276,16 +276,16 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
             let centralID = peripheral.identifier.uuidString
             guard self.setup.transport == .forward,
                   self.ppogSession == nil,
-                  !PebbleGattServer.shared.isSubscribed(centralID: centralID) else {
+                  !GATTServer.shared.isSubscribed(centralID: centralID) else {
                 return
             }
             self.hasRepublishedForThisLink = true
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 .warning,
                 category: "pairing",
                 message: "[\(tag)] the watch has not subscribed to the phone's service; publishing it again"
             )
-            PebbleGattServer.shared.republish(chasing: centralID)
+            GATTServer.shared.republish(chasing: centralID)
         }
     }
 
@@ -299,7 +299,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
         let steps = setup.stepsToOpenTheSession(askingIfNeeded: false)
         guard !steps.isEmpty else {
             Task { [tag = clientTag] in
-                await PebbleDiagnostics.shared.record(
+                await DiagnosticLog.shared.record(
                     category: "pairing",
                     message: "[\(tag)] waiting for the watch to open the session"
                 )
@@ -314,7 +314,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
     }
 
     private func handleConnectivity(_ bytes: [UInt8], on peripheral: CBPeripheral) {
-        guard let status = PebbleConnectivityStatus(decoding: bytes) else {
+        guard let status = ConnectivityStatus(decoding: bytes) else {
             // A watch stuck in a bad state reports a truncated value; it needs
             // a reboot before it can be paired.
             abortLink(
@@ -325,7 +325,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
             return
         }
         Task {
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "pairing",
                 message: "[\(clientTag)] connectivity paired=\(status.isPaired) encrypted=\(status.isEncrypted)"
                     + " connected=\(status.isConnected) bondedGateway=\(status.hasBondedGateway)"
@@ -358,7 +358,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
         // which is what makes iOS show its pairing prompt.
         if let trigger = activePairingTriggerCharacteristic {
             peripheral.writeValue(
-                Data(PebblePairingTrigger.value()),
+                Data(PairingTrigger.value()),
                 for: trigger,
                 type: trigger.properties.contains(.write) ? .withResponse : .withoutResponse
             )
@@ -435,7 +435,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
                 // Reading this needs the link encrypted, so a refusal here is
                 // the bond being refused rather than a characteristic problem.
                 Task { [tag = clientTag, described = error.map { String(describing: $0) } ?? "it was empty"] in
-                    await PebbleDiagnostics.shared.record(
+                    await DiagnosticLog.shared.record(
                         .warning,
                         category: "pairing",
                         message: "[\(tag)] the watch's pairing state could not be read: \(described)"
@@ -471,7 +471,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
             let steps = setup.steps(for: packet, hasSession: ppogSession != nil)
             if steps.isEmpty {
                 Task { [tag = clientTag] in
-                    await PebbleDiagnostics.shared.record(
+                    await DiagnosticLog.shared.record(
                         category: "ppog",
                         message: "[\(tag)] a packet arrived before there was a way to answer it; left alone"
                     )
@@ -484,7 +484,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
                 // A packet that makes no sense is no reason to drop a working
                 // link: the transport re-sends whatever went unacknowledged.
                 Task { [tag = clientTag, message = error.localizedDescription] in
-                    await PebbleDiagnostics.shared.record(
+                    await DiagnosticLog.shared.record(
                         .error,
                         category: "pairing",
                         message: "[\(tag)] ignoring an unusable packet: \(message)"
@@ -555,10 +555,10 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
             receive = session.receiveWindow,
             transmit = session.transmitWindow,
             packetSize = setup.transport == .forward
-                ? PebbleGattServer.shared.maximumPacketSize(centralID: peripheral.identifier.uuidString)
+                ? GATTServer.shared.maximumPacketSize(centralID: peripheral.identifier.uuidString)
                 : peripheral.maximumWriteValueLength(for: .withoutResponse)
         ] in
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "ppog",
                 message: "[\(tag)] session open: watch rx=\(watchReceive) tx=\(watchTransmit),"
                     + " ours rx=\(receive) tx=\(transmit), packet size=\(packetSize)"
@@ -583,7 +583,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
         case .acknowledgement, .data: return
         }
         Task { [tag = clientTag] in
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "ppog",
                 message: "[\(tag)] \(direction) \(description)"
             )

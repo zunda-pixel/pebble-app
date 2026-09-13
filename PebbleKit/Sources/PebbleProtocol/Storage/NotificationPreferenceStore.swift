@@ -4,13 +4,20 @@ import MemberwiseInit
 @MemberwiseInit(.public)
 public struct NotificationDeliveryPreferences: Codable, Equatable, Sendable {
     public var mutedApplicationIDs: Set<UUID> = []
-    public var quietHoursEnabled: Bool = false
+    public var areQuietHoursEnabled: Bool = false
     public var quietHoursStart: Int = 22
     public var quietHoursEnd: Int = 7
 
+    // The file on disk keeps the name the field was first written under.
+    private enum CodingKeys: String, CodingKey {
+        case mutedApplicationIDs
+        case areQuietHoursEnabled = "quietHoursEnabled"
+        case quietHoursStart, quietHoursEnd
+    }
+
     public func permits(applicationID: UUID, at date: Date, calendar: Calendar = .current) -> Bool {
         guard !mutedApplicationIDs.contains(applicationID) else { return false }
-        guard quietHoursEnabled else { return true }
+        guard areQuietHoursEnabled else { return true }
         let hour = calendar.component(.hour, from: date)
         if quietHoursStart == quietHoursEnd { return false }
         return quietHoursStart < quietHoursEnd

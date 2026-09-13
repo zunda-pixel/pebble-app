@@ -52,7 +52,7 @@ extension AppModel {
                 connection.synchronizedAppGlances[glance.applicationID] = value
                 taken += 1
             } catch {
-                await PebbleDiagnostics.shared.record(
+                await DiagnosticLog.shared.record(
                     .error,
                     category: "glance",
                     message: "\(connection.watch.name) would not take a glance: \(String(reflecting: error))"
@@ -68,7 +68,7 @@ extension AppModel {
                 connection.synchronizedAppGlances[applicationID] = nil
                 dropped += 1
             } catch {
-                await PebbleDiagnostics.shared.record(
+                await DiagnosticLog.shared.record(
                     .error,
                     category: "glance",
                     message: "\(connection.watch.name) kept a glance that is gone here: \(String(reflecting: error))"
@@ -79,7 +79,7 @@ extension AppModel {
         // Nothing to say when nothing changed: this runs on every connection, and
         // a glance already on the watch is skipped above.
         guard taken + dropped > 0 else { return }
-        await PebbleDiagnostics.shared.record(
+        await DiagnosticLog.shared.record(
             category: "glance",
             message: "\(connection.watch.name) took \(taken) glance(s) and dropped \(dropped)"
         )

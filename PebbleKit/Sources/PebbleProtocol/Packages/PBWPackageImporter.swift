@@ -15,7 +15,7 @@ public struct PBWPackage: Equatable, Sendable {
     public var binaryHeader: PBWBinaryHeader
     public var objects: [PBWPackageObject]
 
-    public var appMetadata: PebbleAppMetadata {
+    public var appMetadata: ApplicationMetadata {
         binaryHeader.appMetadata(name: application.displayName)
     }
 }

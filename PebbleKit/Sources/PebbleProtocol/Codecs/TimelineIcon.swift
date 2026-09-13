@@ -1,7 +1,7 @@
 /// The numbers are the firmware's `TimelineResourceId`s, which are generated
 /// per board; these are the ones that come out the same on asterix, obelix and
 /// gabbro.
-public enum PebbleTimelineIcon: UInt32, CaseIterable, Codable, Sendable {
+public enum TimelineIcon: UInt32, CaseIterable, Codable, Sendable {
     case generic = 1
     case missedCall = 2
     case reminder = 3
@@ -70,7 +70,7 @@ public enum PebbleTimelineIcon: UInt32, CaseIterable, Codable, Sendable {
 
     /// The watch already knows the apps whose own logo it has, so what is left to
     /// choose is the kind of thing a notification is.
-    public static let choosable: [PebbleTimelineIcon] = [
+    public static let choosable: [TimelineIcon] = [
         .generic, .sms, .email, .calendar, .reminder, .alarmClock, .duringPhoneCall,
         .missedCall, .musicEvent, .newsEvent, .payBill, .scheduledEvent, .warning,
         .question, .flag,
@@ -78,11 +78,11 @@ public enum PebbleTimelineIcon: UInt32, CaseIterable, Codable, Sendable {
 
     /// What the firmware would pick for an iOS app by itself
     /// (`ancs_known_apps.h`).
-    public static func suggested(forBundleID bundleID: String) -> PebbleTimelineIcon? {
+    public static func suggested(forBundleID bundleID: String) -> TimelineIcon? {
         knownApplications[bundleID]
     }
 
-    static let knownApplications: [String: PebbleTimelineIcon] = [
+    static let knownApplications: [String: TimelineIcon] = [
         "com.apple.mobilecal": .calendar,
         "com.apple.facetime": .faceTime,
         "com.apple.mobilemail": .email,

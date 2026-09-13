@@ -51,7 +51,7 @@ struct ApplicationDetailSubjectTests {
     /// would name a version that is not on the watch. The newer one is offered
     /// by the Update button instead.
     @Test func thePackageWinsWhereBothKnowTheSameFact() {
-        let subject = ApplicationDetailSubject(installed: installed(), store: store())
+        let subject = ApplicationDetailSubject(installed: installed(), catalogEntry: store())
 
         #expect(subject.version == "1.3.0")
         #expect(subject.name == "Watch Tools")
@@ -61,11 +61,11 @@ struct ApplicationDetailSubjectTests {
 
     /// And the store fills in only what a package cannot say about itself.
     @Test func theStoreAddsWhatThePackageCannotSay() {
-        let subject = ApplicationDetailSubject(installed: installed(), store: store())
+        let subject = ApplicationDetailSubject(installed: installed(), catalogEntry: store())
 
-        #expect(subject.store?.summary == "Five watch utilities in one place.")
-        #expect(subject.store?.category == "Tools & Utilities")
-        #expect(subject.store?.storePageURL != nil)
+        #expect(subject.catalogEntry?.summary == "Five watch utilities in one place.")
+        #expect(subject.catalogEntry?.category == "Tools & Utilities")
+        #expect(subject.catalogEntry?.storePageURL != nil)
     }
 
     /// A package may leave a field out; then the store's row is better than an
@@ -73,7 +73,7 @@ struct ApplicationDetailSubjectTests {
     @Test func theStoreStandsInForWhatThePackageLeftBlank() {
         let subject = ApplicationDetailSubject(
             installed: installed(companyName: "", platforms: []),
-            store: store()
+            catalogEntry: store()
         )
 
         #expect(subject.developer == "Keynes on the store")
@@ -85,8 +85,8 @@ struct ApplicationDetailSubjectTests {
     /// the library — otherwise the same application would have two versions and
     /// two names depending on which list was tapped.
     @Test func bothWaysInAgreeWhenTheApplicationIsInBoth() {
-        let fromLibrary = ApplicationDetailSubject(installed: installed(), store: store())
-        let fromCatalog = ApplicationDetailSubject(store: store(), installed: installed())
+        let fromLibrary = ApplicationDetailSubject(installed: installed(), catalogEntry: store())
+        let fromCatalog = ApplicationDetailSubject(catalogEntry: store(), installed: installed())
 
         #expect(fromLibrary == fromCatalog)
     }
@@ -94,7 +94,7 @@ struct ApplicationDetailSubjectTests {
     /// In the store and not installed: nothing of the library's, and the
     /// store's own version is the only one there is.
     @Test func anApplicationOnlyInTheStoreIsDescribedByTheStore() {
-        let subject = ApplicationDetailSubject(store: store(), installed: nil)
+        let subject = ApplicationDetailSubject(catalogEntry: store(), installed: nil)
 
         #expect(subject.installed == nil)
         #expect(subject.version == "1.4.0")
@@ -106,9 +106,9 @@ struct ApplicationDetailSubjectTests {
     /// screen still has everything the package said, and simply offers no
     /// store.
     @Test func anApplicationTheStoreNeverListedStillHasItsPackage() {
-        let subject = ApplicationDetailSubject(installed: installed(), store: nil)
+        let subject = ApplicationDetailSubject(installed: installed(), catalogEntry: nil)
 
-        #expect(subject.store == nil)
+        #expect(subject.catalogEntry == nil)
         #expect(subject.name == "Watch Tools")
         #expect(subject.version == "1.3.0")
         #expect(subject.developer == "Keynes")

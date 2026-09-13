@@ -91,7 +91,7 @@ struct FeatureFeedbackTests {
     /// which has the button, sat there as though nothing had been asked.
     ///
     /// The failure itself is not covered here: `AppModel` calls
-    /// `PebbleDiagnostics.shared` with no seam to stand in for it, and
+    /// `DiagnosticLog.shared` with no seam to stand in for it, and
     /// `exportReport` writes into the temporary directory, which does not fail.
     /// What is covered is the field it lands in and the two things the success
     /// has to leave behind it.
@@ -175,7 +175,7 @@ struct FeatureFeedbackTests {
             client: MockWatchClient(),
             storageDirectory: StorageDirectory(url: directory),
             // Nothing registered with the stub, so every request is a 404.
-            appCatalog: AppCatalog(
+            appCatalog: ApplicationCatalog(
                 cacheURL: directory.appending(path: "catalog.json"),
                 session: StoreStubURLProtocol.session()
             )

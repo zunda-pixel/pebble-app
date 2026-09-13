@@ -139,13 +139,13 @@ struct GattServerTests {
     @Test func serviceUsesTheForwardTransportUUIDs() {
         // The phone hosts these when the watch has no protocol service of its
         // own; the values have to match what the watch looks for.
-        #expect(PebbleGattServer.serviceUUID.uuidString == "10000000-328E-0FBB-C642-1AA6699BDADA")
-        #expect(PebbleGattServer.dataCharacteristicUUID.uuidString == "10000001-328E-0FBB-C642-1AA6699BDADA")
-        #expect(PebbleGattServer.metaCharacteristicUUID.uuidString == "10000002-328E-0FBB-C642-1AA6699BDADA")
+        #expect(GATTServer.serviceUUID.uuidString == "10000000-328E-0FBB-C642-1AA6699BDADA")
+        #expect(GATTServer.dataCharacteristicUUID.uuidString == "10000001-328E-0FBB-C642-1AA6699BDADA")
+        #expect(GATTServer.metaCharacteristicUUID.uuidString == "10000002-328E-0FBB-C642-1AA6699BDADA")
     }
 
     @Test func sendingWithoutASubscribedWatchFails() {
-        let server = PebbleGattServer.shared
+        let server = GATTServer.shared
         #expect(!server.isSubscribed(centralID: "unknown-watch"))
         #expect(!server.send([0x01, 0x02], to: "unknown-watch"))
         // An unsubscribed watch falls back to the smallest possible payload.
@@ -159,17 +159,17 @@ struct PairingTests {
     @Test func connectivityStatusDecodesFlags() throws {
         // A watch that has just been reset: connected, not paired, not
         // encrypted, and no pairing error yet.
-        let fresh = try #require(PebbleConnectivityStatus(decoding: [0b1, 0, 0, 0]))
+        let fresh = try #require(ConnectivityStatus(decoding: [0b1, 0, 0, 0]))
         #expect(fresh.isConnected)
         #expect(!fresh.isPaired)
         #expect(!fresh.isEncrypted)
         #expect(!fresh.isReadyForProtocol)
 
-        let bonded = try #require(PebbleConnectivityStatus(decoding: [0b111, 0, 0, 0]))
+        let bonded = try #require(ConnectivityStatus(decoding: [0b111, 0, 0, 0]))
         #expect(bonded.isReadyForProtocol)
 
         // Paired but unencrypted means the phone forgot the bond.
-        let stale = try #require(PebbleConnectivityStatus(decoding: [0b10_0011, 0, 0, 8]))
+        let stale = try #require(ConnectivityStatus(decoding: [0b10_0011, 0, 0, 8]))
         #expect(stale.isPaired)
         #expect(!stale.isEncrypted)
         #expect(stale.hasRemoteAttemptedToUseStalePairing)
@@ -179,17 +179,17 @@ struct PairingTests {
 
     @Test func connectivityStatusRejectsTruncatedValues() {
         // Watches wedged in a bad state report a short value.
-        #expect(PebbleConnectivityStatus(decoding: []) == nil)
-        #expect(PebbleConnectivityStatus(decoding: [0b111, 0, 0]) == nil)
+        #expect(ConnectivityStatus(decoding: []) == nil)
+        #expect(ConnectivityStatus(decoding: [0b111, 0, 0]) == nil)
     }
 
     @Test func pairingTriggerAsksTheWatchForASecurityRequest() {
         // Only the watch can start bonding, so the default value sets the
         // force-security-request bit and nothing else.
-        #expect(PebblePairingTrigger.value() == [0b100])
-        #expect(PebblePairingTrigger.value(noSecurityRequest: true) == [0b10])
-        #expect(PebblePairingTrigger.value(pinAddress: true) == [0b101])
-        #expect(PebblePairingTrigger.value(watchAsGattServer: true) == [0b1_0100])
+        #expect(PairingTrigger.value() == [0b100])
+        #expect(PairingTrigger.value(noSecurityRequest: true) == [0b10])
+        #expect(PairingTrigger.value(pinAddress: true) == [0b101])
+        #expect(PairingTrigger.value(watchAsGattServer: true) == [0b1_0100])
     }
 }
 
@@ -967,7 +967,7 @@ struct NotificationAppsTests {
         )
         app.filterRules = [
             NotificationFilterRule(pattern: "ad", field: .body),
-            NotificationFilterRule(pattern: "Hi", field: .title, caseSensitive: true),
+            NotificationFilterRule(pattern: "Hi", field: .title, isCaseSensitive: true),
         ]
 
         let value = NotificationAppsCodec.value(for: app)
@@ -1451,7 +1451,7 @@ private actor FrameCollector {
     }
 }
 
-private actor StaticTranscriptionProvider: PebbleVoiceTranscriptionProvider {
+private actor StaticTranscriptionProvider: VoiceTranscriptionProvider {
     private let words: [VoiceTranscriptionWord]
     private let reminder: VoiceReminderOutcome
     private let servesReminders: Bool

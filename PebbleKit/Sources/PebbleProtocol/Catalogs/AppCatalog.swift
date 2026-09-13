@@ -139,7 +139,7 @@ public struct CatalogSnapshot: Codable, Equatable, Sendable {
     public var applications: [CatalogApplication]
 }
 
-public actor AppCatalog {
+public actor ApplicationCatalog {
     /// The store. The only one there is.
     ///
     /// This used to be a default the reader could replace in Settings, which
@@ -230,23 +230,23 @@ public actor AppCatalog {
             do {
                 return try await downloadFile(from: application.downloadURL, using: session)
             } catch HTTPFileDownloadError.insecureURL {
-                throw NotRetryable(AppCatalogError.insecureURL)
+                throw NotRetryable(ApplicationCatalogError.insecureURL)
             } catch let error as HTTPFileDownloadError {
                 throw error.isWorthAnotherAttempt
-                    ? AppCatalogError.invalidResponse
-                    : NotRetryable(AppCatalogError.invalidResponse)
+                    ? ApplicationCatalogError.invalidResponse
+                    : NotRetryable(ApplicationCatalogError.invalidResponse)
             } catch {
-                throw AppCatalogError.invalidResponse
+                throw ApplicationCatalogError.invalidResponse
             }
         }
         let attributes = try FileManager.default.attributesOfItem(atPath: temporaryURL.path)
         guard (attributes[.size] as? NSNumber)?.intValue ?? 0 <= 64 * 1_024 * 1_024 else {
-            throw AppCatalogError.packageTooLarge
+            throw ApplicationCatalogError.packageTooLarge
         }
         let data = try Data(contentsOf: temporaryURL, options: .mappedIfSafe)
         if let expected = application.sha256?.lowercased() {
             let actual = SHA256.hash(data: data).hexadecimalString
-            guard actual == expected else { throw AppCatalogError.checksumMismatch }
+            guard actual == expected else { throw ApplicationCatalogError.checksumMismatch }
         }
         let output = FileManager.default.temporaryDirectory.appending(path: "catalog-\(application.id.uuidString).pbw")
         try? FileManager.default.removeItem(at: output)
@@ -319,11 +319,11 @@ public actor AppCatalog {
             let (data, response) = try await session.data(for: request)
             if response.status == .notFound { return nil }
             guard response.status == .ok else {
-                let error = AppCatalogError.invalidResponse
+                let error = ApplicationCatalogError.invalidResponse
                 throw response.status.isWorthAnotherAttempt ? error : NotRetryable(error)
             }
             guard data.count <= 20 * 1_024 * 1_024 else {
-                throw NotRetryable(AppCatalogError.invalidResponse)
+                throw NotRetryable(ApplicationCatalogError.invalidResponse)
             }
             return data
         }
@@ -334,12 +334,12 @@ public actor AppCatalog {
             let request = HTTPRequest(method: .get, url: url, headerFields: [.accept: "application/json"])
             let (data, response) = try await session.data(for: request)
             guard response.status == .ok else {
-                let error = AppCatalogError.invalidResponse
+                let error = ApplicationCatalogError.invalidResponse
                 throw response.status.isWorthAnotherAttempt ? error : NotRetryable(error)
             }
             guard data.count <= 20 * 1_024 * 1_024 else {
                 // The feed is this size on purpose; it will be next time too.
-                throw NotRetryable(AppCatalogError.invalidResponse)
+                throw NotRetryable(ApplicationCatalogError.invalidResponse)
             }
             return data
         }
@@ -460,7 +460,7 @@ struct OfficialCatalogRelease: Decodable {
         case version
     }
 }
-public enum AppCatalogError: Error, Equatable, Sendable {
+public enum ApplicationCatalogError: Error, Equatable, Sendable {
     case invalidResponse
     case insecureURL
     case packageTooLarge

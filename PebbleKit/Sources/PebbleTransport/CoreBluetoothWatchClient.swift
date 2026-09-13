@@ -60,7 +60,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     /// transport on it, and nothing notices until the health check fails a
     /// minute later.
     var sessionRestartTimeoutTask: Task<Void, Never>?
-    var pendingDevice: DiscoveredWatch?
+    var pendingWatch: DiscoveredWatch?
     var activeWriteCharacteristic: CBCharacteristic?
     var activeBatteryCharacteristic: CBCharacteristic?
     var activePairingTriggerCharacteristic: CBCharacteristic?
@@ -143,7 +143,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         )
         // Watches inspect the phone's GATT database right after connecting, so
         // the phone-hosted protocol service has to exist before that.
-        PebbleGattServer.shared.start()
+        GATTServer.shared.start()
     }
 
     /// The watch to write to, once there is a session to write into. A connected
@@ -161,7 +161,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     /// which is indistinguishable from the watch going away.
     func cancelLink(_ peripheral: CBPeripheral, reason: String) {
         Task { [tag = clientTag] in
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 category: "pairing",
                 message: "[\(tag)] dropping link: \(reason)"
             )
@@ -218,20 +218,20 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
                 continue
             }
             discoveredPeripherals[id] = peripheral
-            let device = DiscoveredWatch(
+            let watch = DiscoveredWatch(
                 id: id,
                 name: peripheral.name ?? hint.name,
                 model: hint.model,
                 signalStrength: hint.signalStrength
             )
-            scanResults[id] = device
-            retrieved.append(device)
+            scanResults[id] = watch
+            retrieved.append(watch)
         }
         return retrieved
     }
 
     public func connect(
-        to device: DiscoveredWatch,
+        to watch: DiscoveredWatch,
         reportingPhase: @escaping @MainActor (WatchHandshakePhase) -> Void
     ) async throws -> ConnectedWatch {
         try await waitForBluetooth()
@@ -243,7 +243,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         // continuation: a phase reported against a connect that has already
         // finished would move the app off `connected`.
         handshakePhaseReporter = reportingPhase
-        if let connectedWatch, connectedWatch.id == device.id {
+        if let connectedWatch, connectedWatch.id == watch.id {
             return connectedWatch
         }
         reconnects.stop()
@@ -252,19 +252,19 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
             cancelLink(previousPeripheral, reason: "a manual connect superseded it")
             clearTransportState()
         }
-        if discoveredPeripherals[device.id] == nil {
-            _ = try await retrieveKnownWatches([device])
+        if discoveredPeripherals[watch.id] == nil {
+            _ = try await retrieveKnownWatches([watch])
         }
-        guard let peripheral = discoveredPeripherals[device.id] else {
+        guard let peripheral = discoveredPeripherals[watch.id] else {
             throw WatchConnectionError.watchNotFound
         }
 
         centralManager.stopScan()
-        pendingDevice = DiscoveredWatch(
-            id: device.id,
-            name: peripheral.name ?? device.name,
-            model: device.model,
-            signalStrength: device.signalStrength
+        pendingWatch = DiscoveredWatch(
+            id: watch.id,
+            name: peripheral.name ?? watch.name,
+            model: watch.model,
+            signalStrength: watch.signalStrength
         )
         peripheral.delegate = self
 
@@ -286,20 +286,20 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         }
     }
 
-    public func disconnect(from device: ConnectedWatch) async {
+    public func disconnect(from watch: ConnectedWatch) async {
         // Stop the reconnection machinery first: a scheduled retry captured
         // its peripheral by value and would otherwise undo this disconnect.
-        if reconnects.isFollowing(device.id) {
+        if reconnects.isFollowing(watch.id) {
             reconnects.stop()
         }
-        guard let peripheral = discoveredPeripherals[device.id]
-            ?? (connectedPeripheral?.watchID == device.id ? connectedPeripheral : nil) else {
+        guard let peripheral = discoveredPeripherals[watch.id]
+            ?? (connectedPeripheral?.watchID == watch.id ? connectedPeripheral : nil) else {
             return
         }
         if peripheral.state != .disconnected {
             // Only expect a disconnect callback when a link actually exists;
             // a stale marker would suppress reconnection after a later drop.
-            reconnects.expectDisconnect(of: device.id)
+            reconnects.expectDisconnect(of: watch.id)
         }
         stopHealthChecks()
         cancelLink(peripheral, reason: "the app asked to disconnect")
@@ -403,10 +403,10 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         scanTimeoutTask?.cancel()
         scanTimeoutTask = nil
 
-        let devices = scanResults.values.sorted { lhs, rhs in
+        let watches = scanResults.values.sorted { lhs, rhs in
             lhs.signalStrength > rhs.signalStrength
         }
-        scanContinuation?.resume(returning: devices)
+        scanContinuation?.resume(returning: watches)
         scanContinuation = nil
     }
 
@@ -422,7 +422,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         peripheral: CBPeripheral,
         information: WatchVersionInformation
     ) {
-        guard let device = pendingDevice else {
+        guard let watch = pendingWatch else {
             failConnection(.protocolNegotiationFailed)
             return
         }
@@ -431,10 +431,10 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         connectionTimeoutTask = nil
         let connectedWatch = ConnectedWatch(
             id: peripheral.watchID,
-            name: device.name,
+            name: watch.name,
             // The version's own platform byte wins; the discovered model is
             // the fallback for a platform this app has no table entry for.
-            model: WatchModel(hardwarePlatform: information.hardwarePlatform) ?? device.model,
+            model: WatchModel(hardwarePlatform: information.hardwarePlatform) ?? watch.model,
             batteryLevel: latestBatteryLevel,
             version: information
         )
@@ -443,9 +443,9 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         initialConnectionContinuation?.resume(returning: connectedWatch)
         connectionContinuation = nil
         handshakePhaseReporter = nil
-        pendingDevice = nil
+        pendingWatch = nil
         connectedPeripheral = peripheral
-        reconnects.follow(device)
+        reconnects.follow(watch)
         if initialConnectionContinuation == nil {
             eventContinuation?.yield(.watchUpdated(connectedWatch))
         }
@@ -462,7 +462,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         step: String
     ) {
         Task { [tag = clientTag] in
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 .error,
                 category: "pairing",
                 message: "[\(tag)] giving up while \(step)"
@@ -489,11 +489,11 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         // Withdraw the pending connect request: CoreBluetooth otherwise keeps
         // it queued forever and a late didConnect would create a session the
         // app no longer expects.
-        if let pending = pendingDevice,
+        if let pending = pendingWatch,
            let peripheral = discoveredPeripherals[pending.id] {
             cancelLink(peripheral, reason: "the connect attempt failed: \(error.logDescription)")
         }
-        pendingDevice = nil
+        pendingWatch = nil
         activeWriteCharacteristic = nil
         activeBatteryCharacteristic = nil
         connectedPeripheral = nil
@@ -511,7 +511,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
 
     func model(from advertisementData: [String: Any]) -> WatchModel? {
         let serviceUUIDs = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] ?? []
-        return PebbleAdvertisement.model(
+        return WatchAdvertisement.model(
             advertisesPebbleService: serviceUUIDs.contains(Self.ppogService)
                 || serviceUUIDs.contains(Self.pairingService),
             localName: advertisementData[CBAdvertisementDataLocalNameKey] as? String,
@@ -525,7 +525,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         recordPPoGPacket(packet, direction: "out")
         let bytes = try packet.encoded(for: .one)
         if setup.transport == .forward {
-            guard PebbleGattServer.shared.send(bytes, to: peripheral.identifier.uuidString) else {
+            guard GATTServer.shared.send(bytes, to: peripheral.identifier.uuidString) else {
                 throw WatchConnectionError.protocolNegotiationFailed
             }
             return
@@ -590,10 +590,10 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
             throw WatchConnectionError.disconnected
         }
 
-        Task { await PebbleDiagnostics.shared.recordFrame(direction: "out", frame: frame) }
+        Task { await DiagnosticLog.shared.recordFrame(direction: "out", frame: frame) }
         let bytes = try frame.encoded()
         let maximumPacketSize = setup.transport == .forward
-            ? PebbleGattServer.shared.maximumPacketSize(centralID: peripheral.identifier.uuidString)
+            ? GATTServer.shared.maximumPacketSize(centralID: peripheral.identifier.uuidString)
             : peripheral.maximumWriteValueLength(for: .withoutResponse)
         let actions = try session.enqueue(bytes, maximumPacketSize: maximumPacketSize)
         ppogSession = session
@@ -605,13 +605,13 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         _ frame: PebbleProtocolFrame,
         peripheral: CBPeripheral
     ) throws {
-        Task { await PebbleDiagnostics.shared.recordFrame(direction: "in", frame: frame) }
+        Task { await DiagnosticLog.shared.recordFrame(direction: "in", frame: frame) }
         if try answer(frame, peripheral: peripheral) { return }
         // A frame the app takes off `frames()` is answered, just not here, and
         // the audio endpoint alone sends fifty a second.
         guard CompanionFrame(endpoint: frame.endpoint) == nil else { return }
         Task { [frame, tag = clientTag] in
-            await PebbleDiagnostics.shared.recordUnansweredFrame(frame, tag: tag)
+            await DiagnosticLog.shared.recordUnansweredFrame(frame, tag: tag)
         }
     }
 
@@ -721,10 +721,10 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     ) throws -> Bool {
         // The watch changes what it reports when a language pack is installed,
         // which is how the app finds out.
-        if pendingDevice == nil, let device = connectedWatch {
+        if pendingWatch == nil, let watch = connectedWatch {
             clearPendingHealthCheck()
             let information = try WatchVersionCodec.decode(frame)
-            var updated = device
+            var updated = watch
             // The third place that used to copy these across one at a time, and
             // the one that would have been missed by a reader adding a field:
             // `hardwareRevision` was added to the other two and not to this, so
@@ -734,28 +734,28 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
             // The platform byte can change under the app — a watch flashed with
             // firmware for another board reports the new one — so the model is
             // resolved again rather than left at what the scan guessed.
-            updated.model = WatchModel(hardwarePlatform: information.hardwarePlatform) ?? device.model
+            updated.model = WatchModel(hardwarePlatform: information.hardwarePlatform) ?? watch.model
             connectedWatch = updated
             // The health check asks for this once a minute and the answer is
             // almost always the same one; announcing it anyway had the app
             // rewriting its watch library every minute. A session started over
             // is the exception: the app is waiting to hear that the transport
             // works before it re-sends anything.
-            if updated != device || isRestartingSession {
+            if updated != watch || isRestartingSession {
                 eventContinuation?.yield(.watchUpdated(updated))
             }
             isRestartingSession = false
             return true
         }
 
-        guard pendingDevice != nil else { return false }
+        guard pendingWatch != nil else { return false }
         let information = try WatchVersionCodec.decode(frame)
         Task { [
             tag = clientTag,
             summary = information.diagnosticSummary,
             recovery = information.isRunningRecoveryFirmware
         ] in
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 recovery ? .error : .info,
                 category: "connection",
                 message: "[\(tag)] \(summary)"
@@ -869,7 +869,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     /// what it has to.
     func abandonSession(on peripheral: CBPeripheral, because reason: String) {
         Task { [tag = clientTag] in
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 .warning,
                 category: "ppog",
                 message: "[\(tag)] starting the session over: \(reason)"
@@ -897,8 +897,8 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
             guard !Task.isCancelled, self?.ppogSession == nil else { return }
             self?.cancelLink(peripheral, reason: "the session was never started over")
         }
-        if let device = connectedWatch {
-            eventContinuation?.yield(.reconnecting(watchID: device.id))
+        if let watch = connectedWatch {
+            eventContinuation?.yield(.reconnecting(watchID: watch.id))
         }
     }
 
@@ -987,7 +987,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         }
         refusedNotificationAccess.insert(peripheral.identifier)
         Task { [tag = clientTag] in
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 .warning,
                 category: "pairing",
                 message: "[\(tag)] the link was refused with notification sharing required; asking again without it"
@@ -997,17 +997,17 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         return true
     }
 
-    func reconnect(to device: DiscoveredWatch, using peripheral: CBPeripheral) {
+    func reconnect(to watch: DiscoveredWatch, using peripheral: CBPeripheral) {
         reconnects.cancelSchedule()
         guard centralManager.state == .poweredOn else {
-            eventContinuation?.yield(.reconnecting(watchID: device.id))
-            scheduleReconnect(to: device, using: peripheral)
+            eventContinuation?.yield(.reconnecting(watchID: watch.id))
+            scheduleReconnect(to: watch, using: peripheral)
             return
         }
-        pendingDevice = device
+        pendingWatch = watch
         reconnects.beginAutomaticAttempt()
         peripheral.delegate = self
-        eventContinuation?.yield(.reconnecting(watchID: device.id))
+        eventContinuation?.yield(.reconnecting(watchID: watch.id))
         centralManager.connect(peripheral, options: connectOptions(for: peripheral))
 
         connectionTimeoutTask?.cancel()
@@ -1022,14 +1022,14 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
 
     /// Stops chasing a watch whose links keep dying in the handshake, and says
     /// so: the reader was told "Reconnecting…" for as long as they watched.
-    func giveUpReconnecting(to device: DiscoveredWatch) {
+    func giveUpReconnecting(to watch: DiscoveredWatch) {
         let attempts = reconnects.failedHandshakes
         reconnects.stop()
         connectionTimeoutTask?.cancel()
         connectionTimeoutTask = nil
-        pendingDevice = nil
-        Task { [tag = clientTag, name = device.name] in
-            await PebbleDiagnostics.shared.record(
+        pendingWatch = nil
+        Task { [tag = clientTag, name = watch.name] in
+            await DiagnosticLog.shared.record(
                 .error,
                 category: "connection",
                 message: "[\(tag)] giving up on \(name):"
@@ -1039,16 +1039,16 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         eventContinuation?.yield(.disconnected(.handshakeKeptFailing))
     }
 
-    func scheduleReconnect(to device: DiscoveredWatch, using peripheral: CBPeripheral) {
+    func scheduleReconnect(to watch: DiscoveredWatch, using peripheral: CBPeripheral) {
         connectionTimeoutTask?.cancel()
         connectionTimeoutTask = nil
         reconnects.schedule { [weak self] in
-            self?.reconnect(to: device, using: peripheral)
+            self?.reconnect(to: watch, using: peripheral)
         }
     }
 
     func resumeReconnectAfterPowerOn() {
-        guard let device = reconnects.watch,
+        guard let watch = reconnects.watch,
               connectedWatch == nil,
               connectionContinuation == nil else {
             return
@@ -1056,14 +1056,14 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         Task { [weak self] in
             guard let self else { return }
             // The pre-power-cycle CBPeripheral may be invalid; look it up again.
-            _ = try? await self.retrieveKnownWatches([device])
-            guard self.reconnects.watch?.id == device.id,
+            _ = try? await self.retrieveKnownWatches([watch])
+            guard self.reconnects.watch?.id == watch.id,
                   self.connectedWatch == nil,
                   self.connectionContinuation == nil,
-                  let peripheral = self.discoveredPeripherals[device.id] else {
+                  let peripheral = self.discoveredPeripherals[watch.id] else {
                 return
             }
-            self.reconnect(to: device, using: peripheral)
+            self.reconnect(to: watch, using: peripheral)
         }
     }
 
@@ -1073,12 +1073,12 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         }
 
         latestBatteryLevel = batteryLevel
-        guard var device = connectedWatch else {
+        guard var watch = connectedWatch else {
             return
         }
-        device.batteryLevel = batteryLevel
-        connectedWatch = device
-        eventContinuation?.yield(.watchUpdated(device))
+        watch.batteryLevel = batteryLevel
+        connectedWatch = watch
+        eventContinuation?.yield(.watchUpdated(watch))
     }
 
     private func observeSystemTimeChanges() {

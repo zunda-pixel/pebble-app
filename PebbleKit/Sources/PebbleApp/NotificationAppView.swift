@@ -47,7 +47,7 @@ struct NotificationAppContent<RulesDestination: View>: View {
     var app: NotificationSourceApp
     var feedback: FeatureFeedback?
     var setMute: (NotificationAppMuteState) -> Void
-    var setIcon: (PebbleTimelineIcon?) -> Void
+    var setIcon: (TimelineIcon?) -> Void
     var setColours: (_ background: PebbleColor?, _ foreground: PebbleColor?) -> Void
     var setVibePattern: (NotificationVibePattern?) -> Void
     /// Older firmware plays its own buzz and cannot be told another.
@@ -105,9 +105,9 @@ struct NotificationAppContent<RulesDestination: View>: View {
                     get: { current.icon },
                     set: { icon in setIcon(icon) }
                 )) {
-                    Text("Chosen by the Watch").tag(PebbleTimelineIcon?.none)
-                    ForEach(PebbleTimelineIcon.choosable, id: \.self) { icon in
-                        Text(icon.title).tag(PebbleTimelineIcon?.some(icon))
+                    Text("Chosen by the Watch").tag(TimelineIcon?.none)
+                    ForEach(TimelineIcon.choosable, id: \.self) { icon in
+                        Text(icon.title).tag(TimelineIcon?.some(icon))
                     }
                 }
             } header: {

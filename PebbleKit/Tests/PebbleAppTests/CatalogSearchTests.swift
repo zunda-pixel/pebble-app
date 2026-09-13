@@ -61,8 +61,8 @@ struct CatalogSearchTests {
         let feedURL = URL(string: "https://stub.example/\(UUID().uuidString)/api")!
         var bulkURL: URL { feedURL.appending(path: "v1/apps/bulk") }
 
-        func catalog(in directory: URL) -> AppCatalog {
-            AppCatalog(
+        func catalog(in directory: URL) -> ApplicationCatalog {
+            ApplicationCatalog(
                 cacheURL: directory.appending(path: "catalog.json"),
                 session: StoreStubURLProtocol.session(),
                 searchURL: searchURL,

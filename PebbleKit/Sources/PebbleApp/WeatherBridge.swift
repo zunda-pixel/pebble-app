@@ -85,7 +85,7 @@ struct WeatherBridge {
 
     // The watch has nine icons, so conditions are grouped by what they look like
     // out of a window: how wet, how frozen, how violent.
-    static func watchType(for condition: WeatherCondition, isDaylight: Bool) -> WeatherType {
+    static func watchType(for condition: WeatherCondition, isDaylight: Bool) -> WeatherKind {
         switch condition {
         case .clear, .hot:
             isDaylight ? .sun : .partlyCloudy

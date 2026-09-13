@@ -205,7 +205,7 @@ extension AppModel {
             firmwareUpdateTask = nil
             connection.endTransfer()
         }
-        await PebbleDiagnostics.shared.record(
+        await DiagnosticLog.shared.record(
             category: "firmware",
             message: "sending \(package.manifest.firmware.versionTag ?? "firmware")"
                 + " to \(connection.watch.name)"
@@ -214,7 +214,7 @@ extension AppModel {
         do {
             try await task.value
         } catch {
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 .warning,
                 category: "firmware",
                 message: "the transfer stopped: \(error.localizedDescription)"
@@ -231,7 +231,7 @@ extension AppModel {
         try await pendingFirmwareUpdateStore.updatePhase(.awaitingRestart)
         firmware.journal = try await pendingFirmwareUpdateStore.journal()
         firmware.feedback = .progress("Firmware installed. Waiting for the watch to restart.")
-        await PebbleDiagnostics.shared.record(
+        await DiagnosticLog.shared.record(
             category: "firmware",
             message: "the watch took the firmware and is restarting"
         )
@@ -246,8 +246,8 @@ extension AppModel {
     /// transfer finishes, and the copy held here is what the screens read: left
     /// at `awaitingRestart` it offers Stop and Try Again for an update that is
     /// over, and the watch's own row goes on saying an update is waiting.
-    func noteFirmwareUpdateFinished(on device: ConnectedWatch) {
-        guard firmware.journal?.watchID == device.id,
+    func noteFirmwareUpdateFinished(on watch: ConnectedWatch) {
+        guard firmware.journal?.watchID == watch.id,
               firmware.journal?.phase == .awaitingRestart else { return }
         firmware.journal = nil
         firmware.feedback = nil
@@ -269,11 +269,11 @@ extension AppModel {
 
     // The only case that runs unasked, which is the whole point of staging one.
     func resumePendingFirmwareUpdate(on connection: WatchConnection) async {
-        let device = connection.watch
+        let watch = connection.watch
         guard let package = try? await pendingFirmwareUpdateStore.package(),
               let journal = try? await pendingFirmwareUpdateStore.journal(),
-              journal.watchID == device.id,
-              journal.hardwareRevision == device.board?.rawValue,
+              journal.watchID == watch.id,
+              journal.hardwareRevision == watch.board?.rawValue,
               journal.packageSHA256 == package.sha256,
               journal.phase != .cancelled else { return }
         firmware.journal = journal
@@ -323,13 +323,13 @@ extension AppModel {
     /// how "the target version changed" cleans up after the old one.
     func checkFirmwareUpdateUnattended(on connection: WatchConnection) async {
         guard notifyAboutFirmwareUpdatesEnabled else { return }
-        let device = connection.watch
+        let watch = connection.watch
         // A watch in recovery firmware is mid-rescue: what it needs is the
         // resume path with its confirmation, not an advertisement.
-        guard !device.isRunningRecoveryFirmware,
-              let board = device.board,
-              let running = device.firmwareVersion else { return }
-        let cacheKey = "\(device.id.rawValue)|\(running)"
+        guard !watch.isRunningRecoveryFirmware,
+              let board = watch.board,
+              let running = watch.firmwareVersion else { return }
+        let cacheKey = "\(watch.id.rawValue)|\(running)"
         if let checked = firmwareCheckedAt[cacheKey],
            Date().timeIntervalSince(checked) < 15 * 60 {
             return
@@ -342,7 +342,7 @@ extension AppModel {
             // answered "up to date". Said in the log, because a check that
             // fails silently on every connect looks exactly like one that
             // never ran.
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 .error,
                 category: "firmware",
                 message: "The update check could not reach the catalogue: \(String(reflecting: error))"
@@ -351,15 +351,15 @@ extension AppModel {
         }
         firmwareCheckedAt[cacheKey] = Date()
         guard Self.isFirmwareVersion(release.versionTag, newerThan: running) else { return }
-        guard Defaults[.notifiedFirmwareVersions][device.id.rawValue] != release.versionTag else {
+        guard Defaults[.notifiedFirmwareVersions][watch.id.rawValue] != release.versionTag else {
             return
         }
-        Defaults[.notifiedFirmwareVersions][device.id.rawValue] = release.versionTag
+        Defaults[.notifiedFirmwareVersions][watch.id.rawValue] = release.versionTag
         await localNotifier.post(
-            identifier: Self.firmwareNotificationIdentifier(for: device.id),
+            identifier: Self.firmwareNotificationIdentifier(for: watch.id),
             title: String(localized: "Firmware Update", bundle: .module),
             body: String(
-                localized: "PebbleOS \(release.versionTag) is available for \(device.name).",
+                localized: "PebbleOS \(release.versionTag) is available for \(watch.name).",
                 bundle: .module
             )
         )

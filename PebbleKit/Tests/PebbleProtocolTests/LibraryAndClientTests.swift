@@ -90,10 +90,10 @@ struct LibraryAndClientTests {
     @Test
     func mockClientDiscoversOnlySupportedModels() async throws {
         let client = MockWatchClient()
-        let devices = try await client.scan()
+        let watches = try await client.scan()
 
-        #expect(devices.count == WatchModel.allCases.count)
-        #expect(Set(devices.map(\.model)) == Set(WatchModel.allCases))
+        #expect(watches.count == WatchModel.allCases.count)
+        #expect(Set(watches.map(\.model)) == Set(WatchModel.allCases))
     }
 
     @Test
@@ -125,7 +125,7 @@ struct LibraryAndClientTests {
 
     @Test
     func diagnosticsKeepsBoundedHistoryAndExportsReport() async throws {
-        let diagnostics = PebbleDiagnostics(maximumEntryCount: 2)
+        let diagnostics = DiagnosticLog(maximumEntryCount: 2)
         // Frames go to the log's own packet channel and nowhere near the report
         // a reader shares: fifty a second of them would be the whole of it.
         await diagnostics.recordFrame(
@@ -144,7 +144,7 @@ struct LibraryAndClientTests {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let reportURL = try await diagnostics.exportReport(
-            device: nil,
+            watch: nil,
             applications: [],
             directory: directory
         )
@@ -170,7 +170,7 @@ struct LibraryAndClientTests {
     @Test
     func mockClientRecordsTimelineNotifications() async throws {
         let client = MockWatchClient()
-        let notification = PebbleTimelineNotification(
+        let notification = TimelineNotification(
             parentApplicationID: UUID(),
             title: "Title",
             body: "Body",
@@ -191,7 +191,7 @@ struct SavedWatchStoreTests {
         let fileURL = directory.appending(path: "watches.json")
         defer { try? FileManager.default.removeItem(at: directory) }
         let library = SavedWatchStore(fileURL: fileURL)
-        let device = ConnectedWatch(
+        let watch = ConnectedWatch(
             id: WatchID("watch-1"),
             name: "Pebble QEMU",
             model: .pebbleTime2,
@@ -203,17 +203,17 @@ struct SavedWatchStoreTests {
             )
         )
 
-        var watches = try await library.record(device)
+        var watches = try await library.record(watch)
         #expect(watches.count == 1)
         #expect(watches[0].automaticallyConnects)
         #expect(watches[0].lastBatteryLevel == 75)
 
-        watches = try await library.setAutomaticallyConnects(false, watchID: device.id)
+        watches = try await library.setAutomaticallyConnects(false, watchID: watch.id)
         #expect(!watches[0].automaticallyConnects)
 
         let reloaded = SavedWatchStore(fileURL: fileURL)
         #expect(try await reloaded.allWatches()[0].firmwareVersion == "v1")
-        #expect(try await reloaded.remove(watchID: device.id).isEmpty)
+        #expect(try await reloaded.remove(watchID: watch.id).isEmpty)
     }
 
     /// A connection that does not know the hardware revision does not erase it.
@@ -312,7 +312,7 @@ struct CompanionStorageTests {
             bytes: [1, 2, 3],
             objectType: .file,
             appBankID: 0,
-            filename: PebbleLanguagePackCatalog.filename
+            filename: LanguagePackCatalog.filename
         )
         guard case .send(let initialization) = try session.start() else {
             Issue.record("Expected a file initialization frame")
@@ -348,7 +348,7 @@ struct CompanionStorageTests {
     }
 
     @Test func languagePacksFallBackToThePebble2WhereABoardHasNoneOfItsOwn() {
-        let packs = PebbleLanguagePackCatalog.packs(for: .obelixPVT)
+        let packs = LanguagePackCatalog.packs(for: .obelixPVT)
 
         // Arabic is built for this board; everything else is a silk pack.
         let arabic = packs.filter { $0.locale == "ar_SA" }
@@ -525,8 +525,8 @@ struct CompanionStorageTests {
         // Past the header and the record's own identifiers: key, value length,
         // then the item's id, its app's id, the time and the duration.
         let typeIndex = 5 + 16 + 2 + 16 + 16 + 4 + 2
-        #expect(pin.payload[typeIndex] == TimelineItemType.pin.rawValue)
-        #expect(alarm.payload[typeIndex] == TimelineItemType.reminder.rawValue)
+        #expect(pin.payload[typeIndex] == TimelineItemKind.pin.rawValue)
+        #expect(alarm.payload[typeIndex] == TimelineItemKind.reminder.rawValue)
     }
 
     @Test func aPinsTextIsCutOnACharacterAndNotInsideOne() throws {
@@ -690,7 +690,7 @@ struct CompanionStorageTests {
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         let tenPM = calendar.date(from: DateComponents(year: 2026, month: 1, day: 1, hour: 22))!
         let noon = calendar.date(from: DateComponents(year: 2026, month: 1, day: 1, hour: 12))!
-        let quiet = NotificationDeliveryPreferences(quietHoursEnabled: true, quietHoursStart: 21, quietHoursEnd: 7)
+        let quiet = NotificationDeliveryPreferences(areQuietHoursEnabled: true, quietHoursStart: 21, quietHoursEnd: 7)
         #expect(!quiet.permits(applicationID: id, at: tenPM, calendar: calendar))
         #expect(quiet.permits(applicationID: id, at: noon, calendar: calendar))
         let muted = NotificationDeliveryPreferences(mutedApplicationIDs: [id])
@@ -805,7 +805,7 @@ struct CompanionStorageTests {
         )
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try JSONEncoder().encode(snapshot).write(to: url, options: .atomic)
-        let catalog = AppCatalog(cacheURL: url)
+        let catalog = ApplicationCatalog(cacheURL: url)
         #expect(try await catalog.cachedSnapshot() == snapshot)
     }
 
@@ -866,7 +866,7 @@ struct CompanionStorageTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try Data([0xFF, 0x00, 0x01]).write(to: url)
-        let catalog = AppCatalog(cacheURL: url)
+        let catalog = ApplicationCatalog(cacheURL: url)
 
         #expect(try await catalog.cachedSnapshot() == nil)
         #expect(!FileManager.default.fileExists(atPath: url.path))
@@ -1116,8 +1116,8 @@ struct StoreLookupByUUIDTests {
     }
     """
 
-    private func catalog() -> AppCatalog {
-        AppCatalog(
+    private func catalog() -> ApplicationCatalog {
+        ApplicationCatalog(
             cacheURL: FileManager.default.temporaryDirectory.appending(path: "\(UUID().uuidString).json"),
             session: StubURLProtocol.session()
         )

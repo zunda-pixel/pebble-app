@@ -17,7 +17,7 @@ extension AppModel {
             items = try await remindersAppStore.reminders()
         } catch {
             timeline.reminderFeedback = .failure("The Reminders app could not be read.")
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 .error,
                 category: "timeline",
                 message: "the Reminders app could not be read: \(String(reflecting: error))"
@@ -59,7 +59,7 @@ extension AppModel {
             mirrored[reminder.id] = try await remindersAppStore.add(reminder)
             try await reminderStore.setMirroredIdentifiers(mirrored)
         } catch {
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 .error,
                 category: "timeline",
                 message: "the Reminders app did not take \(reminder.title): \(String(reflecting: error))"
@@ -79,7 +79,7 @@ extension AppModel {
                 mirrored[id] = nil
                 changed = true
             } catch {
-                await PebbleDiagnostics.shared.record(
+                await DiagnosticLog.shared.record(
                     .error,
                     category: "timeline",
                     message: "the Reminders app kept a reminder that is gone here: "

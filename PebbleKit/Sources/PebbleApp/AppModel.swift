@@ -181,8 +181,8 @@ public final class AppModel {
     /// deleting one by hand would only have the next read put it back.
     let calendarReminderStore: TimelinePinStore
     let healthStore: WatchHealthStore
-    let appCatalog: AppCatalog
-    let languagePackCatalog = PebbleLanguagePackCatalog()
+    let appCatalog: ApplicationCatalog
+    let languagePackCatalog = LanguagePackCatalog()
     let weatherBridge = WeatherBridge()
     // Held as a function so a test can answer for some places and refuse for
     // others, which WeatherKit itself cannot be asked to produce.
@@ -253,7 +253,7 @@ public final class AppModel {
     @ObservationIgnored var needsApplicationSynchronization = false
     @ObservationIgnored var hasStarted = false
     @ObservationIgnored var recentNotificationFingerprints: [String: Date] = [:]
-    @ObservationIgnored var pendingNotifications: [PendingDelivery<PebbleTimelineNotification>] = []
+    @ObservationIgnored var pendingNotifications: [PendingDelivery<TimelineNotification>] = []
     // Both the app coming forward and a watch finishing its synchronization ask
     // for a flush; two at once hand the watch everything twice.
     @ObservationIgnored var pendingNotificationFlush: Task<Void, Never>?
@@ -299,7 +299,7 @@ public final class AppModel {
         watchStore: SavedWatchStore? = nil,
         appGlanceStore: AppGlanceStore? = nil,
         reminderStore: TimelinePinStore? = nil,
-        appCatalog: AppCatalog? = nil,
+        appCatalog: ApplicationCatalog? = nil,
         clientFactory: (@MainActor (WatchID) -> any WatchClient)? = nil,
         localNotifier: (any LocalNotifying)? = nil,
         firmwareCatalog: PebbleOSFirmwareCatalog? = nil
@@ -326,7 +326,7 @@ public final class AppModel {
         healthStore = WatchHealthStore(directory: storageDirectory)
         // Passed in for the same reason as the stores above: a test that has to
         // answer for the store needs to hold the catalogue the model holds.
-        self.appCatalog = appCatalog ?? AppCatalog(directory: storageDirectory)
+        self.appCatalog = appCatalog ?? ApplicationCatalog(directory: storageDirectory)
         pendingNotificationStore = PendingNotificationStore(directory: storageDirectory)
         sentNotificationStore = SentNotificationStore(directory: storageDirectory)
         notificationPreferenceStore = NotificationPreferenceStore(directory: storageDirectory)
@@ -385,7 +385,7 @@ public final class AppModel {
 
     public func applicationDidBecomeActive() async {
         await start()
-        await PebbleDiagnostics.shared.record(category: "lifecycle", message: "Application became active")
+        await DiagnosticLog.shared.record(category: "lifecycle", message: "Application became active")
         // Coming to the foreground is one of the few moments iOS promises the
         // app is running, which makes it the reliable one of the staleness
         // triggers.
@@ -421,26 +421,26 @@ public final class AppModel {
             await loadSavedWatches()
             // Asking for a watch is the moment the radio is worth its dialog.
             scannerClient.startBluetooth()
-            var devices = try await scannerClient.scan()
+            var scanned = try await scannerClient.scan()
             let connectedIDs = Set(connections.map(\.watch.id))
             let missingSavedWatches = watches.saved
                 .filter { saved in
-                    !connectedIDs.contains(saved.id) && !devices.contains { $0.id == saved.id }
+                    !connectedIDs.contains(saved.id) && !scanned.contains { $0.id == saved.id }
                 }
                 .map { saved in
                     DiscoveredWatch(id: saved.id, name: saved.name, model: saved.model, signalStrength: 0)
                 }
             if !missingSavedWatches.isEmpty,
                let retrieved = try? await scannerClient.retrieveKnownWatches(missingSavedWatches) {
-                devices.append(contentsOf: retrieved)
+                scanned.append(contentsOf: retrieved)
             }
-            discoveredWatches = devices.filter { !connectedIDs.contains($0.id) }
+            discoveredWatches = scanned.filter { !connectedIDs.contains($0.id) }
             refreshConnectionState()
             let automaticTargets = discoveredWatches.filter { discovered in
                 watches.saved.contains { $0.id == discovered.id && $0.automaticallyConnects }
             }
-            for device in automaticTargets {
-                await connect(to: device)
+            for watch in automaticTargets {
+                await connect(to: watch)
             }
         } catch let error as WatchConnectionError {
             if connections.isEmpty {
@@ -462,40 +462,40 @@ public final class AppModel {
         ))
     }
 
-    public func connect(to device: DiscoveredWatch) async {
-        guard !connectingWatchIDs.contains(device.id),
-              !connections.contains(where: { $0.watch.id == device.id }) else {
+    public func connect(to watch: DiscoveredWatch) async {
+        guard !connectingWatchIDs.contains(watch.id),
+              !connections.contains(where: { $0.watch.id == watch.id }) else {
             return
         }
-        connectingWatchIDs.insert(device.id)
-        connectionFailures[device.id] = nil
+        connectingWatchIDs.insert(watch.id)
+        connectionFailures[watch.id] = nil
         refreshConnectionState()
-        Task { [id = device.id] in
-            await PebbleDiagnostics.shared.record(
+        Task { [id = watch.id] in
+            await DiagnosticLog.shared.record(
                 category: "connection",
                 message: "connect requested for \(id)"
             )
         }
         defer {
-            connectingWatchIDs.remove(device.id)
-            negotiatingWatchIDs.remove(device.id)
+            connectingWatchIDs.remove(watch.id)
+            negotiatingWatchIDs.remove(watch.id)
             refreshConnectionState()
         }
 
-        let connectionClient = clientFactory(device.id)
+        let connectionClient = clientFactory(watch.id)
         do {
-            let connectedWatch = try await connectionClient.connect(to: device) { [weak self] _ in
+            let connectedWatch = try await connectionClient.connect(to: watch) { [weak self] _ in
                 // Both phases mean the same thing to a screen: the link is up
                 // and the watch has not finished answering. They are reported
                 // separately because a watch that reaches the first and never
                 // the second is one whose protocol service is unusable, and
                 // the log needs to tell those apart.
                 guard let self else { return }
-                self.negotiatingWatchIDs.insert(device.id)
+                self.negotiatingWatchIDs.insert(watch.id)
                 self.refreshConnectionState()
             }
             lastConnectionError = nil
-            connectionFailures[device.id] = nil
+            connectionFailures[watch.id] = nil
             let connection = WatchConnection(
                 client: connectionClient,
                 watch: connectedWatch,
@@ -510,26 +510,26 @@ public final class AppModel {
                     await self?.handleCompanionFrame(frame, from: connection)
                 }
             )
-            discoveredWatches.removeAll { $0.id == device.id }
-            watches.unknownBonded.removeAll { $0.id == device.id }
+            discoveredWatches.removeAll { $0.id == watch.id }
+            watches.unknownBonded.removeAll { $0.id == watch.id }
             // Leaving the id here until this function returns would rank the whole
             // post-connect synchronization as "connecting".
-            connectingWatchIDs.remove(device.id)
+            connectingWatchIDs.remove(watch.id)
             refreshConnectionState()
             await recordConnectedWatch(connectedWatch)
             await restorePendingNotifications()
-            await PebbleDiagnostics.shared.record(category: "connection", message: "Watch connected")
+            await DiagnosticLog.shared.record(category: "connection", message: "Watch connected")
             await synchronizeEverything(on: connection)
         } catch let error as WatchConnectionError {
             lastConnectionError = error
-            connectionFailures[device.id] = error
+            connectionFailures[watch.id] = error
             if !connections.isEmpty {
                 watches.feedback = .failure(error.message)
             }
-            await PebbleDiagnostics.shared.record(.error, category: "connection", message: error.logDescription)
+            await DiagnosticLog.shared.record(.error, category: "connection", message: error.logDescription)
         } catch {
             lastConnectionError = .protocolNegotiationFailed
-            connectionFailures[device.id] = .protocolNegotiationFailed
+            connectionFailures[watch.id] = .protocolNegotiationFailed
         }
     }
 
@@ -564,12 +564,12 @@ public final class AppModel {
 
     func handleEvent(_ event: WatchClientEvent, from connection: WatchConnection) {
         switch event {
-        case .watchUpdated(let device):
+        case .watchUpdated(let watch):
             let needsResync = connection.consumePostReconnectSync()
             refreshConnectionState()
             Task { [weak self] in
-                await self?.trackChargeLevel(of: device)
-                await self?.recordConnectedWatch(device)
+                await self?.trackChargeLevel(of: watch)
+                await self?.recordConnectedWatch(watch)
             }
             guard needsResync else { return }
             Task { [weak self] in
@@ -668,7 +668,7 @@ public final class AppModel {
             watches.feedback = .failure(
                 "This watch started its recovery firmware. It works again once PebbleOS is installed."
             )
-            await PebbleDiagnostics.shared.record(
+            await DiagnosticLog.shared.record(
                 .error,
                 category: "connection",
                 message: "Skipping synchronization: the watch is in recovery firmware"

@@ -3,7 +3,7 @@ import MemberwiseInit
 
 /// The firmware has one icon per case and nothing else, so anything outside
 /// this list has to be mapped onto it.
-public enum WeatherType: UInt8, Equatable, Sendable, CaseIterable {
+public enum WeatherKind: UInt8, Equatable, Sendable, CaseIterable {
     case partlyCloudy = 0
     case cloudyDay = 1
     case lightSnow = 2
@@ -26,10 +26,10 @@ public struct WeatherReport: Equatable, Identifiable, Sendable {
     public var locationName: String
     public var isCurrentLocation: Bool
     public var currentTemperature: Int16
-    public var currentType: WeatherType
+    public var currentType: WeatherKind
     public var todayHigh: Int16
     public var todayLow: Int16
-    public var tomorrowType: WeatherType
+    public var tomorrowType: WeatherKind
     public var tomorrowHigh: Int16
     public var tomorrowLow: Int16
     public var shortPhrase: String
@@ -37,7 +37,7 @@ public struct WeatherReport: Equatable, Identifiable, Sendable {
     /// The day after tomorrow, for the timeline pins alone: the Weather DB
     /// record is version 3 and carries two days, so none of these three reach
     /// the wire. Nil where the forecast did not run that far.
-    public var dayAfterTomorrowType: WeatherType? = nil
+    public var dayAfterTomorrowType: WeatherKind? = nil
     public var dayAfterTomorrowHigh: Int16? = nil
     public var dayAfterTomorrowLow: Int16? = nil
 }

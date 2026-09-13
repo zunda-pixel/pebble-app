@@ -4,14 +4,14 @@ import Retry
 import SwiftUI
 
 extension AppModel {
-    public func languagePacks(watchID: WatchID? = nil) -> [PebbleLanguagePack] {
+    public func languagePacks(watchID: WatchID? = nil) -> [LanguagePack] {
         guard let board = board(for: watchID) else { return [] }
-        return PebbleLanguagePackCatalog.packs(for: board)
+        return LanguagePackCatalog.packs(for: board)
     }
 
     // Fetched before the watch is asked for anything: finding out afterwards that
     // it went away beats holding a transfer open through a download.
-    public func installLanguagePack(_ pack: PebbleLanguagePack, watchID: WatchID? = nil) async {
+    public func installLanguagePack(_ pack: LanguagePack, watchID: WatchID? = nil) async {
         guard let connection = connection(for: watchID), connection.isConnected else {
             language.feedback = .failure("Connect the watch to change its language.")
             return
@@ -65,7 +65,7 @@ extension AppModel {
         }
         do {
             try await retry(with: .watchWork) {
-                try await connection.client.installFile(bytes, filename: PebbleLanguagePackCatalog.filename)
+                try await connection.client.installFile(bytes, filename: LanguagePackCatalog.filename)
             }
             // The watch does not restart: it notices the file, reloads it and says so on
             // its own screen. Nothing it reports about itself changes until it is asked.

@@ -8,7 +8,7 @@ extension CBPeripheral {
     /// CoreBluetooth's identifier is per host rather than the watch's own, which
     /// is exactly what a `WatchID` is — so this is the one place the conversion
     /// happens, rather than `identifier.uuidString` at thirty call sites.
-    /// `PebbleGattServer` keys by the same string under its own name, because
+    /// `GATTServer` keys by the same string under its own name, because
     /// there a watch is a central.
     var watchID: WatchID {
         WatchID(identifier.uuidString)
