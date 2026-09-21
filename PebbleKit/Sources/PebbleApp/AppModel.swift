@@ -1,4 +1,5 @@
 public import PebbleProtocol
+import CoreLocation
 import Defaults
 public import Foundation
 import Observation
@@ -187,9 +188,9 @@ public final class AppModel {
     // Held as a function so a test can answer for some places and refuse for
     // others, which WeatherKit itself cannot be asked to produce.
     @ObservationIgnored
-    var fetchWeatherReport: (WeatherPlace, Bool) async throws -> WeatherReport = {
-        place, usesFahrenheit in
-        try await WeatherBridge().report(for: place, inFahrenheit: usesFahrenheit)
+    var fetchWeatherReport: (WeatherPlace, CLLocation, Bool) async throws -> WeatherReport = {
+        place, location, usesFahrenheit in
+        try await WeatherBridge().report(for: place, at: location, inFahrenheit: usesFahrenheit)
     }
     let phoneLocationSource = PhoneLocationSource()
     let pendingNotificationStore: PendingNotificationStore

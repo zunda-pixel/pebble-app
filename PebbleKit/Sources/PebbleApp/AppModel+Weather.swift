@@ -14,16 +14,12 @@ extension AppModel {
             return
         }
         do {
+            // The position is read here for the *name* alone; the row keeps no
+            // coordinates, so a later refresh can never fall back to today's.
             let location = try await phoneLocationSource.currentLocation()
             let name = await placeName(for: location) ?? String(localized: "Current Location", bundle: .module)
             weather.places.insert(
-                WeatherPlace(
-                    id: UUID(),
-                    name: name,
-                    latitude: location.coordinate.latitude,
-                    longitude: location.coordinate.longitude,
-                    followsPhone: true
-                ),
+                WeatherPlace(id: UUID(), name: name, position: .phone),
                 at: 0
             )
             saveWeatherPlaces()
@@ -53,9 +49,10 @@ extension AppModel {
                 WeatherPlace(
                     id: UUID(),
                     name: placeName(of: place) ?? query,
-                    latitude: coordinate.latitude,
-                    longitude: coordinate.longitude,
-                    followsPhone: false
+                    position: .fixed(
+                        latitude: coordinate.latitude,
+                        longitude: coordinate.longitude
+                    )
                 )
             )
             saveWeatherPlaces()
@@ -134,15 +131,31 @@ extension AppModel {
         var reports: [WeatherReport] = []
         var placeFailed = false
         for place in weather.places {
-            var place = place
-            // The entry that follows the phone is only useful where the phone is now.
-            if place.followsPhone, let location = try? await phoneLocationSource.currentLocation() {
-                place.latitude = location.coordinate.latitude
-                place.longitude = location.coordinate.longitude
+            let location: CLLocation
+            switch place.position {
+            case .fixed(let latitude, let longitude):
+                location = CLLocation(latitude: latitude, longitude: longitude)
+            case .phone:
+                // A position the phone will not give is a failure to say, not
+                // a fallback to take: the coordinates this used to fall back
+                // on were a snapshot from the day the row was added, served
+                // under the name "Current Location" (#122).
+                do {
+                    location = try await phoneLocationSource.currentLocation()
+                } catch {
+                    placeFailed = true
+                    weather.feedback = .failure("The phone's position could not be read.")
+                    await DiagnosticLog.shared.record(
+                        .error,
+                        category: "weather",
+                        message: "the phone's position: \(String(reflecting: error))"
+                    )
+                    continue
+                }
             }
             do {
                 reports.append(
-                    try await fetchWeatherReport(place, weather.usesFahrenheit)
+                    try await fetchWeatherReport(place, location, weather.usesFahrenheit)
                 )
             } catch {
                 placeFailed = true

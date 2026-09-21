@@ -76,9 +76,7 @@ struct ReportedStateTests {
         let kyoto = WeatherPlace(
             id: UUID(),
             name: "Kyoto",
-            latitude: 35.01,
-            longitude: 135.76,
-            followsPhone: false
+            position: .fixed(latitude: 35.01, longitude: 135.76)
         )
         model.weather.places = [kyoto]
         model.weather.feedback = nil
@@ -108,19 +106,15 @@ struct ReportedStateTests {
         let kyoto = WeatherPlace(
             id: UUID(),
             name: "Kyoto",
-            latitude: 35.01,
-            longitude: 135.76,
-            followsPhone: false
+            position: .fixed(latitude: 35.01, longitude: 135.76)
         )
         let refused = WeatherPlace(
             id: UUID(),
             name: "Nowhere",
-            latitude: 0,
-            longitude: 0,
-            followsPhone: false
+            position: .fixed(latitude: 0, longitude: 0)
         )
         model.weather.places = [kyoto, refused]
-        model.fetchWeatherReport = { place, _ in
+        model.fetchWeatherReport = { place, _, _ in
             guard place.id == kyoto.id else { throw WeatherSourceError.placeNotFound }
             return WeatherReport(
                 id: place.id,

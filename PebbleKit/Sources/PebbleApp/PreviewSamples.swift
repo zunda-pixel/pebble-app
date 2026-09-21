@@ -234,8 +234,8 @@ enum PreviewSamples {
     )
 
     static let weatherPlaces: [WeatherPlace] = [
-        WeatherPlace(id: UUID(), name: "現在地", latitude: 35.68, longitude: 139.76, followsPhone: true),
-        WeatherPlace(id: UUID(), name: "Kyoto", latitude: 35.01, longitude: 135.76, followsPhone: false),
+        WeatherPlace(id: UUID(), name: "現在地", position: .phone),
+        WeatherPlace(id: UUID(), name: "Kyoto", position: .fixed(latitude: 35.01, longitude: 135.76)),
     ]
 
     static let weatherReports: [WeatherReport] = weatherPlaces.enumerated().map { index, place in

@@ -111,7 +111,7 @@ struct WeatherAutomationTests {
         }
         let model = makeModel(directory: directory)
         model.weather.places = [
-            WeatherPlace(id: UUID(), name: "Sapporo", latitude: 43, longitude: 141, followsPhone: false),
+            WeatherPlace(id: UUID(), name: "Sapporo", position: .fixed(latitude: 43, longitude: 141)),
         ]
         Defaults[.weatherRefreshMinutes] = 60
 

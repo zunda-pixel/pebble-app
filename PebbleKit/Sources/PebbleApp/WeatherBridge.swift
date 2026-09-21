@@ -3,15 +3,64 @@ import CoreLocation
 public import Foundation
 import WeatherKit
 
+/// Where a place's forecast is fetched for.
+///
+/// Two variants rather than coordinates plus a flag: the phone-following row
+/// used to persist a snapshot of wherever the phone was when it was added, and
+/// a failed location read silently served that stale place under the name
+/// "Current Location" (#122). A `.phone` row holds no coordinates to fall back
+/// on, so the failure has to be said instead.
+public enum WeatherPlacePosition: Codable, Equatable, Hashable, Sendable {
+    /// Wherever the phone is at the moment the forecast is fetched.
+    case phone
+    case fixed(latitude: Double, longitude: Double)
+}
+
 public struct WeatherPlace: Codable, Equatable, Identifiable, Sendable {
     public var id: UUID
     public var name: String
-    public var latitude: Double
-    public var longitude: Double
-    public var followsPhone: Bool
+    public var position: WeatherPlacePosition
 
-    var coordinate: CLLocation {
-        CLLocation(latitude: latitude, longitude: longitude)
+    public init(id: UUID, name: String, position: WeatherPlacePosition) {
+        self.id = id
+        self.name = name
+        self.position = position
+    }
+
+    public var followsPhone: Bool {
+        position == .phone
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, position
+        // The shape this was stored as before positions existed.
+        case latitude, longitude, followsPhone
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        if let position = try container.decodeIfPresent(WeatherPlacePosition.self, forKey: .position) {
+            self.position = position
+        } else if try container.decodeIfPresent(Bool.self, forKey: .followsPhone) == true {
+            // The legacy snapshot coordinates are dropped on purpose: they are
+            // wherever the phone was the day the row was added, which is the
+            // stale fallback this type exists to end.
+            position = .phone
+        } else {
+            position = .fixed(
+                latitude: try container.decode(Double.self, forKey: .latitude),
+                longitude: try container.decode(Double.self, forKey: .longitude)
+            )
+        }
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(position, forKey: .position)
     }
 }
 
@@ -27,13 +76,17 @@ public struct WeatherCredit: Equatable, Sendable {
 struct WeatherBridge {
     /// Two days are enough for what the watch shows, and asking for less than the
     /// daily forecast is not something WeatherKit offers.
+    /// `location` is resolved by the caller: for a `.fixed` place it is the
+    /// stored pair, and for `.phone` it is a fresh read whose failure the
+    /// caller reports rather than papering over.
     func report(
         for place: WeatherPlace,
+        at location: CLLocation,
         inFahrenheit: Bool,
         now: Date = .now
     ) async throws -> WeatherReport {
         let weather = try await WeatherService.shared.weather(
-            for: place.coordinate,
+            for: location,
             including: .current, .daily
         )
         let (current, daily) = weather
