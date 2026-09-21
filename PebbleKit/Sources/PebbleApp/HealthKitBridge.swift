@@ -7,9 +7,24 @@ import HealthKit
 @MainActor
 final class HealthKitBridge {
     private var store = HKHealthStore()
-    private var lastExportDate: Date {
-        get { Defaults[.healthKitLastExportDate] }
-        set { Defaults[.healthKitLastExportDate] = newValue }
+
+    /// The types the export writes, each with a cursor of its own: what one
+    /// type has exported must not decide what another still owes. A single
+    /// cursor stranded any day that arrived while its type's permission was
+    /// still refused — the other types dragged the cursor past it, and the
+    /// permission arriving later found nothing left to export.
+    private enum ExportKind: String, CaseIterable {
+        case steps, sleep, heartRate, workouts
+    }
+
+    private func exportCursor(_ kind: ExportKind) -> Date {
+        Defaults[.healthKitLastExportDates][kind.rawValue] ?? .distantPast
+    }
+
+    private func advanceExportCursor(_ kind: ExportKind, to date: Date) {
+        if date > exportCursor(kind) {
+            Defaults[.healthKitLastExportDates][kind.rawValue] = date
+        }
     }
 
     /// Asking puts a full-screen sheet over whatever the reader is doing, so only
@@ -70,29 +85,44 @@ final class HealthKitBridge {
         // The reader may allow steps and refuse the heart: HealthKit's sheet
         // takes them separately. Skipping just the refused type keeps the rest
         // flowing rather than failing the whole export.
-        let mayWriteHeartRate = store.authorizationStatus(for: heartRateType) == .sharingAuthorized
-        let mayWriteWorkouts = store.authorizationStatus(for: .workoutType()) == .sharingAuthorized
-        let changedSamples = samples.filter { $0.updatedAt > lastExportDate && $0.source != .healthKit }
+        let mayWrite: [ExportKind: Bool] = [
+            .steps: store.authorizationStatus(for: stepsType) == .sharingAuthorized,
+            .sleep: store.authorizationStatus(for: sleepType) == .sharingAuthorized,
+            .heartRate: store.authorizationStatus(for: heartRateType) == .sharingAuthorized,
+            .workouts: store.authorizationStatus(for: .workoutType()) == .sharingAuthorized,
+        ]
+        let watchSamples = samples.filter { $0.source != .healthKit }
+        func owed(_ kind: ExportKind, _ sample: WatchHealthSample) -> Bool {
+            mayWrite[kind] == true && sample.updatedAt > exportCursor(kind)
+        }
+        var exportedThrough: [ExportKind: Date] = [:]
+        func exported(_ kind: ExportKind, _ sample: WatchHealthSample) {
+            exportedThrough[kind] = max(exportedThrough[kind] ?? .distantPast, sample.updatedAt)
+        }
         var healthSamples: [HKSample] = []
         var outgrownSleepIdentifiers: [String] = []
         var workoutWrites: [(workout: WatchWorkout, metadata: [String: Any])] = []
-        for sample in changedSamples {
+        for sample in watchSamples {
             let version = max(1, Int(sample.updatedAt.timeIntervalSince1970))
             let baseIdentifier = "pebble.\(sample.id.uuidString.lowercased())"
             let commonMetadata: [String: Any] = [
                 HKMetadataKeyExternalUUID: sample.id.uuidString,
                 HKMetadataKeySyncVersion: version,
             ]
-            var stepsMetadata = commonMetadata
-            stepsMetadata[HKMetadataKeySyncIdentifier] = "\(baseIdentifier).steps"
-            healthSamples.append(HKQuantitySample(
-                type: stepsType,
-                quantity: HKQuantity(unit: .count(), doubleValue: Double(sample.steps)),
-                start: sample.date,
-                end: sample.date.addingTimeInterval(60),
-                metadata: stepsMetadata
-            ))
-            if !sample.sleepSessions.isEmpty {
+            if owed(.steps, sample) {
+                exported(.steps, sample)
+                var stepsMetadata = commonMetadata
+                stepsMetadata[HKMetadataKeySyncIdentifier] = "\(baseIdentifier).steps"
+                healthSamples.append(HKQuantitySample(
+                    type: stepsType,
+                    quantity: HKQuantity(unit: .count(), doubleValue: Double(sample.steps)),
+                    start: sample.date,
+                    end: sample.date.addingTimeInterval(60),
+                    metadata: stepsMetadata
+                ))
+            }
+            if owed(.sleep, sample), !sample.sleepSessions.isEmpty {
+                exported(.sleep, sample)
                 // The night as the watch measured it: real start and end, the
                 // nap as its own block, and the deep stretches as the stage
                 // they are. The synthetic block below misplaces all three.
@@ -116,7 +146,8 @@ final class HealthKitBridge {
                         ))
                     }
                 }
-            } else if sample.sleepMinutes > 0 {
+            } else if owed(.sleep, sample), sample.sleepMinutes > 0 {
+                exported(.sleep, sample)
                 // A record from before sessions were kept knows only the
                 // total, so the block is synthetic — anchored to the day, not
                 // to when anybody slept.
@@ -130,7 +161,8 @@ final class HealthKitBridge {
                     metadata: sleepMetadata
                 ))
             }
-            if mayWriteWorkouts {
+            if owed(.workouts, sample) {
+                exported(.workouts, sample)
                 for workout in sample.workouts where workout.duration > 0 {
                     var workoutMetadata = commonMetadata
                     workoutMetadata[HKMetadataKeySyncIdentifier] =
@@ -138,7 +170,8 @@ final class HealthKitBridge {
                     workoutWrites.append((workout, workoutMetadata))
                 }
             }
-            if mayWriteHeartRate {
+            if owed(.heartRate, sample) {
+                exported(.heartRate, sample)
                 // One sample per measured minute, at the minute it was
                 // measured — a day's average written as one sample would sit
                 // among real readings and bend every chart it touches.
@@ -177,8 +210,10 @@ final class HealthKitBridge {
         if !healthSamples.isEmpty {
             try await store.save(healthSamples)
         }
-        if !healthSamples.isEmpty || !workoutWrites.isEmpty {
-            lastExportDate = changedSamples.map(\.updatedAt).max() ?? lastExportDate
+        // Only after everything reached HealthKit: a cursor moved before a
+        // failed save would strand what the save dropped.
+        for (kind, through) in exportedThrough {
+            advanceExportCursor(kind, to: through)
         }
     }
 

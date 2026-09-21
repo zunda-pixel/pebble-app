@@ -91,7 +91,11 @@ extension Defaults.Keys {
 
     static let activeWatchfaceID = Key<UUID?>("activeWatchfaceID")
 
-    static let healthKitLastExportDate = Key<Date>("healthKitLastExportDate", default: .distantPast)
+    /// One cursor per exported type, not one for the batch: a type the reader
+    /// had not allowed yet must not be dragged forward by the types they had,
+    /// or the data waiting on the permission is stranded behind the cursor
+    /// when the permission finally comes.
+    static let healthKitLastExportDates = Key<[String: Date]>("healthKitLastExportDates", default: [:])
 }
 
 extension DownloadedFirmware: Defaults.Serializable {}
