@@ -9,7 +9,9 @@ import SwiftUI
 struct CatalogApplicationDetailView: View {
     var application: CatalogApplication
     var model: AppModel
-    var editGlance: (WatchApplication) -> Void
+    /// Nil where no screen can host the glance editor — a deep link's sheet —
+    /// which hides the row rather than showing a button that does nothing.
+    var editGlance: ((WatchApplication) -> Void)?
     @Environment(\.dismiss) private var dismiss
 
     private var installed: WatchApplication? {
@@ -31,7 +33,9 @@ struct CatalogApplicationDetailView: View {
             configureApplication: {
                 if let installed { Task { await model.configureApplication(installed) } }
             },
-            editGlance: installed.map { installed in { editGlance(installed) } },
+            editGlance: installed.flatMap { installed in
+                editGlance.map { edit in { edit(installed) } }
+            },
             activateWatchface: {
                 if let installed { Task { await model.activateWatchface(installed) } }
             },

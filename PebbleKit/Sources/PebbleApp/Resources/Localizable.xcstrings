@@ -1,22 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "%@ · %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ · %2$@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "%1$@ · %2$@"
-          }
-        }
-      }
-    },
     "%@ could not be downloaded right now." : {
       "localizations" : {
         "ja" : {
@@ -198,22 +182,6 @@
         }
       }
     },
-    "%@ of %@ bytes" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ of %2$@ bytes"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "%2$@バイト中%1$@バイト"
-          }
-        }
-      }
-    },
     "%@ of %@ MB sent" : {
       "localizations" : {
         "en" : {
@@ -226,6 +194,22 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "%@/%@ MB 送信済み"
+          }
+        }
+      }
+    },
+    "%@ of %@ bytes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ of %2$@ bytes"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%2$@バイト中%1$@バイト"
           }
         }
       }
@@ -263,6 +247,22 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "“%@”をライブラリに追加しました。"
+          }
+        }
+      }
+    },
+    "%@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "%1$@ · %2$@"
           }
         }
       }
@@ -353,6 +353,16 @@
         }
       }
     },
+    "24-Hour Clock" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "24時間表示"
+          }
+        }
+      }
+    },
     "3 Hours" : {
       "localizations" : {
         "ja" : {
@@ -369,6 +379,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "3秒"
+          }
+        }
+      }
+    },
+    "30 Minutes" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "30分"
           }
         }
       }
@@ -403,22 +423,22 @@
         }
       }
     },
-    "24-Hour Clock" : {
+    "A PBL pack built for this watch's board. A pack built for another board installs but shows the wrong glyphs." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "24時間表示"
+            "state" : "translated",
+            "value" : "このウォッチのボード向けにビルドされたPBLパック。別のボード向けのパックもインストールはできますが、字形が崩れます。"
           }
         }
       }
     },
-    "30 Minutes" : {
+    "A PBZ package built for this watch's board." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
-            "value" : "30分"
+            "value" : "このウォッチのボード向けにビルドされたPBZパッケージです。"
           }
         }
       }
@@ -469,26 +489,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "これらのいずれかが見つかった通知は、ウォッチに表示されずに破棄されます。"
-          }
-        }
-      }
-    },
-    "A PBL pack built for this watch's board. A pack built for another board installs but shows the wrong glyphs." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このウォッチのボード向けにビルドされたPBLパック。別のボード向けのパックもインストールはできますが、字形が崩れます。"
-          }
-        }
-      }
-    },
-    "A PBZ package built for this watch's board." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "このウォッチのボード向けにビルドされたPBZパッケージです。"
           }
         }
       }
@@ -553,22 +553,22 @@
         }
       }
     },
-    "A watch that has been factory reset no longer knows this iPhone, and cannot be added again while the old pairing is around. Forget it here, then open Settings › Bluetooth, tap the ⓘ beside it and choose Forget This Device." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "工場出荷時の状態にリセットしたウォッチは、このiPhoneを認識しなくなります。古いペアリングが残っていると追加し直せないので、ここで登録を解除してから、「設定」＞「Bluetooth」でウォッチの横のⓘをタップし、「このデバイスの登録を解除」を選んでください。"
-          }
-        }
-      }
-    },
     "A watch that has been factory reset no longer knows this Mac, and cannot be added again while the old pairing is around. Forget it here, then open System Settings › Bluetooth and forget it there too." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "工場出荷時の状態にリセットしたウォッチは、このMacを認識しなくなります。古いペアリングが残っていると追加し直せないので、ここで登録を解除してから、「システム設定」＞「Bluetooth」でも登録を解除してください。"
+          }
+        }
+      }
+    },
+    "A watch that has been factory reset no longer knows this iPhone, and cannot be added again while the old pairing is around. Forget it here, then open Settings › Bluetooth, tap the ⓘ beside it and choose Forget This Device." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "工場出荷時の状態にリセットしたウォッチは、このiPhoneを認識しなくなります。古いペアリングが残っていると追加し直せないので、ここで登録を解除してから、「設定」＞「Bluetooth」でウォッチの横のⓘをタップし、「このデバイスの登録を解除」を選んでください。"
           }
         }
       }
@@ -599,6 +599,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "身体情報"
+          }
+        }
+      }
+    },
+    "Account links are not supported yet." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アカウントのリンクにはまだ対応していません。"
           }
         }
       }
@@ -653,52 +663,12 @@
         }
       }
     },
-    "Add a Pebble 2 Duo, Pebble Time 2, or Pebble Round 2." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "Pebble 2 Duo、Pebble Time 2、またはPebble Round 2を追加してください。"
-          }
-        }
-      }
-    },
-    "Add a Place" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "地点を追加"
-          }
-        }
-      }
-    },
     "Add App" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "アプリを追加"
-          }
-        }
-      }
-    },
-    "Add one and the watch will buzz when its time comes." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "追加すると、時間になったときにウォッチが振動して知らせます。"
-          }
-        }
-      }
-    },
-    "Add one with the plus button, or sync the calendar." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "+ボタンで追加するか、カレンダーを同期してください。"
           }
         }
       }
@@ -723,12 +693,62 @@
         }
       }
     },
+    "Add a Pebble 2 Duo, Pebble Time 2, or Pebble Round 2." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "Pebble 2 Duo、Pebble Time 2、またはPebble Round 2を追加してください。"
+          }
+        }
+      }
+    },
+    "Add a Place" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地点を追加"
+          }
+        }
+      }
+    },
+    "Add one and the watch will buzz when its time comes." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "追加すると、時間になったときにウォッチが振動して知らせます。"
+          }
+        }
+      }
+    },
+    "Add one with the plus button, or sync the calendar." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "+ボタンで追加するか、カレンダーを同期してください。"
+          }
+        }
+      }
+    },
     "Add where you are, or a place you want to keep an eye on." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "現在地か、気にしている場所を追加してください。"
+          }
+        }
+      }
+    },
+    "Adding store feeds by link is not supported yet." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リンクによるストアフィードの追加にはまだ対応していません。"
           }
         }
       }
@@ -863,6 +883,16 @@
         }
       }
     },
+    "App Logs" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリのログ"
+          }
+        }
+      }
+    },
     "App catalog updated with %lld apps." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -870,16 +900,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "アプリカタログを更新しました（%lld個のアプリ）。"
-          }
-        }
-      }
-    },
-    "App Logs" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アプリのログ"
           }
         }
       }
@@ -1034,6 +1054,16 @@
         }
       }
     },
+    "Backlight Only in the Dark" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "暗い場所でのみバックライト点灯"
+          }
+        }
+      }
+    },
     "Backlight on Touch" : {
       "localizations" : {
         "ja" : {
@@ -1050,16 +1080,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "手首を返してバックライト点灯"
-          }
-        }
-      }
-    },
-    "Backlight Only in the Dark" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "暗い場所でのみバックライト点灯"
           }
         }
       }
@@ -1114,6 +1134,16 @@
         }
       }
     },
+    "Bluetooth Low Energy is not supported on this device." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このデバイスはBluetooth Low Energyに対応していません。"
+          }
+        }
+      }
+    },
     "Bluetooth access is not allowed. Enable it in System Settings." : {
       "localizations" : {
         "ja" : {
@@ -1140,16 +1170,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "Bluetoothがオフか、一時的に利用できません。"
-          }
-        }
-      }
-    },
-    "Bluetooth Low Energy is not supported on this device." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "このデバイスはBluetooth Low Energyに対応していません。"
           }
         }
       }
@@ -1434,16 +1454,6 @@
         }
       }
     },
-    "Clear every pin from this watch?" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "このウォッチのピンをすべて消去しますか？"
-          }
-        }
-      }
-    },
     "Clear History" : {
       "localizations" : {
         "ja" : {
@@ -1454,22 +1464,32 @@
         }
       }
     },
-    "Clear the Watch's Timeline" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチのタイムラインを消去"
-          }
-        }
-      }
-    },
     "Clear Timeline" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "タイムラインを消去"
+          }
+        }
+      }
+    },
+    "Clear every pin from this watch?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このウォッチのピンをすべて消去しますか？"
+          }
+        }
+      }
+    },
+    "Clear the Watch's Timeline" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチのタイムラインを消去"
           }
         }
       }
@@ -1524,6 +1544,16 @@
         }
       }
     },
+    "Connect Automatically" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "自動的に接続"
+          }
+        }
+      }
+    },
     "Connect a Pebble before sending a test notification." : {
       "localizations" : {
         "ja" : {
@@ -1540,16 +1570,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ウォッチフェイスを変更するには、Pebbleを接続してください。"
-          }
-        }
-      }
-    },
-    "Connect Automatically" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "自動的に接続"
           }
         }
       }
@@ -1854,16 +1874,6 @@
         }
       }
     },
-    "Delete all local health data?" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ローカルのヘルスケアデータをすべて削除しますか?"
-          }
-        }
-      }
-    },
     "Delete Health Data" : {
       "localizations" : {
         "ja" : {
@@ -1880,6 +1890,26 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ローカルのヘルスケアデータを削除"
+          }
+        }
+      }
+    },
+    "Delete all local health data?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ローカルのヘルスケアデータをすべて削除しますか?"
+          }
+        }
+      }
+    },
+    "Details" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "詳細"
           }
         }
       }
@@ -1974,22 +2004,22 @@
         }
       }
     },
-    "Download it, then install it." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ダウンロードしてからインストールします。"
-          }
-        }
-      }
-    },
     "Download PebbleOS %@" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "PebbleOS %@をダウンロード"
+          }
+        }
+      }
+    },
+    "Download it, then install it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ダウンロードしてからインストールします。"
           }
         }
       }
@@ -2034,22 +2064,22 @@
         }
       }
     },
-    "Downloading only needs the network, so it works with the watch away. Installing needs the watch, and starts as soon as it connects." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ダウンロードはネットワークだけで済むので、ウォッチが手元になくても実行できます。インストールにはウォッチが必要で、接続され次第始まります。"
-          }
-        }
-      }
-    },
     "Downloading PebbleOS %@…" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "PebbleOS %@をダウンロード中…"
+          }
+        }
+      }
+    },
+    "Downloading only needs the network, so it works with the watch away. Installing needs the watch, and starts as soon as it connects." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ダウンロードはネットワークだけで済むので、ウォッチが手元になくても実行できます。インストールにはウォッチが必要で、接続され次第始まります。"
           }
         }
       }
@@ -2214,6 +2244,16 @@
         }
       }
     },
+    "Every Hour" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1時間ごと"
+          }
+        }
+      }
+    },
     "Every app, watchface, and setting stored on the watch is erased. This cannot be undone." : {
       "localizations" : {
         "ja" : {
@@ -2230,16 +2270,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチが記録した日のデータをすべて1つのJSONファイルに書き出します。ここから共有するまで、ファイルがこのiPhoneの外に出ることはありません。"
-          }
-        }
-      }
-    },
-    "Every Hour" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1時間ごと"
           }
         }
       }
@@ -2384,6 +2414,26 @@
         }
       }
     },
+    "Firmware Required" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ファームウェアが必要"
+          }
+        }
+      }
+    },
+    "Firmware Update" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ファームウェアアップデート"
+          }
+        }
+      }
+    },
     "Firmware could not be downloaded right now." : {
       "localizations" : {
         "ja" : {
@@ -2414,32 +2464,12 @@
         }
       }
     },
-    "Firmware Required" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ファームウェアが必要"
-          }
-        }
-      }
-    },
     "Firmware unknown" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ファームウェア不明"
-          }
-        }
-      }
-    },
-    "Firmware Update" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ファームウェアアップデート"
           }
         }
       }
@@ -2524,22 +2554,22 @@
         }
       }
     },
-    "Forget this update?" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "このアップデートを破棄しますか?"
-          }
-        }
-      }
-    },
     "Forget Watch" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチの登録を解除"
+          }
+        }
+      }
+    },
+    "Forget this update?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このアップデートを破棄しますか?"
           }
         }
       }
@@ -2844,22 +2874,22 @@
         }
       }
     },
-    "Import from Apple Health" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "“ヘルスケア”から読み込む"
-          }
-        }
-      }
-    },
     "Import Health Archive" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ヘルスケアアーカイブを読み込む"
+          }
+        }
+      }
+    },
+    "Import from Apple Health" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "“ヘルスケア”から読み込む"
           }
         }
       }
@@ -2914,22 +2944,32 @@
         }
       }
     },
-    "Install and activate another watchface before removing the active one." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "使用中のウォッチフェイスを削除する前に、別のウォッチフェイスをインストールして使用してください。"
-          }
-        }
-      }
-    },
     "Install Firmware" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ファームウェアをインストール"
+          }
+        }
+      }
+    },
+    "Install PebbleOS %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "PebbleOS %@をインストール"
+          }
+        }
+      }
+    },
+    "Install and activate another watchface before removing the active one." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "使用中のウォッチフェイスを削除する前に、別のウォッチフェイスをインストールして使用してください。"
           }
         }
       }
@@ -2944,22 +2984,22 @@
         }
       }
     },
+    "Install from link?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リンクからインストールしますか?"
+          }
+        }
+      }
+    },
     "Install it whenever you like." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "好きなタイミングでインストールできます。"
-          }
-        }
-      }
-    },
-    "Install PebbleOS %@" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "PebbleOS %@をインストール"
           }
         }
       }
@@ -3014,6 +3054,16 @@
         }
       }
     },
+    "Installing PebbleOS %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "PebbleOS %@をインストール中"
+          }
+        }
+      }
+    },
     "Installing a language replaces the one on the watch. The watch switches over by itself and says so on its own screen. English needs no pack: it is part of the firmware." : {
       "localizations" : {
         "ja" : {
@@ -3040,16 +3090,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ファームウェアをインストール中"
-          }
-        }
-      }
-    },
-    "Installing PebbleOS %@" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "PebbleOS %@をインストール中"
           }
         }
       }
@@ -3134,22 +3174,22 @@
         }
       }
     },
-    "km/h" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "km/h"
-          }
-        }
-      }
-    },
     "Language" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "言語"
+          }
+        }
+      }
+    },
+    "Language pack" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "言語パック"
           }
         }
       }
@@ -3484,16 +3524,6 @@
         }
       }
     },
-    "mph" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "mph"
-          }
-        }
-      }
-    },
     "Music" : {
       "localizations" : {
         "ja" : {
@@ -3547,7 +3577,6 @@
       }
     },
     "Name" : {
-      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -3677,16 +3706,6 @@
         }
       }
     },
-    "No place was found for “%@”." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "“%@”に該当する地点が見つかりませんでした。"
-          }
-        }
-      }
-    },
     "No Places" : {
       "localizations" : {
         "ja" : {
@@ -3703,6 +3722,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "リマインダーなし"
+          }
+        }
+      }
+    },
+    "No place was found for “%@”." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”に該当する地点が見つかりませんでした。"
           }
         }
       }
@@ -3737,22 +3766,22 @@
         }
       }
     },
-    "Not connected" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "未接続"
-          }
-        }
-      }
-    },
     "Not Downloaded" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "未ダウンロード"
+          }
+        }
+      }
+    },
+    "Not connected" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "未接続"
           }
         }
       }
@@ -3767,22 +3796,22 @@
         }
       }
     },
-    "Nothing matches, or the catalog could not be fetched." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "条件に一致するアプリがないか、カタログを取得できませんでした。"
-          }
-        }
-      }
-    },
     "Nothing Sent Yet" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "まだ何も送信していません"
+          }
+        }
+      }
+    },
+    "Nothing matches, or the catalog could not be fetched." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "条件に一致するアプリがないか、カタログを取得できませんでした。"
           }
         }
       }
@@ -4343,16 +4372,6 @@
         }
       }
     },
-    "Quiet hours updated." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "サイレント時間帯を更新しました。"
-          }
-        }
-      }
-    },
     "Quiet Time" : {
       "localizations" : {
         "ja" : {
@@ -4369,6 +4388,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "クワイエットタイムはウォッチを消音する機能です。iPhoneが何を転送するかは、“通知”画面のサイレント時間帯で決まります。"
+          }
+        }
+      }
+    },
+    "Quiet hours updated." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "サイレント時間帯を更新しました。"
           }
         }
       }
@@ -4664,22 +4693,22 @@
         }
       }
     },
-    "Restart into Recovery Firmware" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "リカバリファームウェアで再起動"
-          }
-        }
-      }
-    },
     "Restart Watch" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチを再起動"
+          }
+        }
+      }
+    },
+    "Restart into Recovery Firmware" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リカバリファームウェアで再起動"
           }
         }
       }
@@ -4714,6 +4743,16 @@
         }
       }
     },
+    "Running Slot" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "実行中のスロット"
+          }
+        }
+      }
+    },
     "Running recovery firmware" : {
       "localizations" : {
         "ja" : {
@@ -4724,12 +4763,12 @@
         }
       }
     },
-    "Running Slot" : {
+    "SOS" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
-            "value" : "実行中のスロット"
+            "value" : "SOS"
           }
         }
       }
@@ -4995,6 +5034,16 @@
         }
       }
     },
+    "Size" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "サイズ"
+          }
+        }
+      }
+    },
     "Sleep" : {
       "localizations" : {
         "ja" : {
@@ -5032,16 +5081,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "並べ替え"
-          }
-        }
-      }
-    },
-    "SOS" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "SOS"
           }
         }
       }
@@ -5347,6 +5386,46 @@
         }
       }
     },
+    "The App's Own" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリのアイコン"
+          }
+        }
+      }
+    },
+    "The PBW package contains mismatched application identifiers." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "PBWパッケージ内のアプリケーション識別子が一致していません。"
+          }
+        }
+      }
+    },
+    "The PBW package does not contain an application executable." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "PBWパッケージにアプリケーションの実行ファイルが含まれていません。"
+          }
+        }
+      }
+    },
+    "The Reminders app could not be read." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リマインダーアプリを読み込めませんでした。"
+          }
+        }
+      }
+    },
     "The app catalog cache could not be loaded." : {
       "localizations" : {
         "ja" : {
@@ -5363,16 +5442,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "アプリカタログを更新できませんでした。"
-          }
-        }
-      }
-    },
-    "The App's Own" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アプリのアイコン"
           }
         }
       }
@@ -5537,16 +5606,6 @@
         }
       }
     },
-    "The forecast for %@ could not be fetched: the network did not answer." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "“%@”の予報を取得できませんでした。ネットワークから応答がありません。"
-          }
-        }
-      }
-    },
     "The forecast for %@ could not be fetched. %@" : {
       "localizations" : {
         "en" : {
@@ -5559,6 +5618,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "“%@”の予報を取得できませんでした。%@"
+          }
+        }
+      }
+    },
+    "The forecast for %@ could not be fetched: the network did not answer." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”の予報を取得できませんでした。ネットワークから応答がありません。"
           }
         }
       }
@@ -5603,6 +5672,26 @@
         }
       }
     },
+    "The link could not be opened." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リンクを開けませんでした。"
+          }
+        }
+      }
+    },
+    "The linked package could not be read." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "リンク先のパッケージを読み込めませんでした。"
+          }
+        }
+      }
+    },
     "The package is removed, so this update cannot be picked up again. The watch keeps the firmware it is running." : {
       "localizations" : {
         "ja" : {
@@ -5613,22 +5702,12 @@
         }
       }
     },
-    "The PBW package contains mismatched application identifiers." : {
+    "The package link is not https, so what arrives could differ from what was linked." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
-            "value" : "PBWパッケージ内のアプリケーション識別子が一致していません。"
-          }
-        }
-      }
-    },
-    "The PBW package does not contain an application executable." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "PBWパッケージにアプリケーションの実行ファイルが含まれていません。"
+            "value" : "パッケージのリンクがhttpsではないため、届く内容がリンク先のものと異なる可能性があります。"
           }
         }
       }
@@ -5643,32 +5722,12 @@
         }
       }
     },
-    "The Reminders app could not be read." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "リマインダーアプリを読み込めませんでした。"
-          }
-        }
-      }
-    },
     "The reset command could not be sent." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "リセットコマンドを送信できませんでした。"
-          }
-        }
-      }
-    },
-    "The selected health archive is invalid or unsupported." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "選択したヘルスケアのアーカイブは無効か、対応していません。"
           }
         }
       }
@@ -5683,6 +5742,16 @@
         }
       }
     },
+    "The selected health archive is invalid or unsupported." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "選択したヘルスケアのアーカイブは無効か、対応していません。"
+          }
+        }
+      }
+    },
     "The selected watch is no longer available. Scan again." : {
       "localizations" : {
         "ja" : {
@@ -5693,12 +5762,32 @@
         }
       }
     },
+    "The store could not be reached." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ストアに接続できませんでした。"
+          }
+        }
+      }
+    },
     "The store could not be searched." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ストアを検索できませんでした。"
+          }
+        }
+      }
+    },
+    "The store does not list this application." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このアプリケーションはストアに掲載されていません。"
           }
         }
       }
@@ -6324,6 +6413,16 @@
         }
       }
     },
+    "This Update" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このアップデート"
+          }
+        }
+      }
+    },
     "This application does not support the connected Pebble model." : {
       "localizations" : {
         "ja" : {
@@ -6340,6 +6439,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "このアプリケーションはライブラリにありません。"
+          }
+        }
+      }
+    },
+    "This arrived as a link. It is only installed if you choose to." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "これはリンクから届いたものです。ここで選ばないかぎりインストールされません。"
           }
         }
       }
@@ -6384,22 +6493,32 @@
         }
       }
     },
+    "This link belongs to a settings page and only means something there." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このリンクは設定ページのもので、そこでしか意味を持ちません。"
+          }
+        }
+      }
+    },
+    "This link is not one the app knows." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このアプリが知らないリンクです。"
+          }
+        }
+      }
+    },
     "This removes locally stored step and sleep history. This action cannot be undone." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ローカルに保存されている歩数と睡眠の履歴が削除されます。この操作は取り消せません。"
-          }
-        }
-      }
-    },
-    "This Update" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "このアップデート"
           }
         }
       }
@@ -6484,6 +6603,26 @@
         }
       }
     },
+    "Timeline Pins" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "タイムラインピン"
+          }
+        }
+      }
+    },
+    "Timeline Quick View" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "タイムラインクイックビュー"
+          }
+        }
+      }
+    },
     "Timeline action completed." : {
       "localizations" : {
         "ja" : {
@@ -6520,26 +6659,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "タイムラインのピンを保存しました。"
-          }
-        }
-      }
-    },
-    "Timeline Pins" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "タイムラインピン"
-          }
-        }
-      }
-    },
-    "Timeline Quick View" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "タイムラインクイックビュー"
           }
         }
       }
@@ -6955,6 +7074,46 @@
         }
       }
     },
+    "Watch Apps" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチアプリ"
+          }
+        }
+      }
+    },
+    "Watch Logs" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチのログ"
+          }
+        }
+      }
+    },
+    "Watch Settings" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチ設定"
+          }
+        }
+      }
+    },
+    "Watch app" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチアプリ"
+          }
+        }
+      }
+    },
     "Watch app notifications and test notifications appear here once one has gone out." : {
       "localizations" : {
         "ja" : {
@@ -6985,42 +7144,12 @@
         }
       }
     },
-    "Watch Apps" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチアプリ"
-          }
-        }
-      }
-    },
     "Watch health data could not be saved." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチのヘルスケアデータを保存できませんでした。"
-          }
-        }
-      }
-    },
-    "Watch Logs" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチのログ"
-          }
-        }
-      }
-    },
-    "Watch Settings" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチ設定"
           }
         }
       }
@@ -7231,6 +7360,26 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ゾーン3"
+          }
+        }
+      }
+    },
+    "km/h" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "km/h"
+          }
+        }
+      }
+    },
+    "mph" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "mph"
           }
         }
       }

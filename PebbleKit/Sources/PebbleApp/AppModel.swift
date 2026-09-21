@@ -82,6 +82,7 @@ public final class AppModel {
     public let diagnostics = DiagnosticsModel()
     public let health = HealthModel()
     public let weather = WeatherModel()
+    public let deepLinks = DeepLinksModel()
 
     public var isScanningOrConnecting: Bool {
         switch connectionState {

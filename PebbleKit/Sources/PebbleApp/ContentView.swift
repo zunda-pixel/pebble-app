@@ -62,7 +62,7 @@ public struct ContentView: View {
     }
 }
 
-public enum AppSection: String, CaseIterable, Identifiable {
+public enum AppSection: String, CaseIterable, Identifiable, Sendable {
     case watches
     case apps
     case timeline
@@ -144,6 +144,42 @@ struct AppRootView: View {
                 setup = nil
             }
         }
+        .onOpenURL { url in
+            Task { await model.openDeepLink(url) }
+        }
+        // Dismissing is the reader's answer too: the copy is deleted either way.
+        .sheet(item: Binding(
+            get: { model.deepLinks.pendingPackage },
+            set: { if $0 == nil { model.dismissPendingDeepLinkPackage() } }
+        )) { pending in
+            DeepLinkPackageSheet(
+                package: pending,
+                install: { Task { await model.confirmPendingDeepLinkPackage() } },
+                cancel: { model.dismissPendingDeepLinkPackage() }
+            )
+        }
+        .sheet(item: Binding(
+            get: { model.deepLinks.storeApplication },
+            set: { if $0 == nil { model.dismissDeepLinkStoreApplication() } }
+        )) { application in
+            NavigationStack {
+                CatalogApplicationDetailView(
+                    application: application,
+                    model: model,
+                    editGlance: nil
+                )
+            }
+        }
+        .alert(
+            Text("The link could not be opened."),
+            isPresented: Binding(
+                get: { model.deepLinks.feedback != nil },
+                set: { if !$0 { model.clearDeepLinkFeedback() } }
+            ),
+            presenting: model.deepLinks.feedback
+        ) { _ in } message: { feedback in
+            Text(feedback.message)
+        }
     }
 }
 
@@ -176,19 +212,27 @@ struct MacRootView: View {
         .onWindowMessage(SectionRequest.self, from: model) { message in
             selection = message.section
         }
+        // A deep link's navigation. Settings is its own window on the Mac and
+        // not in the sidebar, so that one request has nowhere to go here.
+        .onChange(of: model.deepLinks.requestedSection, initial: true) { _, requested in
+            guard let requested else { return }
+            if requested != .settings { selection = requested }
+            model.consumeRequestedDeepLinkSection()
+        }
     }
 }
 #else
 struct IOSRootView: View {
     var model: AppModel
+    @State private var selection: AppSection = .watches
 
     var body: some View {
-        TabView {
+        TabView(selection: $selection) {
             ForEach(AppSection.allCases) { section in
                 // The label as a view rather than a key: `Tab`'s own
                 // title initializer and a shimmed one cannot be told apart,
                 // and this way the label is built by `Label` above.
-                Tab {
+                Tab(value: section) {
                     NavigationStack {
                         SectionContent(section: section, model: model)
                         .toolbar {
@@ -203,6 +247,13 @@ struct IOSRootView: View {
                     Label(section.title, systemImage: section.systemImage)
                 }
             }
+        }
+        // `initial:` because a cold start from a link sets the request before
+        // this view exists, and waiting for a change would wait forever.
+        .onChange(of: model.deepLinks.requestedSection, initial: true) { _, requested in
+            guard let requested else { return }
+            selection = requested
+            model.consumeRequestedDeepLinkSection()
         }
     }
 }

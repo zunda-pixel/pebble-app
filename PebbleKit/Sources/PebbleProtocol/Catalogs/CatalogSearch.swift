@@ -115,7 +115,7 @@ extension ApplicationCatalog {
     /// The full store entries for these identifiers, in the order they were
     /// asked for — which is the index's ranking. An identifier the feed does
     /// not answer for costs that row alone.
-    func applications(ids: [String], source: CatalogSource = .pebble) async throws -> [CatalogApplication] {
+    public func applications(ids: [String], source: CatalogSource = .pebble) async throws -> [CatalogApplication] {
         guard !ids.isEmpty else { return [] }
         let request = HTTPRequest(
             method: .post,
