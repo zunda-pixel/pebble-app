@@ -35,6 +35,27 @@ extension AppModel {
         appGlances.feedback = .success("Launcher line saved. A Pebble that is not connected is told when it connects.")
     }
 
+    /// The launcher line a watch app's JavaScript reloaded (#92): the same
+    /// store and delivery as the editor's, silent because the script has its
+    /// own callback to answer and nobody asked the screen anything. Ownership
+    /// is the running application's — a script can only reload its own line.
+    func reloadCompanionAppGlance(_ slices: [AppGlanceSlice], applicationID: UUID) async -> Bool {
+        let glance = AppGlance(applicationID: applicationID, slices: slices, updatedAt: .now)
+        guard let glances = try? await appGlanceStore.update(glance) else {
+            await DiagnosticLog.shared.record(
+                .error,
+                category: "timeline",
+                message: "an application's glance could not be saved"
+            )
+            return false
+        }
+        appGlances.glances = glances
+        for connection in activeConnections {
+            await synchronizeAppGlances(on: connection)
+        }
+        return true
+    }
+
     func synchronizeAppGlances(on connection: WatchConnection) async {
         var taken = 0
         var dropped = 0

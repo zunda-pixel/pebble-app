@@ -49,7 +49,7 @@ public enum AppGlanceCodec {
     /// `APP_GLANCE_DB_MAX_SLICES_PER_GLANCE`. The watch trims what it is sent
     /// past this, saying in a comment that a phone has no way of knowing the
     /// limit. This one does.
-    static let maximumSlices = 8
+    public static let maximumSlices = 8
     /// `ATTRIBUTE_APP_GLANCE_SUBTITLE_MAX_LEN`. Longer and the watch keeps this
     /// much and drops the rest, so the cut is made here where a character can
     /// be kept whole.

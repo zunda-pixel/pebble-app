@@ -23,6 +23,9 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
     /// application whose script said so.
     private var timelinePinInsertHandler: (CompanionTimelinePin, UUID) async -> Void
     private var timelinePinDeleteHandler: (String, UUID) async -> Void
+    /// The launcher line a script reloaded, owned by the running application.
+    /// Answers whether it was saved, which is what the script's callback says.
+    private var appGlanceReloadHandler: ([AppGlanceSlice], UUID) async -> Bool
     /// One task per `watchPosition` call, keyed by the script's own watch id,
     /// cancelled by `clearWatch` and when the page goes away.
     private var positionWatchers: [Int: Task<Void, Never>] = [:]
@@ -45,7 +48,8 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
             throw WeatherSourceError.locationNotAllowed
         },
         timelinePinInsertHandler: @escaping (CompanionTimelinePin, UUID) async -> Void = { _, _ in },
-        timelinePinDeleteHandler: @escaping (String, UUID) async -> Void = { _, _ in }
+        timelinePinDeleteHandler: @escaping (String, UUID) async -> Void = { _, _ in },
+        appGlanceReloadHandler: @escaping ([AppGlanceSlice], UUID) async -> Bool = { _, _ in false }
     ) {
         self.openURLHandler = openURLHandler
         self.appMessageHandler = appMessageHandler
@@ -55,6 +59,7 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
         self.locationUpdatesHandler = locationUpdatesHandler
         self.timelinePinInsertHandler = timelinePinInsertHandler
         self.timelinePinDeleteHandler = timelinePinDeleteHandler
+        self.appGlanceReloadHandler = appGlanceReloadHandler
         super.init()
     }
 
@@ -138,6 +143,34 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
             webkit.messageHandlers.pebble.postMessage({
               type:'deletePin', id: String(typeof pin === 'object' && pin ? pin.id : pin)
             }),
+          // The launcher line, reloaded by the running app's own script (#92).
+          // The callbacks get the slices back, which is the SDK's shape.
+          appGlanceReload: (slices, onSuccess, onFailure) => {
+            const id = ++callbackID;
+            callbacks[id] = {
+              success: onSuccess ? (() => onSuccess(slices)) : undefined,
+              failure: onFailure ? (() => onFailure(slices)) : undefined
+            };
+            webkit.messageHandlers.pebble.postMessage({
+              type:'appGlance', id, slices: JSON.stringify(slices == null ? [] : slices)
+            });
+          },
+          // Refused honestly, like getTimelineToken above: subscriptions need
+          // a timeline service and an account, and this app has neither (#20,
+          // not planned). Defined at all so a caller falls to its failure
+          // branch instead of dying on undefined.
+          timelineSubscribe: (topic, onSuccess, onFailure) => {
+            webkit.messageHandlers.pebble.postMessage({type:'timelineSubscription'});
+            setTimeout(() => onFailure && onFailure(), 0);
+          },
+          timelineUnsubscribe: (topic, onSuccess, onFailure) => {
+            webkit.messageHandlers.pebble.postMessage({type:'timelineSubscription'});
+            setTimeout(() => onFailure && onFailure(), 0);
+          },
+          timelineSubscriptions: (onSuccess, onFailure) => {
+            webkit.messageHandlers.pebble.postMessage({type:'timelineSubscription'});
+            setTimeout(() => onFailure && onFailure(), 0);
+          },
           showSimpleNotificationOnPebble: (title, body) =>
             webkit.messageHandlers.pebble.postMessage({type:'notification', title, body})
         };
@@ -343,6 +376,37 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
                     headers: headers,
                     body: requestBody,
                     timeoutMilliseconds: timeout
+                )
+            }
+            return
+        }
+        if type == "appGlance",
+           let requestID = body["id"] as? Int,
+           let slicesJSON = body["slices"] as? String,
+           let application {
+            let applicationID = application.id
+            Task {
+                do {
+                    let slices = try CompanionAppGlance.slices(from: slicesJSON)
+                    let saved = await appGlanceReloadHandler(slices, applicationID)
+                    try? await resolve(callbackID: requestID, succeeded: saved)
+                } catch {
+                    try? await resolve(callbackID: requestID, succeeded: false)
+                    await DiagnosticLog.shared.record(
+                        .warning,
+                        category: "timeline",
+                        message: "an application's glance was refused: \(String(reflecting: error))"
+                    )
+                }
+            }
+            return
+        }
+        if type == "timelineSubscription" {
+            Task {
+                await DiagnosticLog.shared.record(
+                    category: "configuration",
+                    message: "an application asked about timeline subscriptions;"
+                        + " there is no timeline service to subscribe through (#20)"
                 )
             }
             return

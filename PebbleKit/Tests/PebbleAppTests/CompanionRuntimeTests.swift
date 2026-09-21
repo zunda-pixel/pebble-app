@@ -222,6 +222,53 @@ struct CompanionRuntimeTests {
         #expect(inserted.deletions.first?.1 == id)
     }
 
+    /// A glance a script reloads travels the whole way and its callback hears
+    /// the answer; the subscription APIs exist to fail honestly — a caller
+    /// falls to its failure branch instead of dying on undefined (#92).
+    @Test func aScriptsGlanceIsSavedAndItsSubscriptionsAreRefused() async throws {
+        let id = UUID()
+        defer { Task { await PebbleCompanionRuntime.forget(applicationID: id) } }
+        let sent = SentTuples()
+        let reloaded = PendingGlances()
+        let runtime = PebbleCompanionRuntime(
+            openURLHandler: { _ in },
+            appMessageHandler: { _, tuples in sent.append(tuples) },
+            notificationHandler: { _, _, _ in },
+            activeWatchHandler: { nil },
+            locationHandler: { throw WeatherSourceError.locationNotAllowed },
+            appGlanceReloadHandler: { slices, owner in
+                reloaded.append(slices, owner: owner)
+                return true
+            }
+        )
+
+        try await runtime.load(
+            source: """
+            Pebble.addEventListener('ready', function () {
+              Pebble.timelineSubscribe('a-topic', function () {
+                Pebble.sendAppMessage({kept: 'subscribed somehow'});
+              }, function () {
+                Pebble.appGlanceReload(
+                  [{layout: {icon: 'system://images/TIMELINE_WEATHER', subtitleTemplateString: 'Sunny'}}],
+                  function (slices) { Pebble.sendAppMessage({kept: 'glance saved ' + slices.length}); },
+                  function () { Pebble.sendAppMessage({kept: 'glance failed'}); }
+                );
+              });
+            });
+            """,
+            application: makeApplication(id: id)
+        )
+        for _ in 0..<40 where sent.tuples.isEmpty {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+
+        #expect(sent.tuples.first?.value == .string("glance saved 1"))
+        let glance = try #require(reloaded.glances.first)
+        #expect(glance.0.first?.subtitleTemplate == "Sunny")
+        #expect(glance.0.first?.icon == .weather)
+        #expect(glance.1 == id)
+    }
+
     /// A script's request is answered across origins: PKJS scripts were
     /// written for a runtime without the web's same-origin rules, and the
     /// services they call offer no CORS headers to a pebble.local origin —
@@ -400,6 +447,16 @@ private extension NWListener.State {
     var isFailure: Bool {
         if case .failed = self { return true }
         return false
+    }
+}
+
+/// The glances a script reloaded, held where the handler can reach them.
+@MainActor
+private final class PendingGlances {
+    private(set) var glances: [([AppGlanceSlice], UUID)] = []
+
+    func append(_ slices: [AppGlanceSlice], owner: UUID) {
+        glances.append((slices, owner))
     }
 }
 

@@ -317,6 +317,9 @@ public final class AppModel {
         },
         timelinePinDeleteHandler: { [weak self] backingID, applicationID in
             await self?.deleteCompanionTimelinePin(backingID: backingID, applicationID: applicationID)
+        },
+        appGlanceReloadHandler: { [weak self] slices, applicationID in
+            await self?.reloadCompanionAppGlance(slices, applicationID: applicationID) ?? false
         }
     )
 
