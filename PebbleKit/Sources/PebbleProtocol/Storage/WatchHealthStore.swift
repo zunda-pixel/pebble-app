@@ -33,6 +33,9 @@ public struct WatchHealthSample: Codable, Equatable, Identifiable, Sendable {
     /// cannot honestly become per-moment samples again. Empty wherever
     /// `heartRate` is nil, and for files written before this existed.
     public var heartRateReadings: [HeartRateReading] = []
+    /// The walks, runs and open workouts the watch recorded, filed under the
+    /// day they ended in. Empty for a day from HealthKit or an older file.
+    public var workouts: [WatchWorkout] = []
     public var timeZoneIdentifier: String = TimeZone.current.identifier
     public var source: WatchHealthDataSource = .watch
     public var updatedAt: Date = Date()
@@ -40,7 +43,7 @@ public struct WatchHealthSample: Codable, Equatable, Identifiable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case id, date, steps, sleepMinutes, deepSleepMinutes, sleepSessions
         case activeKilocalories, restingKilocalories, distanceMetres, activeMinutes
-        case heartRate, heartRateReadings, timeZoneIdentifier, source, updatedAt
+        case heartRate, heartRateReadings, workouts, timeZoneIdentifier, source, updatedAt
     }
 
     public init(from decoder: any Decoder) throws {
@@ -57,6 +60,7 @@ public struct WatchHealthSample: Codable, Equatable, Identifiable, Sendable {
         activeMinutes = try container.decodeIfPresent(Int.self, forKey: .activeMinutes) ?? 0
         heartRate = try container.decodeIfPresent(WatchHeartRateSummary.self, forKey: .heartRate)
         heartRateReadings = try container.decodeIfPresent([HeartRateReading].self, forKey: .heartRateReadings) ?? []
+        workouts = try container.decodeIfPresent([WatchWorkout].self, forKey: .workouts) ?? []
         timeZoneIdentifier = try container.decodeIfPresent(String.self, forKey: .timeZoneIdentifier)
             ?? TimeZone.current.identifier
         source = try container.decodeIfPresent(WatchHealthDataSource.self, forKey: .source) ?? .watch
@@ -172,6 +176,17 @@ public actor WatchHealthStore {
             case (nil, nil):
                 resolved.heartRate = nil
                 resolved.heartRateReadings = []
+            }
+            // Workouts arrive one sync at a time — the morning walk in the
+            // morning, the evening run in the evening — so the day is the
+            // union of both records, keyed by when each workout started, and
+            // the newer record wins only where both tell the same workout.
+            if !existing.workouts.isEmpty || !normalized.workouts.isEmpty {
+                let (older, newer) = normalized.updatedAt >= existing.updatedAt
+                    ? (existing, normalized) : (normalized, existing)
+                var byStart: [Date: WatchWorkout] = [:]
+                for workout in older.workouts + newer.workouts { byStart[workout.start] = workout }
+                resolved.workouts = byStart.values.sorted { $0.start < $1.start }
             }
             // The night is taken whole from whichever record is newer: its
             // total, its restful part and the sessions it was made of belong

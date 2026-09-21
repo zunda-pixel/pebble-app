@@ -60,7 +60,7 @@ public struct HealthDataLoggingProcessor: Sendable {
         case 81:
             return try stepSamples(from: bytes, itemSize: session.itemSize)
         case 83, 84:
-            return try sleepSamples(from: bytes, itemSize: session.itemSize)
+            return try sessionSamples(from: bytes, itemSize: session.itemSize)
         default:
             return []
         }
@@ -134,36 +134,73 @@ public struct HealthDataLoggingProcessor: Sendable {
         }
     }
 
-    /// Sleep as the watch keeps it: one record per stretch, filed under the day
-    /// it ended in.
+    /// Where the fields this reads sit inside one
+    /// `ActivitySessionDataLoggingRecord` (`activity_private.h`): the type at
+    /// byte 4, the UTC offset, start and length after it, and — from logging
+    /// version 3 — what a stepping session cost (`ActivitySessionDataStepping`
+    /// in `activity.h`), four little-endian words from byte 18.
+    private enum SessionRecord {
+        static let type = 4
+        static let utcOffset = 6
+        static let start = 10
+        static let duration = 14
+        static let steps = 18
+        static let activeKilocalories = 20
+        static let restingKilocalories = 22
+        static let distanceMetres = 24
+        static let sizeWithStepping = 26
+    }
+
+    /// Sleep and workouts as the watch keeps them: one record per session,
+    /// filed under the day it ended in.
     ///
     /// A restful stretch (types 2 and 4) lies *inside* a sleep or a nap and is
     /// the same minutes said again — `activity.h` is explicit that its start and
     /// end are always within the containing session. Adding all four types
     /// together, which this used to do, made a night with two hours of deep
-    /// sleep ten hours long.
-    private func sleepSamples(from bytes: [UInt8], itemSize: Int) throws -> [WatchHealthSample] {
-        var daily: [Date: (intervals: [SleepInterval], timeZoneIdentifier: String)] = [:]
+    /// sleep ten hours long. Walks, runs and open workouts (types 5–7) travel
+    /// on the same session and stand alone.
+    private func sessionSamples(from bytes: [UInt8], itemSize: Int) throws -> [WatchHealthSample] {
+        var daily: [Date: (intervals: [SleepInterval], workouts: [WatchWorkout], timeZoneIdentifier: String)] = [:]
         for itemStart in stride(from: 0, to: bytes.count - (bytes.count % itemSize), by: itemSize) {
             let itemEnd = itemStart + itemSize
             guard itemEnd <= bytes.count, itemSize >= 18 else { continue }
-            let type = try uint16(bytes, at: itemStart + 4)
-            guard (1...4).contains(type) else { continue }
-            let rawOffset = Int32(bitPattern: try uint32(bytes, at: itemStart + 6))
-            let start = try uint32(bytes, at: itemStart + 10)
-            let duration = try uint32(bytes, at: itemStart + 14)
+            let type = try uint16(bytes, at: itemStart + SessionRecord.type)
+            guard (1...7).contains(type) else { continue }
+            let rawOffset = Int32(bitPattern: try uint32(bytes, at: itemStart + SessionRecord.utcOffset))
+            let start = try uint32(bytes, at: itemStart + SessionRecord.start)
+            let duration = try uint32(bytes, at: itemStart + SessionRecord.duration)
             let timeZone = TimeZone(secondsFromGMT: Int(rawOffset)) ?? .current
             var calendar = Calendar(identifier: .gregorian)
             calendar.timeZone = timeZone
             let endDate = Date(timeIntervalSince1970: TimeInterval(start + duration))
             let day = calendar.startOfDay(for: endDate)
-            var value = daily[day, default: ([], timeZone.identifier)]
-            value.intervals.append(SleepInterval(
-                start: Date(timeIntervalSince1970: TimeInterval(start)),
-                duration: TimeInterval(duration),
-                // Restful sleep, and restful nap.
-                isDeep: type == 2 || type == 4
-            ))
+            var value = daily[day, default: ([], [], timeZone.identifier)]
+            switch type {
+            case 1...4:
+                value.intervals.append(SleepInterval(
+                    start: Date(timeIntervalSince1970: TimeInterval(start)),
+                    duration: TimeInterval(duration),
+                    // Restful sleep, and restful nap.
+                    isDeep: type == 2 || type == 4
+                ))
+            default:
+                // A record from before logging version 3 ends at the length:
+                // when and how long are known, what it cost is not.
+                let counted = itemSize >= SessionRecord.sizeWithStepping
+                value.workouts.append(WatchWorkout(
+                    start: Date(timeIntervalSince1970: TimeInterval(start)),
+                    duration: TimeInterval(duration),
+                    kind: type == 5 ? .walk : type == 6 ? .run : .open,
+                    steps: counted ? Int(try uint16(bytes, at: itemStart + SessionRecord.steps)) : 0,
+                    activeKilocalories: counted
+                        ? Int(try uint16(bytes, at: itemStart + SessionRecord.activeKilocalories)) : 0,
+                    restingKilocalories: counted
+                        ? Int(try uint16(bytes, at: itemStart + SessionRecord.restingKilocalories)) : 0,
+                    distanceMetres: counted
+                        ? Int(try uint16(bytes, at: itemStart + SessionRecord.distanceMetres)) : 0
+                ))
+            }
             daily[day] = value
         }
         return daily.map { day, value in
@@ -174,6 +211,7 @@ public struct HealthDataLoggingProcessor: Sendable {
                 sleepMinutes: min(24 * 60, sessions.reduce(0) { $0 + $1.asleepMinutes }),
                 deepSleepMinutes: min(24 * 60, sessions.reduce(0) { $0 + $1.deepMinutes }),
                 sleepSessions: sessions,
+                workouts: value.workouts.sorted { $0.start < $1.start },
                 timeZoneIdentifier: value.timeZoneIdentifier,
                 source: .watch
             )

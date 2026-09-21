@@ -32,9 +32,17 @@ final class HealthKitBridge {
             HKQuantityType.quantityType(forIdentifier: $0.identifier) as HKObjectType?
         }
         try await store.requestAuthorization(
-            toShare: [stepsType, sleepType, heartRateType],
+            toShare: Set([stepsType, sleepType, heartRateType] as [HKSampleType] + workoutShareTypes),
             read: Set([stepsType, sleepType] as [HKObjectType] + effortTypes)
         )
+    }
+
+    /// A workout, and the samples that carry what it cost: HealthKit derives a
+    /// workout's totals from the samples attached to it.
+    private var workoutShareTypes: [HKSampleType] {
+        [HKObjectType.workoutType() as HKSampleType]
+            + [HKQuantityTypeIdentifier.activeEnergyBurned, .distanceWalkingRunning]
+                .compactMap { HKQuantityType.quantityType(forIdentifier: $0) }
     }
 
     func synchronize(
@@ -50,7 +58,7 @@ final class HealthKitBridge {
         switch authorization {
         case .mayAsk:
             try await store.requestAuthorization(
-                toShare: [stepsType, sleepType, heartRateType],
+                toShare: Set([stepsType, sleepType, heartRateType] as [HKSampleType] + workoutShareTypes),
                 read: [stepsType, sleepType]
             )
         case .onlyWhatIsAlreadyGranted:
@@ -63,9 +71,11 @@ final class HealthKitBridge {
         // takes them separately. Skipping just the refused type keeps the rest
         // flowing rather than failing the whole export.
         let mayWriteHeartRate = store.authorizationStatus(for: heartRateType) == .sharingAuthorized
+        let mayWriteWorkouts = store.authorizationStatus(for: .workoutType()) == .sharingAuthorized
         let changedSamples = samples.filter { $0.updatedAt > lastExportDate && $0.source != .healthKit }
         var healthSamples: [HKSample] = []
         var outgrownSleepIdentifiers: [String] = []
+        var workoutWrites: [(workout: WatchWorkout, metadata: [String: Any])] = []
         for sample in changedSamples {
             let version = max(1, Int(sample.updatedAt.timeIntervalSince1970))
             let baseIdentifier = "pebble.\(sample.id.uuidString.lowercased())"
@@ -120,6 +130,14 @@ final class HealthKitBridge {
                     metadata: sleepMetadata
                 ))
             }
+            if mayWriteWorkouts {
+                for workout in sample.workouts where workout.duration > 0 {
+                    var workoutMetadata = commonMetadata
+                    workoutMetadata[HKMetadataKeySyncIdentifier] =
+                        "\(baseIdentifier).workout.\(Int(workout.start.timeIntervalSince1970))"
+                    workoutWrites.append((workout, workoutMetadata))
+                }
+            }
             if mayWriteHeartRate {
                 // One sample per measured minute, at the minute it was
                 // measured — a day's average written as one sample would sit
@@ -153,10 +171,67 @@ final class HealthKitBridge {
                 )
             )
         }
+        for (workout, metadata) in workoutWrites {
+            try await saveWorkout(workout, metadata: metadata)
+        }
         if !healthSamples.isEmpty {
             try await store.save(healthSamples)
+        }
+        if !healthSamples.isEmpty || !workoutWrites.isEmpty {
             lastExportDate = changedSamples.map(\.updatedAt).max() ?? lastExportDate
         }
+    }
+
+    /// One watch workout as HealthKit takes it: a builder over the workout's
+    /// real span, with the distance and active energy attached as samples —
+    /// that is where a workout's totals come from since iOS 17 retired the
+    /// total-carrying initializers.
+    private func saveWorkout(_ workout: WatchWorkout, metadata: [String: Any]) async throws {
+        let configuration = HKWorkoutConfiguration()
+        configuration.activityType = switch workout.kind {
+        case .walk: .walking
+        case .run: .running
+        case .open: .other
+        }
+        let builder = HKWorkoutBuilder(healthStore: store, configuration: configuration, device: nil)
+        try await builder.beginCollection(at: workout.start)
+        try await builder.addMetadata(metadata)
+        // The attached samples get identifiers of their own: replacing the
+        // workout on a re-export replaces the workout object, and a distance
+        // left without one would stay behind and count twice.
+        func attachedMetadata(_ suffix: String) -> [String: Any] {
+            var value = metadata
+            value[HKMetadataKeySyncIdentifier] = (metadata[HKMetadataKeySyncIdentifier] as? String ?? "") + suffix
+            return value
+        }
+        var attached: [HKSample] = []
+        if workout.distanceMetres > 0,
+           let distanceType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning),
+           store.authorizationStatus(for: distanceType) == .sharingAuthorized {
+            attached.append(HKQuantitySample(
+                type: distanceType,
+                quantity: HKQuantity(unit: .meter(), doubleValue: Double(workout.distanceMetres)),
+                start: workout.start,
+                end: workout.end,
+                metadata: attachedMetadata(".distance")
+            ))
+        }
+        if workout.activeKilocalories > 0,
+           let energyType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned),
+           store.authorizationStatus(for: energyType) == .sharingAuthorized {
+            attached.append(HKQuantitySample(
+                type: energyType,
+                quantity: HKQuantity(unit: .kilocalorie(), doubleValue: Double(workout.activeKilocalories)),
+                start: workout.start,
+                end: workout.end,
+                metadata: attachedMetadata(".energy")
+            ))
+        }
+        if !attached.isEmpty {
+            try await builder.addSamples(attached)
+        }
+        try await builder.endCollection(at: workout.end)
+        try await builder.finishWorkout()
     }
 
     private func deleteOwnObjects(of type: HKObjectType, predicate: NSPredicate) async throws {
@@ -241,6 +316,9 @@ final class HealthKitBridge {
         var effortBySource: [EffortMeasure: [Date: [String: Int]]] = [:]
         for (measure, type) in effortTypes {
             for case let sample as HKQuantitySample in try await query(type: type, start: start, end: end) {
+                // The watch's own workouts come back on these types too now,
+                // and reading them here would send the watch its own numbers.
+                guard !(sample.metadata?[HKMetadataKeySyncIdentifier] as? String ?? "").hasPrefix("pebble.") else { continue }
                 let day = Calendar.current.startOfDay(for: sample.startDate)
                 let source = sample.sourceRevision.source.bundleIdentifier
                 effortBySource[measure, default: [:]][day, default: [:]][source, default: 0]
