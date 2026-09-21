@@ -9,6 +9,15 @@ targets iOS 27 and macOS 27; the app target also builds for visionOS.
 | --- | --- |
 | `Pebble.xcodeproj` | The app project. One shared scheme, `Pebble`. |
 | `Pebble/` | App target: `MainApp.swift`, `Info.plist`, entitlements, app-level strings. |
+
+`Info.plist` carries no comments — Xcode rewrites the file and strips them — so
+its one non-obvious entry is explained here instead: `NSAppTransportSecurity`
+allows `NSAllowsArbitraryLoadsInWebContent` because watch applications'
+settings pages are largely plain http — the ones people already own were
+written years ago and are served as they were. It is the `InWebContent` key
+rather than the blanket one, so it reaches the configuration web view and
+nothing the app fetches itself — the application catalogue, the firmware and
+the weather all stay https.
 | `PebbleKit/` | Local Swift package with everything else. Its only product, `PebbleKit`, exports the `PebbleApp` target. |
 | `PebbleKit/Sources/PebbleProtocol` | What the watch says and what the phone says back. **Foundation only** — no CoreBluetooth, no SwiftUI, so it holds anywhere and a test of it needs no radio. Six folders, below. |
 | &nbsp;&nbsp;`Wire/` | The link itself: frames, PPoG, the advertisement, the pairing state, the `WatchClient` protocol every transport implements, and the byte helpers. |
