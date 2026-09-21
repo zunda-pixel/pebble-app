@@ -31,6 +31,63 @@ public struct SleepSession: Codable, Equatable, Sendable {
     public var deepMinutes: Int { Int(deep / 60) }
 }
 
+/// One non-overlapping piece of a session, the shape an export can write.
+@MemberwiseInit(.public)
+public struct SleepStageSegment: Equatable, Sendable {
+    public var start: Date
+    public var end: Date
+    public var isDeep: Bool
+}
+
+public extension SleepSession {
+    /// The session cut into non-overlapping stage segments.
+    ///
+    /// The firmware records a restful stretch *inside* the sleep it belongs to
+    /// — the same minutes told twice — so writing the intervals as they are
+    /// would double-count the night. The deep stretches are kept whole and the
+    /// light ones lose the minutes the deep ones already tell.
+    ///
+    /// A session from a file written before intervals were kept has none; the
+    /// whole session comes back as one light segment, because the deep
+    /// minutes' positions are genuinely unknown and placing them anywhere
+    /// would be invention.
+    var stageSegments: [SleepStageSegment] {
+        guard !intervals.isEmpty else {
+            return [SleepStageSegment(start: start, end: end, isDeep: false)]
+        }
+        let deepRanges = Self.merged(intervals.filter(\.isDeep))
+        let lightRanges = Self.merged(intervals.filter { !$0.isDeep })
+        var segments = deepRanges.map { SleepStageSegment(start: $0.start, end: $0.end, isDeep: true) }
+        for light in lightRanges {
+            var cursor = light.start
+            for deep in deepRanges where deep.end > light.start && deep.start < light.end {
+                if deep.start > cursor {
+                    segments.append(SleepStageSegment(start: cursor, end: deep.start, isDeep: false))
+                }
+                cursor = max(cursor, deep.end)
+            }
+            if cursor < light.end {
+                segments.append(SleepStageSegment(start: cursor, end: light.end, isDeep: false))
+            }
+        }
+        return segments.sorted { $0.start < $1.start }
+    }
+
+    /// Overlapping and touching stretches folded into disjoint ranges,
+    /// oldest first.
+    private static func merged(_ intervals: [SleepInterval]) -> [(start: Date, end: Date)] {
+        var ranges: [(start: Date, end: Date)] = []
+        for interval in intervals.sorted(by: { $0.start < $1.start }) {
+            if let last = ranges.last, interval.start <= last.end {
+                ranges[ranges.count - 1].end = max(last.end, interval.end)
+            } else {
+                ranges.append((interval.start, interval.end))
+            }
+        }
+        return ranges
+    }
+}
+
 public enum SleepSessions {
     /// How long a gap can be and still be the same night. Waking to turn over
     /// is not the end of a sleep; going for breakfast is. An hour is where the

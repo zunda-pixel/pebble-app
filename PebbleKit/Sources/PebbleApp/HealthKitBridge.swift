@@ -65,6 +65,7 @@ final class HealthKitBridge {
         let mayWriteHeartRate = store.authorizationStatus(for: heartRateType) == .sharingAuthorized
         let changedSamples = samples.filter { $0.updatedAt > lastExportDate && $0.source != .healthKit }
         var healthSamples: [HKSample] = []
+        var outgrownSleepIdentifiers: [String] = []
         for sample in changedSamples {
             let version = max(1, Int(sample.updatedAt.timeIntervalSince1970))
             let baseIdentifier = "pebble.\(sample.id.uuidString.lowercased())"
@@ -81,7 +82,34 @@ final class HealthKitBridge {
                 end: sample.date.addingTimeInterval(60),
                 metadata: stepsMetadata
             ))
-            if sample.sleepMinutes > 0 {
+            if !sample.sleepSessions.isEmpty {
+                // The night as the watch measured it: real start and end, the
+                // nap as its own block, and the deep stretches as the stage
+                // they are. The synthetic block below misplaces all three.
+                // A day this app once exported as one synthetic block keeps
+                // that block even as the segments arrive — the identifiers
+                // differ, so nothing replaces it and the night counts twice.
+                outgrownSleepIdentifiers.append("\(baseIdentifier).sleep")
+                for session in sample.sleepSessions {
+                    for segment in session.stageSegments {
+                        var sleepMetadata = commonMetadata
+                        sleepMetadata[HKMetadataKeySyncIdentifier] =
+                            "\(baseIdentifier).sleep.\(Int(segment.start.timeIntervalSince1970))"
+                        healthSamples.append(HKCategorySample(
+                            type: sleepType,
+                            value: (segment.isDeep
+                                ? HKCategoryValueSleepAnalysis.asleepDeep
+                                : HKCategoryValueSleepAnalysis.asleepUnspecified).rawValue,
+                            start: segment.start,
+                            end: segment.end,
+                            metadata: sleepMetadata
+                        ))
+                    }
+                }
+            } else if sample.sleepMinutes > 0 {
+                // A record from before sessions were kept knows only the
+                // total, so the block is synthetic — anchored to the day, not
+                // to when anybody slept.
                 var sleepMetadata = commonMetadata
                 sleepMetadata[HKMetadataKeySyncIdentifier] = "\(baseIdentifier).sleep"
                 healthSamples.append(HKCategorySample(
@@ -113,9 +141,30 @@ final class HealthKitBridge {
                 }
             }
         }
+        if !outgrownSleepIdentifiers.isEmpty {
+            // HealthKit only lets an app delete what it wrote itself, which is
+            // exactly the reach this needs. A day never exported the old way
+            // simply has nothing to delete.
+            try await deleteOwnObjects(
+                of: sleepType,
+                predicate: HKQuery.predicateForObjects(
+                    withMetadataKey: HKMetadataKeySyncIdentifier,
+                    allowedValues: outgrownSleepIdentifiers
+                )
+            )
+        }
         if !healthSamples.isEmpty {
             try await store.save(healthSamples)
             lastExportDate = changedSamples.map(\.updatedAt).max() ?? lastExportDate
+        }
+    }
+
+    private func deleteOwnObjects(of type: HKObjectType, predicate: NSPredicate) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            store.deleteObjects(of: type, predicate: predicate) { _, _, error in
+                if let error { continuation.resume(throwing: error) }
+                else { continuation.resume() }
+            }
         }
     }
 
