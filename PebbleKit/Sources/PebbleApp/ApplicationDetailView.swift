@@ -128,8 +128,25 @@ struct ApplicationDetailContent: View {
                 FeedbackBanner(feedback: feedback)
             }
             
-            if let releaseNotes = subject.catalogEntry?.releaseNotes {
-                Section("Release Notes") { Text(releaseNotes) }
+            if subject.catalogEntry?.releaseNotes != nil || subject.catalogEntry?.changelog.isEmpty == false {
+                Section("Release Notes") {
+                    if let releaseNotes = subject.catalogEntry?.releaseNotes {
+                        Text(releaseNotes)
+                    }
+                    // Hidden where the store told no history — a side-loaded
+                    // package, or a feed that does not carry one — rather than
+                    // opening onto an empty list.
+                    if let changelog = subject.catalogEntry?.changelog, !changelog.isEmpty {
+                        NavigationLink {
+                            CatalogChangelogView(
+                                entries: changelog,
+                                installedVersion: subject.installed?.storeVersion
+                            )
+                        } label: {
+                            Label("Version History", systemImage: "clock.arrow.circlepath")
+                        }
+                    }
+                }
             }
 
             if subject.installed != nil, subject.kind == .watchface {

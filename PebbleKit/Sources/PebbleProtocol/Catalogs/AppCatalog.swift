@@ -51,6 +51,10 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
     /// Which store listed it — `CatalogSource.id`. Nil for a row cached before
     /// sources existed, which can only have come from the Pebble store.
     public var sourceID: String? = nil
+    /// Every published version the store told of, newest first. Empty for a
+    /// row cached before this was kept, and for a store that says nothing —
+    /// which is also what hides the version-history entrance.
+    public var changelog: [CatalogChangelogEntry] = []
 
     public var declaredCapabilities: [WatchApplicationCapability] {
         WatchApplicationCapability.declared(in: capabilities)
@@ -59,7 +63,7 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case id, storeID, name, developer, version, downloadURL, supportedPlatforms
         case kind, category, summary, releaseNotes, iconURL, screenshotURLs, sha256
-        case capabilities, sourceID
+        case capabilities, sourceID, changelog
     }
 
     public init(from decoder: any Decoder) throws {
@@ -88,6 +92,7 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
         // why it decodes to empty rather than refusing the whole row.
         capabilities = try container.decodeIfPresent([String].self, forKey: .capabilities) ?? []
         sourceID = try container.decodeIfPresent(String.self, forKey: .sourceID)
+        changelog = try container.decodeIfPresent([CatalogChangelogEntry].self, forKey: .changelog) ?? []
     }
 
     /// The store's own page for this application, where there is one.
@@ -393,8 +398,11 @@ struct OfficialCatalogApplication: Decodable {
     var screenshotImages: [[String: String]]?
     var latestRelease: OfficialCatalogRelease?
 
+    /// Every published version, as the store lists them.
+    var changelog: [OfficialCatalogChangelogEntry]?
+
     private enum CodingKeys: String, CodingKey {
-        case author, capabilities, category, description, id, title, type, uuid
+        case author, capabilities, category, description, id, title, type, uuid, changelog
         case hardwarePlatforms = "hardware_platforms"
         case iconImage = "icon_image"
         case screenshotImages = "screenshot_images"
@@ -437,8 +445,52 @@ struct OfficialCatalogApplication: Decodable {
             iconURL: iconImage?.values.compactMap(URL.init(string:)).first,
             screenshotURLs: screenshotImages?.flatMap { $0.values }.compactMap(URL.init(string:)) ?? [],
             capabilities: capabilities ?? [],
-            sourceID: sourceID
+            sourceID: sourceID,
+            // Newest first however the store ordered them; an entry that names
+            // no version has nothing to head its row and costs itself alone.
+            changelog: (changelog ?? [])
+                .compactMap { entry -> CatalogChangelogEntry? in
+                    guard let version = entry.version?.nilWhenEmpty else { return nil }
+                    return CatalogChangelogEntry(
+                        version: version,
+                        publishedAt: OfficialCatalogChangelogEntry.date(entry.publishedDate),
+                        notes: entry.releaseNotes?.nilWhenEmpty
+                    )
+                }
+                .sorted { ($0.publishedAt ?? .distantPast) > ($1.publishedAt ?? .distantPast) }
         )
+    }
+}
+
+/// One row of an application's published history, as this app keeps it.
+@MemberwiseInit(.public)
+public struct CatalogChangelogEntry: Codable, Equatable, Sendable {
+    public var version: String
+    /// Nil where the store gave no date, or one this app could not read.
+    public var publishedAt: Date? = nil
+    public var notes: String? = nil
+}
+
+/// Optional fields for the reason every `OfficialCatalog…` field is: one
+/// half-written entry must cost itself, not the response it arrived in.
+struct OfficialCatalogChangelogEntry: Decodable {
+    var version: String?
+    var publishedDate: String?
+    var releaseNotes: String?
+    private enum CodingKeys: String, CodingKey {
+        case version
+        case publishedDate = "published_date"
+        case releaseNotes = "release_notes"
+    }
+
+    /// The store writes `2026-09-21T01:49:41.888` — fractional seconds, no
+    /// zone. The times are the store's own clock, which serves UTC, so a
+    /// zoneless one is read as UTC rather than dropped.
+    static func date(_ string: String?) -> Date? {
+        guard let string = string?.nilWhenEmpty else { return nil }
+        let zoned = string.contains("Z") || string.contains("+") ? string : string + "Z"
+        return (try? Date(zoned, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)))
+            ?? (try? Date(zoned, strategy: .iso8601))
     }
 }
 

@@ -6984,6 +6984,16 @@
         }
       }
     },
+    "Version History" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "バージョン履歴"
+          }
+        }
+      }
+    },
     "Vibration" : {
       "localizations" : {
         "ja" : {
