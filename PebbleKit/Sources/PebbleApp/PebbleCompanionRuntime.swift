@@ -15,6 +15,17 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
     private var notificationHandler: (WatchApplication, String, String) async throws -> Void
     private var activeWatchHandler: () -> ConnectedWatch?
     private var locationHandler: () async throws -> CLLocation
+    /// A live stream of positions for `watchPosition`, or a throw where the
+    /// phone has not been allowed to know. Throwing is the gate that keeps a
+    /// script's request from ever raising the OS permission dialog itself.
+    private var locationUpdatesHandler: @MainActor () throws -> AsyncThrowingStream<CLLocation, any Error>
+    /// A pin a script pushed, and the one it took back — owned by the
+    /// application whose script said so.
+    private var timelinePinInsertHandler: (CompanionTimelinePin, UUID) async -> Void
+    private var timelinePinDeleteHandler: (String, UUID) async -> Void
+    /// One task per `watchPosition` call, keyed by the script's own watch id,
+    /// cancelled by `clearWatch` and when the page goes away.
+    private var positionWatchers: [Int: Task<Void, Never>] = [:]
     private var loadContinuation: CheckedContinuation<Void, any Error>?
     private var loadedApplicationID: UUID?
     /// The load under way (or the finished one, which costs nothing to await).
@@ -29,13 +40,21 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
         appMessageHandler: @escaping (UUID, [AppMessageTuple]) async throws -> Void,
         notificationHandler: @escaping (WatchApplication, String, String) async throws -> Void,
         activeWatchHandler: @escaping () -> ConnectedWatch?,
-        locationHandler: @escaping () async throws -> CLLocation
+        locationHandler: @escaping () async throws -> CLLocation,
+        locationUpdatesHandler: @escaping @MainActor () throws -> AsyncThrowingStream<CLLocation, any Error> = {
+            throw WeatherSourceError.locationNotAllowed
+        },
+        timelinePinInsertHandler: @escaping (CompanionTimelinePin, UUID) async -> Void = { _, _ in },
+        timelinePinDeleteHandler: @escaping (String, UUID) async -> Void = { _, _ in }
     ) {
         self.openURLHandler = openURLHandler
         self.appMessageHandler = appMessageHandler
         self.notificationHandler = notificationHandler
         self.activeWatchHandler = activeWatchHandler
         self.locationHandler = locationHandler
+        self.locationUpdatesHandler = locationUpdatesHandler
+        self.timelinePinInsertHandler = timelinePinInsertHandler
+        self.timelinePinDeleteHandler = timelinePinDeleteHandler
         super.init()
     }
 
@@ -100,6 +119,22 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
           }),
           getAccountToken: () => \(accountTokenLiteral),
           getWatchToken: () => \(watchTokenLiteral),
+          // Refused honestly rather than answered with a made-up token: the
+          // real one is the Locker's, and this app has no account (#20, not
+          // planned). Deferred so the caller's own frame finishes first, the
+          // way the real answer would arrive.
+          getTimelineToken: (onSuccess, onFailure) => {
+            webkit.messageHandlers.pebble.postMessage({type:'timelineToken'});
+            setTimeout(() => onFailure && onFailure(), 0);
+          },
+          insertTimelinePin: pin =>
+            webkit.messageHandlers.pebble.postMessage({
+              type:'insertPin', pin: typeof pin === 'string' ? pin : JSON.stringify(pin)
+            }),
+          deleteTimelinePin: pin =>
+            webkit.messageHandlers.pebble.postMessage({
+              type:'deletePin', id: String(typeof pin === 'object' && pin ? pin.id : pin)
+            }),
           showSimpleNotificationOnPebble: (title, body) =>
             webkit.messageHandlers.pebble.postMessage({type:'notification', title, body})
         };
@@ -119,15 +154,23 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
         };
         Object.defineProperty(navigator, 'geolocation', {configurable: true, value: {
           getCurrentPosition: (success, failure) => { ask(success, failure); },
-          // Answered once rather than followed: the app asks for a position, it
-          // does not subscribe to them. An app watching gets the first fix and
-          // no refreshes, which is the whole of what is on offer.
-          watchPosition: (success, failure) => ask(success, failure),
-          clearWatch: id => { delete positions[id]; }
+          // Followed, not answered once: the entry stays and the app keeps
+          // delivering into it until clearWatch (#90).
+          watchPosition: (success, failure) => {
+            const id = ++positionID;
+            positions[id] = {success, failure, watching: true};
+            webkit.messageHandlers.pebble.postMessage({type:'watchPosition', id});
+            return id;
+          },
+          clearWatch: id => {
+            if (positions[id] && positions[id].watching)
+              webkit.messageHandlers.pebble.postMessage({type:'clearWatch', id});
+            delete positions[id];
+          }
         }});
         window.__pebblePosition = (id, position, error) => {
           const cb = positions[id]; if (!cb) return;
-          delete positions[id];
+          if (!cb.watching) delete positions[id];
           if (position) cb.success?.(position); else cb.failure?.(error);
         };
         window.__pebbleDispatch = (name, detail) => (listeners[name] || []).forEach(fn => fn(detail));
@@ -138,6 +181,9 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
         window.__pebbleDispatch('ready', {});
         </script>
         """
+        // The page being replaced takes its watchers with it: their
+        // callbacks live in the page.
+        cancelPositionWatchers()
         let webView = makeWebView(for: application)
         self.webView = webView
         loadedApplicationID = application.id
@@ -204,6 +250,47 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
             Task { await answerPosition(requestID: requestID) }
             return
         }
+        if type == "watchPosition", let requestID = body["id"] as? Int {
+            startPositionWatcher(requestID: requestID)
+            return
+        }
+        if type == "clearWatch", let requestID = body["id"] as? Int {
+            positionWatchers.removeValue(forKey: requestID)?.cancel()
+            return
+        }
+        if type == "timelineToken" {
+            Task {
+                await DiagnosticLog.shared.record(
+                    category: "configuration",
+                    message: "an application asked for a timeline token;"
+                        + " this app has no account to mint one (#20)"
+                )
+            }
+            return
+        }
+        if type == "insertPin", let pinJSON = body["pin"] as? String, let application {
+            let applicationID = application.id
+            Task {
+                do {
+                    let pin = try CompanionTimelinePin.parse(pinJSON)
+                    await timelinePinInsertHandler(pin, applicationID)
+                } catch {
+                    // The official API takes no callback here, so a broken pin
+                    // can only be told to the diagnostics.
+                    await DiagnosticLog.shared.record(
+                        .warning,
+                        category: "timeline",
+                        message: "an application's pin was refused: \(String(reflecting: error))"
+                    )
+                }
+            }
+            return
+        }
+        if type == "deletePin", let backingID = body["id"] as? String, let application {
+            let applicationID = application.id
+            Task { await timelinePinDeleteHandler(backingID, applicationID) }
+            return
+        }
         if type == "notification",
            let title = body["title"] as? String,
            let notificationBody = body["body"] as? String,
@@ -261,8 +348,47 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
     /// app. The next message starts a fresh page.
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         loadedApplicationID = nil
+        cancelPositionWatchers()
         loadContinuation?.resume(throwing: CompanionRuntimeError.pageWentAway)
         loadContinuation = nil
+    }
+
+    /// Follows the phone's position for a script's `watchPosition`, delivering
+    /// every fix into the same callback until `clearWatch` or the page's end.
+    private func startPositionWatcher(requestID: Int) {
+        positionWatchers.removeValue(forKey: requestID)?.cancel()
+        positionWatchers[requestID] = Task { [weak self] in
+            do {
+                guard let updates = try self?.locationUpdatesHandler() else { return }
+                for try await location in updates {
+                    guard !Task.isCancelled else { return }
+                    await self?.deliverPosition(
+                        requestID: requestID,
+                        position: Self.webPosition(location),
+                        error: nil
+                    )
+                }
+            } catch {
+                guard !Task.isCancelled else { return }
+                let refused = (error as? WeatherSourceError) == .locationNotAllowed
+                await self?.deliverPosition(
+                    requestID: requestID,
+                    position: nil,
+                    error: [
+                        "code": refused ? 1 : 2,
+                        "message": refused
+                            ? "Pebble has not been allowed your position."
+                            : "Your position could not be found.",
+                    ]
+                )
+            }
+        }
+    }
+
+    /// The page is going or gone: nobody is left to deliver positions to.
+    private func cancelPositionWatchers() {
+        for watcher in positionWatchers.values { watcher.cancel() }
+        positionWatchers = [:]
     }
 
     /// Answers a script's request for a position, in the shape the web has for

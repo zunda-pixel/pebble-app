@@ -74,6 +74,47 @@ extension AppModel {
         }
     }
 
+    /// A pin a watch app's JavaScript pushed (#90). Same insert again is an
+    /// update — the identifier is a digest of (application, the script's own
+    /// pin id) — and silent either way: the official API takes no callback, so
+    /// there is nobody to answer, and a banner would interrupt whoever is on
+    /// screen about a background script's bookkeeping.
+    func insertCompanionTimelinePin(_ webPin: CompanionTimelinePin, applicationID: UUID) async {
+        let pin = webPin.timelinePin(applicationID: applicationID)
+        await loadTimeline()
+        timeline.pins.removeAll { $0.id == pin.id }
+        timeline.pins.append(pin)
+        do {
+            try await timelineStore.save(timeline.pins)
+        } catch {
+            timeline.pins.removeAll { $0.id == pin.id }
+            await DiagnosticLog.shared.record(
+                .error,
+                category: "timeline",
+                message: "an application's pin could not be saved: \(String(reflecting: error))"
+            )
+            return
+        }
+        try? await queueTimelineOperation(.upsert(pin))
+        if connectedWatch != nil { await synchronizeTimeline() }
+    }
+
+    /// The pin that script takes back. Only its own can go: the identifier is
+    /// derived from the asking application, so one app's id can never name
+    /// another's pin.
+    func deleteCompanionTimelinePin(backingID: String, applicationID: UUID) async {
+        let id = CompanionTimelinePin.pinID(applicationID: applicationID, backingID: backingID)
+        await loadTimeline()
+        guard let pin = timeline.pins.first(where: { $0.id == id }) else {
+            await DiagnosticLog.shared.record(
+                category: "timeline",
+                message: "an application deleted a pin this app does not hold"
+            )
+            return
+        }
+        await removeTimelinePins([pin])
+    }
+
     // Named rather than numbered: the list they were picked from may be grouped
     // or narrowed by a search.
     public func removeTimelinePins(_ removed: [TimelinePin]) async {

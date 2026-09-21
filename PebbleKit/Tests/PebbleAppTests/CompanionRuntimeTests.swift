@@ -39,7 +39,11 @@ struct CompanionRuntimeTests {
         for application: WatchApplication,
         answeringPositionWith position: @escaping () async throws -> CLLocation = {
             throw WeatherSourceError.locationNotAllowed
-        }
+        },
+        watchingPositionsWith updates: @escaping @MainActor () throws -> AsyncThrowingStream<CLLocation, any Error> = {
+            throw WeatherSourceError.locationNotAllowed
+        },
+        untilSent: Int = 1
     ) async throws -> [AppMessageTuple] {
         let sent = SentTuples()
         let runtime = PebbleCompanionRuntime(
@@ -47,12 +51,13 @@ struct CompanionRuntimeTests {
             appMessageHandler: { _, tuples in sent.append(tuples) },
             notificationHandler: { _, _, _ in },
             activeWatchHandler: { nil },
-            locationHandler: position
+            locationHandler: position,
+            locationUpdatesHandler: updates
         )
         try await runtime.load(source: script, application: application)
         // `ready` is dispatched by the load, and the script answers on the
         // handler above; the round trip is through a web view either way.
-        for _ in 0..<40 where sent.tuples.isEmpty {
+        for _ in 0..<40 where sent.tuples.count < untilSent {
             try? await Task.sleep(for: .milliseconds(50))
         }
         return sent.tuples
@@ -170,15 +175,13 @@ struct CompanionRuntimeTests {
         #expect(answered.first?.value == .string("code 1 true"))
     }
 
-    /// `watchPosition` answers once and hands back a token `clearWatch` takes.
-    ///
-    /// A script that watches gets its first fix; it does not get refreshes,
-    /// which is what the app has to offer and is worth being plain about.
+    /// `watchPosition` follows the phone: every fix lands in the same callback
+    /// until `clearWatch` takes the token back (#90).
     ///
     /// Both ways round in one test on purpose: that nothing arrives after
     /// `clearWatch` means nothing on its own — it is also what a shim that
     /// never worked would do. The pair differs by that one call.
-    @Test func aScriptWatchingIsAnsweredOnceAndCanStop() async throws {
+    @Test func aScriptWatchingIsFollowedUntilItStops() async throws {
         let watching = UUID()
         let cleared = UUID()
         defer {
@@ -187,7 +190,13 @@ struct CompanionRuntimeTests {
                 await PebbleCompanionRuntime.forget(applicationID: cleared)
             }
         }
-        let position = { CLLocation(latitude: 1.5, longitude: 2.5) }
+        // Two fixes and then an open line, which is what a live watch is.
+        let fixes: @MainActor () throws -> AsyncThrowingStream<CLLocation, any Error> = {
+            AsyncThrowingStream { continuation in
+                continuation.yield(CLLocation(latitude: 1.5, longitude: 2.5))
+                continuation.yield(CLLocation(latitude: 3.5, longitude: 2.5))
+            }
+        }
 
         let answered = try await run(
             """
@@ -198,9 +207,10 @@ struct CompanionRuntimeTests {
             });
             """,
             for: makeApplication(id: watching),
-            answeringPositionWith: position
+            watchingPositionsWith: fixes,
+            untilSent: 2
         )
-        #expect(answered.first?.value == .string("token true at 1.5"))
+        #expect(answered.map(\.value) == [.string("token true at 1.5"), .string("token true at 3.5")])
 
         let stopped = try await run(
             """
@@ -212,7 +222,7 @@ struct CompanionRuntimeTests {
             });
             """,
             for: makeApplication(id: cleared),
-            answeringPositionWith: position
+            watchingPositionsWith: fixes
         )
         #expect(stopped.isEmpty)
     }

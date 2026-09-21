@@ -284,6 +284,39 @@ public final class AppModel {
         locationHandler: { [weak self] in
             guard let self else { throw WeatherSourceError.locationNotAllowed }
             return try await self.phoneLocationSource.currentLocation()
+        },
+        // Followed positions for `watchPosition` (#90). Gated on the phone's
+        // standing permission and never asking for it: a script's request must
+        // not be what raises the OS dialog.
+        locationUpdatesHandler: { [weak self] in
+            guard let self, self.phoneLocationSource.isAllowed else {
+                throw WeatherSourceError.locationNotAllowed
+            }
+            // `CLLocationUpdate.Updates` cannot be made by hand, which is what
+            // a test needs to stand a stream of fixes in — so the fixes travel
+            // as a plain stream and the CoreLocation shape stays here.
+            let updates = CLLocationUpdate.liveUpdates()
+            return AsyncThrowingStream { continuation in
+                let task = Task {
+                    do {
+                        for try await update in updates {
+                            if let location = update.location {
+                                continuation.yield(location)
+                            }
+                        }
+                        continuation.finish()
+                    } catch {
+                        continuation.finish(throwing: error)
+                    }
+                }
+                continuation.onTermination = { _ in task.cancel() }
+            }
+        },
+        timelinePinInsertHandler: { [weak self] pin, applicationID in
+            await self?.insertCompanionTimelinePin(pin, applicationID: applicationID)
+        },
+        timelinePinDeleteHandler: { [weak self] backingID, applicationID in
+            await self?.deleteCompanionTimelinePin(backingID: backingID, applicationID: applicationID)
         }
     )
 
