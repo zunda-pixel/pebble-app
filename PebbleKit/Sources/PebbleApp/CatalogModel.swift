@@ -9,6 +9,8 @@ public import Observation
 @Observable
 public final class CatalogModel {
     public internal(set) var applications: [CatalogApplication] = []
+    /// The feed's shelves — Top Picks, Most Loved — in the feed's own order.
+    public internal(set) var collections: [CatalogCollection] = []
     /// Where these came from, so that asking the store about one application
     /// goes to the store the rest of them came from.
     public internal(set) var sourceURL: URL?

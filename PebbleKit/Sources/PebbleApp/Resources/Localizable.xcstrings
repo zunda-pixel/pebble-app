@@ -1504,6 +1504,16 @@
         }
       }
     },
+    "Collections" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "コレクション"
+          }
+        }
+      }
+    },
     "Colours" : {
       "localizations" : {
         "ja" : {
@@ -5546,6 +5556,16 @@
         }
       }
     },
+    "The collection could not be fetched." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "コレクションを取得できませんでした。"
+          }
+        }
+      }
+    },
     "The connection failed: the watch has thrown away its pairing with this device. A Pebble keeps one, so pairing it with another phone or computer does this. Forget the watch in the system Bluetooth settings, then pair it again here." : {
       "localizations" : {
         "ja" : {
@@ -6459,6 +6479,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "この変更内容を保存できませんでした。いまは有効ですが、次回の起動時には失われます。"
+          }
+        }
+      }
+    },
+    "This collection is empty." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "このコレクションは空です。"
           }
         }
       }

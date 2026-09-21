@@ -233,6 +233,21 @@ enum PreviewSamples {
         summary: "A watchface with nothing on it but the time."
     )
 
+    static let catalogCollections: [CatalogCollection] = [
+        CatalogCollection(
+            slug: "top-picks",
+            name: "Top Picks (Changes Daily)",
+            kind: .watchface,
+            appsPath: "/api/v1/apps/collection/top-picks/faces"
+        ),
+        CatalogCollection(
+            slug: "most-loved",
+            name: "Most Loved",
+            kind: .watchapp,
+            appsPath: "/api/v1/apps/collection/most-loved/apps"
+        ),
+    ]
+
     static let weatherPlaces: [WeatherPlace] = [
         WeatherPlace(id: UUID(), name: "現在地", position: .phone),
         WeatherPlace(id: UUID(), name: "Kyoto", position: .fixed(latitude: 35.01, longitude: 135.76)),

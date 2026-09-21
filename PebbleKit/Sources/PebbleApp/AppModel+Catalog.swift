@@ -28,6 +28,7 @@ extension AppModel {
         do {
             let snapshot = try await appCatalog.cachedSnapshot(source: selectedCatalogSource)
             catalog.applications = snapshot?.applications ?? []
+            catalog.collections = snapshot?.collections ?? []
             catalog.sourceURL = snapshot?.sourceURL
             catalog.lastUpdated = snapshot?.fetchedAt
         }
@@ -44,6 +45,7 @@ extension AppModel {
                 source: selectedCatalogSource
             )
             catalog.applications = snapshot.applications
+            catalog.collections = snapshot.collections
             catalog.sourceURL = snapshot.sourceURL
             catalog.lastUpdated = snapshot.fetchedAt
             // Silent on success, like the installs (owner feedback,
@@ -56,6 +58,30 @@ extension AppModel {
                     ? "The app catalog could not be updated."
                     : "Catalog refresh failed; showing the offline cache."
             )
+        }
+    }
+
+    /// One page of a shelf's full listing. Nil is the network's refusal — the
+    /// screen that asked shows it in place, because the reader is looking at
+    /// the shelf, not at the catalogue behind it.
+    public func fetchCollectionPage(
+        _ collection: CatalogCollection,
+        offset: Int
+    ) async -> CatalogCollectionPage? {
+        do {
+            return try await appCatalog.collectionPage(
+                collection,
+                offset: offset,
+                hardware: connectedWatch?.model?.compatibleApplicationVariants.first,
+                source: selectedCatalogSource
+            )
+        } catch {
+            await DiagnosticLog.shared.record(
+                .error,
+                category: "catalog",
+                message: "collection \(collection.slug) page failed: \(String(reflecting: error))"
+            )
+            return nil
         }
     }
 

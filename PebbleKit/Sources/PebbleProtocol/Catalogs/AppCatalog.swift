@@ -137,11 +137,52 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+/// One of the store's shelves: Top Picks, Most Loved, and whatever else the
+/// feed curates. Login-free by nature — the Heart-backed one is account
+/// territory and deliberately absent (#107).
+@MemberwiseInit(.public)
+public struct CatalogCollection: Codable, Equatable, Identifiable, Sendable {
+    /// The store's own slug, unique within one kind of one feed.
+    public var slug: String
+    /// The store's title, shown verbatim: the shelf is the store's to name.
+    public var name: String
+    /// Which home it came off — the store keeps one for apps and one for faces,
+    /// and `top-picks` exists on both as two different shelves.
+    public var kind: WatchApplicationKind
+    /// The store's own path for the full listing, server-relative
+    /// (`/api/v1/apps/collection/top-picks/faces`).
+    public var appsPath: String? = nil
+
+    public var id: String { "\(kind.rawValue)/\(slug)" }
+}
+
 @MemberwiseInit(.public)
 public struct CatalogSnapshot: Codable, Equatable, Sendable {
     public var sourceURL: URL
     public var fetchedAt: Date = Date()
     public var applications: [CatalogApplication]
+    /// The feed's shelves, faces first to match the applications' own mixing.
+    /// Empty for a cache written before these were kept.
+    public var collections: [CatalogCollection] = []
+
+    private enum CodingKeys: String, CodingKey {
+        case sourceURL, fetchedAt, applications, collections
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        sourceURL = try container.decode(URL.self, forKey: .sourceURL)
+        fetchedAt = try container.decodeIfPresent(Date.self, forKey: .fetchedAt) ?? Date()
+        applications = try container.decode([CatalogApplication].self, forKey: .applications)
+        collections = try container.decodeIfPresent([CatalogCollection].self, forKey: .collections) ?? []
+    }
+}
+
+/// One page of a collection's full listing, and whether the store has more.
+@MemberwiseInit(.public)
+public struct CatalogCollectionPage: Equatable, Sendable {
+    public var applications: [CatalogApplication]
+    public var hasMore: Bool
 }
 
 public actor ApplicationCatalog {
@@ -220,14 +261,71 @@ public actor ApplicationCatalog {
         let sourceURL = feedURLOverride ?? source.feedURL
         async let watchapps = fetchOfficialHome(sourceURL, kind: .watchapp, model: model, source: source)
         async let watchfaces = fetchOfficialHome(sourceURL, kind: .watchface, model: model, source: source)
-        let applications = try await watchapps + watchfaces
+        let (apps, faces) = try await (watchapps, watchfaces)
+        let applications = apps.applications + faces.applications
         // Later entries win, so the newest description of an application is
         // the one kept.
         let unique = applications.reversed().uniqued(on: \.id)
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-        let snapshot = CatalogSnapshot(sourceURL: sourceURL, applications: unique)
+        let snapshot = CatalogSnapshot(
+            sourceURL: sourceURL,
+            applications: unique,
+            collections: faces.collections + apps.collections
+        )
         try PersistentJSON.save(snapshot, to: cacheURL(for: source))
         return snapshot
+    }
+
+    /// One page of a collection's full listing, from the path the feed gave.
+    /// - Parameter hardware: The connected watch's board, which decides the
+    ///   screenshots and the compatibility filter, as everywhere else.
+    public func collectionPage(
+        _ collection: CatalogCollection,
+        offset: Int,
+        limit: Int = 20,
+        hardware: String? = nil,
+        source: CatalogSource = .pebble
+    ) async throws -> CatalogCollectionPage {
+        guard let url = collectionPageURL(
+            for: collection,
+            offset: offset,
+            limit: limit,
+            hardware: hardware,
+            baseURL: feedURLOverride ?? source.feedURL
+        ) else { throw ApplicationCatalogError.invalidResponse }
+        let response = try JSONDecoder().decode(OfficialCatalogPage.self, from: await responseData(from: url))
+        return CatalogCollectionPage(
+            applications: response.data.compactMap {
+                // The entry's own word first: an apps shelf can hold faces and
+                // the other way round is not this app's to rule out.
+                $0.application(kind: $0.declaredKind ?? collection.kind, sourceID: source.id)
+            },
+            hasMore: response.links?.nextPage != nil
+        )
+    }
+
+    /// The path is the store's own, server-relative, so it resolves against
+    /// the feed's host rather than being appended to the feed's `/api` base —
+    /// the path already carries it.
+    func collectionPageURL(
+        for collection: CatalogCollection,
+        offset: Int,
+        limit: Int,
+        hardware: String?,
+        baseURL: URL
+    ) -> URL? {
+        guard let appsPath = collection.appsPath,
+              let resolved = URL(string: appsPath, relativeTo: baseURL) else { return nil }
+        var components = URLComponents(url: resolved, resolvingAgainstBaseURL: true)
+        var queryItems = [
+            URLQueryItem(name: "platform", value: "ios"),
+            URLQueryItem(name: "filter_hardware", value: "true"),
+            URLQueryItem(name: "offset", value: String(offset)),
+            URLQueryItem(name: "limit", value: String(limit)),
+        ]
+        if let hardware { queryItems.append(URLQueryItem(name: "hardware", value: hardware)) }
+        components?.queryItems = queryItems
+        return components?.url
     }
 
     public func download(_ application: CatalogApplication) async throws -> URL {
@@ -298,7 +396,7 @@ public actor ApplicationCatalog {
         kind: WatchApplicationKind,
         model: WatchModel?,
         source: CatalogSource
-    ) async throws -> [CatalogApplication] {
+    ) async throws -> (applications: [CatalogApplication], collections: [CatalogCollection]) {
         // `apps` and `faces`, the official application's own spelling
         // (`AppType.storeString()`): the Pebble store answers the longer
         // `watchapps`/`watchfaces` as well, but the Rebble store answers only
@@ -311,7 +409,10 @@ public actor ApplicationCatalog {
         components?.queryItems = queryItems
         if let value = components?.url { url = value }
         let response = try JSONDecoder().decode(OfficialCatalogHome.self, from: await responseData(from: url))
-        return response.applications.compactMap { $0.application(kind: kind, sourceID: source.id) }
+        return (
+            applications: response.applications.compactMap { $0.application(kind: kind, sourceID: source.id) },
+            collections: response.catalogCollections(kind: kind)
+        )
     }
 
     /// Nil where the store said it has no such application.
@@ -353,6 +454,37 @@ public actor ApplicationCatalog {
 
 struct OfficialCatalogHome: Decodable {
     var applications: [OfficialCatalogApplication]
+    /// The feed's shelves. Optional like everything off this wire.
+    var collections: [OfficialCatalogCollection]?
+
+    /// The shelves worth showing: one with neither a listing path nor a name
+    /// is nothing a screen can open or label, and costs itself alone.
+    func catalogCollections(kind: WatchApplicationKind) -> [CatalogCollection] {
+        (collections ?? []).compactMap { shelf in
+            guard let slug = shelf.slug?.nilWhenEmpty,
+                  let name = shelf.name?.nilWhenEmpty,
+                  let appsPath = shelf.links?["apps"]?.nilWhenEmpty else { return nil }
+            return CatalogCollection(slug: slug, name: name, kind: kind, appsPath: appsPath)
+        }
+    }
+}
+
+/// Optional fields for the reason every `OfficialCatalog…` field is.
+struct OfficialCatalogCollection: Decodable {
+    var name: String?
+    var slug: String?
+    var links: [String: String]?
+}
+
+/// One page of a paged listing: the rows, and the store's own word on whether
+/// there are more.
+struct OfficialCatalogPage: Decodable {
+    var data: [OfficialCatalogApplication]
+    var links: OfficialCatalogPageLinks?
+}
+
+struct OfficialCatalogPageLinks: Decodable {
+    var nextPage: String?
 }
 
 /// One application asked for by identifier. Answered as a list of one, which

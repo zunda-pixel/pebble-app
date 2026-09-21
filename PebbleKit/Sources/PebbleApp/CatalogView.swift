@@ -36,6 +36,7 @@ struct CatalogView: View {
     var body: some View {
         CatalogContent(
             applications: model.catalog.applications,
+            collections: model.catalog.collections,
             state: { model.catalogInstallationState(for: $0) },
             isImportingApplication: isImportingApplication,
             isImportDisabled: isImportDisabled,
@@ -61,6 +62,13 @@ struct CatalogView: View {
                     model: model,
                     editGlance: editGlance
                 )
+            },
+            collectionDestination: { collection in
+                CatalogCollectionView(
+                    collection: collection,
+                    model: model,
+                    editGlance: editGlance
+                )
             }
         )
         .task {
@@ -70,8 +78,11 @@ struct CatalogView: View {
     }
 }
 
-struct CatalogContent<Destination: View>: View {
+struct CatalogContent<Destination: View, CollectionDestination: View>: View {
     var applications: [CatalogApplication]
+    /// The feed's shelves. Empty hides the section — a feed without them, or a
+    /// cache from before they were kept, has nothing to open.
+    var collections: [CatalogCollection] = []
     var state: (CatalogApplication) -> CatalogInstallationState
     var isImportingApplication: Bool
     var isImportDisabled: Bool
@@ -97,6 +108,7 @@ struct CatalogContent<Destination: View>: View {
     var loadMoreResults: @MainActor () async -> Void = {}
     var clearSearch: @MainActor () -> Void = {}
     @ViewBuilder var destination: (CatalogApplication) -> Destination
+    @ViewBuilder var collectionDestination: (CatalogCollection) -> CollectionDestination
 
     @State private var query = ""
     /// Nil for every category.
@@ -187,6 +199,23 @@ struct CatalogContent<Destination: View>: View {
                         }
                     }
                 }
+                // The type picker above sifts the shelves like the rows below:
+                // the store keeps one set for apps and one for faces.
+                if !filteredCollections.isEmpty {
+                    Section("Collections") {
+                        ForEach(filteredCollections) { collection in
+                            NavigationLink {
+                                collectionDestination(collection)
+                            } label: {
+                                Label {
+                                    Text(verbatim: collection.name)
+                                } icon: {
+                                    Image(systemName: "square.grid.3x1.below.line.grid.1x2")
+                                }
+                            }
+                        }
+                    }
+                }
                 Section("Applications") {
                     ForEach(filteredApplications) { application in
                         NavigationLink {
@@ -249,6 +278,11 @@ struct CatalogContent<Destination: View>: View {
 
     private var filteredApplications: [CatalogApplication] {
         CatalogFilter(category: category, kind: kind).applied(to: applications)
+    }
+
+    private var filteredCollections: [CatalogCollection] {
+        guard let searchKind else { return collections }
+        return collections.filter { $0.kind == searchKind }
     }
 
     private var categories: [String] {
@@ -393,17 +427,21 @@ struct CatalogStateLabel: View {
 }
 
 #Preview("Catalog") {
-    CatalogContent(
-        applications: [PreviewSamples.catalogApplication],
-        state: { _ in .updateAvailable },
-        isImportingApplication: false,
-        isImportDisabled: false,
-        isUpdating: false,
-        feedback: nil,
-        importApplication: {},
-        refresh: {},
-        destination: { application in Text(verbatim: application.name) }
-    )
+    NavigationStack {
+        CatalogContent(
+            applications: [PreviewSamples.catalogApplication],
+            collections: PreviewSamples.catalogCollections,
+            state: { _ in .updateAvailable },
+            isImportingApplication: false,
+            isImportDisabled: false,
+            isUpdating: false,
+            feedback: nil,
+            importApplication: {},
+            refresh: {},
+            destination: { application in Text(verbatim: application.name) },
+            collectionDestination: { collection in Text(verbatim: collection.name) }
+        )
+    }
 }
 
 #Preview("Empty catalog") {
@@ -416,7 +454,8 @@ struct CatalogStateLabel: View {
         feedback: .failure("Catalog refresh failed; showing the offline cache."),
         importApplication: {},
         refresh: {},
-        destination: { _ in EmptyView() }
+        destination: { _ in EmptyView() },
+        collectionDestination: { _ in EmptyView() }
     )
 }
 
@@ -433,6 +472,7 @@ struct CatalogStateLabel: View {
         importFeedback: .failure("The package is not built for any connected watch."),
         importApplication: {},
         refresh: {},
-        destination: { _ in EmptyView() }
+        destination: { _ in EmptyView() },
+        collectionDestination: { _ in EmptyView() }
     )
 }
