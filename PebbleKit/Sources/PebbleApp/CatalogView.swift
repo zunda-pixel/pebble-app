@@ -22,6 +22,22 @@ func catalogCategoryText(_ category: String) -> Text {
     }
 }
 
+/// The store's shelf, in the reader's language where this app knows the name
+/// and as the store said it where it does not — the same bargain as
+/// `catalogCategoryText` above. The known names are both homes' current four
+/// (measured 2026-09-21): Top Picks and Generated Watchfaces exist only on the
+/// faces home, Most Loved on both, and `all` names its kind.
+func catalogCollectionText(_ name: String) -> Text {
+    switch name {
+    case "Top Picks (Changes Daily)": Text("Top Picks (Changes Daily)")
+    case "Most Loved": Text("Most Loved")
+    case "All Watchapps": Text("All Watchapps")
+    case "All Watchfaces": Text("All Watchfaces")
+    case "Generated Watchfaces": Text("Generated Watchfaces")
+    default: Text(verbatim: name)
+    }
+}
+
 /// The app catalog, pushed from the Apps tab's plus button.
 struct CatalogView: View {
     var model: AppModel
@@ -73,7 +89,15 @@ struct CatalogView: View {
         )
         .task {
             await model.loadCatalog()
-            if model.catalog.applications.isEmpty { await model.refreshCatalog() }
+            // Refreshed when the shelves are missing too, not only the rows: a
+            // cache written before shelves were kept has rows and no shelves,
+            // and waiting for a pull-to-refresh made the section look like it
+            // did not exist (owner feedback, 2026-09-21). A feed that truly
+            // has no shelves pays one conditional refetch per visit, which is
+            // the price of not being able to tell the two apart.
+            if model.catalog.applications.isEmpty || model.catalog.collections.isEmpty {
+                await model.refreshCatalog()
+            }
         }
     }
 }
@@ -208,7 +232,7 @@ struct CatalogContent<Destination: View, CollectionDestination: View>: View {
                                 collectionDestination(collection)
                             } label: {
                                 Label {
-                                    Text(verbatim: collection.name)
+                                    catalogCollectionText(collection.name)
                                 } icon: {
                                     Image(systemName: "square.grid.3x1.below.line.grid.1x2")
                                 }

@@ -40,8 +40,9 @@ struct CatalogCollectionView: View {
                 }
             }
         }
-        // The store's own title, shown verbatim: the shelf is the store's to name.
-        .navigationTitle(Text(verbatim: collection.name))
+        // The store's title, translated where this app knows it and verbatim
+        // where it does not, like the section row that opened this.
+        .navigationTitle(catalogCollectionText(collection.name))
         .task {
             guard applications.isEmpty else { return }
             await loadPage()

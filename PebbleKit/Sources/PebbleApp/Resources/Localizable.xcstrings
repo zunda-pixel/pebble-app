@@ -803,6 +803,26 @@
         }
       }
     },
+    "All Watchapps" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "すべてのウォッチアプリ"
+          }
+        }
+      }
+    },
+    "All Watchfaces" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "すべてのウォッチフェイス"
+          }
+        }
+      }
+    },
     "Allow location access to use where the phone is." : {
       "localizations" : {
         "ja" : {
@@ -2644,6 +2664,16 @@
         }
       }
     },
+    "Generated Watchfaces" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "自動生成ウォッチフェイス"
+          }
+        }
+      }
+    },
     "Hardware Revision" : {
       "localizations" : {
         "ja" : {
@@ -3530,6 +3560,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "その他"
+          }
+        }
+      }
+    },
+    "Most Loved" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "人気"
           }
         }
       }
@@ -6729,6 +6769,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ツール＆ユーティリティ"
+          }
+        }
+      }
+    },
+    "Top Picks (Changes Daily)" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "おすすめ（毎日更新）"
           }
         }
       }
