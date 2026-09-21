@@ -168,6 +168,15 @@
           }
         }
       }
+    },
+    "Pebble Firmware" : {
+
+    },
+    "Pebble Language Pack" : {
+
+    },
+    "Pebble Watch App" : {
+
     }
   },
   "version" : "1.3"

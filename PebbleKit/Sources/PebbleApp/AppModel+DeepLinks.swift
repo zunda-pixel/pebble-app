@@ -121,6 +121,11 @@ extension AppModel {
             let accessed = source.startAccessingSecurityScopedResource()
             defer { if accessed { source.stopAccessingSecurityScopedResource() } }
             try FileManager.default.copyItem(at: source, to: destination)
+            // A document handed over by the system lands in the app's own
+            // inbox and stays there; once copied it is this app's litter.
+            if source.path().contains("/Documents/Inbox/") {
+                try? FileManager.default.removeItem(at: source)
+            }
         } else {
             let (downloaded, response) = try await URLSession.shared.download(from: source)
             guard (response as? HTTPURLResponse)?.statusCode == 200 else {
