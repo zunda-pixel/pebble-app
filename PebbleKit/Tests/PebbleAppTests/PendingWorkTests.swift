@@ -55,6 +55,46 @@ struct PendingWorkTests {
         #expect(model.pendingNotifications.isEmpty)
     }
 
+    /// The digest record moves by what was actually sent, not to a snapshot of
+    /// the pin list. Snapshot bookkeeping recorded pins a pass never wrote and
+    /// resurrected entries the reconciliation had just cleaned, so every
+    /// queued trigger "forgot" and re-removed the same pins (#123) — and a
+    /// pass that died part-way recorded none of what it did manage, so the
+    /// next one re-sent pins the watch already held.
+    @Test
+    func aPartialSendKeepsExactlyWhatGotThrough() async throws {
+        let client = SuspendingWatchClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = makeModel(client: client, directory: directory)
+        let pins = ["A", "B", "C"].map { title in
+            TimelinePin(parentApplicationID: UUID(), timestamp: .now, title: title, subtitle: nil, body: nil)
+        }
+        try await model.timelineStore.save(pins)
+        try await model.pendingTimelineOperationStore.save([])
+        // The link dies after two pins, the way a watch walking away does.
+        client.timelinePinWritesAllowed = 2
+
+        await model.scan()
+        await model.connect(to: try #require(model.discoveredWatches.first))
+
+        let watchID = try #require(model.connectedWatch?.id)
+        let afterFailure = try await model.timelineStore.writtenPinDigests(watchID: watchID)
+        #expect(Set(afterFailure.keys) == Set(pins.prefix(2).map(\.id)))
+
+        // The link recovers: only the pin that never got through is sent, and
+        // nothing is "forgotten" and re-removed.
+        client.timelinePinWritesAllowed = nil
+        await model.synchronizeTimeline()
+
+        #expect(client.timelinePinWrites == pins.map(\.id))
+        #expect(client.deletedPinIDs.isEmpty)
+
+        // And a third pass has nothing left to say.
+        await model.synchronizeTimeline()
+        #expect(client.timelinePinWrites == pins.map(\.id))
+    }
+
     @Test
     func aNotificationTheSecondWatchRefusesIsNotShownTwiceOnTheFirst() async throws {
         var clients: [WatchID: SuspendingWatchClient] = [:]

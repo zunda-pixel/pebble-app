@@ -18,12 +18,18 @@ final class SuspendingWatchClient: WatchClient {
     var notificationFailure: (any Error)?
     var appMessageFailure: (any Error)?
     var transferFailure: (any Error)?
+    /// Refuses timeline-pin writes once this many are held, the way a link
+    /// that dies part-way through a synchronization does. Nil takes them all.
+    var timelinePinWritesAllowed: Int?
 
     private(set) var sentNotifications: [TimelineNotification] = []
     private(set) var sentAppMessages: [(applicationID: UUID, tuples: [AppMessageTuple])] = []
     private(set) var installedObjects: [(objectType: PutBytesObjectType, appBankID: UInt32)] = []
     private(set) var appFetchResponses: [AppFetchResponseStatus] = []
     private(set) var upsertedPins: [TimelinePin] = []
+    /// Every accepted pin write in order, duplicates included — `upsertedPins`
+    /// keeps one entry per pin, which hides a pin written twice.
+    private(set) var timelinePinWrites: [UUID] = []
     private(set) var deletedPinIDs: [UUID] = []
     private(set) var clearedTimelineCount = 0
     private(set) var sentFrames: [PebbleProtocolFrame] = []
@@ -91,6 +97,10 @@ final class SuspendingWatchClient: WatchClient {
             if let notificationFailure { throw notificationFailure }
             sentNotifications.append(notification)
         case .timelinePin(let pin):
+            if let allowed = timelinePinWritesAllowed, upsertedPins.count >= allowed {
+                throw WatchConnectionError.disconnected
+            }
+            timelinePinWrites.append(pin.id)
             upsertedPins.removeAll { $0.id == pin.id }
             upsertedPins.append(pin)
         // Not what these tests are about: the watch takes it and says nothing.

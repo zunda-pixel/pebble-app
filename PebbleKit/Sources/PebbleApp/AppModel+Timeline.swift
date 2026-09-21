@@ -113,11 +113,6 @@ extension AppModel {
             if case .upsert(let pin) = operation { return pin.id }
             return nil
         })
-        // One snapshot for the whole pass. The sends below suspend for as long
-        // as the slowest watch takes, and `timeline.pins` moves under them: a
-        // digest map computed from the live array afterwards records pins this
-        // pass never sent, and forgets pins it did.
-        let pins = timeline.pins
         // A watch that stopped part-way keeps the rest of the queue for its next
         // connection, and so does every other watch: whatever the least
         // finished one did not get is what is kept.
@@ -130,10 +125,9 @@ extension AppModel {
             // Derived per watch, because what each already holds is its own: the
             // queue is the durable work and goes first, so an index into it
             // keeps its meaning however many pins this watch still needs.
-            let derived = await upsertsStillNeeded(besides: queuedUpserts, of: pins, on: connection)
+            let derived = await upsertsStillNeeded(besides: queuedUpserts, on: connection)
             let stopped = await send(
                 queued + derived,
-                of: pins,
                 to: connection,
                 queuedCount: queued.count,
                 alreadyGone: alreadyGone
@@ -164,11 +158,10 @@ extension AppModel {
     /// survive a launch.
     private func upsertsStillNeeded(
         besides queuedUpserts: Set<UUID>,
-        of pins: [TimelinePin],
         on connection: WatchConnection
     ) async -> [PendingTimelineOperation] {
         let written = (try? await timelineStore.writtenPinDigests(watchID: connection.watch.id)) ?? [:]
-        return pins
+        return timeline.pins
             .filter { pin in
                 // A pin the watch made is already on the watch, with actions and
                 // an icon this app does not model: writing it back would replace
@@ -192,7 +185,6 @@ extension AppModel {
     /// the pin is off the watch, which is all the queue was asking for.
     private func send(
         _ operations: [PendingTimelineOperation],
-        of pins: [TimelinePin],
         to connection: WatchConnection,
         queuedCount: Int,
         alreadyGone: Set<UUID>
@@ -200,50 +192,55 @@ extension AppModel {
         let client = connection.client
         var taken = 0
         var takenFromQueue = 0
-        var dropped = 0
+        var sentDigests: [UUID: String] = [:]
+        var removedIDs: Set<UUID> = []
+        var stopped = operations.count
         for (index, operation) in operations.indexed() {
             do {
                 switch operation {
                 case .upsert(let pin):
                     try await retry(with: .watchWork) { try await client.write(.timelinePin(pin)) }
                     taken += 1
+                    sentDigests[pin.id] = pin.writtenDigest
                     if index < queuedCount { takenFromQueue += 1 }
                 case .delete(let id):
                     // Counted by the reconciliation's own line, not here: one
                     // pin leaving should read as one pin leaving.
                     guard !alreadyGone.contains(id) else { continue }
                     try await retry(with: .watchWork) { try await client.remove(.timelinePin(id)) }
-                    dropped += 1
+                    removedIDs.insert(id)
                 }
             } catch {
-                return index
+                stopped = index
+                break
             }
         }
-        // This watch now holds exactly the snapshot this pass sent from, which
-        // is what makes the reconciliation above possible next time — and, by
-        // the digests, what makes the next synchronization write only what
-        // changed. The snapshot, not the live array: a pin added during the
-        // sends was never written and must not be recorded as though it was,
-        // and one removed during them is on the watch until the next pass
-        // takes it off.
-        try? await timelineStore.setWrittenPinDigests(
-            Dictionary(
-                pins.map { ($0.id, $0.writtenDigest) },
-                uniquingKeysWith: { _, latest in latest }
-            ),
-            watchID: connection.watch.id
-        )
+        // The record moves by exactly what this pass sent, never to a snapshot
+        // of the pin list. Writing the whole list recorded pins the pass never
+        // wrote, and when the list moved under the sends it resurrected the
+        // entries the reconciliation had just cleaned — so every queued
+        // trigger "forgot" and re-removed the same pins, six passes in a row
+        // on the reader's watch (#123). The by-delta write also keeps what a
+        // partial pass did manage, where the early return used to record none
+        // of it and the next pass re-sent work the watch already took.
+        if !sentDigests.isEmpty || !removedIDs.isEmpty {
+            var written = (try? await timelineStore.writtenPinDigests(watchID: connection.watch.id)) ?? [:]
+            for (id, digest) in sentDigests { written[id] = digest }
+            for id in removedIDs { written[id] = nil }
+            try? await timelineStore.setWrittenPinDigests(written, watchID: connection.watch.id)
+        }
         // Nothing to say when there was nothing to send: this runs on every
         // connection.
+        let dropped = removedIDs.count
         if taken + dropped > 0 {
             await DiagnosticLog.shared.record(
                 category: "timeline",
-                message: "\(connection.watch.name) took \(taken) of \(pins.count) pin(s)"
+                message: "\(connection.watch.name) took \(taken) pin(s)"
                     + " — \(takenFromQueue) queued, \(taken - takenFromQueue) derived"
                     + " — and dropped \(dropped)"
             )
         }
-        return operations.count
+        return stopped
     }
 
     /// Deletes the pins this watch was given and the app no longer has, and
