@@ -1,5 +1,7 @@
 import CoreLocation
 import Foundation
+import Network
+import Synchronization
 import Testing
 @testable import PebbleProtocol
 @testable import PebbleApp
@@ -175,6 +177,38 @@ struct CompanionRuntimeTests {
         #expect(answered.first?.value == .string("code 1 true"))
     }
 
+    /// A script's request is answered across origins: PKJS scripts were
+    /// written for a runtime without the web's same-origin rules, and the
+    /// services they call offer no CORS headers to a pebble.local origin —
+    /// through WebKit's own XMLHttpRequest this exact request died silently
+    /// (#129). The server here shares no origin with the page and sends no
+    /// CORS header, which is the situation being fixed.
+    @Test func aScriptsRequestIsAnsweredWithoutTheWebsOriginRules() async throws {
+        let server = MiniHTTPServer(responseBody: #"{"answer": 42}"#)
+        let port = try await server.start()
+        defer { server.stop() }
+        let id = UUID()
+        defer { Task { await PebbleCompanionRuntime.forget(applicationID: id) } }
+
+        let answered = try await run(
+            """
+            Pebble.addEventListener('ready', function () {
+              var req = new XMLHttpRequest();
+              req.open('GET', 'http://127.0.0.1:\(port)/answer', true);
+              req.onload = function () {
+                var parsed = JSON.parse(req.responseText);
+                Pebble.sendAppMessage({kept: 'status ' + req.status + ' answer ' + parsed.answer});
+              };
+              req.onerror = function () { Pebble.sendAppMessage({kept: 'error'}); };
+              req.send(null);
+            });
+            """,
+            for: makeApplication(id: id)
+        )
+
+        #expect(answered.first?.value == .string("status 200 answer 42"))
+    }
+
     /// A payload off the watch reads under both spellings: the name the
     /// appKeys declare, which is how the SDK's own samples read it, and the
     /// number, which is how the older scripts do. Numbers alone left every
@@ -262,6 +296,65 @@ struct CompanionRuntimeTests {
             watchingPositionsWith: fixes
         )
         #expect(stopped.isEmpty)
+    }
+}
+
+/// One HTTP answer on a loopback port, for proving the shim's requests reach
+/// past the page's origin. It reads the request only to know one arrived; the
+/// answer is fixed.
+private final class MiniHTTPServer: @unchecked Sendable {
+    private let listener: NWListener
+    private let queue = DispatchQueue(label: "mini-http-server")
+
+    init(responseBody: String) {
+        listener = try! NWListener(using: .tcp, on: .any)
+        let response = "HTTP/1.1 200 OK\r\n"
+            + "Content-Type: application/json\r\n"
+            + "Content-Length: \(responseBody.utf8.count)\r\n"
+            + "Connection: close\r\n\r\n"
+            + responseBody
+        listener.newConnectionHandler = { [queue] connection in
+            connection.start(queue: queue)
+            connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { _, _, _, _ in
+                connection.send(content: Data(response.utf8), completion: .contentProcessed { _ in
+                    connection.cancel()
+                })
+            }
+        }
+    }
+
+    func start() async throws -> UInt16 {
+        try await withCheckedThrowingContinuation { continuation in
+            // The listener may pass through ready and then fail; the
+            // continuation is owed exactly one answer.
+            let resumed = Mutex(false)
+            listener.stateUpdateHandler = { [listener] state in
+                let alreadyAnswered = resumed.withLock { answered in
+                    let was = answered
+                    if state == .ready || state.isFailure { answered = true }
+                    return was
+                }
+                guard !alreadyAnswered else { return }
+                switch state {
+                case .ready:
+                    continuation.resume(returning: listener.port?.rawValue ?? 0)
+                case .failed(let error):
+                    continuation.resume(throwing: error)
+                default:
+                    break
+                }
+            }
+            listener.start(queue: queue)
+        }
+    }
+
+    func stop() { listener.cancel() }
+}
+
+private extension NWListener.State {
+    var isFailure: Bool {
+        if case .failed = self { return true }
+        return false
     }
 }
 

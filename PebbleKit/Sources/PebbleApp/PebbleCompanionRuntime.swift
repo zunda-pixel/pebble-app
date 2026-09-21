@@ -176,6 +176,60 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
           if (!cb.watching) delete positions[id];
           if (position) cb.success?.(position); else cb.failure?.(error);
         };
+        // `XMLHttpRequest`, answered by the app rather than by WebKit: PKJS
+        // scripts were written for a runtime without the web's same-origin
+        // rules, and the services they call (wikipedia, hobbyist APIs) offer
+        // no CORS headers to a pebble.local origin — through WebKit their
+        // requests died silently (#129).
+        const xhrs = {};
+        let xhrID = 0;
+        class PebbleXMLHttpRequest {
+          constructor() {
+            this.readyState = 0; this.status = 0; this.statusText = '';
+            this.responseText = ''; this.response = ''; this.responseType = '';
+            this.timeout = 0; this._headers = {}; this._responseHeaders = '';
+          }
+          open(method, url) { this._method = method; this._url = url; this.readyState = 1; }
+          setRequestHeader(name, value) { this._headers[String(name)] = String(value); }
+          getAllResponseHeaders() { return this._responseHeaders; }
+          getResponseHeader(name) {
+            const line = this._responseHeaders.split('\\r\\n')
+              .find(l => l.toLowerCase().startsWith(String(name).toLowerCase() + ':'));
+            return line ? line.slice(line.indexOf(':') + 1).trim() : null;
+          }
+          abort() { this._aborted = true; }
+          send(body) {
+            const id = ++xhrID; xhrs[id] = this;
+            webkit.messageHandlers.pebble.postMessage({
+              type: 'xhr', id, method: String(this._method || 'GET'), url: String(this._url),
+              headers: this._headers, body: body == null ? null : String(body),
+              timeout: Number(this.timeout) || 0
+            });
+          }
+        }
+        window.__pebbleXHRResult = (id, status, statusText, responseText, responseHeaders, failed) => {
+          const x = xhrs[id]; if (!x) return;
+          delete xhrs[id];
+          if (x._aborted) return;
+          x.readyState = 4;
+          if (failed) {
+            if (x.onreadystatechange) x.onreadystatechange();
+            if (x.onerror) x.onerror();
+            if (x.onloadend) x.onloadend();
+            return;
+          }
+          x.status = status; x.statusText = statusText;
+          x.responseText = responseText; x._responseHeaders = responseHeaders;
+          if (x.responseType === 'json') {
+            try { x.response = JSON.parse(responseText); } catch (e) { x.response = null; }
+          } else {
+            x.response = responseText;
+          }
+          if (x.onreadystatechange) x.onreadystatechange();
+          if (x.onload) x.onload();
+          if (x.onloadend) x.onloadend();
+        };
+        window.XMLHttpRequest = PebbleXMLHttpRequest;
         window.__pebbleDispatch = (name, detail) => (listeners[name] || []).forEach(fn => fn(detail));
         window.__pebbleResult = (id, ok) => { const cb = callbacks[id]; if (!cb) return;
           delete callbacks[id]; (ok ? cb.success : cb.failure)?.(); };
@@ -273,6 +327,24 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
         }
         if type == "clearWatch", let requestID = body["id"] as? Int {
             positionWatchers.removeValue(forKey: requestID)?.cancel()
+            return
+        }
+        if type == "xhr", let requestID = body["id"] as? Int {
+            let method = body["method"] as? String ?? "GET"
+            let urlString = body["url"] as? String ?? ""
+            let headers = body["headers"] as? [String: String] ?? [:]
+            let requestBody = body["body"] as? String
+            let timeout = body["timeout"] as? Double ?? 0
+            Task {
+                await answerScriptRequest(
+                    requestID: requestID,
+                    method: method,
+                    urlString: urlString,
+                    headers: headers,
+                    body: requestBody,
+                    timeoutMilliseconds: timeout
+                )
+            }
             return
         }
         if type == "timelineToken" {
@@ -432,6 +504,87 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
                 )
             }
         }
+    }
+
+    /// Fetches on a script's behalf, which is what the shim's
+    /// `XMLHttpRequest` hands over (#129). Only the web's own schemes: a
+    /// script has no business reading file: or anything else the phone holds.
+    private func answerScriptRequest(
+        requestID: Int,
+        method: String,
+        urlString: String,
+        headers: [String: String],
+        body: String?,
+        timeoutMilliseconds: Double
+    ) async {
+        var answered = false
+        defer {
+            if !answered {
+                Task { await deliverScriptResponse(requestID: requestID, failed: true) }
+            }
+        }
+        guard let url = URL(string: urlString),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "https" || scheme == "http" else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        if timeoutMilliseconds > 0 { request.timeoutInterval = timeoutMilliseconds / 1000 }
+        for (name, value) in headers {
+            request.setValue(value, forHTTPHeaderField: name)
+        }
+        if let body { request.httpBody = Data(body.utf8) }
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            // Far beyond any API answer a watch app could hold, and a bound on
+            // what a hostile page could make the shim buffer.
+            guard data.count <= 10 * 1_024 * 1_024,
+                  let http = response as? HTTPURLResponse else { return }
+            let headerText = http.allHeaderFields
+                .compactMap { name, value -> String? in
+                    guard let name = name as? String else { return nil }
+                    return "\(name.lowercased()): \(value)"
+                }
+                .sorted()
+                .joined(separator: "\r\n")
+            answered = true
+            await deliverScriptResponse(
+                requestID: requestID,
+                status: http.statusCode,
+                statusText: HTTPURLResponse.localizedString(forStatusCode: http.statusCode),
+                responseText: String(data: data, encoding: .utf8)
+                    ?? String(data: data, encoding: .isoLatin1) ?? "",
+                responseHeaders: headerText
+            )
+        } catch {
+            await DiagnosticLog.shared.record(
+                category: "configuration",
+                message: "a script's request could not be made: \(String(reflecting: error))"
+            )
+        }
+    }
+
+    private func deliverScriptResponse(
+        requestID: Int,
+        status: Int = 0,
+        statusText: String = "",
+        responseText: String = "",
+        responseHeaders: String = "",
+        failed: Bool = false
+    ) async {
+        guard let webView else { return }
+        _ = try? await webView.callAsyncJavaScript(
+            "window.__pebbleXHRResult(id, status, statusText, responseText, responseHeaders, failed);",
+            arguments: [
+                "id": requestID,
+                "status": status,
+                "statusText": statusText,
+                "responseText": responseText,
+                "responseHeaders": responseHeaders,
+                "failed": failed,
+            ],
+            in: nil,
+            contentWorld: .page
+        )
     }
 
     /// The page is going or gone: nobody is left to deliver positions to.
