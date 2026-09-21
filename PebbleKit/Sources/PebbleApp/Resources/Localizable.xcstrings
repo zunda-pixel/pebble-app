@@ -4823,6 +4823,16 @@
         }
       }
     },
+    "Same as the Phone" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "iPhoneと同じ"
+          }
+        }
+      }
+    },
     "Saved watches could not be loaded." : {
       "localizations" : {
         "ja" : {
@@ -5131,6 +5141,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "並べ替え"
+          }
+        }
+      }
+    },
+    "Spoken Language" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "話す言語"
           }
         }
       }
@@ -6263,7 +6283,18 @@
         }
       }
     },
+    "The watch records what you say and this app turns it into words here on the phone, without sending the sound anywhere. Turning this on downloads the recognizer for the chosen language." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ウォッチが録音した音声を、このiPhone上で文字に変換します。音声はどこにも送信されません。オンにすると、選んだ言語に対応した認識モデルをダウンロードします。"
+          }
+        }
+      }
+    },
     "The watch records what you say and this app turns it into words here on the phone, without sending the sound anywhere. Turning this on downloads the recognizer for the language the phone is set to." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {

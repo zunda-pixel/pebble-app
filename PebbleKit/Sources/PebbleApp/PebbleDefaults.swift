@@ -91,6 +91,9 @@ extension Defaults.Keys {
 
     static let activeWatchfaceID = Key<UUID?>("activeWatchfaceID")
 
+    /// Which language dictation listens for — a locale identifier, or nil to
+    /// follow the phone's own language, which is where everyone starts.
+    static let voiceSpokenLanguage = Key<String?>("voiceSpokenLanguage", default: nil)
     /// One cursor per exported type, not one for the batch: a type the reader
     /// had not allowed yet must not be dragged forward by the types they had,
     /// or the data waiting on the permission is stranded behind the cursor

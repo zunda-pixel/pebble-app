@@ -240,6 +240,9 @@ public final class AppModel {
     let appGlanceStore: AppGlanceStore
     let speechBridge = SpeechBridge()
     var voiceTranscriptionReadiness = VoiceTranscriptionReadiness.turnedOff
+    /// Every language the phone's recognizer can be asked for, for the
+    /// settings picker. Filled beside the readiness, and empty until then.
+    var voiceSupportedLanguages: [String] = []
     @ObservationIgnored lazy var musicCoordinator = MusicCoordinator(
         source: makeSystemMusicSource(),
         send: { [weak self] frame in try await self?.broadcast(frame) }

@@ -30,6 +30,7 @@ struct SettingsView: View {
             diagnosticReportURL: model.diagnostics.reportURL,
             diagnosticsFeedback: model.diagnostics.feedback[.report],
             voiceTranscription: model.voiceTranscriptionReadiness,
+            voiceLanguages: model.voiceSupportedLanguages,
             phoneAlertsFeedback: model.phoneAlertsFeedback,
             setNotifyWhenFullyCharged: { enabled in
                 Task { await model.setNotifyWhenFullyCharged(enabled) }
@@ -39,6 +40,9 @@ struct SettingsView: View {
             },
             setVoiceTranscriptionEnabled: { enabled in
                 Task { await model.setVoiceTranscriptionEnabled(enabled) }
+            },
+            setVoiceSpokenLanguage: { identifier in
+                Task { await model.setVoiceSpokenLanguage(identifier) }
             },
             setCompanionNotificationsEnabled: { model.setCompanionNotificationsEnabled($0) },
             setQuietHours: { enabled, start, end in
@@ -83,10 +87,14 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
     /// The answer to asking for a diagnostic report, which is asked for here.
     var diagnosticsFeedback: FeatureFeedback?
     var voiceTranscription: VoiceTranscriptionReadiness
+    /// The languages the recognizer can be asked for. Empty hides the picker —
+    /// a phone that has not answered yet, or cannot at all, offers no choice.
+    var voiceLanguages: [String] = []
     var phoneAlertsFeedback: FeatureFeedback?
     var setNotifyWhenFullyCharged: (Bool) -> Void = { _ in }
     var setNotifyAboutFirmwareUpdates: (Bool) -> Void = { _ in }
     var setVoiceTranscriptionEnabled: (Bool) -> Void
+    var setVoiceSpokenLanguage: (String?) -> Void = { _ in }
     var setCompanionNotificationsEnabled: (Bool) -> Void
     var setQuietHours: (_ enabled: Bool, _ start: Int?, _ end: Int?) -> Void
     var setNotificationsEnabled: (Bool, UUID) -> Void
@@ -101,6 +109,18 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
     // a refused permission does exactly that.
     @Default(.notifyWhenFullyCharged) private var notifyWhenFullyCharged
     @Default(.notifyAboutFirmwareUpdates) private var notifyAboutFirmwareUpdates
+    @Default(.voiceSpokenLanguage) private var spokenLanguage
+
+    /// Named in the reader's own language and sorted the way they read, so 日本語
+    /// is where a Japanese reader looks for it. The identifier the picker keeps
+    /// is the locale's, untranslated.
+    private var sortedVoiceLanguages: [(identifier: String, name: String)] {
+        voiceLanguages
+            .map { identifier in
+                (identifier, Locale.current.localizedString(forIdentifier: identifier) ?? identifier)
+            }
+            .sorted { $0.1.localizedCaseInsensitiveCompare($1.1) == .orderedAscending }
+    }
 
     private var voiceTranscriptionSummary: Text {
         switch voiceTranscription {
@@ -169,6 +189,22 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
                     set: { setVoiceTranscriptionEnabled($0) }
                 ))
                 .disabled(voiceTranscription == .unsupported)
+                // Offered even while the phone's own language is unsupported:
+                // choosing a supported one is exactly the way out of that.
+                if !voiceLanguages.isEmpty {
+                    Picker("Spoken Language", selection: Binding(
+                        get: { spokenLanguage },
+                        set: { chosen in
+                            spokenLanguage = chosen
+                            setVoiceSpokenLanguage(chosen)
+                        }
+                    )) {
+                        Text("Same as the Phone").tag(String?.none)
+                        ForEach(sortedVoiceLanguages, id: \.identifier) { language in
+                            Text(verbatim: language.name).tag(String?.some(language.identifier))
+                        }
+                    }
+                }
                 if voiceTranscription != .turnedOff {
                     LabeledContent("Recognizer") {
                         voiceTranscriptionSummary
@@ -177,7 +213,7 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
             } header: {
                 Text("Voice")
             } footer: {
-                Text("The watch records what you say and this app turns it into words here on the phone, without sending the sound anywhere. Turning this on downloads the recognizer for the language the phone is set to.")
+                Text("The watch records what you say and this app turns it into words here on the phone, without sending the sound anywhere. Turning this on downloads the recognizer for the chosen language.")
             }
             Section("Diagnostics") {
                 Button("Prepare Diagnostic Report", systemImage: "stethoscope", action: prepareDiagnosticReport)
@@ -216,6 +252,7 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
             diagnosticReportURL: nil,
             diagnosticsFeedback: nil,
             voiceTranscription: .ready,
+            voiceLanguages: ["en_US", "ja_JP", "de_DE"],
             setVoiceTranscriptionEnabled: { _ in },
             setCompanionNotificationsEnabled: { _ in },
             setQuietHours: { _, _, _ in },

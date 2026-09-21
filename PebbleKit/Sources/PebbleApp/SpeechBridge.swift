@@ -32,9 +32,36 @@ actor SpeechBridge: VoiceTranscriptionProvider {
     private var installation: Task<Void, any Error>?
     private var hasInstalledAssets = false
 
-    /// The recognizer for the language the phone is set to, if there is one.
+    /// The recognizer for the language dictation should listen for, if there
+    /// is one: the reader's chosen language, or the phone's own where they
+    /// chose to follow it (#100).
     private nonisolated func supportedLocale() async -> Locale? {
-        await SpeechTranscriber.supportedLocale(equivalentTo: Locale.current)
+        await SpeechTranscriber.supportedLocale(
+            equivalentTo: Self.wantedLocale(
+                chosenIdentifier: Defaults[.voiceSpokenLanguage],
+                phone: .current
+            )
+        )
+    }
+
+    /// Split out so the choice's meaning can be tested without the OS's
+    /// recognizer in the room.
+    nonisolated static func wantedLocale(chosenIdentifier: String?, phone: Locale) -> Locale {
+        chosenIdentifier.map(Locale.init(identifier:)) ?? phone
+    }
+
+    /// Every language the phone's recognizer can be asked for, as identifiers:
+    /// the screen names them in the reader's own language via `Locale`.
+    nonisolated func supportedLanguageIdentifiers() async -> [String] {
+        await SpeechTranscriber.supportedLocales.map(\.identifier)
+    }
+
+    /// The chosen language changed: whatever was installed was for the old
+    /// one, and the next readiness check has to ask about the new one afresh.
+    func forgetInstalledAssets() {
+        installation?.cancel()
+        installation = nil
+        hasInstalledAssets = false
     }
 
     func readiness() async -> VoiceTranscriptionReadiness {
