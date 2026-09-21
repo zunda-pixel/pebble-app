@@ -83,7 +83,7 @@ public struct HealthDataLoggingProcessor: Sendable {
     }
 
     private func stepSamples(from bytes: [UInt8], itemSize: Int) throws -> [WatchHealthSample] {
-        var daily: [Date: (steps: Int, heartRates: [Int])] = [:]
+        var daily: [Date: (steps: Int, heartRates: [HeartRateReading])] = [:]
         for itemStart in stride(from: 0, to: bytes.count - (bytes.count % itemSize), by: itemSize) {
             let itemEnd = itemStart + itemSize
             guard itemEnd <= bytes.count, itemSize >= 9 else { continue }
@@ -110,7 +110,12 @@ public struct HealthDataLoggingProcessor: Sendable {
                 if version >= MinuteSample.firstVersionWithHeartRate,
                    recordSize > MinuteSample.heartRate {
                     let beats = Int(bytes[cursor + MinuteSample.heartRate])
-                    if beats > 0 { entry.heartRates.append(beats) }
+                    // The moment is kept with the count: HealthKit takes
+                    // per-minute samples, and a day summary cannot honestly
+                    // be turned back into moments.
+                    if beats > 0 {
+                        entry.heartRates.append(HeartRateReading(date: date, beatsPerMinute: beats))
+                    }
                 }
                 daily[day] = entry
                 cursor += recordSize
@@ -122,7 +127,8 @@ public struct HealthDataLoggingProcessor: Sendable {
                 date: day,
                 steps: entry.steps,
                 sleepMinutes: 0,
-                heartRate: .from(entry.heartRates),
+                heartRate: .from(entry.heartRates.map(\.beatsPerMinute)),
+                heartRateReadings: entry.heartRates,
                 source: .watch
             )
         }

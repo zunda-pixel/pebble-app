@@ -88,6 +88,28 @@ struct HealthMinuteRecordTests {
         #expect(day.heartRate?.measuredMinutes == 2)
     }
 
+    /// Each measured minute keeps its moment: the HealthKit export writes them
+    /// back as per-minute samples, which a day summary could not honestly
+    /// become. The unmeasured minute between them is absent, not zero.
+    @Test func theMeasuredMinutesKeepTheirMoments() throws {
+        let read = try samples(
+            version: 13,
+            sampleSize: 16,
+            minutes: [
+                minute(steps: 10, heartRate: 60),
+                minute(steps: 5, heartRate: nil),
+                minute(steps: 20, heartRate: 80),
+            ]
+        )
+
+        let day = try #require(read.first)
+        #expect(day.heartRateReadings.map(\.beatsPerMinute) == [60, 80])
+        #expect(day.heartRateReadings.map(\.date) == [
+            Date(timeIntervalSince1970: 1_757_000_000),
+            Date(timeIntervalSince1970: 1_757_000_120),
+        ])
+    }
+
     /// Zero is the watch saying it did not measure, and averaging it in would
     /// halve the day.
     @Test func aMinuteWithNoReadingIsNotAHeartRateOfZero() throws {

@@ -24,6 +24,7 @@ final class HealthKitBridge {
     func requestAuthorization() async throws {
         guard HKHealthStore.isHealthDataAvailable(),
               let stepsType = HKQuantityType.quantityType(forIdentifier: .stepCount),
+              let heartRateType = HKQuantityType.quantityType(forIdentifier: .heartRate),
               let sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) else {
             throw HealthKitBridgeError.unavailable
         }
@@ -31,7 +32,7 @@ final class HealthKitBridge {
             HKQuantityType.quantityType(forIdentifier: $0.identifier) as HKObjectType?
         }
         try await store.requestAuthorization(
-            toShare: [stepsType, sleepType],
+            toShare: [stepsType, sleepType, heartRateType],
             read: Set([stepsType, sleepType] as [HKObjectType] + effortTypes)
         )
     }
@@ -42,18 +43,26 @@ final class HealthKitBridge {
     ) async throws {
         guard HKHealthStore.isHealthDataAvailable(),
               let stepsType = HKQuantityType.quantityType(forIdentifier: .stepCount),
+              let heartRateType = HKQuantityType.quantityType(forIdentifier: .heartRate),
               let sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) else {
             throw HealthKitBridgeError.unavailable
         }
         switch authorization {
         case .mayAsk:
-            try await store.requestAuthorization(toShare: [stepsType, sleepType], read: [stepsType, sleepType])
+            try await store.requestAuthorization(
+                toShare: [stepsType, sleepType, heartRateType],
+                read: [stepsType, sleepType]
+            )
         case .onlyWhatIsAlreadyGranted:
             // Writing is the one side HealthKit lets an app read back.
             guard store.authorizationStatus(for: stepsType) == .sharingAuthorized else {
                 throw HealthKitBridgeError.notGranted
             }
         }
+        // The reader may allow steps and refuse the heart: HealthKit's sheet
+        // takes them separately. Skipping just the refused type keeps the rest
+        // flowing rather than failing the whole export.
+        let mayWriteHeartRate = store.authorizationStatus(for: heartRateType) == .sharingAuthorized
         let changedSamples = samples.filter { $0.updatedAt > lastExportDate && $0.source != .healthKit }
         var healthSamples: [HKSample] = []
         for sample in changedSamples {
@@ -82,6 +91,26 @@ final class HealthKitBridge {
                     end: sample.date,
                     metadata: sleepMetadata
                 ))
+            }
+            if mayWriteHeartRate {
+                // One sample per measured minute, at the minute it was
+                // measured — a day's average written as one sample would sit
+                // among real readings and bend every chart it touches.
+                for reading in sample.heartRateReadings {
+                    var heartRateMetadata = commonMetadata
+                    heartRateMetadata[HKMetadataKeySyncIdentifier] =
+                        "\(baseIdentifier).hr.\(Int(reading.date.timeIntervalSince1970))"
+                    healthSamples.append(HKQuantitySample(
+                        type: heartRateType,
+                        quantity: HKQuantity(
+                            unit: .count().unitDivided(by: .minute()),
+                            doubleValue: Double(reading.beatsPerMinute)
+                        ),
+                        start: reading.date,
+                        end: reading.date.addingTimeInterval(60),
+                        metadata: heartRateMetadata
+                    ))
+                }
             }
         }
         if !healthSamples.isEmpty {

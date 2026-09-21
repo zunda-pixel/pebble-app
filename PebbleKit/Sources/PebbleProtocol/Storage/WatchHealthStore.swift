@@ -29,6 +29,10 @@ public struct WatchHealthSample: Codable, Equatable, Identifiable, Sendable {
     /// off. Distinct from a day of zeroes, which would read as a heart that
     /// stopped.
     public var heartRate: WatchHeartRateSummary? = nil
+    /// The measured minutes themselves, for the HealthKit export: a summary
+    /// cannot honestly become per-moment samples again. Empty wherever
+    /// `heartRate` is nil, and for files written before this existed.
+    public var heartRateReadings: [HeartRateReading] = []
     public var timeZoneIdentifier: String = TimeZone.current.identifier
     public var source: WatchHealthDataSource = .watch
     public var updatedAt: Date = Date()
@@ -36,7 +40,7 @@ public struct WatchHealthSample: Codable, Equatable, Identifiable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case id, date, steps, sleepMinutes, deepSleepMinutes, sleepSessions
         case activeKilocalories, restingKilocalories, distanceMetres, activeMinutes
-        case heartRate, timeZoneIdentifier, source, updatedAt
+        case heartRate, heartRateReadings, timeZoneIdentifier, source, updatedAt
     }
 
     public init(from decoder: any Decoder) throws {
@@ -52,6 +56,7 @@ public struct WatchHealthSample: Codable, Equatable, Identifiable, Sendable {
         distanceMetres = try container.decodeIfPresent(Int.self, forKey: .distanceMetres) ?? 0
         activeMinutes = try container.decodeIfPresent(Int.self, forKey: .activeMinutes) ?? 0
         heartRate = try container.decodeIfPresent(WatchHeartRateSummary.self, forKey: .heartRate)
+        heartRateReadings = try container.decodeIfPresent([HeartRateReading].self, forKey: .heartRateReadings) ?? []
         timeZoneIdentifier = try container.decodeIfPresent(String.self, forKey: .timeZoneIdentifier)
             ?? TimeZone.current.identifier
         source = try container.decodeIfPresent(WatchHealthDataSource.self, forKey: .source) ?? .watch
@@ -88,6 +93,13 @@ public struct WatchHeartRateSummary: Codable, Equatable, Sendable {
             measuredMinutes: beatsPerMinute.count
         )
     }
+}
+
+/// One minute the sensor ran: when, and what it counted.
+@MemberwiseInit(.public)
+public struct HeartRateReading: Codable, Equatable, Sendable {
+    public var date: Date
+    public var beatsPerMinute: Int
 }
 
 public enum WatchHealthDataSource: String, Codable, Equatable, Sendable {
@@ -139,12 +151,27 @@ public actor WatchHealthStore {
             // nil — and being the newer of the two would otherwise have wiped
             // what the watch measured. Whichever record has one keeps it, and
             // the newer wins only when both do.
-            resolved.heartRate = switch (existing.heartRate, normalized.heartRate) {
+            // The summary and its readings travel together: they are two
+            // shapes of the same measurement, and splitting them across two
+            // records would pair one day's average with another's minutes.
+            switch (existing.heartRate, normalized.heartRate) {
             case (let older?, let newer?):
-                normalized.updatedAt >= existing.updatedAt ? newer : older
-            case (let only?, nil): only
-            case (nil, let only?): only
-            case (nil, nil): nil
+                if normalized.updatedAt >= existing.updatedAt {
+                    resolved.heartRate = newer
+                    resolved.heartRateReadings = normalized.heartRateReadings
+                } else {
+                    resolved.heartRate = older
+                    resolved.heartRateReadings = existing.heartRateReadings
+                }
+            case (let only?, nil):
+                resolved.heartRate = only
+                resolved.heartRateReadings = existing.heartRateReadings
+            case (nil, let only?):
+                resolved.heartRate = only
+                resolved.heartRateReadings = normalized.heartRateReadings
+            case (nil, nil):
+                resolved.heartRate = nil
+                resolved.heartRateReadings = []
             }
             // The night is taken whole from whichever record is newer: its
             // total, its restful part and the sessions it was made of belong
