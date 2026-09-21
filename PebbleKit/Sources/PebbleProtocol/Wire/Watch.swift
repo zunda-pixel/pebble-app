@@ -133,8 +133,45 @@ public enum WatchModel: String, CaseIterable, Codable, Sendable {
 public struct DiscoveredWatch: Identifiable, Hashable, Sendable {
     public var id: WatchID
     public var name: String
-    public var model: WatchModel
-    public var signalStrength: Int
+    /// Nil for a watch that was looked up rather than heard advertising, when
+    /// nothing remembered which model it is.
+    public var model: WatchModel?
+    /// Nil for a watch that was looked up rather than heard: a bonded Pebble
+    /// does not advertise, so there is no RSSI to report — and reporting a
+    /// made-up one drew "0 dBm" on screen.
+    public var signalStrength: Int?
+}
+
+/// The handle a connect is aimed at: enough to find the watch, and nothing
+/// that has to be invented.
+///
+/// It is not `DiscoveredWatch`, deliberately. A scan result carries a model
+/// and a signal strength; a saved watch has neither fresh, and a bonded watch
+/// the app has no record of has only an identifier and a name. When the scan
+/// type doubled as this one, those callers fabricated `.pebble2Duo` and a zero
+/// RSSI to satisfy it — and the fabricated model was the fallback the
+/// transport reached for when a watch reported a platform byte this app has no
+/// table entry for, naming the wrong watch for the whole session.
+@MemberwiseInit(.public)
+public struct WatchConnectionTarget: Identifiable, Hashable, Sendable {
+    public var id: WatchID
+    public var name: String
+    /// Nil when nothing has said which watch this is. The version response's
+    /// platform byte replaces it on connect either way; this is only the
+    /// fallback for a byte the app cannot map.
+    public var model: WatchModel?
+}
+
+public extension DiscoveredWatch {
+    var connectionTarget: WatchConnectionTarget {
+        WatchConnectionTarget(id: id, name: name, model: model)
+    }
+}
+
+public extension UnknownBondedWatch {
+    var connectionTarget: WatchConnectionTarget {
+        WatchConnectionTarget(id: id, name: name, model: nil)
+    }
 }
 
 /// A watch the app is talking to.
@@ -163,9 +200,12 @@ public struct ConnectedWatch: Identifiable, Hashable, Sendable {
     /// Which watch this is.
     ///
     /// Stored rather than computed, because `WatchModel(hardwarePlatform:)`
-    /// answers nil for a platform this app does not know and the discovered
-    /// watch's own model is the better guess then. The transports resolve that.
-    public var model: WatchModel
+    /// answers nil for a platform this app does not know and the target's own
+    /// model is the better guess then. The transports resolve that. Nil when
+    /// neither has an answer — a bonded watch the app has no record of, on a
+    /// platform byte it cannot map — which the screens say outright rather
+    /// than naming some other watch.
+    public var model: WatchModel?
     /// From the battery service, not the version response.
     public var batteryLevel: Int?
     /// What the watch said about itself when it connected.

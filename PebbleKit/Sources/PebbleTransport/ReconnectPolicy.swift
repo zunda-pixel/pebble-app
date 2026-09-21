@@ -48,7 +48,7 @@ final class ReconnectPolicy {
     /// covers a watch that is merely restarting.
     static let maximumFailedHandshakes = 5
 
-    private(set) var watch: DiscoveredWatch?
+    private(set) var watch: WatchConnectionTarget?
     /// Whether the attempt in flight is the policy's own rather than a connect
     /// the reader asked for. The handshake takes a different path for each.
     private(set) var isAutomatic = false
@@ -59,7 +59,7 @@ final class ReconnectPolicy {
     private var expectedDisconnects: Set<WatchID> = []
 
     /// The watch to chase from now on, with the wait back at its shortest.
-    func follow(_ watch: DiscoveredWatch) {
+    func follow(_ watch: WatchConnectionTarget) {
         self.watch = watch
         isAutomatic = false
         backoff.reset()

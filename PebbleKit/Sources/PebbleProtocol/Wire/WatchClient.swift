@@ -93,14 +93,18 @@ public protocol WatchClient: Sendable {
     func scan() async throws -> [DiscoveredWatch]
     /// A bonded Pebble usually does not advertise, so scanning alone can never
     /// rediscover it; it has to be looked up by its stored identifier.
-    func retrieveKnownWatches(_ hints: [DiscoveredWatch]) async throws -> [DiscoveredWatch]
+    func retrieveKnownWatches(_ hints: [WatchConnectionTarget]) async throws -> [DiscoveredWatch]
     /// Opens a link and waits for the watch to say what it is.
+    ///
+    /// The target, not a scan result: a connect can be aimed at a saved or
+    /// bonded watch nothing scanned for, and a target has no fields such a
+    /// caller would have to invent.
     ///
     /// `reportingPhase` is called as the handshake passes each stage, on the
     /// main actor, before this returns. A transport with nothing to report
     /// between the two simply never calls it.
     func connect(
-        to device: DiscoveredWatch,
+        to target: WatchConnectionTarget,
         reportingPhase: @escaping @MainActor (WatchHandshakePhase) -> Void
     ) async throws -> ConnectedWatch
     func disconnect(from device: ConnectedWatch) async
@@ -154,11 +158,24 @@ public extension WatchClient {
 
     /// For the call sites that only want the watch: a reconnect the app did not
     /// ask for, and every test that is not about the handshake.
-    func connect(to device: DiscoveredWatch) async throws -> ConnectedWatch {
-        try await connect(to: device, reportingPhase: { _ in })
+    func connect(to target: WatchConnectionTarget) async throws -> ConnectedWatch {
+        try await connect(to: target, reportingPhase: { _ in })
     }
 
-    func retrieveKnownWatches(_ hints: [DiscoveredWatch]) async throws -> [DiscoveredWatch] {
+    /// The scan-result conveniences, so a test can connect to what it scanned
+    /// without spelling the conversion.
+    func connect(to device: DiscoveredWatch) async throws -> ConnectedWatch {
+        try await connect(to: device.connectionTarget, reportingPhase: { _ in })
+    }
+
+    func connect(
+        to device: DiscoveredWatch,
+        reportingPhase: @escaping @MainActor (WatchHandshakePhase) -> Void
+    ) async throws -> ConnectedWatch {
+        try await connect(to: device.connectionTarget, reportingPhase: reportingPhase)
+    }
+
+    func retrieveKnownWatches(_ hints: [WatchConnectionTarget]) async throws -> [DiscoveredWatch] {
         []
     }
 

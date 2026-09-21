@@ -74,7 +74,7 @@ extension AppModel {
                 words,
                 kind: kind,
                 page: 0,
-                preferredHardware: connectedWatch?.model.compatibleApplicationVariants ?? [],
+                preferredHardware: connectedWatch?.model?.compatibleApplicationVariants ?? [],
                 source: selectedCatalogSource
             )
             catalog.searchResults = answer.applications
@@ -102,7 +102,7 @@ extension AppModel {
                 catalog.searchQuery,
                 kind: catalog.searchKind,
                 page: catalog.searchPage,
-                preferredHardware: connectedWatch?.model.compatibleApplicationVariants ?? [],
+                preferredHardware: connectedWatch?.model?.compatibleApplicationVariants ?? [],
                 source: selectedCatalogSource
             )
             // Deduplicated on the identifier: the index can shift under the
@@ -160,7 +160,7 @@ extension AppModel {
             let entry = try await appCatalog.application(
                 uuid: applicationID,
                 from: baseURL,
-                hardware: connectedWatch?.model.compatibleApplicationVariants.first,
+                hardware: connectedWatch?.model?.compatibleApplicationVariants.first,
                 sourceID: source.id
             )
             if let entry { catalog.storeEntries[applicationID] = entry }
@@ -176,8 +176,12 @@ extension AppModel {
     }
 
     public func catalogInstallationState(for application: CatalogApplication) -> CatalogInstallationState {
+        // A watch whose model is unknown cannot prove anything incompatible,
+        // so it does not grey the store out.
         if !connectedWatches.isEmpty,
-           !connectedWatches.contains(where: { application.supports($0.model) }) {
+           !connectedWatches.contains(where: { watch in
+               watch.model.map(application.supports) ?? true
+           }) {
             return .incompatible
         }
         guard let installed = (applications.apps + applications.watchfaces).first(where: { $0.id == application.id }) else {

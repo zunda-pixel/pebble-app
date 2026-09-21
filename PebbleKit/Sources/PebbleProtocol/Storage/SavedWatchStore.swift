@@ -5,7 +5,9 @@ import MemberwiseInit
 public struct SavedWatch: Codable, Equatable, Identifiable, Sendable {
     public var id: WatchID
     public var name: String
-    public var model: WatchModel
+    /// Nil for a watch remembered before its version response ever named a
+    /// model this app knows.
+    public var model: WatchModel?
     public var firmwareVersion: String?
     public var serialNumber: String?
     public var lastBatteryLevel: Int?
@@ -22,6 +24,12 @@ public struct SavedWatch: Codable, Equatable, Identifiable, Sendable {
     /// non-optional field added here would refuse every `watches.json` written
     /// before it existed.
     public var hardwareRevision: String? = nil
+}
+
+public extension SavedWatch {
+    var connectionTarget: WatchConnectionTarget {
+        WatchConnectionTarget(id: id, name: name, model: model)
+    }
 }
 
 public actor SavedWatchStore {

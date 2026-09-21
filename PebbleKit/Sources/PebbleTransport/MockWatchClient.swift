@@ -97,8 +97,8 @@ public final class MockWatchClient: WatchClient {
         ]
     }
 
-    public func retrieveKnownWatches(_ hints: [DiscoveredWatch]) async throws -> [DiscoveredWatch] {
-        hints
+    public func retrieveKnownWatches(_ hints: [WatchConnectionTarget]) async throws -> [DiscoveredWatch] {
+        hints.map { DiscoveredWatch(id: $0.id, name: $0.name, model: $0.model, signalStrength: nil) }
     }
 
     /// Makes the next connection report a watch running recovery firmware.
@@ -110,7 +110,7 @@ public final class MockWatchClient: WatchClient {
     /// Reports both handshake phases, so a test can see the states a real
     /// connect passes through rather than only its result.
     public func connect(
-        to watch: DiscoveredWatch,
+        to watch: WatchConnectionTarget,
         reportingPhase: @escaping @MainActor (WatchHandshakePhase) -> Void
     ) async throws -> ConnectedWatch {
         try await Task.sleep(for: .milliseconds(250))

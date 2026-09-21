@@ -7,8 +7,8 @@ import Testing
 @Suite
 @MainActor
 struct ReconnectPolicyTests {
-    private var watch: DiscoveredWatch {
-        DiscoveredWatch(id: WatchID("watch"), name: "Pebble 5209", model: .pebbleTime2, signalStrength: -60)
+    private var watch: WatchConnectionTarget {
+        WatchConnectionTarget(id: WatchID("watch"), name: "Pebble 5209", model: .pebbleTime2)
     }
 
     @Test

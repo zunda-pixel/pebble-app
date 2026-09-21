@@ -204,8 +204,9 @@ extension AppModel {
                 pendingImportSnapshots[application.id] = snapshot
                 try await synchronizeAllWatches()
                 // The watch only asks for the binary when it tries to run the app.
-                for connection in activeConnections
-                where compatibleApplications([application], with: connection.watch.model).isEmpty == false {
+                for connection in activeConnections {
+                    guard let model = connection.watch.model,
+                          !compatibleApplications([application], with: model).isEmpty else { continue }
                     try? await connection.client.launchApplication(id: application.id)
                 }
                 expirePendingSnapshot(applicationID: application.id)
@@ -337,9 +338,20 @@ extension AppModel {
 
     func performApplicationSynchronization(on connection: WatchConnection) async throws {
         let watch = connection.watch
+        // With no model there is no way to pick a variant, and an empty
+        // "compatible" list here would read as "remove everything this watch
+        // was given". Leaving the watch alone is the smaller wrong.
+        guard let watchModel = watch.model else {
+            await DiagnosticLog.shared.record(
+                .warning,
+                category: "application",
+                message: "\(watch.name) has no known model; leaving its applications untouched"
+            )
+            return
+        }
         let installed = try await applicationLibrary.applications()
         let synchronizedIDs = try await applicationLibrary.synchronizedApplicationIDs(watchID: watch.id)
-        let compatibleApplications = compatibleApplications(installed, with: watch.model)
+        let compatibleApplications = compatibleApplications(installed, with: watchModel)
         let localIDs = Set(compatibleApplications.map(\.id))
         var dropped = 0
         for applicationID in synchronizedIDs where !localIDs.contains(applicationID) {
@@ -349,7 +361,6 @@ extension AppModel {
         // Reading and unzipping a package is disk work with nothing to do with the
         // watch, so a few run at once while `asyncMap` keeps them in library order.
         let library = applicationLibrary
-        let watchModel = watch.model
         let packages = try await compatibleApplications
             .asyncMap(numberOfConcurrentTasks: 4) { application in
                 guard let packageURL = await library.storedPackageURL(applicationID: application.id) else {
@@ -379,7 +390,10 @@ extension AppModel {
         _ library: [WatchApplication],
         watch: ConnectedWatch
     ) async throws {
-        let synchronizedIDs = compatibleApplications(library, with: watch.model).map(\.id)
+        // No model means the synchronization above never ran; there is nothing
+        // to record.
+        guard let model = watch.model else { return }
+        let synchronizedIDs = compatibleApplications(library, with: model).map(\.id)
         try await applicationLibrary.setSynchronizedApplicationIDs(
             synchronizedIDs,
             watchID: watch.id
@@ -526,11 +540,17 @@ extension AppModel {
             return
         }
 
+        // A fetch names a variant to send, and without a model there is no way
+        // to choose one; "no data" lets the watch stop waiting.
+        guard let model = connection.watch.model else {
+            try? await connection.client.respondToAppFetch(with: .noData)
+            return
+        }
+
         connection.beginTransfer(.application(request.applicationID))
         defer { connection.endTransfer() }
 
         do {
-            let model = connection.watch.model
             let package = try await Task.detached(priority: .userInitiated) {
                 try PBWPackageImporter.load(from: packageURL, for: model)
             }.value

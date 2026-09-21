@@ -59,19 +59,20 @@ extension AppModel {
     }
 
     public func connect(to watch: UnknownBondedWatch) async {
-        await connect(to: provisionalWatch(id: watch.id, name: watch.name))
+        await connect(to: provisionalTarget(id: watch.id, name: watch.name))
     }
 
     private func bondedWatchName(watchID: WatchID) async -> String {
-        let hint = provisionalWatch(id: watchID, name: "Pebble")
+        let hint = provisionalTarget(id: watchID, name: "Pebble")
         let retrieved = try? await scannerClient.retrieveKnownWatches([hint])
         return retrieved?.first { $0.id == watchID }?.name ?? hint.name
     }
 
-    // Only the identifier and the name are real; the version the watch reports
-    // on connecting replaces the rest.
-    private func provisionalWatch(id: WatchID, name: String) -> DiscoveredWatch {
-        DiscoveredWatch(id: id, name: name, model: .pebble2Duo, signalStrength: 0)
+    // Only the identifier and the name are real, and the target says so: the
+    // model stays nil instead of naming some other watch, and the version the
+    // watch reports on connecting fills it in.
+    private func provisionalTarget(id: WatchID, name: String) -> WatchConnectionTarget {
+        WatchConnectionTarget(id: id, name: name, model: nil)
     }
 
     public func setAutomaticallyConnects(_ enabled: Bool, watchID: WatchID) async {

@@ -60,7 +60,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     /// transport on it, and nothing notices until the health check fails a
     /// minute later.
     var sessionRestartTimeoutTask: Task<Void, Never>?
-    var pendingWatch: DiscoveredWatch?
+    var pendingWatch: WatchConnectionTarget?
     var activeWriteCharacteristic: CBCharacteristic?
     var activeBatteryCharacteristic: CBCharacteristic?
     var activePairingTriggerCharacteristic: CBCharacteristic?
@@ -197,7 +197,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         }
     }
 
-    public func retrieveKnownWatches(_ hints: [DiscoveredWatch]) async throws -> [DiscoveredWatch] {
+    public func retrieveKnownWatches(_ hints: [WatchConnectionTarget]) async throws -> [DiscoveredWatch] {
         try await waitForBluetooth()
 
         // A bonded Pebble stays connected at the system level and stops
@@ -218,11 +218,14 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
                 continue
             }
             discoveredPeripherals[id] = peripheral
+            // A looked-up watch was not heard: no advertisement, so no RSSI,
+            // and the model is whatever the hint remembered — possibly
+            // nothing. Both say so as nil rather than as invented numbers.
             let watch = DiscoveredWatch(
                 id: id,
                 name: peripheral.name ?? hint.name,
                 model: hint.model,
-                signalStrength: hint.signalStrength
+                signalStrength: nil
             )
             scanResults[id] = watch
             retrieved.append(watch)
@@ -231,7 +234,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     }
 
     public func connect(
-        to watch: DiscoveredWatch,
+        to watch: WatchConnectionTarget,
         reportingPhase: @escaping @MainActor (WatchHandshakePhase) -> Void
     ) async throws -> ConnectedWatch {
         try await waitForBluetooth()
@@ -260,11 +263,10 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         }
 
         centralManager.stopScan()
-        pendingWatch = DiscoveredWatch(
+        pendingWatch = WatchConnectionTarget(
             id: watch.id,
             name: peripheral.name ?? watch.name,
-            model: watch.model,
-            signalStrength: watch.signalStrength
+            model: watch.model
         )
         peripheral.delegate = self
 
@@ -403,8 +405,10 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         scanTimeoutTask?.cancel()
         scanTimeoutTask = nil
 
+        // Strongest signal first; a watch that was looked up rather than heard
+        // has none and sorts after every watch that was.
         let watches = scanResults.values.sorted { lhs, rhs in
-            lhs.signalStrength > rhs.signalStrength
+            (lhs.signalStrength ?? Int.min) > (rhs.signalStrength ?? Int.min)
         }
         scanContinuation?.resume(returning: watches)
         scanContinuation = nil
@@ -997,7 +1001,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         return true
     }
 
-    func reconnect(to watch: DiscoveredWatch, using peripheral: CBPeripheral) {
+    func reconnect(to watch: WatchConnectionTarget, using peripheral: CBPeripheral) {
         reconnects.cancelSchedule()
         guard centralManager.state == .poweredOn else {
             eventContinuation?.yield(.reconnecting(watchID: watch.id))
@@ -1022,7 +1026,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
 
     /// Stops chasing a watch whose links keep dying in the handshake, and says
     /// so: the reader was told "Reconnecting…" for as long as they watched.
-    func giveUpReconnecting(to watch: DiscoveredWatch) {
+    func giveUpReconnecting(to watch: WatchConnectionTarget) {
         let attempts = reconnects.failedHandshakes
         reconnects.stop()
         connectionTimeoutTask?.cancel()
@@ -1039,7 +1043,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         eventContinuation?.yield(.disconnected(.handshakeKeptFailing))
     }
 
-    func scheduleReconnect(to watch: DiscoveredWatch, using peripheral: CBPeripheral) {
+    func scheduleReconnect(to watch: WatchConnectionTarget, using peripheral: CBPeripheral) {
         connectionTimeoutTask?.cancel()
         connectionTimeoutTask = nil
         reconnects.schedule { [weak self] in

@@ -31,7 +31,7 @@ public final class QEMUWatchClient: WatchClient {
     private var pendingInstallCookie: UInt32?
     private var nextAppMessageTransactionID: UInt8 = 0
     private var pendingAppMessageTransactionID: UInt8?
-    private var reconnectWatch: DiscoveredWatch?
+    private var reconnectWatch: WatchConnectionTarget?
     private var connectedWatch: ConnectedWatch?
     private var reconnectTask: Task<Void, Never>?
     private var isManualDisconnect = false
@@ -47,12 +47,12 @@ public final class QEMUWatchClient: WatchClient {
             id: WatchID("qemu-emery"),
             name: "Pebble QEMU",
             model: .pebbleTime2,
-            signalStrength: 0
+            signalStrength: nil
         )]
     }
 
     public func connect(
-        to watch: DiscoveredWatch,
+        to watch: WatchConnectionTarget,
         reportingPhase: @escaping @MainActor (WatchHandshakePhase) -> Void
     ) async throws -> ConnectedWatch {
         reconnectWatch = watch
@@ -61,7 +61,7 @@ public final class QEMUWatchClient: WatchClient {
     }
 
     private func establishConnection(
-        to watch: DiscoveredWatch,
+        to watch: WatchConnectionTarget,
         reportingPhase: @MainActor (WatchHandshakePhase) -> Void = { _ in }
     ) async throws -> ConnectedWatch {
         guard connection == nil else { throw WatchConnectionError.connectionAlreadyInProgress }

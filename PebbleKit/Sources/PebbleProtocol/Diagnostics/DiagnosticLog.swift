@@ -96,7 +96,7 @@ public actor DiagnosticLog {
             watchDescription: watch.map { watch in
                 [
                     watch.name,
-                    watch.model.displayName,
+                    watch.model?.displayName ?? "unknown model",
                     watch.board?.rawValue ?? "unknown board",
                     watch.hardwareRevision ?? "unknown revision",
                     watch.firmwareVersion ?? "unknown",

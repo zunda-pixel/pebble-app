@@ -139,14 +139,20 @@ struct DiscoveredWatchRow: View {
     var body: some View {
         Button(action: connect) {
             LabeledContent {
-                Text("\(watch.signalStrength) dBm")
-                    .foregroundStyle(.secondary)
+                // A looked-up bonded watch was not heard advertising, so there
+                // is no signal strength to show — and no row for a made-up one.
+                if let signalStrength = watch.signalStrength {
+                    Text("\(signalStrength) dBm")
+                        .foregroundStyle(.secondary)
+                }
             } label: {
                 Label {
                     VStack(alignment: .leading) {
                         Text(watch.name)
-                        Text(watch.model.displayName)
-                            .foregroundStyle(.secondary)
+                        if let model = watch.model {
+                            Text(model.displayName)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 } icon: {
                     Image(systemName: "applewatch.radiowaves.left.and.right")

@@ -44,7 +44,7 @@ final class SuspendingWatchClient: WatchClient {
     /// No phases: these tests are about the queues, and a connect that reports
     /// nothing between the link and the answer is what the protocol allows.
     func connect(
-        to watch: DiscoveredWatch,
+        to watch: WatchConnectionTarget,
         reportingPhase: @escaping @MainActor (WatchHandshakePhase) -> Void
     ) async throws -> ConnectedWatch {
         ConnectedWatch(

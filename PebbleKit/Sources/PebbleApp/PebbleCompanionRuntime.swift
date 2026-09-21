@@ -73,8 +73,8 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
         let watch = activeWatchHandler()
         let sourceLiteral = try javaScriptLiteral(source)
         let identifierLiteral = try javaScriptLiteral(application.id.uuidString)
-        let platformLiteral = try javaScriptLiteral(watch?.model.platformName ?? "unknown")
-        let modelLiteral = try javaScriptLiteral(watch?.model.rawValue ?? "unknown")
+        let platformLiteral = try javaScriptLiteral(watch?.model?.platformName ?? "unknown")
+        let modelLiteral = try javaScriptLiteral(watch?.model?.rawValue ?? "unknown")
         let firmwareLiteral = try javaScriptLiteral(watch?.firmwareVersion ?? "unknown")
         let accountTokenLiteral = try javaScriptLiteral(
             tokenStore.token(named: PebbleTokenStore.accountTokenName)

@@ -427,9 +427,7 @@ public final class AppModel {
                 .filter { saved in
                     !connectedIDs.contains(saved.id) && !scanned.contains { $0.id == saved.id }
                 }
-                .map { saved in
-                    DiscoveredWatch(id: saved.id, name: saved.name, model: saved.model, signalStrength: 0)
-                }
+                .map(\.connectionTarget)
             if !missingSavedWatches.isEmpty,
                let retrieved = try? await scannerClient.retrieveKnownWatches(missingSavedWatches) {
                 scanned.append(contentsOf: retrieved)
@@ -454,15 +452,14 @@ public final class AppModel {
     }
 
     public func connect(to watch: SavedWatch) async {
-        await connect(to: DiscoveredWatch(
-            id: watch.id,
-            name: watch.name,
-            model: watch.model,
-            signalStrength: 0
-        ))
+        await connect(to: watch.connectionTarget)
     }
 
     public func connect(to watch: DiscoveredWatch) async {
+        await connect(to: watch.connectionTarget)
+    }
+
+    public func connect(to watch: WatchConnectionTarget) async {
         guard !connectingWatchIDs.contains(watch.id),
               !connections.contains(where: { $0.watch.id == watch.id }) else {
             return
