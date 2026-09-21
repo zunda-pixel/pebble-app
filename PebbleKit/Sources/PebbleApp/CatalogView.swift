@@ -231,10 +231,18 @@ struct CatalogContent<Destination: View, CollectionDestination: View>: View {
                             NavigationLink {
                                 collectionDestination(collection)
                             } label: {
+                                // Both homes carry a Most Loved, so the
+                                // unfiltered list holds two shelves of one
+                                // name: the icon is what tells them apart
+                                // (owner feedback, 2026-09-21) — the same
+                                // symbols the rest of the app uses for the two
+                                // kinds.
                                 Label {
                                     catalogCollectionText(collection.name)
                                 } icon: {
-                                    Image(systemName: "square.grid.3x1.below.line.grid.1x2")
+                                    Image(systemName: collection.kind == .watchapp
+                                        ? "square.grid.2x2"
+                                        : "applewatch.watchface")
                                 }
                             }
                         }
