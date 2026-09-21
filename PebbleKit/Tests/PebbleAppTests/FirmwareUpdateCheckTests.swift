@@ -27,7 +27,7 @@ struct FirmwareUpdateCheckTests {
         /// `v5.0.0-mock`, whose board is asterix.
         func publish(version: String) {
             StoreStubURLProtocol.answer(releasesURL, with: Data("""
-            {
+            [{
               "tag_name": "\(version)",
               "html_url": "https://example.invalid/notes",
               "assets": [
@@ -37,7 +37,7 @@ struct FirmwareUpdateCheckTests {
                   "browser_download_url": "https://example.invalid/firmware.pbz"
                 }
               ]
-            }
+            }]
             """.utf8))
         }
     }

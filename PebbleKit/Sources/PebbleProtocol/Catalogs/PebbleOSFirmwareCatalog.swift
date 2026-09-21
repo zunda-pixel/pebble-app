@@ -31,7 +31,7 @@ public struct PebbleOSFirmwareCatalog: Sendable {
     private let session: URLSession
 
     public init(
-        releasesURL: URL = URL(string: "https://api.github.com/repos/coredevices/PebbleOS/releases/latest")!,
+        releasesURL: URL = URL(string: "https://api.github.com/repos/coredevices/PebbleOS/releases?per_page=100")!,
         session: URLSession? = nil
     ) {
         self.releasesURL = releasesURL
@@ -58,19 +58,41 @@ public struct PebbleOSFirmwareCatalog: Sendable {
                 let error = PebbleOSFirmwareCatalogError.releasesUnavailable
                 throw response.status.isWorthAnotherAttempt ? error : NotRetryable(error)
             }
-            let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
-            guard let asset = Self.asset(for: board, in: release.assets) else {
+            let releases = try JSONDecoder().decode([GitHubRelease].self, from: data)
+            // The highest version with a package for this board, never the
+            // newest date. PebbleOS ships patches for its older lines after
+            // newer releases — v4.27.3 arrived six releases after v4.37.0
+            // (measured 2026-09-21) — so GitHub's own `latest`, which is a
+            // date, answered a downgrade and hid the real update (#124).
+            let candidates = releases
+                .filter { $0.prerelease != true && $0.draft != true }
+                .compactMap { release -> PebbleOSFirmwareRelease? in
+                    guard let asset = Self.asset(for: board, in: release.assets) else { return nil }
+                    return PebbleOSFirmwareRelease(
+                        versionTag: release.tagName,
+                        board: board,
+                        downloadURL: asset.browserDownloadURL,
+                        sizeInBytes: asset.size,
+                        releaseNotesURL: release.htmlURL
+                    )
+                }
+            guard let newest = candidates.max(by: {
+                Self.isVersion($1.versionTag, newerThan: $0.versionTag)
+            }) else {
                 // Asking again returns the same list.
                 throw NotRetryable(PebbleOSFirmwareCatalogError.noFirmwareForBoard(board))
             }
-            return PebbleOSFirmwareRelease(
-                versionTag: release.tagName,
-                board: board,
-                downloadURL: asset.browserDownloadURL,
-                sizeInBytes: asset.size,
-                releaseNotesURL: release.htmlURL
-            )
+            return newest
         }
+    }
+
+    /// Numeric and component-wise: "v4.37.0" beats "v4.30.3" however their
+    /// dates fall, and "v4.9.142.4" sits below both because 9 < 30.
+    public static func isVersion(_ candidate: String, newerThan running: String) -> Bool {
+        func bare(_ version: String) -> String {
+            version.hasPrefix("v") ? String(version.dropFirst()) : version
+        }
+        return bare(candidate).compare(bare(running), options: .numeric) == .orderedDescending
     }
 
     static func asset(for board: WatchBoard, in assets: [GitHubReleaseAsset]) -> GitHubReleaseAsset? {
@@ -140,11 +162,14 @@ struct GitHubRelease: Decodable {
     var tagName: String
     var htmlURL: URL?
     var assets: [GitHubReleaseAsset]
+    /// Nil in older fixtures; GitHub always sends both.
+    var prerelease: Bool?
+    var draft: Bool?
 
     private enum CodingKeys: String, CodingKey {
         case tagName = "tag_name"
         case htmlURL = "html_url"
-        case assets
+        case assets, prerelease, draft
     }
 }
 

@@ -979,9 +979,11 @@ final class StubURLProtocol: URLProtocol {
 @Suite
 struct FirmwareCatalogNetworkTests {
     private static let releaseJSON = """
-    {
+    [{
       "tag_name": "v4.36.2",
       "html_url": "https://example.invalid/release",
+      "prerelease": false,
+      "draft": false,
       "assets": [
         {
           "name": "normal_obelix_pvt_v4.36.2.pbz",
@@ -989,7 +991,49 @@ struct FirmwareCatalogNetworkTests {
           "browser_download_url": "https://example.invalid/normal_obelix_pvt_v4.36.2.pbz"
         }
       ]
-    }
+    }]
+    """
+
+    /// The release list as it really looked on 2026-09-21: a patch for an old
+    /// line published after — and dated after — the newest version, plus a
+    /// prerelease above everything. The date must not win, and the prerelease
+    /// must not either.
+    private static let mixedLinesJSON = """
+    [
+      {
+        "tag_name": "v4.38.0-beta1",
+        "prerelease": true,
+        "assets": [{
+          "name": "normal_obelix_pvt_v4.38.0-beta1.pbz",
+          "size": 1,
+          "browser_download_url": "https://example.invalid/beta.pbz"
+        }]
+      },
+      {
+        "tag_name": "v4.27.3",
+        "assets": [{
+          "name": "normal_obelix_pvt_v4.27.3.pbz",
+          "size": 2,
+          "browser_download_url": "https://example.invalid/old-line.pbz"
+        }]
+      },
+      {
+        "tag_name": "v4.9.142.4",
+        "assets": [{
+          "name": "normal_obelix_pvt_v4.9.142.4.pbz",
+          "size": 3,
+          "browser_download_url": "https://example.invalid/prf-line.pbz"
+        }]
+      },
+      {
+        "tag_name": "v4.37.0",
+        "assets": [{
+          "name": "normal_obelix_pvt_v4.37.0.pbz",
+          "size": 4,
+          "browser_download_url": "https://example.invalid/newest.pbz"
+        }]
+      }
+    ]
     """
 
     private func catalog(_ url: URL) -> PebbleOSFirmwareCatalog {
@@ -1007,6 +1051,19 @@ struct FirmwareCatalogNetworkTests {
         #expect(release.sizeInBytes == 3_126_600)
         // The typed header name has to survive the bridge to URLRequest.
         #expect(StubURLProtocol.sentHeaders(for: url)["Accept"] == "application/vnd.github+json")
+    }
+
+    /// The list is ordered by date and the newest-dated entry is a patch for
+    /// an older line — the shape PebbleOS's releases really take. The highest
+    /// version wins, not the newest date, and not the taller prerelease.
+    @Test func aPatchForAnOlderLineDoesNotHideTheNewestVersion() async throws {
+        let url = URL(string: "https://example.invalid/mixed-lines/releases")!
+        StubURLProtocol.stub(url, status: 200, body: Data(Self.mixedLinesJSON.utf8))
+
+        let release = try await catalog(url).latestRelease(for: .obelixPVT)
+
+        #expect(release.versionTag == "v4.37.0")
+        #expect(release.downloadURL.absoluteString == "https://example.invalid/newest.pbz")
     }
 
     @Test func anUnsuccessfulStatusIsReported() async {

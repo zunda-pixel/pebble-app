@@ -305,10 +305,7 @@ extension AppModel {
     /// rather than assumed. Numeric compare after that, the same way the app
     /// versions in the store are judged.
     static func isFirmwareVersion(_ candidate: String, newerThan running: String) -> Bool {
-        func bare(_ version: String) -> String {
-            version.hasPrefix("v") ? String(version.dropFirst()) : version
-        }
-        return bare(candidate).compare(bare(running), options: .numeric) == .orderedDescending
+        PebbleOSFirmwareCatalog.isVersion(candidate, newerThan: running)
     }
 
     /// The connect-time check, which tells the phone about an update instead
