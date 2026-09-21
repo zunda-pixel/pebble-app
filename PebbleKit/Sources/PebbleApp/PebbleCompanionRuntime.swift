@@ -108,6 +108,9 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
         let callbackID = 0;
         window.Pebble = {
           addEventListener: (name, callback) => (listeners[name] ||= []).push(callback),
+          removeEventListener: (name, callback) => {
+            listeners[name] = (listeners[name] || []).filter(fn => fn !== callback);
+          },
           openURL: url => webkit.messageHandlers.pebble.postMessage({type:'openURL', url}),
           sendAppMessage: (message, success, failure) => {
             const id = ++callbackID; callbacks[id] = {success, failure};
@@ -224,9 +227,23 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
     }
 
     func deliver(_ message: AppMessageData) async throws {
-        let payload = Dictionary(uniqueKeysWithValues: message.tuples.map { tuple in
-            (String(tuple.key), javaScriptValue(tuple.value))
-        })
+        // Under both spellings: the name the appKeys declare, which is how the
+        // SDK's own samples read a payload, and the number, which is how the
+        // older ones do. Numbers alone left every name-reading script deaf to
+        // the watch (#128) — WikiRadius waited forever for a READY it had
+        // already been sent.
+        let names = Dictionary(
+            (application?.appKeys ?? [:]).map { ($0.value, $0.key) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        var payload: [String: Any] = [:]
+        for tuple in message.tuples {
+            let value = javaScriptValue(tuple.value)
+            payload[String(tuple.key)] = value
+            if let name = names[tuple.key] {
+                payload[name] = value
+            }
+        }
         guard let webView else { throw CompanionRuntimeError.noApplicationLoaded }
         _ = try await webView.callAsyncJavaScript(
             "window.__pebbleDispatch('appmessage', {payload: payload});",

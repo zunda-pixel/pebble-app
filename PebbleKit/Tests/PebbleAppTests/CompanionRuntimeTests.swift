@@ -175,6 +175,43 @@ struct CompanionRuntimeTests {
         #expect(answered.first?.value == .string("code 1 true"))
     }
 
+    /// A payload off the watch reads under both spellings: the name the
+    /// appKeys declare, which is how the SDK's own samples read it, and the
+    /// number, which is how the older scripts do. Numbers alone left every
+    /// name-reading script deaf to the watch (#128).
+    @Test func aPayloadOffTheWatchAnswersToItsNameAndItsNumber() async throws {
+        let id = UUID()
+        let application = makeApplication(id: id)
+        defer { Task { await PebbleCompanionRuntime.forget(applicationID: id) } }
+        let sent = SentTuples()
+        let runtime = PebbleCompanionRuntime(
+            openURLHandler: { _ in },
+            appMessageHandler: { _, tuples in sent.append(tuples) },
+            notificationHandler: { _, _, _ in },
+            activeWatchHandler: { nil },
+            locationHandler: { throw WeatherSourceError.locationNotAllowed }
+        )
+        try await runtime.load(
+            source: """
+            Pebble.addEventListener('appmessage', function (e) {
+              Pebble.sendAppMessage({kept: 'name ' + e.payload.kept + ' number ' + e.payload[1]});
+            });
+            """,
+            application: application
+        )
+
+        try await runtime.deliver(AppMessageData(
+            transactionID: 1,
+            applicationID: id,
+            tuples: [AppMessageTuple(key: 1, value: .string("hello"))]
+        ))
+
+        for _ in 0..<40 where sent.tuples.isEmpty {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        #expect(sent.tuples.first?.value == .string("name hello number hello"))
+    }
+
     /// `watchPosition` follows the phone: every fix lands in the same callback
     /// until `clearWatch` takes the token back (#90).
     ///
