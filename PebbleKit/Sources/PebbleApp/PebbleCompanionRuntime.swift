@@ -360,6 +360,22 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
         positionWatchers[requestID] = Task { [weak self] in
             do {
                 guard let updates = try self?.locationUpdatesHandler() else { return }
+                await DiagnosticLog.shared.record(
+                    category: "configuration",
+                    message: "a script is watching the position (watch \(requestID))"
+                )
+                // The first fix, straight away: the live stream can take
+                // seconds to warm up, and the single-shot path already holds a
+                // recent one. A script's first paint should not wait on GPS.
+                if let seed = try? await self?.locationHandler() {
+                    guard !Task.isCancelled else { return }
+                    await self?.deliverPosition(
+                        requestID: requestID,
+                        position: Self.webPosition(seed),
+                        error: nil
+                    )
+                }
+                var delivered = 0
                 for try await location in updates {
                     guard !Task.isCancelled else { return }
                     await self?.deliverPosition(
@@ -367,7 +383,18 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
                         position: Self.webPosition(location),
                         error: nil
                     )
+                    delivered += 1
+                    if delivered == 1 {
+                        await DiagnosticLog.shared.record(
+                            category: "configuration",
+                            message: "the watched position delivered its first live fix (watch \(requestID))"
+                        )
+                    }
                 }
+                await DiagnosticLog.shared.record(
+                    category: "configuration",
+                    message: "the position stream ended (watch \(requestID), \(delivered) live fixes)"
+                )
             } catch {
                 guard !Task.isCancelled else { return }
                 let refused = (error as? WeatherSourceError) == .locationNotAllowed
@@ -380,6 +407,11 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
                             ? "Pebble has not been allowed your position."
                             : "Your position could not be found.",
                     ]
+                )
+                await DiagnosticLog.shared.record(
+                    .warning,
+                    category: "configuration",
+                    message: "a watched position failed (watch \(requestID)): \(String(reflecting: error))"
                 )
             }
         }
