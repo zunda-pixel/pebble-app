@@ -177,6 +177,51 @@ struct CompanionRuntimeTests {
         #expect(answered.first?.value == .string("code 1 true"))
     }
 
+    /// A pin a script pushes travels the whole way: the shim's
+    /// `insertTimelinePin`, the message across the bridge, and the web JSON
+    /// parsed into the handler's hands — owned by the application whose
+    /// script said so. The delete follows its own id back.
+    @Test func aScriptsPinReachesTheHandlerParsedAndOwned() async throws {
+        let id = UUID()
+        defer { Task { await PebbleCompanionRuntime.forget(applicationID: id) } }
+        let inserted = PendingPins()
+        let runtime = PebbleCompanionRuntime(
+            openURLHandler: { _ in },
+            appMessageHandler: { _, _ in },
+            notificationHandler: { _, _, _ in },
+            activeWatchHandler: { nil },
+            locationHandler: { throw WeatherSourceError.locationNotAllowed },
+            timelinePinInsertHandler: { pin, owner in inserted.append(pin, owner: owner) },
+            timelinePinDeleteHandler: { backingID, owner in inserted.appendDeletion(backingID, owner: owner) }
+        )
+
+        try await runtime.load(
+            source: """
+            Pebble.addEventListener('ready', function () {
+              Pebble.insertTimelinePin({
+                id: 'game-7',
+                time: '2026-10-04T05:00:00Z',
+                duration: 100,
+                layout: {type: 'genericPin', title: 'Grand Final'}
+              });
+              Pebble.deleteTimelinePin('game-6');
+            });
+            """,
+            application: makeApplication(id: id)
+        )
+        for _ in 0..<40 where inserted.pins.isEmpty || inserted.deletions.isEmpty {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+
+        let pin = try #require(inserted.pins.first)
+        #expect(pin.0.backingID == "game-7")
+        #expect(pin.0.title == "Grand Final")
+        #expect(pin.0.durationMinutes == 100)
+        #expect(pin.1 == id)
+        #expect(inserted.deletions.first?.0 == "game-6")
+        #expect(inserted.deletions.first?.1 == id)
+    }
+
     /// A script's request is answered across origins: PKJS scripts were
     /// written for a runtime without the web's same-origin rules, and the
     /// services they call offer no CORS headers to a pebble.local origin —
@@ -355,6 +400,21 @@ private extension NWListener.State {
     var isFailure: Bool {
         if case .failed = self { return true }
         return false
+    }
+}
+
+/// The pins a script pushed and took back, held where the handler can reach them.
+@MainActor
+private final class PendingPins {
+    private(set) var pins: [(CompanionTimelinePin, UUID)] = []
+    private(set) var deletions: [(String, UUID)] = []
+
+    func append(_ pin: CompanionTimelinePin, owner: UUID) {
+        pins.append((pin, owner))
+    }
+
+    func appendDeletion(_ backingID: String, owner: UUID) {
+        deletions.append((backingID, owner))
     }
 }
 
