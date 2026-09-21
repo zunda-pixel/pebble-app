@@ -97,6 +97,19 @@ extension AppModel {
         }
     }
 
+    /// The watch launched an app (#130): a fresh page, so `ready` fires for
+    /// this launch the way the PKJS lifecycle promises. The lazy starts on
+    /// configuration and on an incoming appmessage remain as the net under a
+    /// run-state event that never came.
+    func launchCompanionRuntime(applicationID: UUID) async {
+        guard let application = (applications.apps + applications.watchfaces)
+            .first(where: { $0.id == applicationID }),
+            application.hasCompanionJavaScript,
+            let source = ((try? await applicationLibrary.companionJavaScript(applicationID: applicationID)) ?? nil)
+        else { return }
+        try? await companionRuntime.relaunch(source: source, application: application)
+    }
+
     public func configureApplication(_ application: WatchApplication) async {
         guard application.isConfigurable else { return }
         do {

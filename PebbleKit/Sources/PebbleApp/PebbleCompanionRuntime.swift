@@ -36,6 +36,10 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
     /// to find the identifier already claimed, skip the wait, and be delivered
     /// into a page whose script had not run — a NAK for nothing.
     private var loadTask: Task<Void, any Error>?
+    /// True from a load's start until its continuation resumes, which is what
+    /// `relaunch` reads to tell "the burst raced the run-state event" from
+    /// "the same app launched again".
+    private var isLoadInFlight = false
     private let tokenStore = PebbleTokenStore()
 
     init(
@@ -84,6 +88,20 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
     /// watch app installed again under the same identifier.
     static func forget(applicationID: UUID) async {
         try? await WKWebsiteDataStore.remove(forIdentifier: applicationID)
+    }
+
+    /// A fresh page for a fresh launch: the PKJS lifecycle ties the script to
+    /// the watchapp's run, so launching the app runs `ready` again — a weather
+    /// face refetches every time it is shown (#130). A load still in flight is
+    /// joined instead, which is the launch's own appmessage burst racing the
+    /// run-state event that called this.
+    func relaunch(source: String, application: WatchApplication) async throws {
+        if loadedApplicationID == application.id, isLoadInFlight {
+            try await loadTask?.value
+            return
+        }
+        loadedApplicationID = nil
+        try await load(source: source, application: application)
     }
 
     func load(source: String, application: WatchApplication) async throws {
@@ -277,6 +295,7 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
         let webView = makeWebView(for: application)
         self.webView = webView
         loadedApplicationID = application.id
+        isLoadInFlight = true
         let task = Task {
             try await withCheckedThrowingContinuation { continuation in
                 loadContinuation?.resume(throwing: CancellationError())
@@ -290,6 +309,7 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
             }
         }
         loadTask = task
+        defer { isLoadInFlight = false }
         try await task.value
     }
 

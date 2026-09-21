@@ -674,6 +674,12 @@ public final class AppModel {
                     applications.activeWatchfaceID = id
                     Defaults[.activeWatchfaceID] = id
                 }
+                // The PKJS lifecycle ties the script's life to the app's run,
+                // so a launch is what makes `ready` fire — every launch, not
+                // only the first (#130).
+                Task { [weak self] in
+                    await self?.launchCompanionRuntime(applicationID: id)
+                }
             case .stopped(let id):
                 if applications.activeWatchfaceID == id { applications.activeWatchfaceID = nil }
             }

@@ -222,6 +222,42 @@ struct CompanionRuntimeTests {
         #expect(inserted.deletions.first?.1 == id)
     }
 
+    /// Launching the same app again runs its script again: the PKJS lifecycle
+    /// ties the script to the watchapp's run, and `ready` fires per launch —
+    /// while `localStorage` carries across, which is how the page can prove it
+    /// really was rebuilt rather than redispatched (#130).
+    @Test func launchingTheSameAppAgainRunsItsScriptAgain() async throws {
+        let id = UUID()
+        let application = makeApplication(id: id)
+        defer { Task { await PebbleCompanionRuntime.forget(applicationID: id) } }
+        let sent = SentTuples()
+        let runtime = PebbleCompanionRuntime(
+            openURLHandler: { _ in },
+            appMessageHandler: { _, tuples in sent.append(tuples) },
+            notificationHandler: { _, _, _ in },
+            activeWatchHandler: { nil },
+            locationHandler: { throw WeatherSourceError.locationNotAllowed }
+        )
+        let script = """
+        Pebble.addEventListener('ready', function () {
+          var n = parseInt(localStorage.getItem('launches') || '0', 10) + 1;
+          localStorage.setItem('launches', String(n));
+          Pebble.sendAppMessage({kept: 'launch ' + n});
+        });
+        """
+
+        try await runtime.relaunch(source: script, application: application)
+        for _ in 0..<40 where sent.tuples.count < 1 {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        try await runtime.relaunch(source: script, application: application)
+        for _ in 0..<40 where sent.tuples.count < 2 {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+
+        #expect(sent.tuples.map(\.value) == [.string("launch 1"), .string("launch 2")])
+    }
+
     /// A glance a script reloads travels the whole way and its callback hears
     /// the answer; the subscription APIs exist to fail honestly — a caller
     /// falls to its failure branch instead of dying on undefined (#92).
