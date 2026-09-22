@@ -646,6 +646,18 @@ public final class AppModel {
         case .healthSamplesReceived(let samples):
             Task { [weak self] in
                 guard let self else { return }
+                // What the watch actually sent, on the diagnostics report so a
+                // reader can tell "the watch measured nothing" from "the app
+                // dropped it" — the heart rate and blood oxygen especially,
+                // which only appear once their sensor has run.
+                let spo2Days = samples.filter { $0.bloodOxygen != nil }.count
+                let spo2Readings = samples.reduce(0) { $0 + $1.bloodOxygenReadings.count }
+                let hrReadings = samples.reduce(0) { $0 + $1.heartRateReadings.count }
+                await DiagnosticLog.shared.record(
+                    category: "health",
+                    message: "received \(samples.count) day(s): "
+                        + "\(spo2Days) with SpO2 (\(spo2Readings) readings), \(hrReadings) HR readings"
+                )
                 do {
                     self.health.samples = try await self.healthStore.merge(samples)
                 } catch {
