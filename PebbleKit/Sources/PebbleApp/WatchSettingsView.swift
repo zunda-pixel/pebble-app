@@ -430,6 +430,11 @@ struct WatchSettingsContent: View {
                 Text("The watch works out calories and distance from these. They are sent as one record, so all of them are written together.")
             }
 
+            // Heart rate and blood oxygen share the one sensor, which only the
+            // Pebble Time 2 (obelix) carries. A watch without it — Pebble 2 Duo,
+            // Pebble Round 2 — gets neither row, the way the backlight rows hide
+            // on a board that lacks their hardware.
+            if board?.hasHeartRateSensor == true {
             Section {
                 Toggle("Heart Rate", isOn: Binding(
                     get: { heartRateSettings.isEnabled },
@@ -524,6 +529,7 @@ struct WatchSettingsContent: View {
             } footer: {
                 Text("Measures blood oxygen (SpO2) on its own schedule, off until you turn it on.")
             }
+            }  // board?.hasHeartRateSensor
 
             Section {
                 Toggle("Reminders App", isOn: Binding(

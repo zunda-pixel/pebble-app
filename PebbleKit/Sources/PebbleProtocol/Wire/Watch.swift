@@ -110,6 +110,23 @@ public extension WatchBoard {
             false
         }
     }
+
+    /// `CONFIG_HRM`. Only obelix carries a heart-rate sensor — the Goodix
+    /// GH3X2X (`CONFIG_HRM_GH3X2X`), whose red/IR path is also what the firmware
+    /// samples blood oxygen (SpO2) on. asterix (Pebble 2 Duo) and getafix
+    /// (Pebble Round 2) have no `CONFIG_HRM` at all, so they measure neither.
+    /// The emulator's `qemu_emery` sets `CONFIG_HRM` with a stub, standing in
+    /// for a Pebble Time 2. Gates the Heart Rate and Blood Oxygen rows: a
+    /// reading a watch cannot take is a row that does nothing.
+    var hasHeartRateSensor: Bool {
+        switch self {
+        case .obelixEVT, .obelixDVT, .obelixPVT, .obelixBigboard, .obelixBigboard2,
+             .qemuEmery:
+            true
+        default:
+            false
+        }
+    }
 }
 
 public enum WatchModel: String, CaseIterable, Codable, Sendable {
