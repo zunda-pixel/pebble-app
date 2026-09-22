@@ -108,6 +108,16 @@ struct HealthContent: View {
                     }
                     LabeledContent("Minutes Measured", value: heartRate.measuredMinutes, format: .number)
                 }
+                // The range, like the heart rate: a scattered handful of measured
+                // minutes, so the low and the high say more than one average.
+                if let bloodOxygen = newestSample?.bloodOxygen {
+                    LabeledContent("Blood Oxygen") {
+                        Text("\(bloodOxygen.lowest)–\(bloodOxygen.highest)%")
+                    }
+                    LabeledContent("Average Blood Oxygen") {
+                        Text("\(bloodOxygen.average)%")
+                    }
+                }
                 // A night the watch broke into a sleep and a nap, or into two
                 // halves with a wakeful hour between them, is two rows: one
                 // range would say the reader slept through what they did not.

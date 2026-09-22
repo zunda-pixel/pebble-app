@@ -33,6 +33,13 @@ public struct WatchHealthSample: Codable, Equatable, Identifiable, Sendable {
     /// cannot honestly become per-moment samples again. Empty wherever
     /// `heartRate` is nil, and for files written before this existed.
     public var heartRateReadings: [HeartRateReading] = []
+    /// The day's blood oxygen (SpO2) as the watch measured it, minute by minute.
+    /// Nil under the same conditions as `heartRate`: nothing measured it — a day
+    /// from HealthKit, an older file, a watch with no sensor, or the reading off.
+    public var bloodOxygen: WatchBloodOxygenSummary? = nil
+    /// The measured minutes themselves, for the HealthKit export. Empty wherever
+    /// `bloodOxygen` is nil, and for files written before this existed.
+    public var bloodOxygenReadings: [BloodOxygenReading] = []
     /// The walks, runs and open workouts the watch recorded, filed under the
     /// day they ended in. Empty for a day from HealthKit or an older file.
     public var workouts: [WatchWorkout] = []
@@ -43,7 +50,8 @@ public struct WatchHealthSample: Codable, Equatable, Identifiable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case id, date, steps, sleepMinutes, deepSleepMinutes, sleepSessions
         case activeKilocalories, restingKilocalories, distanceMetres, activeMinutes
-        case heartRate, heartRateReadings, workouts, timeZoneIdentifier, source, updatedAt
+        case heartRate, heartRateReadings, bloodOxygen, bloodOxygenReadings
+        case workouts, timeZoneIdentifier, source, updatedAt
     }
 
     public init(from decoder: any Decoder) throws {
@@ -60,6 +68,8 @@ public struct WatchHealthSample: Codable, Equatable, Identifiable, Sendable {
         activeMinutes = try container.decodeIfPresent(Int.self, forKey: .activeMinutes) ?? 0
         heartRate = try container.decodeIfPresent(WatchHeartRateSummary.self, forKey: .heartRate)
         heartRateReadings = try container.decodeIfPresent([HeartRateReading].self, forKey: .heartRateReadings) ?? []
+        bloodOxygen = try container.decodeIfPresent(WatchBloodOxygenSummary.self, forKey: .bloodOxygen)
+        bloodOxygenReadings = try container.decodeIfPresent([BloodOxygenReading].self, forKey: .bloodOxygenReadings) ?? []
         workouts = try container.decodeIfPresent([WatchWorkout].self, forKey: .workouts) ?? []
         timeZoneIdentifier = try container.decodeIfPresent(String.self, forKey: .timeZoneIdentifier)
             ?? TimeZone.current.identifier
@@ -104,6 +114,39 @@ public struct WatchHeartRateSummary: Codable, Equatable, Sendable {
 public struct HeartRateReading: Codable, Equatable, Sendable {
     public var date: Date
     public var beatsPerMinute: Int
+}
+
+/// A day's blood oxygen, reduced the same way `WatchHeartRateSummary` reduces the
+/// heart rate: the watch measures a saturation percentage only for the minutes
+/// its sensor ran, so a day is a scattered handful of readings, and `lowest` is
+/// the smallest measured minute rather than any clinical figure.
+@MemberwiseInit(.public)
+public struct WatchBloodOxygenSummary: Codable, Equatable, Sendable {
+    public var lowest: Int
+    public var average: Int
+    public var highest: Int
+    /// How many minutes the watch actually measured.
+    public var measuredMinutes: Int
+
+    /// Nil for a day with nothing measured, rather than a summary of zeroes.
+    public static func from(_ percentages: [Int]) -> Self? {
+        guard let lowest = percentages.min(), let highest = percentages.max() else {
+            return nil
+        }
+        return Self(
+            lowest: lowest,
+            average: percentages.reduce(0, +) / percentages.count,
+            highest: highest,
+            measuredMinutes: percentages.count
+        )
+    }
+}
+
+/// One minute the SpO2 sensor ran: when, and the saturation percentage it read.
+@MemberwiseInit(.public)
+public struct BloodOxygenReading: Codable, Equatable, Sendable {
+    public var date: Date
+    public var percent: Int
 }
 
 public enum WatchHealthDataSource: String, Codable, Equatable, Sendable {
@@ -176,6 +219,28 @@ public actor WatchHealthStore {
             case (nil, nil):
                 resolved.heartRate = nil
                 resolved.heartRateReadings = []
+            }
+            // Blood oxygen travels with its readings the same way heart rate
+            // does, and for the same reason: only the watch measures it, so a
+            // HealthKit record carries nil and must not wipe what the watch saw.
+            switch (existing.bloodOxygen, normalized.bloodOxygen) {
+            case (let older?, let newer?):
+                if normalized.updatedAt >= existing.updatedAt {
+                    resolved.bloodOxygen = newer
+                    resolved.bloodOxygenReadings = normalized.bloodOxygenReadings
+                } else {
+                    resolved.bloodOxygen = older
+                    resolved.bloodOxygenReadings = existing.bloodOxygenReadings
+                }
+            case (let only?, nil):
+                resolved.bloodOxygen = only
+                resolved.bloodOxygenReadings = existing.bloodOxygenReadings
+            case (nil, let only?):
+                resolved.bloodOxygen = only
+                resolved.bloodOxygenReadings = normalized.bloodOxygenReadings
+            case (nil, nil):
+                resolved.bloodOxygen = nil
+                resolved.bloodOxygenReadings = []
             }
             // Workouts arrive one sync at a time — the morning walk in the
             // morning, the evening run in the evening — so the day is the

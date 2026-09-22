@@ -76,14 +76,18 @@ public struct HealthDataLoggingProcessor: Sendable {
     /// | 6–11 | resting and active calories, distance | 6 |
     /// | 12 | heart rate | 7 |
     /// | 13–15 | heart rate weight and zone | 12, 13 |
+    /// | 16 | SpO2 percent | 14 |
+    /// | 17 | SpO2 quality | 14 |
     private enum MinuteSample {
         static let steps = 0
         static let heartRate = 12
         static let firstVersionWithHeartRate = 7
+        static let spo2Percent = 16
+        static let firstVersionWithSpo2 = 14
     }
 
     private func stepSamples(from bytes: [UInt8], itemSize: Int) throws -> [WatchHealthSample] {
-        var daily: [Date: (steps: Int, heartRates: [HeartRateReading])] = [:]
+        var daily: [Date: (steps: Int, heartRates: [HeartRateReading], bloodOxygens: [BloodOxygenReading])] = [:]
         for itemStart in stride(from: 0, to: bytes.count - (bytes.count % itemSize), by: itemSize) {
             let itemEnd = itemStart + itemSize
             guard itemEnd <= bytes.count, itemSize >= 9 else { continue }
@@ -103,7 +107,7 @@ public struct HealthDataLoggingProcessor: Sendable {
             for _ in 0..<recordCount where cursor + recordSize <= itemEnd {
                 let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
                 let day = Calendar.current.startOfDay(for: date)
-                var entry = daily[day] ?? (steps: 0, heartRates: [])
+                var entry = daily[day] ?? (steps: 0, heartRates: [], bloodOxygens: [])
                 entry.steps += Int(bytes[cursor + MinuteSample.steps])
                 // Zero is the watch saying it did not measure this minute, not
                 // a heart that stopped: averaging it in would halve the day.
@@ -115,6 +119,16 @@ public struct HealthDataLoggingProcessor: Sendable {
                     // be turned back into moments.
                     if beats > 0 {
                         entry.heartRates.append(HeartRateReading(date: date, beatsPerMinute: beats))
+                    }
+                }
+                // SpO2 shares the minute record, appended in version 14. Zero is
+                // the watch saying it did not measure this minute, the same as
+                // the heart rate above.
+                if version >= MinuteSample.firstVersionWithSpo2,
+                   recordSize > MinuteSample.spo2Percent {
+                    let percent = Int(bytes[cursor + MinuteSample.spo2Percent])
+                    if percent > 0 {
+                        entry.bloodOxygens.append(BloodOxygenReading(date: date, percent: percent))
                     }
                 }
                 daily[day] = entry
@@ -129,6 +143,8 @@ public struct HealthDataLoggingProcessor: Sendable {
                 sleepMinutes: 0,
                 heartRate: .from(entry.heartRates.map(\.beatsPerMinute)),
                 heartRateReadings: entry.heartRates,
+                bloodOxygen: .from(entry.bloodOxygens.map(\.percent)),
+                bloodOxygenReadings: entry.bloodOxygens,
                 source: .watch
             )
         }

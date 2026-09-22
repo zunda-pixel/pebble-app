@@ -40,6 +40,16 @@ struct HealthMinuteRecordTests {
         return sample
     }
 
+    /// An 18-byte minute with steps, heart rate (byte 12) and, from byte 16, the
+    /// SpO2 percentage added in version 14.
+    private func minute(steps: UInt8, heartRate: UInt8?, spo2: UInt8?) -> [UInt8] {
+        var sample = [UInt8](repeating: 0, count: 18)
+        sample[0] = steps
+        if let heartRate { sample[12] = heartRate }
+        if let spo2 { sample[16] = spo2 }
+        return sample
+    }
+
     private func samples(
         version: UInt16,
         sampleSize: Int,
@@ -86,6 +96,38 @@ struct HealthMinuteRecordTests {
         #expect(day.heartRate?.highest == 80)
         #expect(day.heartRate?.average == 70)
         #expect(day.heartRate?.measuredMinutes == 2)
+    }
+
+    /// Version 14 appends SpO2 at byte 16. Zero is "not measured this minute",
+    /// the same as the heart rate, and each measured minute keeps its moment.
+    @Test func bloodOxygenIsReadFromByteSixteen() throws {
+        let read = try samples(
+            version: 14,
+            sampleSize: 18,
+            minutes: [
+                minute(steps: 10, heartRate: 60, spo2: 97),
+                minute(steps: 5, heartRate: nil, spo2: nil),
+                minute(steps: 20, heartRate: 80, spo2: 95),
+            ]
+        )
+
+        let day = try #require(read.first)
+        #expect(day.bloodOxygen?.lowest == 95)
+        #expect(day.bloodOxygen?.highest == 97)
+        #expect(day.bloodOxygen?.average == 96)
+        #expect(day.bloodOxygen?.measuredMinutes == 2)
+        #expect(day.bloodOxygenReadings.map(\.percent) == [97, 95])
+    }
+
+    /// Before version 14 byte 16 is not SpO2, so a record that old carries none.
+    @Test func aVersionOlderThanFourteenCarriesNoBloodOxygen() throws {
+        let read = try samples(
+            version: 13,
+            sampleSize: 16,
+            minutes: [minute(steps: 10, heartRate: 60)]
+        )
+
+        #expect(try #require(read.first).bloodOxygen == nil)
     }
 
     /// Each measured minute keeps its moment: the HealthKit export writes them

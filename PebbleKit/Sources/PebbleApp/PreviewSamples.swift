@@ -179,7 +179,14 @@ enum PreviewSamples {
             activeKilocalories: 320 + day * 37 % 200,
             restingKilocalories: 1_500,
             distanceMetres: 4_800 + day * 311 % 3_000,
-            activeMinutes: 28 + day * 7 % 40
+            activeMinutes: 28 + day * 7 % 40,
+            bloodOxygen: WatchBloodOxygenSummary(
+                lowest: 95, average: 97, highest: 99, measuredMinutes: 6 + day % 5
+            ),
+            bloodOxygenReadings: [
+                BloodOxygenReading(date: date, percent: 97),
+                BloodOxygenReading(date: date.addingTimeInterval(600), percent: 99),
+            ]
         )
     }
 
