@@ -33,6 +33,11 @@ struct QuietTimeSettingsContent: View {
             } footer: {
                 Text("Quiet Time silences the watch. What the phone forwards is decided by Quiet Hours on the Notifications screen.")
             }
+            Section {
+                row(.quietTimeAutoDismiss)
+            } footer: {
+                Text("While Quiet Time is on, clear an arriving notification and return to the watchface instead of showing its popup.")
+            }
             Section("Weekdays") {
                 row(.quietTimeWeekdayScheduleEnabled)
                 if isOn(.quietTimeWeekdayScheduleEnabled) {

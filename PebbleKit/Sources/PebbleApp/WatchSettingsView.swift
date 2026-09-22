@@ -226,7 +226,7 @@ extension WatchSetting {
     /// The rows that belong on the Quiet Time screen.
     var isQuietTime: Bool {
         switch self {
-        case .quietTimeManual, .quietTimeSmart,
+        case .quietTimeManual, .quietTimeSmart, .quietTimeAutoDismiss,
              .quietTimeWeekdayScheduleEnabled, .quietTimeWeekendScheduleEnabled,
              .quietTimeWeekdaySchedule, .quietTimeWeekendSchedule:
             true
@@ -261,7 +261,9 @@ struct WatchSettingsContent: View {
     /// getting no row.
     static let appearanceSettings: [WatchSetting] = [.clock24Hour, .timelineQuickView, .textSize]
     static let unitSettings: [WatchSetting] = [.unitsDistance, .unitsWind]
-    static let musicSettings: [WatchSetting] = [.musicShowVolumeControls, .musicShowProgressBar]
+    static let musicSettings: [WatchSetting] = [
+        .musicShowVolumeControls, .musicShowProgressBar, .musicShowAlbumArt,
+    ]
     /// The ones that are about nothing in particular, in the untitled section
     /// with the Backlight, Quiet Time and Quick Launch links.
     static let generalSettings: [WatchSetting] = [.standbyMode, .menuScrollWrapAround]

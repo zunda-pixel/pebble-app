@@ -97,6 +97,11 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
     case menuScrollWrapAround = "menuScrollWrapAround"
     case musicShowVolumeControls = "musicShowVolumeControls"
     case musicShowProgressBar = "musicShowProgressBar"
+    /// Whether the music app shows the track's cover art, which the firmware
+    /// gained the ability to display in `fw/music: add cover art support`. Off
+    /// on the watch until asked (`s_music_show_album_art = false` in `prefs.c`),
+    /// unlike its two siblings.
+    case musicShowAlbumArt = "musicShowAlbumArt"
     /// `UnitsDistance`: 0 kilometres, 1 miles.
     case unitsDistance
     /// `UnitsWind`: 0 follow the distance unit, 1 km/h, 2 mph.
@@ -138,6 +143,11 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
     case quietTimeManual = "dndManuallyEnabled"
     /// Quiet Time during calendar events, which the firmware calls smart DND.
     case quietTimeSmart = "dndSmartEnabled"
+    /// While Quiet Time is on, clear an arriving notification and go back to the
+    /// watchface instead of showing its popup — the firmware's `dndAutoDismiss`,
+    /// a notif-pref like its sibling `dndMotionBacklight`. Off by default
+    /// (`s_dnd_auto_dismiss = false` in `alerts_preferences.c`).
+    case quietTimeAutoDismiss = "dndAutoDismiss"
     case quietTimeWeekdayScheduleEnabled = "dndWeekdayScheduleEnabled"
     case quietTimeWeekendScheduleEnabled = "dndWeekendScheduleEnabled"
     case quietTimeWeekdaySchedule = "dndWeekdaySchedule"
@@ -200,7 +210,7 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
     /// `prefs.c`.
     public var defaultRawValue: Int {
         switch self {
-        case .clock24Hour, .menuScrollWrapAround, .musicShowProgressBar: 0
+        case .clock24Hour, .menuScrollWrapAround, .musicShowProgressBar, .musicShowAlbumArt: 0
         case .standbyMode, .backlight, .backlightAmbientSensor, .backlightMotion,
              .timelineQuickView, .musicShowVolumeControls: 1
         // `s_units_distance = UnitsDistance_Miles`.
@@ -229,7 +239,7 @@ public enum WatchSetting: String, CaseIterable, Codable, Sendable {
         // no loss.
         case .backlightColor: 0xFFBFA2
         // Off across the board, as `alerts_preferences.c` initialises them.
-        case .quietTimeManual, .quietTimeSmart,
+        case .quietTimeManual, .quietTimeSmart, .quietTimeAutoDismiss,
              .quietTimeWeekdayScheduleEnabled, .quietTimeWeekendScheduleEnabled: 0
         // Midnight to six, the legacy schedule both new ones migrate from.
         case .quietTimeWeekdaySchedule, .quietTimeWeekendSchedule:

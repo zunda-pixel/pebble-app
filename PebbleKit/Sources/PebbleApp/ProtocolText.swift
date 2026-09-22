@@ -115,6 +115,7 @@ public extension WatchSetting {
         // used to carry was doing that section's job on a flat list.
         case .musicShowVolumeControls: "Volume Controls"
         case .musicShowProgressBar: "Progress Bar"
+        case .musicShowAlbumArt: "Album Art"
         case .unitsDistance: "Distance"
         case .unitsWind: "Wind Speed"
         case .textSize: "Text Size"
@@ -128,6 +129,7 @@ public extension WatchSetting {
         // as against the calendar and the schedules.
         case .quietTimeManual: "Manual"
         case .quietTimeSmart: "During Calendar Events"
+        case .quietTimeAutoDismiss: "Auto-Dismiss Notifications"
         case .quietTimeWeekdayScheduleEnabled, .quietTimeWeekendScheduleEnabled: "Scheduled"
         case .quietTimeWeekdaySchedule, .quietTimeWeekendSchedule: "Schedule"
         }
