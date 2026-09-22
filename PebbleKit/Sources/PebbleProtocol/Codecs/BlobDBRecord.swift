@@ -41,6 +41,7 @@ public enum BlobDBRecord: Equatable, Sendable {
     case activitySettings(ActivitySettings)
     case heartRateSettings(HeartRateSettings)
     case heartRateZones(HeartRateZonePreferences)
+    case bloodOxygenSettings(BloodOxygenSettings)
     case healthDay(WatchHealthDay)
     /// The thirty-day averages, sent as a pair because the watch shows them
     /// side by side and half a comparison is worse than none.
@@ -94,6 +95,18 @@ public enum BlobDBRecord: Equatable, Sendable {
 
         case .heartRateZones(let preferences):
             [Self.owned { HealthSettingsCodec.insertFrame(preferences, token: $0) }]
+
+        case .bloodOxygenSettings(let settings):
+            // Three keys, each its own write with its own token: the firmware
+            // keeps the on/off bit, the interval, and the during-activity bit
+            // apart, so they are sent apart.
+            [
+                Self.owned { HealthSettingsCodec.bloodOxygenEnabledFrame(settings.isEnabled, token: $0) },
+                Self.owned { HealthSettingsCodec.spo2IntervalFrame(settings.interval, token: $0) },
+                Self.owned {
+                    HealthSettingsCodec.bloodOxygenActivityFrame(settings.isEnabledDuringActivity, token: $0)
+                },
+            ]
 
         case .healthAverages(let steps, let sleepSeconds):
             [

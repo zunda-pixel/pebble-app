@@ -19,5 +19,6 @@ public final class WatchSettingsModel {
     public internal(set) var activity = ActivitySettings()
     public internal(set) var heartRate = HeartRateSettings()
     public internal(set) var heartRateZones = HeartRateZonePreferences()
+    public internal(set) var bloodOxygen = BloodOxygenSettings()
     public internal(set) var feedback: FeatureFeedback?
 }

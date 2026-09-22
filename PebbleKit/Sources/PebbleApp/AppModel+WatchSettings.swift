@@ -27,6 +27,7 @@ extension AppModel {
         watchSettings.activity = Defaults[.activitySettings]
         watchSettings.heartRate = Defaults[.heartRateSettings]
         watchSettings.heartRateZones = Defaults[.heartRateZonePreferences]
+        watchSettings.bloodOxygen = Defaults[.bloodOxygenSettings]
         timeline.isReminderAppEnabled = Defaults[.reminderAppEnabled]
     }
 
@@ -182,6 +183,18 @@ extension AppModel {
         }
     }
 
+    public func setBloodOxygenSettings(_ settings: BloodOxygenSettings) async {
+        watchSettings.bloodOxygen = settings
+        Defaults[.bloodOxygenSettings] = settings
+        for connection in activeConnections {
+            do {
+                try await connection.client.write(.bloodOxygenSettings(settings))
+            } catch {
+                watchSettings.feedback = .failure(settingsFailureMessage(connection, error))
+            }
+        }
+    }
+
     public func setReminderAppEnabled(_ isEnabled: Bool) async {
         timeline.isReminderAppEnabled = isEnabled
         Defaults[.reminderAppEnabled] = isEnabled
@@ -215,6 +228,7 @@ extension AppModel {
         try? await connection.client.write(.activitySettings(watchSettings.activity))
         try? await connection.client.write(.heartRateSettings(watchSettings.heartRate))
         try? await connection.client.write(.heartRateZones(watchSettings.heartRateZones))
+        try? await connection.client.write(.bloodOxygenSettings(watchSettings.bloodOxygen))
         try? await connection.client.write(
             .reminderAppState(timeline.isReminderAppEnabled ? .enabled : .notEnabled)
         )

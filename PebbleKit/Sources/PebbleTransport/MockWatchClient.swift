@@ -33,6 +33,7 @@ public final class MockWatchClient: WatchClient {
     public private(set) var writtenActivitySettings: ActivitySettings?
     public private(set) var writtenHeartRateSettings: HeartRateSettings?
     public private(set) var writtenHeartRateZones: HeartRateZonePreferences?
+    public private(set) var writtenBloodOxygenSettings: BloodOxygenSettings?
     public private(set) var writtenHealthAverages: (steps: UInt32, sleepSeconds: UInt32)?
     public private(set) var writtenHealthDays: [WatchHealthDay] = []
     public private(set) var writtenReminderAppState: RemindersAppState?
@@ -232,6 +233,8 @@ public final class MockWatchClient: WatchClient {
             writtenHeartRateSettings = settings
         case .heartRateZones(let preferences):
             writtenHeartRateZones = preferences
+        case .bloodOxygenSettings(let settings):
+            writtenBloodOxygenSettings = settings
         case .healthAverages(let steps, let sleepSeconds):
             writtenHealthAverages = (steps, sleepSeconds)
         case .healthDay(let day):

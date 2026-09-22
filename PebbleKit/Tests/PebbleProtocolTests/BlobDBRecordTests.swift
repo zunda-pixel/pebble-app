@@ -220,6 +220,37 @@ struct BlobDBRecordTests {
         #expect(HealthSettingsCodec.activityKey != HealthSettingsCodec.heartRateKey)
     }
 
+    /// Blood oxygen is three prefs, not one packed record: the on/off bit, the
+    /// interval, and the during-activity bit, each its own key and its own write.
+    @Test func bloodOxygenIsThreeSeparateKeyWrites() throws {
+        let settings = BloodOxygenSettings(
+            isEnabled: true,
+            interval: .everyThirtyMinutes,
+            isEnabledDuringActivity: true
+        )
+        try expect(
+            .bloodOxygenSettings(settings),
+            [
+                HealthSettingsCodec.bloodOxygenEnabledFrame(true, token: token),
+                HealthSettingsCodec.spo2IntervalFrame(.everyThirtyMinutes, token: token),
+                HealthSettingsCodec.bloodOxygenActivityFrame(true, token: token),
+            ],
+            accepting: owned
+        )
+        // The interval is one byte, as ActivitySpO2Settings is on the watch.
+        let intervalPayload = HealthSettingsCodec
+            .spo2IntervalFrame(.everyThirtyMinutes, token: token).payload
+        #expect(intervalPayload.suffix(1) == [HeartRateInterval.everyThirtyMinutes.rawValue])
+        // Four distinct keys: the three blood-oxygen ones and heart rate's.
+        let keys = Set([
+            HealthSettingsCodec.bloodOxygenKey,
+            HealthSettingsCodec.spo2IntervalKey,
+            HealthSettingsCodec.bloodOxygenActivityKey,
+            HealthSettingsCodec.heartRateKey,
+        ])
+        #expect(keys.count == 4)
+    }
+
     /// Two records under two keys, movement before sleep, which is the order the
     /// Bluetooth client sent them in.
     @Test func aHealthDayIsTwoWritesMovementThenSleep() throws {

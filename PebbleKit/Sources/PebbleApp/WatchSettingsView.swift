@@ -41,6 +41,7 @@ struct WatchSettingsView: View {
             activitySettings: model.watchSettings.activity,
             heartRateSettings: model.watchSettings.heartRate,
             heartRateZones: model.watchSettings.heartRateZones,
+            bloodOxygenSettings: model.watchSettings.bloodOxygen,
             isReminderAppEnabled: model.timeline.isReminderAppEnabled,
             isConnected: connection?.isConnected == true,
             feedback: model.watchSettings.feedback,
@@ -58,6 +59,9 @@ struct WatchSettingsView: View {
             },
             setHeartRateSettings: { settings in
                 Task { await model.setHeartRateSettings(settings) }
+            },
+            setBloodOxygenSettings: { settings in
+                Task { await model.setBloodOxygenSettings(settings) }
             },
             setReminderAppEnabled: { isOn in
                 Task { await model.setReminderAppEnabled(isOn) }
@@ -244,6 +248,7 @@ struct WatchSettingsContent: View {
     var activitySettings: ActivitySettings
     var heartRateSettings: HeartRateSettings
     var heartRateZones: HeartRateZonePreferences = HeartRateZonePreferences()
+    var bloodOxygenSettings: BloodOxygenSettings = BloodOxygenSettings()
     var isReminderAppEnabled: Bool
     var isConnected: Bool
     var feedback: FeatureFeedback?
@@ -252,6 +257,7 @@ struct WatchSettingsContent: View {
     var setHeartRateZones: (HeartRateZonePreferences) -> Void = { _ in }
     var setActivitySettings: (ActivitySettings) -> Void
     var setHeartRateSettings: (HeartRateSettings) -> Void
+    var setBloodOxygenSettings: (BloodOxygenSettings) -> Void = { _ in }
     var setReminderAppEnabled: (Bool) -> Void
 
     /// The main list, grouped by what a setting is about rather than listed in
@@ -480,6 +486,46 @@ struct WatchSettingsContent: View {
             }
 
             Section {
+                Toggle("Blood Oxygen", isOn: Binding(
+                    get: { bloodOxygenSettings.isEnabled },
+                    set: { isOn in
+                        var settings = bloodOxygenSettings
+                        settings.isEnabled = isOn
+                        setBloodOxygenSettings(settings)
+                    }
+                ))
+                if bloodOxygenSettings.isEnabled {
+                    // Off is not a reading here: the watch keeps blood oxygen's
+                    // on/off in its own pref, which is the toggle above, so the
+                    // interval only ever names how often.
+                    Picker("Reading", selection: Binding(
+                        get: { bloodOxygenSettings.interval == .off ? .everyTenMinutes : bloodOxygenSettings.interval },
+                        set: { interval in
+                            var settings = bloodOxygenSettings
+                            settings.interval = interval
+                            setBloodOxygenSettings(settings)
+                        }
+                    )) {
+                        ForEach(HeartRateInterval.allCases.filter { $0 != .off }, id: \.self) { interval in
+                            Text(interval.title).tag(interval)
+                        }
+                    }
+                    Toggle("Read During Activity", isOn: Binding(
+                        get: { bloodOxygenSettings.isEnabledDuringActivity },
+                        set: { isOn in
+                            var settings = bloodOxygenSettings
+                            settings.isEnabledDuringActivity = isOn
+                            setBloodOxygenSettings(settings)
+                        }
+                    ))
+                }
+            } header: {
+                Text("Blood Oxygen")
+            } footer: {
+                Text("Measures blood oxygen (SpO2) on its own schedule, off until you turn it on.")
+            }
+
+            Section {
                 Toggle("Reminders App", isOn: Binding(
                     get: { isReminderAppEnabled },
                     set: { isOn in setReminderAppEnabled(isOn) }
@@ -585,6 +631,30 @@ struct WatchSettingsContent: View {
             setWatchSetting: { _, _ in },
             setActivitySettings: { _ in },
             setHeartRateSettings: { _ in },
+            setReminderAppEnabled: { _ in }
+        )
+    }
+}
+
+#Preview("Blood oxygen on") {
+    NavigationStack {
+        WatchSettingsContent(
+            watchSettings: [:],
+            board: .obelixPVT,
+            activitySettings: ActivitySettings(),
+            heartRateSettings: HeartRateSettings(),
+            bloodOxygenSettings: BloodOxygenSettings(
+                isEnabled: true,
+                interval: .everyThirtyMinutes,
+                isEnabledDuringActivity: true
+            ),
+            isReminderAppEnabled: true,
+            isConnected: true,
+            feedback: nil,
+            setWatchSetting: { _, _ in },
+            setActivitySettings: { _ in },
+            setHeartRateSettings: { _ in },
+            setBloodOxygenSettings: { _ in },
             setReminderAppEnabled: { _ in }
         )
     }

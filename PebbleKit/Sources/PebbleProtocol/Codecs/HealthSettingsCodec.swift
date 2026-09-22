@@ -59,6 +59,26 @@ public struct HeartRateSettings: Codable, Equatable, Sendable {
     }
 }
 
+/// Blood oxygen (SpO2), which PebbleOS gained over the last two months. The
+/// firmware keeps it as three separate prefs rather than one packed record: the
+/// on/off bit under `bloodOxygenPreferences`, a during-activity bit under
+/// `bloodOxygenActivityPreferences`, and — apart from those — only the
+/// measurement interval in `ActivitySpO2Settings` (one byte) under
+/// `spo2Preferences`, as its own header comment spells out. So this app writes
+/// three keys, not one.
+@MemberwiseInit(.public)
+public struct BloodOxygenSettings: Codable, Equatable, Sendable {
+    /// `s_blood_oxygen_enabled`, off until the wearer asks — the firmware calls
+    /// blood-oxygen monitoring opt-in.
+    public var isEnabled: Bool = false
+    /// `ActivitySpO2Settings.measurement_interval`, an `HRMonitoringInterval`
+    /// like the heart rate's. The default is ten minutes, as
+    /// `ACTIVITY_SPO2_DEFAULT_PREFERENCES` has it.
+    public var interval: HeartRateInterval = .everyTenMinutes
+    /// `s_blood_oxygen_activity_enabled`: measure during detected activities too.
+    public var isEnabledDuringActivity: Bool = false
+}
+
 /// The zone boundaries the watch grades a workout's heart rate against:
 /// `HeartRatePreferences` in PebbleOS's `activity.h`, six packed bytes.
 ///
@@ -95,6 +115,53 @@ public enum HealthSettingsCodec {
     public static var activityKey: String { "activityPreferences" }
     public static var heartRateKey: String { "hrmPreferences" }
     public static var heartRateZonesKey: String { "heartRatePreferences" }
+    /// Blood oxygen's on/off bit, its own key on the wire.
+    public static var bloodOxygenKey: String { "bloodOxygenPreferences" }
+    /// The measurement interval, an `ActivitySpO2Settings` — one byte.
+    public static var spo2IntervalKey: String { "spo2Preferences" }
+    /// Whether to measure during detected activities.
+    public static var bloodOxygenActivityKey: String { "bloodOxygenActivityPreferences" }
+
+    /// Blood oxygen's on/off bit. Its own key on the wire, not folded into the
+    /// interval the way heart rate folds its own.
+    public static func bloodOxygenEnabledFrame(
+        _ isEnabled: Bool,
+        token: UInt16
+    ) -> PebbleProtocolFrame {
+        BlobDBCodec.insertFrame(
+            databaseID: databaseID,
+            key: Array(bloodOxygenKey.utf8),
+            value: [isEnabled ? 1 : 0],
+            token: token
+        )
+    }
+
+    /// The SpO2 measurement interval — an `ActivitySpO2Settings`, which is one
+    /// byte holding only the interval.
+    public static func spo2IntervalFrame(
+        _ interval: HeartRateInterval,
+        token: UInt16
+    ) -> PebbleProtocolFrame {
+        BlobDBCodec.insertFrame(
+            databaseID: databaseID,
+            key: Array(spo2IntervalKey.utf8),
+            value: [interval.rawValue],
+            token: token
+        )
+    }
+
+    /// Whether to measure blood oxygen during detected activities.
+    public static func bloodOxygenActivityFrame(
+        _ isEnabled: Bool,
+        token: UInt16
+    ) -> PebbleProtocolFrame {
+        BlobDBCodec.insertFrame(
+            databaseID: databaseID,
+            key: Array(bloodOxygenActivityKey.utf8),
+            value: [isEnabled ? 1 : 0],
+            token: token
+        )
+    }
 
     public static func insertFrame(
         _ preferences: HeartRateZonePreferences,

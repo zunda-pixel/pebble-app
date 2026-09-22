@@ -68,6 +68,10 @@ extension Defaults.Keys {
         "heartRateZonePreferences",
         default: HeartRateZonePreferences()
     )
+    static let bloodOxygenSettings = Key<BloodOxygenSettings>(
+        "bloodOxygenSettings",
+        default: BloodOxygenSettings()
+    )
     static let reminderAppEnabled = Key<Bool>("reminderAppEnabled", default: true)
 
     /// One row per calendar the reader has touched a switch for; a calendar
@@ -107,4 +111,5 @@ extension ActivitySettings: Defaults.Serializable {}
 extension QuickLaunchAssignment: Defaults.Serializable {}
 extension HeartRateSettings: Defaults.Serializable {}
 extension HeartRateZonePreferences: Defaults.Serializable {}
+extension BloodOxygenSettings: Defaults.Serializable {}
 extension CalendarPreference: Defaults.Serializable {}
