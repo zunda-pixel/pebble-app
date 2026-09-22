@@ -773,6 +773,16 @@
         }
       }
     },
+    "Album Art" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アルバムアート"
+          }
+        }
+      }
+    },
     "All" : {
       "localizations" : {
         "ja" : {
@@ -994,6 +1004,16 @@
         }
       }
     },
+    "Auto-Dismiss Notifications" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "通知を自動で消す"
+          }
+        }
+      }
+    },
     "Automatic reconnection information for this Pebble will be removed." : {
       "localizations" : {
         "ja" : {
@@ -1130,6 +1150,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "1日の最高記録"
+          }
+        }
+      }
+    },
+    "Blood Oxygen" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "血中酸素"
           }
         }
       }
@@ -3460,6 +3490,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "最大"
+          }
+        }
+      }
+    },
+    "Measures blood oxygen (SpO2) on its own schedule, off until you turn it on." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "血中酸素(SpO2)を独自の間隔で測定します。オンにするまでは無効です。"
           }
         }
       }
@@ -7421,6 +7461,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "手順"
+          }
+        }
+      }
+    },
+    "While Quiet Time is on, clear an arriving notification and return to the watchface instead of showing its popup." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "クワイエットタイム中は、届いた通知をポップアップ表示せず消して文字盤に戻ります。"
           }
         }
       }
