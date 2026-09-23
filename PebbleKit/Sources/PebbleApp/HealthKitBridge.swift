@@ -14,7 +14,7 @@ final class HealthKitBridge {
     /// still refused — the other types dragged the cursor past it, and the
     /// permission arriving later found nothing left to export.
     private enum ExportKind: String, CaseIterable {
-        case steps, sleep, heartRate, workouts
+        case steps, sleep, heartRate, workouts, bloodOxygen
     }
 
     private func exportCursor(_ kind: ExportKind) -> Date {
@@ -40,6 +40,7 @@ final class HealthKitBridge {
         guard HKHealthStore.isHealthDataAvailable(),
               let stepsType = HKQuantityType.quantityType(forIdentifier: .stepCount),
               let heartRateType = HKQuantityType.quantityType(forIdentifier: .heartRate),
+              let oxygenType = HKQuantityType.quantityType(forIdentifier: .oxygenSaturation),
               let sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) else {
             throw HealthKitBridgeError.unavailable
         }
@@ -47,7 +48,7 @@ final class HealthKitBridge {
             HKQuantityType.quantityType(forIdentifier: $0.identifier) as HKObjectType?
         }
         try await store.requestAuthorization(
-            toShare: Set([stepsType, sleepType, heartRateType] as [HKSampleType] + workoutShareTypes),
+            toShare: Set([stepsType, sleepType, heartRateType, oxygenType] as [HKSampleType] + workoutShareTypes),
             read: Set([stepsType, sleepType] as [HKObjectType] + effortTypes)
         )
     }
@@ -67,13 +68,14 @@ final class HealthKitBridge {
         guard HKHealthStore.isHealthDataAvailable(),
               let stepsType = HKQuantityType.quantityType(forIdentifier: .stepCount),
               let heartRateType = HKQuantityType.quantityType(forIdentifier: .heartRate),
+              let oxygenType = HKQuantityType.quantityType(forIdentifier: .oxygenSaturation),
               let sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis) else {
             throw HealthKitBridgeError.unavailable
         }
         switch authorization {
         case .mayAsk:
             try await store.requestAuthorization(
-                toShare: Set([stepsType, sleepType, heartRateType] as [HKSampleType] + workoutShareTypes),
+                toShare: Set([stepsType, sleepType, heartRateType, oxygenType] as [HKSampleType] + workoutShareTypes),
                 read: [stepsType, sleepType]
             )
         case .onlyWhatIsAlreadyGranted:
@@ -90,6 +92,7 @@ final class HealthKitBridge {
             .sleep: store.authorizationStatus(for: sleepType) == .sharingAuthorized,
             .heartRate: store.authorizationStatus(for: heartRateType) == .sharingAuthorized,
             .workouts: store.authorizationStatus(for: .workoutType()) == .sharingAuthorized,
+            .bloodOxygen: store.authorizationStatus(for: oxygenType) == .sharingAuthorized,
         ]
         let watchSamples = samples.filter { $0.source != .healthKit }
         func owed(_ kind: ExportKind, _ sample: WatchHealthSample) -> Bool {
@@ -188,6 +191,23 @@ final class HealthKitBridge {
                         start: reading.date,
                         end: reading.date.addingTimeInterval(60),
                         metadata: heartRateMetadata
+                    ))
+                }
+            }
+            if owed(.bloodOxygen, sample) {
+                exported(.bloodOxygen, sample)
+                for reading in sample.bloodOxygenReadings {
+                    var oxygenMetadata = commonMetadata
+                    oxygenMetadata[HKMetadataKeySyncIdentifier] =
+                        "\(baseIdentifier).spo2.\(Int(reading.date.timeIntervalSince1970))"
+                    // HealthKit keeps oxygen saturation as a fraction of one; the
+                    // watch reports whole percent, so 97% is written as 0.97.
+                    healthSamples.append(HKQuantitySample(
+                        type: oxygenType,
+                        quantity: HKQuantity(unit: .percent(), doubleValue: Double(reading.percent) / 100),
+                        start: reading.date,
+                        end: reading.date.addingTimeInterval(60),
+                        metadata: oxygenMetadata
                     ))
                 }
             }
