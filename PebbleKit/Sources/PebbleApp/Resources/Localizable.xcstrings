@@ -1148,6 +1148,7 @@
       }
     },
     "Battery" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -2513,6 +2514,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ファームウェアアップデート"
+          }
+        }
+      }
+    },
+    "Firmware Version" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "ファームウェアバージョン"
           }
         }
       }
@@ -4736,12 +4747,32 @@
         }
       }
     },
+    "Remove %lld selected?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "選択した%lld件を削除しますか?"
+          }
+        }
+      }
+    },
     "Remove Application" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "アプリケーションを削除"
+          }
+        }
+      }
+    },
+    "Remove Selected" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "選択したアプリケーションを削除"
           }
         }
       }
@@ -5023,6 +5054,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "“%@”をウォッチに送信中…"
+          }
+        }
+      }
+    },
+    "Sends a sample notification to the watch to check the connection carries them." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "接続が通知を運べるか確認するため、サンプル通知をウォッチに送ります。"
           }
         }
       }
@@ -5635,6 +5676,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリケーションの転送が中断されました。アプリケーションライブラリは元のままです。"
+          }
+        }
+      }
+    },
+    "The applications and their settings will be removed. A Pebble that is not connected is told the next time it is." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アプリケーションとその設定を削除します。接続していないPebbleには、次に接続したときに伝えます。"
           }
         }
       }

@@ -20,6 +20,11 @@ struct WatchInformationContent: View {
     /// Nil on a watch that never had one written, which is every watch that has
     /// not been through the factory step that writes it.
     var hardwareRevision: String?
+    /// The PebbleOS version the watch is running, shown here as well as on the
+    /// Firmware row — the Firmware row is where it is changed, this is where it
+    /// is read alongside the rest of what the watch is. Nil until a connection
+    /// reports it.
+    var firmwareVersion: String?
 
     /// Whether there is anything here worth pushing a page for.
     ///
@@ -27,8 +32,13 @@ struct WatchInformationContent: View {
     /// model comes from the connection or from what was remembered, and both
     /// are absent. The row that leads here is left out in that case rather than
     /// opening an empty page.
-    static func hasAnything(model: WatchModel?, serialNumber: String?, hardwareRevision: String?) -> Bool {
-        model != nil || serialNumber != nil || hardwareRevision != nil
+    static func hasAnything(
+        model: WatchModel?,
+        serialNumber: String?,
+        hardwareRevision: String?,
+        firmwareVersion: String?
+    ) -> Bool {
+        model != nil || serialNumber != nil || hardwareRevision != nil || firmwareVersion != nil
     }
 
     var body: some View {
@@ -45,6 +55,11 @@ struct WatchInformationContent: View {
                 if let hardwareRevision {
                     LabeledContent("Hardware Revision", value: hardwareRevision)
                 }
+                // A version is a version in any language, so it is not
+                // translated.
+                if let firmwareVersion {
+                    LabeledContent("Firmware Version") { Text(verbatim: firmwareVersion) }
+                }
             }
         }
         .formStyle(.grouped)
@@ -57,7 +72,8 @@ struct WatchInformationContent: View {
         WatchInformationContent(
             model: .pebbleTime2,
             serialNumber: "Q402P000000A",
-            hardwareRevision: "V2R2"
+            hardwareRevision: "V2R2",
+            firmwareVersion: "v4.38.1"
         )
     }
 }
@@ -69,7 +85,8 @@ struct WatchInformationContent: View {
         WatchInformationContent(
             model: .pebbleTime2,
             serialNumber: nil,
-            hardwareRevision: nil
+            hardwareRevision: nil,
+            firmwareVersion: nil
         )
     }
 }

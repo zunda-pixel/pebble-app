@@ -27,7 +27,9 @@ struct WatchDiagnosticsView: View {
             gatherWatchLogs: { Task { await model.gatherWatchLogs(watchID: watchID) } },
             setApplicationLogging: { isOn in Task { await model.setApplicationLoggingEnabled(isOn) } },
             collectCoredump: { Task { await model.collectCoredump(watchID: watchID) } },
-            clearTimeline: { Task { await model.clearWatchTimeline(watchID: watchID) } }
+            clearTimeline: { Task { await model.clearWatchTimeline(watchID: watchID) } },
+            sendTestNotification: { Task { await model.sendTestNotification(watchID: watchID) } },
+            notificationFeedback: model.notifications.feedback
         )
     }
 }
@@ -51,9 +53,21 @@ struct WatchDiagnosticsContent: View {
     var setApplicationLogging: (Bool) -> Void
     var collectCoredump: () -> Void
     var clearTimeline: () -> Void
+    var sendTestNotification: () -> Void
+    var notificationFeedback: FeatureFeedback?
 
     var body: some View {
         List {
+            Section {
+                Button("Send Test Notification", systemImage: "bell.badge", action: sendTestNotification)
+                    .disabled(!isConnected)
+                FeedbackBanner(feedback: notificationFeedback)
+            } header: {
+                Text("Notifications")
+            } footer: {
+                Text("Sends a sample notification to the watch to check the connection carries them.")
+            }
+
             Section {
                 Button("Take Screenshot", systemImage: "camera", action: takeScreenshot)
                     .disabled(!isConnected || isTakingScreenshot)
@@ -174,7 +188,9 @@ struct WatchScreenshotImage {
             gatherWatchLogs: {},
             setApplicationLogging: { _ in },
             collectCoredump: {},
-            clearTimeline: {}
+            clearTimeline: {},
+            sendTestNotification: {},
+            notificationFeedback: nil
         )
     }
 }
@@ -198,7 +214,9 @@ struct WatchScreenshotImage {
             gatherWatchLogs: {},
             setApplicationLogging: { _ in },
             collectCoredump: {},
-            clearTimeline: {}
+            clearTimeline: {},
+            sendTestNotification: {},
+            notificationFeedback: nil
         )
     }
 }

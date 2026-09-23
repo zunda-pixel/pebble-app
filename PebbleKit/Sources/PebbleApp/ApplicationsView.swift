@@ -192,6 +192,10 @@ struct ApplicationsContent<Detail: View>: View {
     @ViewBuilder var detail: (WatchApplication) -> Detail
 
     @State private var applicationToRemove: WatchApplication?
+    /// The rows ticked in edit mode, by application id, for a delete that takes
+    /// several at once. Separate from the single-row swipe above.
+    @State private var selection = Set<UUID>()
+    @State private var isConfirmingBulkRemoval = false
     /// Sifts the library in place. The catalog's search box asks the store;
     /// this one only narrows what is already here.
     @State private var query = ""
@@ -223,7 +227,7 @@ struct ApplicationsContent<Detail: View>: View {
                     libraryFeedback: libraryFeedback,
                     importFeedback: importFeedback
                 )
-                List {
+                List(selection: $selection) {
                     // Each section carries the kind it is for as its identity.
                     // Written as two `if`s, removing the last watch app left the
                     // watchfaces standing where the watch apps had been, and
@@ -278,6 +282,36 @@ struct ApplicationsContent<Detail: View>: View {
                     Button(role: .cancel) {}
                 } message: { _ in
                     Text("The application and its settings will be removed. A Pebble that is not connected is told the next time it is.")
+                }
+                // A second alert, for the several ticked in edit mode at once.
+                .alert(
+                    Text("Remove \(selection.count) selected?"),
+                    isPresented: $isConfirmingBulkRemoval
+                ) {
+                    Button("Remove", role: .destructive) {
+                        for id in selection { removeApplication(id) }
+                        selection.removeAll()
+                    }
+                    Button(role: .cancel) {}
+                } message: {
+                    Text("The applications and their settings will be removed. A Pebble that is not connected is told the next time it is.")
+                }
+                .toolbar {
+                    // The watch's launcher order is what reorder edits, so editing
+                    // is where both multi-select and drag-to-reorder live.
+                    #if os(iOS)
+                    ToolbarItem(placement: .topBarLeading) {
+                        EditButton()
+                    }
+                    #endif
+                    if !selection.isEmpty {
+                        ToolbarItem(placement: .destructiveAction) {
+                            Button("Remove Selected", systemImage: "trash", role: .destructive) {
+                                isConfirmingBulkRemoval = true
+                            }
+                            .disabled(isOperationInProgress)
+                        }
+                    }
                 }
             }
         }
@@ -424,6 +458,9 @@ struct ApplicationSection<Detail: View>: View {
                     activateWatchface: { activateWatchface(application) },
                     detail: { detail(application) }
                 )
+                // The id the List's selection is keyed by, so ticking a row in
+                // edit mode collects it for a delete that takes several at once.
+                .tag(application.id)
             }
             .onMove(perform: moveApplications)
             .moveDisabled(isOperationInProgress || isFiltering)

@@ -28,7 +28,6 @@ struct WatchDetailView: View {
             firmwareJournalPhase: journal?.phase,
             downloadedFirmwareVersion: model.firmware.downloaded?.versionTag,
             languageName: languageName,
-            notificationFeedback: model.notifications.feedback,
             resetFeedback: model.watches.resetFeedback[watchID],
             connectionFeedback: model.connectionFailures[watchID].map { .failure($0.message) },
             connect: {
@@ -39,7 +38,6 @@ struct WatchDetailView: View {
                 Task { await model.setAutomaticallyConnects(enabled, watchID: watchID) }
             },
             disconnect: { Task { await model.disconnect(watchID: watchID) } },
-            sendTestNotification: { Task { await model.sendTestNotification(watchID: watchID) } },
             reset: { kind in Task { await model.resetWatch(kind, watchID: watchID) } },
             forget: {
                 Task {
@@ -65,13 +63,11 @@ struct WatchDetailContent<
     var firmwareJournalPhase: FirmwareUpdatePhase?
     var downloadedFirmwareVersion: String?
     var languageName: String?
-    var notificationFeedback: FeatureFeedback?
     var resetFeedback: FeatureFeedback?
     var connectionFeedback: FeatureFeedback?
     var connect: () -> Void
     var setAutomaticallyConnects: (Bool) -> Void
     var disconnect: () -> Void
-    var sendTestNotification: () -> Void
     var reset: (ResetKind) -> Void
     var forget: () -> Void
     @ViewBuilder var firmwareDestination: () -> FirmwareDestination
@@ -139,13 +135,15 @@ struct WatchDetailContent<
                 if WatchInformationContent.hasAnything(
                     model: watch.model,
                     serialNumber: watch.serialNumber,
-                    hardwareRevision: watch.hardwareRevision
+                    hardwareRevision: watch.hardwareRevision,
+                    firmwareVersion: watch.firmwareVersion
                 ) {
                     NavigationLink {
                         WatchInformationContent(
                             model: watch.model,
                             serialNumber: watch.serialNumber,
-                            hardwareRevision: watch.hardwareRevision
+                            hardwareRevision: watch.hardwareRevision,
+                            firmwareVersion: watch.firmwareVersion
                         )
                     } label: {
                         LabeledContent("General Information") {
@@ -178,24 +176,6 @@ struct WatchDetailContent<
             }
 
 
-            // Between what a watch is and what its connection is doing, since
-            // the battery belongs to neither: it is the one value on this
-            // screen that changes on its own, so it sits on its own, without a
-            // heading a single row does not need.
-            //
-            // The `if` is outside the section rather than inside it because an
-            // empty section is not nothing. Measured on macOS 27 with
-            // `.formStyle(.grouped)`: a section with no rows leaves a gap and
-            // pulls the *next* section's header inside that section's box,
-            // where it loses its weight and gains a divider. No watch,
-            // connected or remembered, has a battery level until one is
-            // reported, so this is the state a watch is first opened in.
-            if let batteryLevel = watch.batteryLevel {
-                Section {
-                    LabeledContent("Battery", value: batteryLevel, format: .percent)
-                }
-            }
-
             Section("Connection") {
                 LabeledContent("Status") {
                     switch watch.phase {
@@ -221,11 +201,6 @@ struct WatchDetailContent<
                     Button("Disconnect", role: .destructive, action: disconnect)
                 }
                 FeedbackBanner(feedback: connectionFeedback)
-            }
-            Section("Notifications") {
-                Button("Send Test Notification", systemImage: "bell.badge", action: sendTestNotification)
-                    .disabled(!watch.isConnected)
-                FeedbackBanner(feedback: notificationFeedback)
             }
 
             Section {
@@ -296,14 +271,11 @@ struct WatchDetailContent<
             watch: PreviewSamples.connectedSummary,
             firmwareJournalPhase: nil,
             downloadedFirmwareVersion: nil,
-            languageName: "日本語",
-            notificationFeedback: nil,
-            resetFeedback: nil,
+            languageName: "日本語",            resetFeedback: nil,
             connectionFeedback: nil,
             connect: {},
             setAutomaticallyConnects: { _ in },
             disconnect: {},
-            sendTestNotification: {},
             reset: { _ in },
             forget: {},
             firmwareDestination: { EmptyView() },
@@ -320,14 +292,11 @@ struct WatchDetailContent<
             watch: PreviewSamples.savedSummary,
             firmwareJournalPhase: .validated,
             downloadedFirmwareVersion: PreviewSamples.firmwareRelease.versionTag,
-            languageName: nil,
-            notificationFeedback: .success("Queued for the next connection."),
-            resetFeedback: nil,
+            languageName: nil,            resetFeedback: nil,
             connectionFeedback: .failure("The watch does not expose the expected Pebble connection service."),
             connect: {},
             setAutomaticallyConnects: { _ in },
             disconnect: {},
-            sendTestNotification: {},
             reset: { _ in },
             forget: {},
             firmwareDestination: { EmptyView() },
@@ -344,14 +313,11 @@ struct WatchDetailContent<
             watch: PreviewSamples.recoverySummary,
             firmwareJournalPhase: nil,
             downloadedFirmwareVersion: nil,
-            languageName: nil,
-            notificationFeedback: nil,
-            resetFeedback: .progress("The watch is erasing itself. It has forgotten this device, so it cannot reconnect until it is forgotten here too."),
+            languageName: nil,            resetFeedback: .progress("The watch is erasing itself. It has forgotten this device, so it cannot reconnect until it is forgotten here too."),
             connectionFeedback: nil,
             connect: {},
             setAutomaticallyConnects: { _ in },
             disconnect: {},
-            sendTestNotification: {},
             reset: { _ in },
             forget: {},
             firmwareDestination: { EmptyView() },
