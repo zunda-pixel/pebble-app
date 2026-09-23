@@ -656,6 +656,16 @@
         }
       }
     },
+    "Activity" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "アクティビティ"
+          }
+        }
+      }
+    },
     "Activity Insights" : {
       "localizations" : {
         "ja" : {
@@ -4888,6 +4898,7 @@
       }
     },
     "Running Slot" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -7515,6 +7526,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチが使えるもの"
+          }
+        }
+      }
+    },
+    "What the watch's music app shows while something is playing." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "machine_translated",
+            "value" : "再生中にウォッチのミュージックアプリが表示する項目です。"
           }
         }
       }
