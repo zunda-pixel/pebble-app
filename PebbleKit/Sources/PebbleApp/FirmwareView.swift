@@ -5,10 +5,6 @@ struct FirmwareView: View {
     var model: AppModel
     var watchID: WatchID
 
-    private var connection: WatchConnection? {
-        model.connections.first { $0.watch.id == watchID }
-    }
-
     private var journal: FirmwareUpdateJournal? {
         guard let journal = model.firmware.journal, journal.watchID == watchID else {
             return nil
@@ -21,7 +17,6 @@ struct FirmwareView: View {
         FirmwareContent(
             installedVersion: summary.firmwareVersion,
             board: summary.board,
-            runningSlot: connection?.watch.runningFirmwareSlot,
             isConnected: summary.isConnected,
             isRunningRecoveryFirmware: summary.isRunningRecoveryFirmware,
             availableRelease: model.firmware.availableRelease,
@@ -45,7 +40,6 @@ struct FirmwareView: View {
 struct FirmwareContent: View {
     var installedVersion: String?
     var board: WatchBoard?
-    var runningSlot: Int?
     var isConnected: Bool
     var isRunningRecoveryFirmware: Bool
     var availableRelease: PebbleOSFirmwareRelease?
@@ -87,9 +81,6 @@ struct FirmwareContent: View {
                 LabeledContent("Version", value: installedVersion ?? "—")
                 if let board {
                     LabeledContent("Board", value: board.rawValue)
-                }
-                if let runningSlot {
-                    LabeledContent("Running Slot", value: runningSlot, format: .number)
                 }
             }
 
@@ -277,9 +268,7 @@ private struct FirmwareStatusRow: View {
     NavigationStack {
         FirmwareContent(
             installedVersion: "v4.36.2",
-            board: .obelixPVT,
-            runningSlot: 0,
-            isConnected: true,
+            board: .obelixPVT,            isConnected: true,
             isRunningRecoveryFirmware: false,
             availableRelease: nil,
             downloadedFirmware: nil,
@@ -303,9 +292,7 @@ private struct FirmwareStatusRow: View {
     NavigationStack {
         FirmwareContent(
             installedVersion: "v4.36.2",
-            board: .obelixPVT,
-            runningSlot: 0,
-            isConnected: true,
+            board: .obelixPVT,            isConnected: true,
             isRunningRecoveryFirmware: false,
             availableRelease: PreviewSamples.firmwareRelease,
             downloadedFirmware: PreviewSamples.downloadedFirmware,
@@ -329,9 +316,7 @@ private struct FirmwareStatusRow: View {
     NavigationStack {
         FirmwareContent(
             installedVersion: "v4.36.2",
-            board: .obelixPVT,
-            runningSlot: nil,
-            isConnected: false,
+            board: .obelixPVT,            isConnected: false,
             isRunningRecoveryFirmware: false,
             availableRelease: PreviewSamples.firmwareRelease,
             downloadedFirmware: PreviewSamples.downloadedFirmware,
@@ -355,9 +340,7 @@ private struct FirmwareStatusRow: View {
     NavigationStack {
         FirmwareContent(
             installedVersion: "v4.36.2",
-            board: .obelixPVT,
-            runningSlot: nil,
-            isConnected: true,
+            board: .obelixPVT,            isConnected: true,
             isRunningRecoveryFirmware: true,
             availableRelease: nil,
             downloadedFirmware: PreviewSamples.downloadedFirmware,
