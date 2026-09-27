@@ -669,6 +669,10 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         case WatchVersionCodec.endpoint:
             return try answerWatchVersion(frame, peripheral: peripheral)
 
+        case TimeSynchronizationCodec.endpoint:
+            guard TimeSynchronizationCodec.isTimeRequest(frame) else { return false }
+            try sendFrame(TimeSynchronizationCodec.frame(), to: peripheral)
+
         case AppFetchCodec.endpoint:
             eventContinuation?.yield(.appFetchRequested(try AppFetchCodec.decodeRequest(frame)))
 

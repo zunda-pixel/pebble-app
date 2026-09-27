@@ -117,6 +117,14 @@ public final class QEMUWatchClient: WatchClient {
                         ? " (recovery firmware: only a firmware install will work)"
                         : "")
             )
+            // Said without being asked. The emulator opens its session at boot
+            // and asks for the phone's version then (`comm_session_open`,
+            // `services/comm_session/session.c`), before anything is listening,
+            // so it never asks again; until told otherwise it runs on the fixed
+            // capabilities `qemu_transport_set_connected` gives it, which lack
+            // the weather and settings-sync bits. `session_remote_version.c`
+            // takes a response whether or not it asked for one.
+            try await send(PhoneVersionCodec.responseFrame(operatingSystem: .macOS))
             try await synchronizeTime()
             let watch = ConnectedWatch(
                 id: watch.id,
@@ -662,6 +670,8 @@ public final class QEMUWatchClient: WatchClient {
             }
         } else if PhoneVersionCodec.isRequest(frame) {
             Task { try? await send(PhoneVersionCodec.responseFrame(operatingSystem: .macOS)) }
+        } else if TimeSynchronizationCodec.isTimeRequest(frame) {
+            Task { try? await synchronizeTime() }
         } else if frame.endpoint == AppFetchCodec.endpoint {
             eventContinuation?.yield(.appFetchRequested(try AppFetchCodec.decodeRequest(frame)))
         } else if frame.endpoint == HealthSyncCodec.endpoint {
@@ -676,6 +686,8 @@ public final class QEMUWatchClient: WatchClient {
             Task { try? await send(TimelineActionCodec.responseFrame(itemID: invocation.itemID, succeeded: true)) }
         } else if frame.endpoint == ImagingCodec.endpoint {
             eventContinuation?.yield(.imageRequested(try ImagingCodec.decode(frame)))
+        } else if frame.endpoint == AppLogCodec.endpoint {
+            eventContinuation?.yield(.applicationLogReceived(try AppLogCodec.decode(frame)))
         } else if frame.endpoint == AppRunStateCodec.endpoint {
             eventContinuation?.yield(.appRunStateChanged(try AppRunStateCodec.decode(frame)))
         } else if frame.endpoint == BlobDBCodec.endpoint, let token = pendingBlobToken {
