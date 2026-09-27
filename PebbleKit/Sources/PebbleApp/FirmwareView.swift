@@ -1,5 +1,6 @@
 import SwiftUI
 import PebbleProtocol
+import UniformTypeIdentifiers
 
 struct FirmwareView: View {
     var model: AppModel
@@ -154,7 +155,11 @@ struct FirmwareContent: View {
             }
         }
         #endif
-        .fileImporter(isPresented: $isChoosingFile, allowedContentTypes: [.pebbleFirmware]) { result in
+        // Any file, not only `.pebbleFirmware`: a `.pbz` that iOS has filed under
+        // another type — saved by another app, or given no extension on the
+        // way down — was greyed out and could not be chosen at all. The package
+        // is checked as firmware before anything is sent.
+        .fileImporter(isPresented: $isChoosingFile, allowedContentTypes: [.pebbleFirmware, .data]) { result in
             guard case .success(let url) = result else { return }
             installFile(url)
         }
