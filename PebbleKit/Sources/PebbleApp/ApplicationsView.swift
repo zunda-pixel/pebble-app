@@ -78,9 +78,15 @@ struct ApplicationsView: View {
             // refused as another operation already in progress.
             removeApplications: { applicationIDs in
                 Task {
+                    var removed = 0
                     for applicationID in applicationIDs {
-                        await model.removeApplication(id: applicationID)
+                        if await model.removeApplication(id: applicationID) { removed += 1 }
                     }
+                    await DiagnosticLog.shared.record(
+                        .info,
+                        category: "application",
+                        message: "Removed \(removed) of \(applicationIDs.count) selected application(s)"
+                    )
                 }
             },
             reorderApplications: { kind, offsets, destination in
@@ -202,9 +208,13 @@ struct ApplicationsContent<Detail: View>: View {
 
     @State private var applicationToRemove: WatchApplication?
     /// The rows ticked in edit mode, by application id, for a delete that takes
-    /// several at once. Separate from the single-row swipe above.
+    /// several at once.
     @State private var selection = Set<UUID>()
     @State private var isConfirmingBulkRemoval = false
+    /// What was ticked when Remove was tapped. The alert's own button reads it
+    /// rather than `selection`, which the list may have emptied by the time the
+    /// alert is answered — the confirmed removal then removed nothing.
+    @State private var applicationsToRemove: [UUID] = []
     /// Sifts the library in place. The catalog's search box asks the store;
     /// this one only narrows what is already here.
     @State private var query = ""
@@ -224,7 +234,7 @@ struct ApplicationsContent<Detail: View>: View {
             )
         } else {
             // Above the list rather than in it. These arrive with the very
-            // operation that removes an application, so a swipe used to insert
+            // operation that removes an application, so a removal used to insert
             // a section at the top of the list in the same update that deleted
             // a row from it — which UIKit would not reconcile: it threw an
             // invalid-update exception rather than drawing.
@@ -270,11 +280,9 @@ struct ApplicationsContent<Detail: View>: View {
                 // Awaited so the indicator stays up until the store has been
                 // asked and any updates are on their way.
                 .refreshable { await refresh() }
-                // An alert, and one for the whole list rather than one per row.
-                // A confirmation dialog is anchored, and a swiped row is already
-                // gone by the time it would be asked about, so there is nothing
-                // left to anchor to; a dialog per row also meant the second row
-                // swiped was refused its own ("already presenting").
+                // An alert, and one for the whole list rather than one per row:
+                // a dialog per row meant the second row asked about was refused
+                // its own ("already presenting").
                 .alert(
                     Text("Remove \(applicationToRemove?.displayName ?? "")?"),
                     isPresented: Binding(
@@ -294,11 +302,12 @@ struct ApplicationsContent<Detail: View>: View {
                 }
                 // A second alert, for the several ticked in edit mode at once.
                 .alert(
-                    Text("Remove \(selection.count) selected?"),
+                    Text("Remove \(applicationsToRemove.count) selected?"),
                     isPresented: $isConfirmingBulkRemoval
                 ) {
                     Button("Remove", role: .destructive) {
-                        removeApplications(Array(selection))
+                        removeApplications(applicationsToRemove)
+                        applicationsToRemove = []
                         selection.removeAll()
                     }
                     Button(role: .cancel) {}
@@ -316,6 +325,7 @@ struct ApplicationsContent<Detail: View>: View {
                     if !selection.isEmpty {
                         ToolbarItem(placement: .destructiveAction) {
                             Button("Remove Selected", systemImage: "trash", role: .destructive) {
+                                applicationsToRemove = Array(selection)
                                 isConfirmingBulkRemoval = true
                             }
                             .disabled(isOperationInProgress)
@@ -508,15 +518,6 @@ struct ApplicationListRow<Detail: View>: View {
         // Asked when the row first appears: the model remembers both answers
         // and refusals, so a long list settles into cached lookups.
         .task { imageURL = await storeImageURL() }
-        // Red, but not `role: .destructive`: that role takes the row out of the
-        // list by itself, and the library still had the application until the
-        // alert was answered — a row deleted from under a count that had not
-        // changed is exactly what UIKit threw over.
-        .swipeActions {
-            Button("Remove", action: requestRemoval)
-                .tint(.red)
-                .disabled(isOperationInProgress)
-        }
         .contextMenu {
             if application.isConfigurable {
                 Button("Configure", systemImage: "gearshape", action: configureApplication)
