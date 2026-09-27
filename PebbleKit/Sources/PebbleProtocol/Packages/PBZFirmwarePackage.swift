@@ -159,4 +159,7 @@ public enum PBZFirmwareError: Error, Equatable, Sendable {
     case entryTooLarge
     case sizeMismatch(String)
     case crcMismatch(String)
+    /// The package on disk is not the one that was accepted: its digest no
+    /// longer matches the journal's.
+    case packageChanged
 }

@@ -206,7 +206,12 @@ extension AppModel {
 
     public func discardPendingFirmwareUpdate(watchID: WatchID) async {
         stopFirmwareTransfer(for: watchID)
-        await pendingFirmwareUpdateStore.clear(watchID: watchID)
+        do {
+            try await pendingFirmwareUpdateStore.clear(watchID: watchID)
+        } catch {
+            firmware[watchID].feedback = .failure("The pending firmware update could not be removed.")
+            return
+        }
         firmware[watchID].journal = nil
         firmware[watchID].requiresConfirmation = false
         firmware[watchID].feedback = .success("Pending firmware update removed.")
@@ -250,7 +255,7 @@ extension AppModel {
         try package.validateIntegrity()
         guard let journal = try await pendingFirmwareUpdateStore.journal(for: watchID),
               journal.packageSHA256 == package.sha256 else {
-            throw PBZFirmwareError.unsafeManifest
+            throw PBZFirmwareError.packageChanged
         }
         guard firmwareUpdateClaim == claim else { throw CancellationError() }
         try await pendingFirmwareUpdateStore.updatePhase(.transferring, watchID: watchID)
@@ -300,7 +305,15 @@ extension AppModel {
             category: "firmware",
             message: "the watch took the firmware and is restarting"
         )
-        await pendingFirmwareUpdateStore.clear(watchID: watchID)
+        do {
+            try await pendingFirmwareUpdateStore.clear(watchID: watchID)
+        } catch {
+            await DiagnosticLog.shared.record(
+                .error,
+                category: "firmware",
+                message: "the finished update's journal could not be cleared: \(error)"
+            )
+        }
         await discardDownloadedFirmware(matching: package, installedOn: watchID)
     }
 
@@ -338,8 +351,21 @@ extension AppModel {
         let watch = connection.watch
         guard let journal = try? await pendingFirmwareUpdateStore.journal(for: watch.id),
               journal.board == watch.board,
-              journal.phase != .cancelled,
-              let package = try? await pendingFirmwareUpdateStore.package(for: journal) else { return }
+              journal.phase != .cancelled else { return }
+        let package: PBZFirmwarePackage
+        do {
+            guard let found = try await pendingFirmwareUpdateStore.package(for: journal) else { return }
+            package = found
+        } catch {
+            // Nobody asked for this, so nothing is said on screen; the log is
+            // where "why did the staged update never start" gets answered.
+            await DiagnosticLog.shared.record(
+                .error,
+                category: "firmware",
+                message: "the staged package could not be read again: \(String(reflecting: error))"
+            )
+            return
+        }
         firmware[watch.id].journal = journal
         guard journal.phase.mayStartUnattended else {
             firmware[watch.id].feedback = .failure(
@@ -444,14 +470,18 @@ extension AppModel {
     }
 
     public func resumeFirmwareUpdate(watchID: WatchID) async {
-        guard let journal = try? await pendingFirmwareUpdateStore.journal(for: watchID),
-              let package = try? await pendingFirmwareUpdateStore.package(for: journal),
-              let connection = connection(for: watchID),
-              connection.isConnected else {
+        guard let connection = connection(for: watchID), connection.isConnected else {
             firmware[watchID].feedback = .failure("Connect the watch to resume its firmware update.")
             return
         }
         do {
+            // A missing package is not a missing watch: it was told to connect
+            // the watch it was already connected to.
+            guard let journal = try await pendingFirmwareUpdateStore.journal(for: watchID),
+                  let package = try await pendingFirmwareUpdateStore.package(for: journal) else {
+                firmware[watchID].feedback = .failure("The package for this update is gone. Choose the firmware again.")
+                return
+            }
             try await performFirmwareUpdate(package, on: connection)
         } catch is CancellationError {
         } catch {

@@ -57,6 +57,25 @@ struct FirmwareContent: View {
 
     @State private var isChoosingFile = false
 
+    /// A transfer is running or the watch is restarting into it: starting
+    /// another only has the model refuse it over the progress being shown.
+    private var isUpdateUnderWay: Bool {
+        guard let phase = journal?.phase else { return false }
+        return phase == .transferring || phase == .installing || phase == .awaitingRestart
+    }
+
+    /// Also what the status row asks, so the button and the row cannot say
+    /// different things about the same release.
+    private func isNewerThanInstalled(_ release: PebbleOSFirmwareRelease) -> Bool {
+        isNewerThanInstalled(release.versionTag)
+    }
+
+    /// A download is per board, so another watch of the same board may have
+    /// left one this watch is already running, or is past.
+    private func isNewerThanInstalled(_ versionTag: String) -> Bool {
+        installedVersion.map { PebbleOSFirmwareCatalog.isVersion(versionTag, newerThan: $0) } ?? true
+    }
+
     var body: some View {
         Form {
             Section {
@@ -80,13 +99,18 @@ struct FirmwareContent: View {
             Section {
                 if let availableRelease {
                     LabeledContent("Published", value: availableRelease.versionTag)
-                    if downloadedFirmware?.versionTag != availableRelease.versionTag {
+                    if isNewerThanInstalled(availableRelease),
+                       downloadedFirmware?.versionTag != availableRelease.versionTag {
                         Button("Download PebbleOS \(availableRelease.versionTag)", systemImage: "arrow.down.circle", action: download)
                     }
                 }
                 if let downloadedFirmware {
                     LabeledContent("Downloaded", value: downloadedFirmware.versionTag)
-                    Button("Install PebbleOS \(downloadedFirmware.versionTag)", systemImage: "arrow.down.app", action: installDownloaded)
+                    // Recovery firmware is running nothing it could be newer than.
+                    if isRunningRecoveryFirmware || isNewerThanInstalled(downloadedFirmware.versionTag) {
+                        Button("Install PebbleOS \(downloadedFirmware.versionTag)", systemImage: "arrow.down.app", action: installDownloaded)
+                            .disabled(isUpdateUnderWay)
+                    }
                 }
             } header: {
                 Text("PebbleOS")
@@ -98,6 +122,7 @@ struct FirmwareContent: View {
                 Button("Install from a File…", systemImage: "folder") {
                     isChoosingFile = true
                 }
+                .disabled(isUpdateUnderWay)
             } footer: {
                 Text("A PBZ package built for this watch's board.")
             }
@@ -122,7 +147,7 @@ struct FirmwareContent: View {
                             action: confirmRecovery
                         )
                     }
-                    if !journal.phase.mayStartUnattended {
+                    if journal.phase.hasStopped {
                         Button("Try Again", systemImage: "arrow.clockwise", action: resume)
                             .disabled(!isConnected)
                     }
@@ -161,10 +186,10 @@ struct FirmwareContent: View {
             guard case .success(let url) = result else { return }
             installFile(url)
         }
+        // As the importer above: whatever was dropped is read as firmware, and
+        // refused as that if it is not one.
         .dropDestination(for: URL.self) { urls, _ in
-            guard let firmwareURL = urls.first(where: { $0.pathExtension.lowercased() == "pbz" }) else {
-                return false
-            }
+            guard !isUpdateUnderWay, let firmwareURL = urls.first else { return false }
             installFile(firmwareURL)
             return true
         }
@@ -209,7 +234,7 @@ struct FirmwareContent: View {
                 tint: .orange
             )
         }
-        if let downloadedFirmware {
+        if let downloadedFirmware, isNewerThanInstalled(downloadedFirmware.versionTag) {
             return FirmwareStatus(
                 title: "PebbleOS \(downloadedFirmware.versionTag) is downloaded",
                 detail: isConnected
@@ -219,8 +244,7 @@ struct FirmwareContent: View {
                 tint: .accentColor
             )
         }
-        if let availableRelease,
-           installedVersion.map({ PebbleOSFirmwareCatalog.isVersion(availableRelease.versionTag, newerThan: $0) }) ?? true {
+        if let availableRelease, isNewerThanInstalled(availableRelease) {
             return FirmwareStatus(
                 title: "PebbleOS \(availableRelease.versionTag) is published",
                 detail: "Download it, then install it.",

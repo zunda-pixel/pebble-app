@@ -5881,6 +5881,26 @@
         }
       }
     },
+    "The next page could not be fetched." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次のページを取得できませんでした。"
+          }
+        }
+      }
+    },
+    "The package for this update is gone. Choose the firmware again." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この更新のパッケージが見つかりません。ファームウェアをもう一度選んでください。"
+          }
+        }
+      }
+    },
     "The package is removed, so this update cannot be picked up again. The watch keeps the firmware it is running." : {
       "localizations" : {
         "ja" : {
@@ -5897,6 +5917,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "パッケージのリンクがhttpsではないため、届く内容がリンク先のものと異なる可能性があります。"
+          }
+        }
+      }
+    },
+    "The pending firmware update could not be removed." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留中のファームウェア更新を削除できませんでした。"
           }
         }
       }

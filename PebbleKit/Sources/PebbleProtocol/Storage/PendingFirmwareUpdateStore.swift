@@ -11,6 +11,12 @@ public enum FirmwareUpdatePhase: String, Codable, Equatable, Sendable {
     public var mayStartUnattended: Bool {
         self == .validated
     }
+
+    /// Whether it ran and stopped short, which is the only time trying again
+    /// means anything.
+    public var hasStopped: Bool {
+        self == .failed || self == .cancelled
+    }
 }
 
 @MemberwiseInit(.public)
@@ -70,7 +76,7 @@ public actor PendingFirmwareUpdateStore {
         let url = packageFolderURL.appending(path: journal.packageFileName, directoryHint: .notDirectory)
         guard FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) else { return nil }
         let package = try PBZFirmwareImporter.load(from: url, board: journal.board, targetSlot: journal.slot)
-        guard package.sha256 == journal.packageSHA256 else { throw PBZFirmwareError.unsafeManifest }
+        guard package.sha256 == journal.packageSHA256 else { throw PBZFirmwareError.packageChanged }
         return package
     }
 
@@ -81,11 +87,10 @@ public actor PendingFirmwareUpdateStore {
         try PersistentJSON.save(journals, to: journalsURL)
     }
 
-    public func clear(watchID: WatchID) {
-        guard var journals = try? journals(), let removed = journals.removeValue(forKey: watchID) else {
-            return
-        }
-        try? PersistentJSON.save(journals, to: journalsURL)
+    public func clear(watchID: WatchID) throws {
+        var journals = try journals()
+        guard let removed = journals.removeValue(forKey: watchID) else { return }
+        try PersistentJSON.save(journals, to: journalsURL)
         removeChosenCopy(removed.packageFileName, unlessUsedBy: journals)
     }
 

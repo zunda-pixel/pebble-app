@@ -398,7 +398,7 @@ struct PackageImportTests {
         try await updates.save(journal(for: WatchID("a"), package: package, fileName: first))
         try await updates.save(journal(for: WatchID("b"), package: package, fileName: second))
 
-        await updates.clear(watchID: WatchID("a"))
+        try await updates.clear(watchID: WatchID("a"))
 
         #expect(try await updates.journal(for: WatchID("a")) == nil)
         let remaining = try #require(try await updates.journal(for: WatchID("b")))
@@ -426,7 +426,7 @@ struct PackageImportTests {
         let package = try PBZFirmwareImporter.load(from: packages.url(for: downloaded), board: .obelixPVT)
         try await updates.save(journal(for: WatchID("watch"), package: package, fileName: fileName))
 
-        await updates.clear(watchID: WatchID("watch"))
+        try await updates.clear(watchID: WatchID("watch"))
 
         #expect(await packages.downloads() == [downloaded])
     }
