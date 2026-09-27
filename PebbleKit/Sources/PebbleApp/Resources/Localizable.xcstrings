@@ -2799,6 +2799,16 @@
         }
       }
     },
+    "Got it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "了解です。"
+          }
+        }
+      }
+    },
     "Hardware Revision" : {
       "localizations" : {
         "ja" : {
@@ -3015,6 +3025,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "文字盤の表示中にボタンを長押しすると、そのボタンに割り当てたアプリが開きます。"
+          }
+        }
+      }
+    },
+    "I'll call you later." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あとで電話します。"
           }
         }
       }
@@ -3829,6 +3849,16 @@
         }
       }
     },
+    "New Reply" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しい返信"
+          }
+        }
+      }
+    },
     "New Rule" : {
       "localizations" : {
         "ja" : {
@@ -3845,6 +3875,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ニュース"
+          }
+        }
+      }
+    },
+    "No" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "いいえ"
           }
         }
       }
@@ -4175,6 +4215,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "オン"
+          }
+        }
+      }
+    },
+    "On my way!" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今向かっています！"
           }
         }
       }
@@ -4925,6 +4975,36 @@
         }
       }
     },
+    "Reply" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返信"
+          }
+        }
+      }
+    },
+    "Reply Templates" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返信の定型文"
+          }
+        }
+      }
+    },
+    "Reply templates cannot be kept here: this app has no storage the notification extension can read." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返信の定型文を保存できません。このアプリには、通知の機能拡張が読み取れる保存場所がありません。"
+          }
+        }
+      }
+    },
     "Reset" : {
       "localizations" : {
         "ja" : {
@@ -5645,6 +5725,16 @@
         }
       }
     },
+    "Thank you!" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ありがとう！"
+          }
+        }
+      }
+    },
     "That language pack could not be read." : {
       "localizations" : {
         "ja" : {
@@ -6067,6 +6157,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "現在地を取得できませんでした。"
+          }
+        }
+      }
+    },
+    "The reply templates could not be read." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返信の定型文を読み込めませんでした。"
+          }
+        }
+      }
+    },
+    "The reply templates could not be saved." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返信の定型文を保存できませんでした。"
           }
         }
       }
@@ -6597,6 +6707,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ウォッチにはもうありません。"
+          }
+        }
+      }
+    },
+    "The watch offers its own replies until you add one here." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ここで追加するまで、ウォッチは内蔵の返信候補を表示します。"
           }
         }
       }
@@ -7771,6 +7891,16 @@
         }
       }
     },
+    "When you reply to an iPhone notification from the watch, it offers these in this order, as many as fit." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ウォッチでiPhoneの通知に返信するとき、ここにある定型文が収まる分だけこの順番で表示されます。"
+          }
+        }
+      }
+    },
     "While Focus is on, clear an arriving notification and return to the watchface instead of showing its popup." : {
       "localizations" : {
         "ja" : {
@@ -7807,6 +7937,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "探す語句"
+          }
+        }
+      }
+    },
+    "Yes" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "はい"
           }
         }
       }
@@ -7861,12 +8001,12 @@
         }
       }
     },
-    "iOS sends the watch its notifications encrypted, and the watch shows them in place of the ones it reads over Bluetooth itself." : {
+    "iOS sends the watch its notifications encrypted, and the watch shows them in place of the ones it reads over Bluetooth itself. When you reply from the watch, it offers your reply templates." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOSが通知を暗号化してウォッチに送り、ウォッチは自分でBluetooth経由で読み取る通知の代わりにそれを表示します。"
+            "value" : "iOSが通知を暗号化してウォッチに送り、ウォッチは自分でBluetooth経由で読み取る通知の代わりにそれを表示します。ウォッチから返信するときは、返信の定型文が表示されます。"
           }
         }
       }

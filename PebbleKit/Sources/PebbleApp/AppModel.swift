@@ -283,6 +283,7 @@ public final class AppModel {
     let notificationSourceAppStore: NotificationSourceAppStore
     let appGlanceStore: AppGlanceStore
     let writtenRecordStore: WrittenRecordStore
+    let replyTemplateStore: ReplyTemplateStore
     let speechBridge = SpeechBridge()
     var voiceTranscriptionReadiness = VoiceTranscriptionReadiness.turnedOff
     /// Every language the phone's recognizer can be asked for, for the
@@ -402,7 +403,8 @@ public final class AppModel {
         appCatalog: ApplicationCatalog? = nil,
         clientFactory: (@MainActor (WatchID) -> any WatchClient)? = nil,
         localNotifier: (any LocalNotifying)? = nil,
-        firmwareCatalog: PebbleOSFirmwareCatalog? = nil
+        firmwareCatalog: PebbleOSFirmwareCatalog? = nil,
+        replyTemplateDirectory: StorageDirectory? = .sharedWithExtensions
     ) {
         // The real one only touches the system centre inside its methods, so a
         // test that never turns a notifying feature on never reaches it.
@@ -436,6 +438,9 @@ public final class AppModel {
         firmwarePackageStore = FirmwarePackageStore(directory: storageDirectory)
         notificationSourceAppStore = NotificationSourceAppStore(directory: storageDirectory)
         writtenRecordStore = WrittenRecordStore(directory: storageDirectory)
+        // Not under `storageDirectory`: the notification extension, which
+        // reads these, cannot see the app's own files.
+        replyTemplateStore = ReplyTemplateStore(directory: replyTemplateDirectory)
         notifications.companionEnabled = Defaults[.companionNotificationsEnabled]
         timeline.allDayReminderMinutes = Defaults[.allDayReminderMinutes]
         catalog.source = Defaults[.catalogSource]

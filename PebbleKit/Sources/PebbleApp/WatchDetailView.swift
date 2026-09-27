@@ -132,13 +132,14 @@ struct WatchDetailView: View {
 
     /// Only iOS forwards notifications to an accessory, and only to a watch
     /// the app has added.
-    private func forwardingSection(isSaved: Bool) -> NotificationForwardingSection? {
+    private func forwardingSection(isSaved: Bool) -> NotificationForwardingSection<ReplyTemplatesView>? {
         #if os(iOS)
         guard isSaved else { return nil }
         return NotificationForwardingSection(
             forwarding: model.notificationForwarding(watchID: watchID),
             allow: { Task { await model.requestNotificationForwarding(watchID: watchID) } },
-            openSettings: { Task { await model.openNotificationForwardingSettings(watchID: watchID) } }
+            openSettings: { Task { await model.openNotificationForwardingSettings(watchID: watchID) } },
+            replyTemplatesDestination: { ReplyTemplatesView(model: model) }
         )
         #else
         return nil
@@ -213,7 +214,7 @@ struct WatchDetailContent<
     var resetFeedback: FeatureFeedback?
     var forgetFeedback: FeatureFeedback? = nil
     var connectionFeedback: FeatureFeedback?
-    var forwardingSection: NotificationForwardingSection? = nil
+    var forwardingSection: NotificationForwardingSection<ReplyTemplatesView>? = nil
     var connect: () -> Void
     var setAutomaticallyConnects: (Bool) -> Void
     var setReminderAppEnabled: (Bool) -> Void

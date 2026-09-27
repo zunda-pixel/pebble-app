@@ -2,11 +2,12 @@ import SwiftUI
 
 /// Whether iOS forwards this watch's notifications to it, and the way to
 /// change that. iOS asks the reader and keeps the choice; this only shows it.
-struct NotificationForwardingSection: View {
+struct NotificationForwardingSection<ReplyTemplatesDestination: View>: View {
     /// Nil until iOS has answered.
     var forwarding: NotificationForwarding?
     var allow: () -> Void
     var openSettings: () -> Void
+    @ViewBuilder var replyTemplatesDestination: () -> ReplyTemplatesDestination
 
     var body: some View {
         Section {
@@ -29,6 +30,14 @@ struct NotificationForwardingSection: View {
             case .notSetUp, .unsupportedAccessory, .unavailable, nil:
                 EmptyView()
             }
+            switch forwarding {
+            case .on, .someApps, .off:
+                NavigationLink(destination: replyTemplatesDestination) {
+                    Label("Reply Templates", systemImage: "text.bubble")
+                }
+            case .notSetUp, .unsupportedAccessory, .unavailable, nil:
+                EmptyView()
+            }
         } header: {
             Text("iPhone Notifications")
         } footer: {
@@ -40,44 +49,80 @@ struct NotificationForwardingSection: View {
             case .unavailable:
                 Text("iOS does not forward notifications to this watch. It needs firmware that supports it, and outside development iOS offers this only in the EU.")
             default:
-                Text("iOS sends the watch its notifications encrypted, and the watch shows them in place of the ones it reads over Bluetooth itself.")
+                Text("iOS sends the watch its notifications encrypted, and the watch shows them in place of the ones it reads over Bluetooth itself. When you reply from the watch, it offers your reply templates.")
             }
         }
     }
 }
 
 #Preview("Off") {
-    Form {
-        NotificationForwardingSection(forwarding: .off, allow: {}, openSettings: {})
+    NavigationStack {
+        Form {
+            NotificationForwardingSection(forwarding: .off, allow: {}, openSettings: {}) {
+                ReplyTemplatesContent(
+                    templates: PreviewSamples.replyTemplates,
+                    add: { _ in },
+                    update: { _ in },
+                    remove: { _ in },
+                    move: { _, _ in }
+                )
+            }
+        }
     }
 }
 
 #Preview("On") {
-    Form {
-        NotificationForwardingSection(forwarding: .on, allow: {}, openSettings: {})
+    NavigationStack {
+        Form {
+            NotificationForwardingSection(forwarding: .on, allow: {}, openSettings: {}) {
+                ReplyTemplatesContent(
+                    templates: PreviewSamples.replyTemplates,
+                    add: { _ in },
+                    update: { _ in },
+                    remove: { _ in },
+                    move: { _, _ in }
+                )
+            }
+        }
     }
 }
 
 #Preview("Added before accessory setup") {
-    Form {
-        NotificationForwardingSection(forwarding: .notSetUp, allow: {}, openSettings: {})
+    NavigationStack {
+        Form {
+            NotificationForwardingSection(forwarding: .notSetUp, allow: {}, openSettings: {}) {
+                EmptyView()
+            }
+        }
     }
 }
 
 #Preview("Not supported") {
-    Form {
-        NotificationForwardingSection(forwarding: .unsupportedAccessory, allow: {}, openSettings: {})
+    NavigationStack {
+        Form {
+            NotificationForwardingSection(forwarding: .unsupportedAccessory, allow: {}, openSettings: {}) {
+                EmptyView()
+            }
+        }
     }
 }
 
 #Preview("Unavailable") {
-    Form {
-        NotificationForwardingSection(forwarding: .unavailable, allow: {}, openSettings: {})
+    NavigationStack {
+        Form {
+            NotificationForwardingSection(forwarding: .unavailable, allow: {}, openSettings: {}) {
+                EmptyView()
+            }
+        }
     }
 }
 
 #Preview("Asking iOS") {
-    Form {
-        NotificationForwardingSection(forwarding: nil, allow: {}, openSettings: {})
+    NavigationStack {
+        Form {
+            NotificationForwardingSection(forwarding: nil, allow: {}, openSettings: {}) {
+                EmptyView()
+            }
+        }
     }
 }
