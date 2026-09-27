@@ -62,6 +62,36 @@ struct HeartRateReadingTests {
         #expect(resolved.sleepSessions.isEmpty)
     }
 
+    /// A HealthKit night is a total with no sessions, and newer as a rule; the
+    /// night the watch measured, sessions and all, is the one kept.
+    @Test(arguments: [false, true])
+    func theWatchsNightSurvivesANewerHealthKitTotal(healthKitArrivesFirst: Bool) async throws {
+        let fileURL = URL.temporaryDirectory.appending(path: "health-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        let store = WatchHealthStore(fileURL: fileURL)
+        var watchDay = day(86_400, readings: [])
+        let session = SleepSession(
+            start: Date(timeIntervalSince1970: 86_400 - 3_600),
+            end: Date(timeIntervalSince1970: 86_400 + 6 * 3_600),
+            asleep: 380 * 60,
+            deep: 90 * 60
+        )
+        watchDay.sleepSessions = [session]
+        watchDay.sleepMinutes = 380
+        watchDay.deepSleepMinutes = 90
+        var healthKitDay = day(86_400, readings: [], source: .healthKit, updatedAt: Date(timeIntervalSince1970: 300))
+        healthKitDay.heartRate = nil
+        healthKitDay.sleepMinutes = 420
+
+        let merged = try await store.merge(healthKitArrivesFirst ? [healthKitDay, watchDay] : [watchDay, healthKitDay], now: now)
+
+        let resolved = try #require(merged.first)
+        #expect(resolved.sleepSessions == [session])
+        #expect(resolved.sleepMinutes == 380)
+        #expect(resolved.deepSleepMinutes == 90)
+        #expect(resolved.source == .watch)
+    }
+
     @Test func anImportedDayStaysImportedWhenHealthKitIsNewer() async throws {
         let fileURL = URL.temporaryDirectory.appending(path: "health-\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: fileURL) }

@@ -288,11 +288,22 @@ public actor WatchHealthStore {
             // restful part and the sessions it was made of belong together,
             // and mixing two readings of one night makes a third that nobody
             // slept. Whichever record has a night keeps it, the same as heart
-            // rate, and the newer wins only when both do — a record with no
-            // sleep in it, like a HealthKit day of steps, says nothing about
-            // the night.
-            let takesIncomingNight = normalized.sleepMinutes > 0
-                && (existing.sleepMinutes == 0 || normalized.updatedAt >= existing.updatedAt)
+            // rate — a record with no sleep in it, like a HealthKit day of
+            // steps, says nothing about the night. Between two nights, the one
+            // with sessions is the watch's and wins: a HealthKit day is only a
+            // total, and it is newer as a rule, dated by the day's last sample,
+            // so letting it win emptied the watch's sessions before they were
+            // exported. Otherwise the newer wins.
+            let takesIncomingNight: Bool
+            if normalized.sleepMinutes == 0 {
+                takesIncomingNight = false
+            } else if existing.sleepMinutes == 0 {
+                takesIncomingNight = true
+            } else if normalized.sleepSessions.isEmpty != existing.sleepSessions.isEmpty {
+                takesIncomingNight = !normalized.sleepSessions.isEmpty
+            } else {
+                takesIncomingNight = normalized.updatedAt >= existing.updatedAt
+            }
             if takesIncomingNight {
                 resolved.sleepMinutes = normalized.sleepMinutes
                 resolved.deepSleepMinutes = normalized.deepSleepMinutes
