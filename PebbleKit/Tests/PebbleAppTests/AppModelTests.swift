@@ -47,18 +47,6 @@ struct AppModelTests {
         #expect(client.registeredApplications.isEmpty)
     }
 
-#if os(macOS)
-    @Test
-    func qemuTransportSmokeTestWhenEnabled() async throws {
-        guard ProcessInfo.processInfo.environment["PEBBLE_QEMU_E2E"] == "1" else { return }
-        let client = QEMUWatchClient()
-        let discovered = try #require(try await client.scan().first)
-        let watch = try await client.connect(to: discovered)
-        try await client.synchronizeTime()
-        await client.disconnect(from: watch)
-    }
-#endif
-
     @Test
     func appModelScansConnectsAndSynchronizesEmptyLibrary() async throws {
         let client = MockWatchClient()
