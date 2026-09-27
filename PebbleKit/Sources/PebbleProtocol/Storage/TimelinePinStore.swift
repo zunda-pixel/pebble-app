@@ -21,10 +21,10 @@ public actor TimelinePinStore {
         self.init(fileURL: directory.file("\(name).json"))
     }
 
-    public init(fileURL: URL, writtenURL: URL? = nil) {
+    public init(fileURL: URL) {
         self.fileURL = fileURL
         let stem = fileURL.deletingPathExtension().lastPathComponent
-        self.writtenURL = writtenURL ?? fileURL
+        writtenURL = fileURL
             .deletingLastPathComponent()
             .appending(path: "\(stem)-written.json")
         mirroredURL = fileURL
@@ -95,13 +95,13 @@ public actor TimelinePinStore {
     /// identifiers and each given a digest no pin can match, so every pin is
     /// written once more and left alone after that.
     private func writtenStates() throws -> [WatchID: [WrittenPin]] {
-        guard FileManager.default.fileExists(atPath: writtenURL.path) else { return [:] }
-        if let states = try? PersistentJSON.load([WatchID: [WrittenPin]].self, from: writtenURL) {
-            return states
-        }
-        if let identifiers = try? PersistentJSON.load([WatchID: [UUID]].self, from: writtenURL) {
+        do {
+            return try PersistentJSON.load([WatchID: [WrittenPin]].self, from: writtenURL) ?? [:]
+        } catch where PersistentJSON.isCorrupt(error) {}
+        do {
+            let identifiers = try PersistentJSON.load([WatchID: [UUID]].self, from: writtenURL) ?? [:]
             return identifiers.mapValues { $0.map { WrittenPin(id: $0, digest: "") } }
-        }
+        } catch where PersistentJSON.isCorrupt(error) {}
         // Neither shape, the same recovery as the files beside it: a written
         // record that cannot be read is worse than none, because every read
         // would fail from here on.

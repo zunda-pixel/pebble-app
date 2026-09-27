@@ -19,6 +19,21 @@ public struct SentNotification: Codable, Equatable, Sendable, Identifiable {
     public var watchNames: [String] = []
 }
 
+public extension SentNotification {
+    // Not the synthesized decoder: that reads a field with a default through
+    // `decode`, so a file written before the field existed fails to decode and
+    // `PersistentJSON.loadRecovering` sets the whole file aside.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        appName = try container.decode(String.self, forKey: .appName)
+        title = try container.decode(String.self, forKey: .title)
+        body = try container.decode(String.self, forKey: .body)
+        sentAt = try container.decodeIfPresent(Date.self, forKey: .sentAt) ?? Date()
+        watchNames = try container.decodeIfPresent([String].self, forKey: .watchNames) ?? []
+    }
+}
+
 public actor SentNotificationStore {
     /// Long enough to answer "did it go?" about this morning, short enough that
     /// the file stays small and nothing is kept that nobody will read.

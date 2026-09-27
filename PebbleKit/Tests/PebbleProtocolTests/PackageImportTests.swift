@@ -281,7 +281,7 @@ struct PackageImportTests {
     @Test func firmwareJournalAndSHA256DetectPackageIdentity() async throws {
         let bytes = Data([1, 2, 3, 4])
         let blob = PBZFirmwareBlob(
-            name: "firmware.bin", type: "normal", hardwareRevision: "EMERY",
+            name: "firmware.bin", type: "normal", boardName: "obelix_pvt",
             size: bytes.count, crc: PebbleCRC32.calculate([UInt8](bytes)),
             versionTag: nil, slot: nil
         )
@@ -299,12 +299,51 @@ struct PackageImportTests {
             journalURL: directory.appending(path: "journal.json")
         )
         let journal = FirmwareUpdateJournal(
-            watchID: WatchID("watch"), hardwareRevision: "EMERY", previousVersion: nil,
+            watchID: WatchID("watch"), board: .obelixPVT, previousVersion: nil,
             targetVersion: nil, packageSHA256: package.sha256
         )
         try await library.save(package, journal: journal)
         #expect(try await library.journal() == journal)
         try await library.updatePhase(.transferring)
         #expect(try await library.journal()?.phase == .transferring)
+    }
+
+    @Test func aJournalWrittenWithAHardwareRevisionStringStillDecodes() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let journalURL = directory.appending(path: "journal.json")
+        // As `PersistentJSON.save` wrote it when the field was a `String`.
+        try Data("""
+        {
+          "createdAt" : 780000000,
+          "hardwareRevision" : "obelix_pvt",
+          "packageSHA256" : "abc",
+          "phase" : "validated",
+          "previousVersion" : "v4.9.142",
+          "targetVersion" : "v4.36.2",
+          "watchID" : "watch"
+        }
+        """.utf8).write(to: journalURL)
+        let store = PendingFirmwareUpdateStore(
+            fileURL: directory.appending(path: "package.json"),
+            journalURL: journalURL
+        )
+
+        let journal = try #require(try await store.journal())
+
+        #expect(journal.board == .obelixPVT)
+        #expect(journal.watchID == WatchID("watch"))
+        #expect(journal.targetVersion == "v4.36.2")
+        let reencoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(journal)) as? [String: Any]
+        #expect(reencoded?["hardwareRevision"] as? String == "obelix_pvt")
+    }
+
+    @Test func aManifestBoardNameMatchesItsBoardWhateverItsCase() {
+        let blob = PBZFirmwareBlob(
+            name: "firmware.bin", type: "normal", boardName: "OBELIX_PVT",
+            size: 1, crc: 1, versionTag: nil, slot: nil
+        )
+        #expect(blob.board == .obelixPVT)
     }
 }

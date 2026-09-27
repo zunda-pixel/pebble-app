@@ -47,7 +47,7 @@ public struct PebbleOSFirmwareCatalog: Sendable {
     }
 
     public func latestRelease(for board: WatchBoard) async throws -> PebbleOSFirmwareRelease {
-        try await retry(with: .networkFetch) {
+        let data = try await retry(with: .networkFetch) {
             let request = HTTPRequest(
                 method: .get,
                 url: releasesURL,
@@ -58,33 +58,39 @@ public struct PebbleOSFirmwareCatalog: Sendable {
                 let error = PebbleOSFirmwareCatalogError.releasesUnavailable
                 throw response.status.isWorthAnotherAttempt ? error : NotRetryable(error)
             }
-            let releases = try JSONDecoder().decode([GitHubRelease].self, from: data)
-            // The highest version with a package for this board, never the
-            // newest date. PebbleOS ships patches for its older lines after
-            // newer releases — v4.27.3 arrived six releases after v4.37.0
-            // (measured 2026-09-21) — so GitHub's own `latest`, which is a
-            // date, answered a downgrade and hid the real update (#124).
-            let candidates = releases
-                .filter { $0.prerelease != true && $0.draft != true }
-                .compactMap { release -> PebbleOSFirmwareRelease? in
-                    guard let asset = Self.asset(for: board, in: release.assets) else { return nil }
-                    return PebbleOSFirmwareRelease(
-                        versionTag: release.tagName,
-                        board: board,
-                        downloadURL: asset.browserDownloadURL,
-                        sizeInBytes: asset.size,
-                        releaseNotesURL: release.htmlURL
-                    )
-                }
-            guard let newest = candidates.max(by: {
-                Self.isVersion($1.versionTag, newerThan: $0.versionTag)
-            }) else {
-                // Asking again returns the same list.
-                throw NotRetryable(PebbleOSFirmwareCatalogError.noFirmwareForBoard(board))
-            }
-            return newest
+            return data
         }
+        guard data.count <= Self.maximumReleaseListSize else {
+            throw PebbleOSFirmwareCatalogError.releasesUnavailable
+        }
+        let releases = try JSONDecoder().decode([GitHubRelease].self, from: data)
+        // The highest version with a package for this board, never the
+        // newest date. PebbleOS ships patches for its older lines after
+        // newer releases — v4.27.3 arrived six releases after v4.37.0
+        // (measured 2026-09-21) — so GitHub's own `latest`, which is a
+        // date, answered a downgrade and hid the real update (#124).
+        let candidates = releases
+            .filter { $0.prerelease != true && $0.draft != true }
+            .compactMap { release -> PebbleOSFirmwareRelease? in
+                guard let asset = Self.asset(for: board, in: release.assets) else { return nil }
+                return PebbleOSFirmwareRelease(
+                    versionTag: release.tagName,
+                    board: board,
+                    downloadURL: asset.browserDownloadURL,
+                    sizeInBytes: asset.size,
+                    releaseNotesURL: release.htmlURL
+                )
+            }
+        guard let newest = candidates.max(by: {
+            Self.isVersion($1.versionTag, newerThan: $0.versionTag)
+        }) else {
+            throw PebbleOSFirmwareCatalogError.noFirmwareForBoard(board)
+        }
+        return newest
     }
+
+    static let maximumReleaseListSize = 16 * 1_024 * 1_024
+    static let maximumPackageSize = 64 * 1_024 * 1_024
 
     /// Numeric and component-wise: "v4.37.0" beats "v4.30.3" however their
     /// dates fall, and "v4.9.142.4" sits below both because 9 < 30.
@@ -111,6 +117,9 @@ public struct PebbleOSFirmwareCatalog: Sendable {
     /// Kept on disk so it can be installed later — on a watch that is not here
     /// yet, or after a first attempt failed.
     public func download(_ release: PebbleOSFirmwareRelease) async throws -> DownloadedFirmware {
+        guard release.sizeInBytes <= Self.maximumPackageSize else {
+            throw PebbleOSFirmwareCatalogError.packageTooLarge
+        }
         let temporaryURL = try await retry(with: .networkFetch) {
             do {
                 return try await downloadFile(from: release.downloadURL, using: session)
@@ -124,6 +133,12 @@ public struct PebbleOSFirmwareCatalog: Sendable {
                 // The file is megabytes, so this is the failure most worth another attempt.
                 throw PebbleOSFirmwareCatalogError.releasesUnavailable
             }
+        }
+        defer { try? FileManager.default.removeItem(at: temporaryURL) }
+        // GitHub publishes each asset's size, and a package cut short by a
+        // dropped connection is otherwise found out only by the watch.
+        guard try downloadedFileSize(at: temporaryURL) == release.sizeInBytes else {
+            throw PebbleOSFirmwareCatalogError.incompleteDownload
         }
         let directory = try Self.downloadDirectory()
         let output = directory
@@ -156,6 +171,8 @@ public enum PebbleOSFirmwareCatalogError: Error, Equatable, Sendable {
     case releasesUnavailable
     case noFirmwareForBoard(WatchBoard)
     case insecureURL
+    case packageTooLarge
+    case incompleteDownload
 }
 
 struct GitHubRelease: Decodable {

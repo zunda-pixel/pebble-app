@@ -59,6 +59,9 @@ public struct LanguagePackCatalog: Sendable {
             }
         }
         defer { try? FileManager.default.removeItem(at: url) }
+        guard try downloadedFileSize(at: url) <= Self.maximumPackSize else {
+            throw LanguagePackError.packTooLarge
+        }
         let data = try Data(contentsOf: url, options: .mappedIfSafe)
         guard !data.isEmpty else { throw LanguagePackError.unavailable }
         return data
@@ -66,6 +69,8 @@ public struct LanguagePackCatalog: Sendable {
 
     /// Sending a pack under any other name stores a file the watch never reads.
     public static var filename: String { "lang" }
+
+    static let maximumPackSize = 16 * 1_024 * 1_024
 
     static let silkBoardName = "silk"
 
@@ -127,5 +132,5 @@ public struct LanguagePackCatalog: Sendable {
 public enum LanguagePackError: Error, Equatable, Sendable {
     case unavailable
     case insecureURL
-    case unsupportedByWatch
+    case packTooLarge
 }

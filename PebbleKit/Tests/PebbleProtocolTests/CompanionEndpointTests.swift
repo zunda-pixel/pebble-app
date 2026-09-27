@@ -118,6 +118,23 @@ struct PhoneControlTests {
         #expect(Array(frame.payload.suffix(8)) == [0x03, 0x35, 0x35, 0x35, 0x03, 0x35, 0x35, 0x35])
     }
 
+    @Test func callerStringsAreCutToThirtyOneBytesOnACharacterBoundary() throws {
+        let name = "山田太郎山田太郎山田太郎"
+        let frame = PhoneControlCodec.incomingCallFrame(
+            cookie: 1,
+            callerNumber: String(repeating: "9", count: 40),
+            callerName: name
+        )
+        let payload = Array(frame.payload.dropFirst(5))
+        #expect(payload[0] == 31)
+        #expect(Array(payload[1...31]) == Array(repeating: 0x39, count: 31))
+        let nameLength = Int(payload[32])
+        let nameBytes = Array(payload[33...])
+        #expect(nameLength == 30)
+        #expect(nameBytes.count == nameLength)
+        #expect(String(bytes: nameBytes, encoding: .utf8) == String(name.prefix(10)))
+    }
+
     @Test func startAndEndFramesCarryTheCookie() {
         #expect(PhoneControlCodec.callStartFrame(cookie: 0xAABB_CCDD).payload == [0x08, 0xAA, 0xBB, 0xCC, 0xDD])
         #expect(PhoneControlCodec.callEndFrame(cookie: 0xAABB_CCDD).payload == [0x09, 0xAA, 0xBB, 0xCC, 0xDD])
@@ -168,13 +185,12 @@ struct PairingTests {
         let bonded = try #require(ConnectivityStatus(decoding: [0b111, 0, 0, 0]))
         #expect(bonded.isReadyForProtocol)
 
-        // Paired but unencrypted means the phone forgot the bond.
-        let stale = try #require(ConnectivityStatus(decoding: [0b10_0011, 0, 0, 8]))
-        #expect(stale.isPaired)
-        #expect(!stale.isEncrypted)
-        #expect(stale.hasRemoteAttemptedToUseStalePairing)
-        #expect(stale.pairingError == 8)
-        #expect(!stale.isReadyForProtocol)
+        let unencrypted = try #require(ConnectivityStatus(decoding: [0b10_0011, 0, 0, 8]))
+        #expect(unencrypted.isPaired)
+        #expect(!unencrypted.isEncrypted)
+        #expect(unencrypted.isReversedPPoGATTEnabled)
+        #expect(unencrypted.pairingError == 8)
+        #expect(!unencrypted.isReadyForProtocol)
     }
 
     @Test func connectivityStatusRejectsTruncatedValues() {
@@ -465,7 +481,7 @@ struct WatchDiagnosticsTests {
         let id = UUID(uuidString: "01020304-0506-0708-090A-0B0C0D0E0F10")!
         // `app_log_vargs` builds its record with the same
         // `pbl_log_binary_format`, so its numbers are the same way round.
-        var payload = BlobDBCodec.uuidBytes(id)
+        var payload = id.bytes
         payload += UInt32(100).bigEndianBytes
         payload += [200, 2]
         payload += UInt16(9).bigEndianBytes
@@ -526,11 +542,9 @@ struct WatchDiagnosticsTests {
         }
     }
 
-    @Test func aRequestForAFileCarriesItsName() {
+    @Test func aCoredumpRequestIsItsCommandAndTransaction() {
         #expect(GetBytesCodec.requestFrame(.coredump, transactionID: 3).payload == [0x00, 3])
         #expect(GetBytesCodec.requestFrame(.unreadCoredump, transactionID: 3).payload == [0x05, 3])
-        #expect(GetBytesCodec.requestFrame(.file(name: "ab"), transactionID: 3).payload
-            == [0x03, 3, 2, 0x61, 0x62])
     }
 
     @Test func aColourIsSixBitsAndAlwaysOpaque() {
@@ -687,7 +701,7 @@ struct WatchSettingsTests {
     }
 
     @Test func theRemindersAppIsTurnedOnThroughItsOwnPreference() {
-        let frame = WeatherCodec.reminderAppFrame(state: .enabled, token: 1)
+        let frame = WatchAppPreferencesCodec.remindersAppFrame(state: .enabled, token: 1)
 
         #expect(frame.payload[3] == 9)
         #expect(Array(frame.payload[5..<17]) == Array("remindersApp".utf8))
@@ -744,7 +758,7 @@ struct WeatherTests {
         // Database 5 is the weather one.
         #expect(frame.payload[3] == 5)
         #expect(frame.payload[4] == 16)
-        #expect(Array(frame.payload[5..<21]) == BlobDBCodec.uuidBytes(report.id))
+        #expect(Array(frame.payload[5..<21]) == report.id.bytes)
     }
 
     @Test func theWeatherAppIsAlsoToldWhichPlacesToShow() {
@@ -752,7 +766,7 @@ struct WeatherTests {
         // the weather app — "has no known ordering" — even though a watchface
         // reading the database directly shows it.
         let second = UUID(uuidString: "FFEEDDCC-BBAA-9988-7766-554433221100")!
-        let frame = WeatherCodec.preferencesFrame(orderedIDs: [report.id, second], token: 0x0102)
+        let frame = WatchAppPreferencesCodec.weatherOrderFrame(orderedIDs: [report.id, second], token: 0x0102)
 
         #expect(frame.payload[0] == 0x01)
         #expect(Array(frame.payload[1..<3]) == [0x01, 0x02])
@@ -763,8 +777,8 @@ struct WeatherTests {
         #expect(Array(frame.payload[5..<15]) == Array("weatherApp".utf8))
         #expect(Array(frame.payload[15..<17]) == UInt16(33).littleEndianBytes)
         #expect(frame.payload[17] == 2)
-        #expect(Array(frame.payload[18..<34]) == BlobDBCodec.uuidBytes(report.id))
-        #expect(Array(frame.payload[34..<50]) == BlobDBCodec.uuidBytes(second))
+        #expect(Array(frame.payload[18..<34]) == report.id.bytes)
+        #expect(Array(frame.payload[34..<50]) == second.bytes)
     }
 
     @Test func aNameLongerThanTheWatchsBufferIsCutBetweenCharacters() {
@@ -854,9 +868,9 @@ struct AppGlanceTests {
         #expect(String(decoding: value[19..<(19 + subtitleLength)], as: UTF8.self).count == 50)
     }
 
-    @Test func insertAndDeleteTargetTheGlanceDatabase() {
+    @Test func insertAndDeleteTargetTheGlanceDatabase() throws {
         let id = UUID()
-        let insert = AppGlanceCodec.insertFrame(AppGlance(applicationID: id), token: 0x0102)
+        let insert = try AppGlanceCodec.insertFrame(AppGlance(applicationID: id), token: 0x0102)
         let delete = AppGlanceCodec.deleteFrame(applicationID: id, token: 0x0102)
 
         #expect(insert.endpoint == 0xB1DB)
@@ -1048,9 +1062,9 @@ struct NotificationAppsTests {
         #expect(NotificationAppMuteState(wireValue: 65) == .weekends)
     }
 
-    @Test func insertFrameTargetsDatabaseSix() {
+    @Test func insertFrameTargetsDatabaseSix() throws {
         let app = NotificationSourceApp(bundleID: "a.b", displayName: "AB")
-        let frame = NotificationAppsCodec.insertFrame(app: app, token: 0x0102)
+        let frame = try NotificationAppsCodec.insertFrame(app: app, token: 0x0102)
         #expect(frame.endpoint == 0xB1DB)
         #expect(Array(frame.payload.prefix(4)) == [0x01, 0x01, 0x02, 0x06])
         #expect(frame.payload[4] == 3)
@@ -1109,6 +1123,46 @@ struct NotificationAppsTests {
         #expect(merged.count == 1)
         #expect(merged[0].displayName == "New")
     }
+
+    @Test func aMergeThatChangesNothingLeavesTheFileAlone() async throws {
+        let fileURL = FileManager.default.temporaryDirectory
+            .appending(path: "notification-apps-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        let library = NotificationSourceAppStore(fileURL: fileURL)
+        let newer = NotificationSourceApp(
+            bundleID: "a.b",
+            displayName: "New",
+            stateUpdated: Date(timeIntervalSince1970: 200)
+        )
+        let older = NotificationSourceApp(
+            bundleID: "a.b",
+            displayName: "Old",
+            stateUpdated: Date(timeIntervalSince1970: 100)
+        )
+        _ = try await library.merge(newer)
+        let marked = try Data(contentsOf: fileURL) + Data("\n\n".utf8)
+        try marked.write(to: fileURL)
+
+        let merged = try await library.merge(older)
+
+        #expect(merged == [newer])
+        #expect(try Data(contentsOf: fileURL) == marked)
+    }
+
+    @Test func anUpdateHandsBackTheSortedListItWrote() async throws {
+        let fileURL = FileManager.default.temporaryDirectory
+            .appending(path: "notification-apps-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        let library = NotificationSourceAppStore(fileURL: fileURL)
+        let zebra = NotificationSourceApp(bundleID: "z", displayName: "Zebra", stateUpdated: Date(timeIntervalSince1970: 1))
+        let apple = NotificationSourceApp(bundleID: "a", displayName: "apple", stateUpdated: Date(timeIntervalSince1970: 1))
+
+        _ = try await library.update(zebra)
+        let updated = try await library.update(apple)
+
+        #expect(updated == [apple, zebra])
+        #expect(try await library.apps() == updated)
+    }
 }
 
 @Suite
@@ -1126,7 +1180,7 @@ struct VoiceTests {
             attributes.append([0x01, UInt8(content.count), 0x00] + content)
         }
         if let applicationID {
-            attributes.append([0x03, 16, 0x00] + BlobDBCodec.uuidBytes(applicationID))
+            attributes.append([0x03, 16, 0x00] + applicationID.bytes)
         }
         var payload: [UInt8] = [0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x34, 0x12]
         payload.append(UInt8(attributes.count))

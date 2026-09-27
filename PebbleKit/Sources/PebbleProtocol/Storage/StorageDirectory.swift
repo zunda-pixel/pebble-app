@@ -22,15 +22,6 @@ public struct StorageDirectory: Hashable, Sendable {
         return StorageDirectory(url: base.appending(path: "Pebble", directoryHint: .isDirectory))
     }
 
-    /// A directory of its own, for a test or a preview that must not touch what
-    /// the reader has.
-    public static func temporary() -> StorageDirectory {
-        StorageDirectory(
-            url: FileManager.default.temporaryDirectory
-                .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        )
-    }
-
     public func file(_ name: String) -> URL {
         url.appending(path: name, directoryHint: .notDirectory)
     }

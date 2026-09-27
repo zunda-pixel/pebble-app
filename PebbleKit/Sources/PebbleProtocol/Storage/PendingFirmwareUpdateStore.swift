@@ -16,12 +16,19 @@ public enum FirmwareUpdatePhase: String, Codable, Equatable, Sendable {
 @MemberwiseInit(.public)
 public struct FirmwareUpdateJournal: Codable, Equatable, Sendable {
     public var watchID: WatchID
-    public var hardwareRevision: String
+    public var board: WatchBoard
     public var previousVersion: String?
     public var targetVersion: String?
     public var packageSHA256: String
     public var phase: FirmwareUpdatePhase = .validated
     public var createdAt: Date = Date()
+
+    // Written as `hardwareRevision` when it held the board's raw value as a
+    // string; renaming the key would orphan a journal already on disk.
+    private enum CodingKeys: String, CodingKey {
+        case watchID, previousVersion, targetVersion, packageSHA256, phase, createdAt
+        case board = "hardwareRevision"
+    }
 }
 
 public actor PendingFirmwareUpdateStore {

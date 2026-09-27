@@ -21,7 +21,10 @@ public struct PBZFirmwareManifest: Codable, Equatable, Sendable {
 public struct PBZFirmwareBlob: Codable, Equatable, Sendable {
     public var name: String
     public var type: String
-    public var hardwareRevision: String
+    /// `hwrev` in the manifest, which `tools/mkbundle.py` fills with the
+    /// board the firmware was built for (`--board`), not the factory revision
+    /// the watch reports as `hardwareRevision` in its version response.
+    public var boardName: String
     public var size: Int
     public var crc: UInt32
     public var versionTag: String?
@@ -29,7 +32,11 @@ public struct PBZFirmwareBlob: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case name, type, size, crc, versionTag, slot
-        case hardwareRevision = "hwrev"
+        case boardName = "hwrev"
+    }
+
+    public var board: WatchBoard? {
+        WatchBoard.allCases.first { $0.rawValue.caseInsensitiveCompare(boardName) == .orderedSame }
     }
 }
 
@@ -68,7 +75,7 @@ public enum PBZFirmwareImporter {
                 PBZFirmwareManifest.self,
                 from: data(entry: entry, archive: archive)
             )
-            guard manifest.firmware.hardwareRevision.caseInsensitiveCompare(board.rawValue) == .orderedSame else {
+            guard manifest.firmware.board == board else {
                 continue
             }
             if let targetSlot,

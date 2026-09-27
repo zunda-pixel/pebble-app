@@ -2,7 +2,6 @@ public import Foundation
 import Algorithms
 import HTTPTypes
 import HTTPTypesFoundation
-import CryptoKit
 import MemberwiseInit
 import Retry
 
@@ -43,7 +42,6 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
     public var releaseNotes: String? = nil
     public var iconURL: URL? = nil
     public var screenshotURLs: [URL] = []
-    public var sha256: String? = nil
     /// What the store's row says the application uses, in the store's own
     /// codes. Empty for a row that predates this field, and for one the store
     /// gave nothing for.
@@ -62,7 +60,7 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, storeID, name, developer, version, downloadURL, supportedPlatforms
-        case kind, category, summary, releaseNotes, iconURL, screenshotURLs, sha256
+        case kind, category, summary, releaseNotes, iconURL, screenshotURLs
         case capabilities, sourceID, changelog
     }
 
@@ -87,7 +85,6 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
         releaseNotes = try container.decodeIfPresent(String.self, forKey: .releaseNotes)?.nilWhenEmpty
         iconURL = try container.decodeIfPresent(URL.self, forKey: .iconURL)
         screenshotURLs = try container.decodeIfPresent([URL].self, forKey: .screenshotURLs) ?? []
-        sha256 = try container.decodeIfPresent(String.self, forKey: .sha256)
         // Absent from every cache written before this field existed, which is
         // why it decodes to empty rather than refusing the whole row.
         capabilities = try container.decodeIfPresent([String].self, forKey: .capabilities) ?? []
@@ -253,8 +250,6 @@ public actor ApplicationCatalog {
         return nil
     }
 
-    public func cachedApplications() throws -> [CatalogApplication] { try cachedSnapshot()?.applications ?? [] }
-
     public func update(model: WatchModel?, source: CatalogSource = .pebble) async throws -> CatalogSnapshot {
         // The test override wins where one was injected; the source names the
         // feed everywhere real.
@@ -342,18 +337,13 @@ public actor ApplicationCatalog {
                 throw ApplicationCatalogError.invalidResponse
             }
         }
-        let attributes = try FileManager.default.attributesOfItem(atPath: temporaryURL.path)
-        guard (attributes[.size] as? NSNumber)?.intValue ?? 0 <= 64 * 1_024 * 1_024 else {
+        defer { try? FileManager.default.removeItem(at: temporaryURL) }
+        guard try downloadedFileSize(at: temporaryURL) <= 64 * 1_024 * 1_024 else {
             throw ApplicationCatalogError.packageTooLarge
-        }
-        let data = try Data(contentsOf: temporaryURL, options: .mappedIfSafe)
-        if let expected = application.sha256?.lowercased() {
-            let actual = SHA256.hash(data: data).hexadecimalString
-            guard actual == expected else { throw ApplicationCatalogError.checksumMismatch }
         }
         let output = FileManager.default.temporaryDirectory.appending(path: "catalog-\(application.id.uuidString).pbw")
         try? FileManager.default.removeItem(at: output)
-        try data.write(to: output, options: .atomic)
+        try FileManager.default.moveItem(at: temporaryURL, to: output)
         return output
     }
 
@@ -555,7 +545,9 @@ struct OfficialCatalogApplication: Decodable {
               uuid.lowercased() != "00000000-0000-0000-0000-000000000000", let release = latestRelease,
               let pbwFile = release.pbwFile,
               let downloadURL = URL(string: pbwFile),
-              ["https", "http"].contains(downloadURL.scheme?.lowercased()),
+              // Only https is ever downloaded (`downloadFile`), so a plain
+              // http package would be a row that cannot be installed.
+              downloadURL.scheme?.lowercased() == "https",
               // A row needs both of these, so an entry the store will not name
               // or attribute is one to skip — the same answer this already
               // gives an entry with no UUID.
@@ -648,9 +640,7 @@ public enum ApplicationCatalogError: Error, Equatable, Sendable {
     case invalidResponse
     case insecureURL
     case packageTooLarge
-    case checksumMismatch
     case applicationIDMismatch
-    case incompatibleHardware
 }
 
 extension String {

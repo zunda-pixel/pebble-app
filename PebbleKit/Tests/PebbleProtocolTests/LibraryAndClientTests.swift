@@ -624,6 +624,27 @@ struct CompanionStorageTests {
         #expect(merged[0].source == .imported)
     }
 
+    @Test(arguments: [false, true])
+    func aNightInTheOlderRecordSurvivesANewerOneWithNoSleep(olderArrivesFirst: Bool) async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let library = WatchHealthStore(fileURL: directory.appending(path: "health.json"))
+        let archived = WatchHealthSample(
+            date: Date(timeIntervalSince1970: 100), steps: 6_000, sleepMinutes: 420,
+            timeZoneIdentifier: "UTC", source: .imported, updatedAt: Date(timeIntervalSince1970: 200)
+        )
+        let steps = WatchHealthSample(
+            date: Date(timeIntervalSince1970: 100), steps: 7_000, sleepMinutes: 0,
+            timeZoneIdentifier: "UTC", source: .healthKit, updatedAt: Date(timeIntervalSince1970: 300)
+        )
+
+        let merged = try await library.merge(olderArrivesFirst ? [archived, steps] : [steps, archived])
+
+        #expect(merged.count == 1)
+        #expect(merged[0].sleepMinutes == 420)
+        #expect(merged[0].steps == 7_000)
+    }
+
     @Test func whatOnlyAppleHealthKnowsSurvivesTheWatchsOwnRecord() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -739,6 +760,23 @@ struct CompanionStorageTests {
         #expect(application.supports(.pebbleTime2))
         #expect(!application.supports(.pebble2Duo))
         #expect(application.releaseNotes == "Improved reliability")
+    }
+
+    @Test func aCatalogRowWhosePackageIsPlainHTTPIsLeftOut() throws {
+        let json = """
+        {
+          "applications": [{
+            "author": "Pebble Developer",
+            "id": "store-id",
+            "title": "Utility",
+            "uuid": "00112233-4455-6677-8899-aabbccddeeff",
+            "latest_release": {"pbw_file":"http://example.com/utility.pbw", "version":"2.0"}
+          }]
+        }
+        """
+        let home = try JSONDecoder().decode(OfficialCatalogHome.self, from: Data(json.utf8))
+        let row = try #require(home.applications.first)
+        #expect(row.application(kind: .watchapp) == nil)
     }
 
     @Test func catalogVersionComparisonUsesNumericOrdering() {
@@ -1109,6 +1147,16 @@ struct FirmwareCatalogNetworkTests {
         await #expect(throws: PebbleOSFirmwareCatalogError.noFirmwareForBoard(.asterix)) {
             try await catalog(url).latestRelease(for: .asterix)
         }
+    }
+
+    @Test func aReleaseListThatCannotBeReadIsNotAskedForTwice() async {
+        let url = URL(string: "https://example.invalid/malformed/releases")!
+        StubURLProtocol.stub(url, status: 200, body: Data("[{\"tag_name\":".utf8))
+
+        await #expect(throws: DecodingError.self) {
+            try await catalog(url).latestRelease(for: .obelixPVT)
+        }
+        #expect(StubURLProtocol.requestCount(for: url) == 1)
     }
 
     @Test func aPlainHTTPURLIsRefusedBeforeAnyRequest() async {

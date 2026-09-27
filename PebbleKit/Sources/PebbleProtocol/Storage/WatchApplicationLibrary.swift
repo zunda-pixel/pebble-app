@@ -143,11 +143,15 @@ public actor WatchApplicationLibrary {
     public func remove(applicationID: UUID) throws -> [WatchApplication] {
         var current = try applications()
         current.removeAll { $0.id == applicationID }
-        try persist(current)
+        // The package goes first, and its failure is the caller's. Saving the
+        // index first and shrugging off the package left a `.pbw` that
+        // `rebuiltFromPackages` would bring back the next time the index was
+        // lost — an application the reader was told had been removed.
         let storedPackageURL = packageURL(applicationID: applicationID)
         if FileManager.default.fileExists(atPath: storedPackageURL.path) {
-            try? FileManager.default.removeItem(at: storedPackageURL)
+            try FileManager.default.removeItem(at: storedPackageURL)
         }
+        try persist(current)
         return current
     }
 

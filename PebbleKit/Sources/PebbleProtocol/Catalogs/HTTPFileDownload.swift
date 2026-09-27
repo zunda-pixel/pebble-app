@@ -39,3 +39,8 @@ func downloadFile(
     }
     return temporaryURL
 }
+
+func downloadedFileSize(at url: URL) throws -> Int {
+    let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+    return (attributes[.size] as? NSNumber)?.intValue ?? 0
+}

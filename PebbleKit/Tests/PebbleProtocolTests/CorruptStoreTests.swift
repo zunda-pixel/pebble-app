@@ -115,6 +115,29 @@ struct CorruptStoreTests {
         #expect(try await WatchApplicationLibrary(fileURL: fileURL).applications().count == 3)
     }
 
+    @Test func aPackageThatCannotBeDeletedFailsTheRemovalAndKeepsTheApplication() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fileURL = directory.appending(path: "applications.json")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let applicationID = UUID()
+        let source = try makeApplicationPackage(in: directory, applicationID: applicationID, name: "App")
+        let library = WatchApplicationLibrary(fileURL: fileURL)
+        try await library.importPackage(from: source)
+
+        let packages = directory.appending(path: "Packages", directoryHint: .isDirectory)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: packages.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: packages.path)
+        }
+
+        await #expect(throws: (any Error).self) {
+            try await library.remove(applicationID: applicationID)
+        }
+        #expect(try await library.applications().map(\.id) == [applicationID])
+        #expect(try await WatchApplicationLibrary(fileURL: fileURL).applications().map(\.id) == [applicationID])
+    }
+
     /// One unreadable package must not cost the reader the other two: the whole
     /// point of the rebuild is that a single bad file is survivable.
     @Test func anUnreadablePackageIsSkippedRatherThanFailingTheRebuild() async throws {
@@ -198,6 +221,48 @@ struct CorruptStoreTests {
         let pinID = UUID()
         try await store.setWrittenPinDigests([pinID: "digest"], watchID: WatchID("mock-flint"))
         #expect(try await store.writtenPinIDs(watchID: WatchID("mock-flint")) == [pinID])
+    }
+
+    @Test func aWrittenPinFileThatCannotBeReadJustNowIsLeftWhereItIs() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let writtenURL = directory.appending(path: "timeline-written.json")
+        let pinID = UUID()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data(#"{"mock-flint":[{"id":"\#(pinID.uuidString)","digest":"d"}]}"#.utf8).write(to: writtenURL)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: writtenURL.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: writtenURL.path)
+        }
+
+        let store = TimelinePinStore(fileURL: directory.appending(path: "timeline.json"))
+
+        await #expect(throws: (any Error).self) {
+            try await store.writtenPinIDs(watchID: WatchID("mock-flint"))
+        }
+        #expect(FileManager.default.fileExists(atPath: writtenURL.path))
+        #expect(try quarantinedFiles(besides: writtenURL).isEmpty)
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: writtenURL.path)
+        #expect(try await store.writtenPinIDs(watchID: WatchID("mock-flint")) == [pinID])
+    }
+
+    @Test func aFileThatCannotBeReadJustNowIsNotMovedAside() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fileURL = directory.appending(path: "watches.json")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data("[]".utf8).write(to: fileURL)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: fileURL.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: fileURL.path)
+        }
+
+        #expect(throws: (any Error).self) {
+            try PersistentJSON.loadRecovering([String].self, from: fileURL)
+        }
+        #expect(FileManager.default.fileExists(atPath: fileURL.path))
+        #expect(try quarantinedFiles(besides: fileURL).isEmpty)
     }
 
     /// A `.pbw` holding one application built for the Pebble Time 2.

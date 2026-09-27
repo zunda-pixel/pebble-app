@@ -16,25 +16,23 @@ public actor NotificationSourceAppStore {
     }
 
     public func save(_ apps: [NotificationSourceApp]) throws {
-        try PersistentJSON.save(
-            apps.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending },
-            to: fileURL
-        )
+        try PersistentJSON.save(Self.sorted(apps), to: fileURL)
     }
 
     public func update(_ app: NotificationSourceApp) throws -> [NotificationSourceApp] {
-        var apps = try apps()
+        let stored = try apps()
+        var apps = stored
         if let index = apps.firstIndex(where: { $0.bundleID == app.bundleID }) {
             apps[index] = app
         } else {
             apps.append(app)
         }
-        try save(apps)
-        return try self.apps()
+        return try save(apps, replacing: stored)
     }
 
     public func merge(_ app: NotificationSourceApp) throws -> [NotificationSourceApp] {
-        var apps = try apps()
+        let stored = try apps()
+        var apps = stored
         if let index = apps.firstIndex(where: { $0.bundleID == app.bundleID }) {
             if app.stateUpdated > apps[index].stateUpdated {
                 var merged = app
@@ -50,7 +48,21 @@ public actor NotificationSourceAppStore {
         } else {
             apps.append(app)
         }
-        try save(apps)
-        return try self.apps()
+        return try save(apps, replacing: stored)
+    }
+
+    private func save(
+        _ apps: [NotificationSourceApp],
+        replacing stored: [NotificationSourceApp]
+    ) throws -> [NotificationSourceApp] {
+        let sorted = Self.sorted(apps)
+        if sorted != stored {
+            try PersistentJSON.save(sorted, to: fileURL)
+        }
+        return sorted
+    }
+
+    private static func sorted(_ apps: [NotificationSourceApp]) -> [NotificationSourceApp] {
+        apps.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
     }
 }

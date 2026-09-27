@@ -23,17 +23,20 @@ enum PersistentJSON {
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
         do {
             try validateFileSize(at: url)
-        } catch {
+            return try JSONDecoder().decode(type, from: Data(contentsOf: url))
+        } catch where isCorrupt(error) {
             try quarantine(url)
             return nil
         }
-        let data = try Data(contentsOf: url)
-        do {
-            return try JSONDecoder().decode(type, from: data)
-        } catch is DecodingError {
-            try quarantine(url)
-            return nil
-        }
+    }
+
+    /// Whether a failed load says the file itself is unusable, rather than that
+    /// it could not be read just now. Only the first is moved aside: a file
+    /// that Data Protection still holds shut, or whose size could not be read,
+    /// is whole, and quarantining it would throw away what the app believed.
+    static func isCorrupt(_ error: any Error) -> Bool {
+        if error is DecodingError { return true }
+        return (error as? CocoaError)?.code == .fileReadTooLarge
     }
 
     static func quarantine(_ url: URL) throws {
