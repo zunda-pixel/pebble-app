@@ -428,7 +428,6 @@ public final class AppModel {
         notificationSourceAppStore = NotificationSourceAppStore(directory: storageDirectory)
         writtenRecordStore = WrittenRecordStore(directory: storageDirectory)
         notifications.companionEnabled = Defaults[.companionNotificationsEnabled]
-        applications.activeWatchfaceIDs = Defaults[.activeWatchfaceIDs]
         catalog.source = Defaults[.catalogSource]
     }
 
@@ -754,7 +753,6 @@ public final class AppModel {
             case .started(let id):
                 if applications.watchfaces.contains(where: { $0.id == id }) {
                     applications.activeWatchfaceIDs[connection.watch.id] = id
-                    Defaults[.activeWatchfaceIDs] = applications.activeWatchfaceIDs
                 }
                 // The PKJS lifecycle ties the script's life to the app's run,
                 // so a launch is what makes `ready` fire — every launch, not

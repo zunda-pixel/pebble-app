@@ -1,5 +1,6 @@
 public import PebbleProtocol
 public import Foundation
+import Defaults
 // The `@Observable` macro writes a public conformance on a public class, so
 // the module that declares the protocol has to be imported publicly too.
 public import Observation
@@ -10,8 +11,12 @@ public import Observation
 public final class ApplicationsModel {
     public internal(set) var apps: [WatchApplication] = []
     public internal(set) var watchfaces: [WatchApplication] = []
-    /// The watchface each watch is showing, as it last said.
-    public internal(set) var activeWatchfaceIDs: [WatchID: UUID] = [:]
+    /// The watchface each watch is showing, as it last said. Kept across
+    /// launches here, the one place it changes: five writers each saving it
+    /// themselves let a stopped watchface come back after a relaunch.
+    public internal(set) var activeWatchfaceIDs: [WatchID: UUID] = Defaults[.activeWatchfaceIDs] {
+        didSet { Defaults[.activeWatchfaceIDs] = activeWatchfaceIDs }
+    }
     public internal(set) var isLoading = false
     public internal(set) var isImporting = false
     /// The answer to importing a package from a file, which is asked for on the

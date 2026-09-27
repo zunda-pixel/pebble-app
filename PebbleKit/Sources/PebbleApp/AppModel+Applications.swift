@@ -146,14 +146,12 @@ extension AppModel {
                 }
                 applications.activeWatchfaceIDs[connection.watch.id] = application.id
             }
-            Defaults[.activeWatchfaceIDs] = applications.activeWatchfaceIDs
             // Beside its failure, so the one never sits on screen under the
             // other: `managementFeedback` is the running operation's, and the
             // next one to start or finish replaces it.
             applications.libraryFeedback = .success("\(application.displayName) is active.")
         } catch {
             // The watches that did launch it are showing it.
-            Defaults[.activeWatchfaceIDs] = applications.activeWatchfaceIDs
             applications.libraryFeedback = .failure("The watchface could not be activated.")
         }
     }
@@ -186,7 +184,6 @@ extension AppModel {
             for watchID in showingIt where applications.activeWatchfaceIDs[watchID] == id {
                 applications.activeWatchfaceIDs[watchID] = fallback.id
             }
-            Defaults[.activeWatchfaceIDs] = applications.activeWatchfaceIDs
         }
         guard beginApplicationOperation(.removing(id)) else { return false }
         defer { finishApplicationOperation(.removing(id)) }
