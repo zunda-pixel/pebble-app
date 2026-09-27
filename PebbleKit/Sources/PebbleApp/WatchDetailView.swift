@@ -1,6 +1,16 @@
 import PebbleProtocol
 import SwiftUI
 
+/// The screens the Watch Settings rows on a watch's detail screen open.
+enum WatchSettingsPage: Hashable {
+    case appearance
+    case backlight
+    case quietTime
+    case quickLaunch
+    case music
+    case health
+}
+
 struct WatchDetailView: View {
     var model: AppModel
     var watchID: WatchID
@@ -17,12 +27,115 @@ struct WatchDetailView: View {
         return model.languagePacks(watchID: watchID).first { $0.locale == locale }?.localName ?? locale
     }
 
+    private func currentWatchSettings(board: WatchBoard?) -> [WatchSetting: Int] {
+        Dictionary(
+            uniqueKeysWithValues: WatchSetting.allCases.map { setting in
+                // The brightness row shows the preset the watch would
+                // report rather than the number last written, the way
+                // `backlight_get_preset` derives it: turning the brightness
+                // down by hand leaves the watch on "Custom", and this
+                // screen has to say so instead of claiming a preset the
+                // watch has left behind.
+                guard setting == .backlightPreset else {
+                    return (setting, model.watchSettingValue(setting))
+                }
+                return (
+                    setting,
+                    BacklightPreset.reported(by: { model.watchSettingValue($0) }, on: board)
+                )
+            }
+        )
+    }
+
+    private func setWatchSetting(_ setting: WatchSetting, _ rawValue: Int) {
+        Task { await model.setWatchSetting(setting, rawValue: rawValue) }
+    }
+
+    /// `board` is the connected watch's, or the remembered one while it is
+    /// away. Nil for a watch neither knows, which hides the rows only some
+    /// boards have.
+    @ViewBuilder
+    private func settingsPage(
+        _ page: WatchSettingsPage,
+        watchSettings: [WatchSetting: Int],
+        board: WatchBoard?,
+        isConnected: Bool
+    ) -> some View {
+        let feedback = model.watchSettings.feedback
+        switch page {
+        case .appearance:
+            AppearanceSettingsContent(
+                watchSettings: watchSettings,
+                board: board,
+                isConnected: isConnected,
+                feedback: feedback,
+                setWatchSetting: setWatchSetting
+            )
+        case .backlight:
+            BacklightSettingsContent(
+                watchSettings: watchSettings,
+                board: board,
+                feedback: feedback,
+                setWatchSetting: setWatchSetting
+            )
+        case .quietTime:
+            QuietTimeSettingsContent(
+                watchSettings: watchSettings,
+                feedback: feedback,
+                setWatchSetting: setWatchSetting
+            )
+        case .quickLaunch:
+            QuickLaunchSettingsContent(
+                assignments: { model.quickLaunchAssignment(for: $0) },
+                applications: model.applications.all,
+                feedback: feedback,
+                setAssignment: { button, assignment in
+                    Task { await model.setQuickLaunch(button, to: assignment) }
+                }
+            )
+        case .music:
+            MusicWatchSettingsContent(
+                watchSettings: watchSettings,
+                board: board,
+                feedback: feedback,
+                setWatchSetting: setWatchSetting
+            )
+        case .health:
+            HealthWatchSettingsContent(
+                activitySettings: model.watchSettings.activity,
+                heartRateSettings: model.watchSettings.heartRate,
+                heartRateZones: model.watchSettings.heartRateZones,
+                bloodOxygenSettings: model.watchSettings.bloodOxygen,
+                board: board,
+                feedback: feedback,
+                setActivitySettings: { settings in
+                    Task { await model.setActivitySettings(settings) }
+                },
+                setHeartRateSettings: { settings in
+                    Task { await model.setHeartRateSettings(settings) }
+                },
+                setHeartRateZones: { preferences in
+                    Task { await model.setHeartRateZones(preferences) }
+                },
+                setBloodOxygenSettings: { settings in
+                    Task { await model.setBloodOxygenSettings(settings) }
+                }
+            )
+        }
+    }
+
     var body: some View {
+        let watch = WatchSummary(watchID: watchID, model: model)
+        let watchSettings = currentWatchSettings(board: watch.board)
         WatchDetailContent(
-            watch: WatchSummary(watchID: watchID, model: model),
+            watch: watch,
             firmwareJournalPhase: model.firmware[watchID].journal?.phase,
             downloadedFirmwareVersion: model.downloadedFirmware(for: watchID)?.versionTag,
             languageName: languageName,
+            backlightSummary: BacklightSettingsContent.summary(of: watchSettings),
+            quietTimeSummary: QuietTimeSettingsContent.summary(of: watchSettings),
+            isReminderAppEnabled: model.timeline.isReminderAppEnabled,
+            settingsFeedback: model.watchSettings.feedback,
             resetFeedback: model.watches.resetFeedback[watchID],
             forgetFeedback: forgetFeedback,
             connectionFeedback: model.connectionFailures[watchID].map { .failure($0.message) },
@@ -32,6 +145,9 @@ struct WatchDetailView: View {
             },
             setAutomaticallyConnects: { enabled in
                 Task { await model.setAutomaticallyConnects(enabled, watchID: watchID) }
+            },
+            setReminderAppEnabled: { isOn in
+                Task { await model.setReminderAppEnabled(isOn) }
             },
             disconnect: { Task { await model.disconnect(watchID: watchID) } },
             reset: { kind in Task { await model.resetWatch(kind, watchID: watchID) } },
@@ -46,7 +162,14 @@ struct WatchDetailView: View {
             },
             firmwareDestination: { FirmwareView(model: model, watchID: watchID) },
             languageDestination: { LanguageView(model: model, watchID: watchID) },
-            settingsDestination: { WatchSettingsView(model: model, watchID: watchID) },
+            settingsDestination: { page in
+                settingsPage(
+                    page,
+                    watchSettings: watchSettings,
+                    board: watch.board,
+                    isConnected: watch.isConnected
+                )
+            },
             diagnosticsDestination: { WatchDiagnosticsView(model: model, watchID: watchID) }
         )
     }
@@ -62,17 +185,22 @@ struct WatchDetailContent<
     var firmwareJournalPhase: FirmwareUpdatePhase?
     var downloadedFirmwareVersion: String?
     var languageName: String?
+    var backlightSummary: LocalizedStringKey
+    var quietTimeSummary: LocalizedStringKey
+    var isReminderAppEnabled: Bool
+    var settingsFeedback: FeatureFeedback? = nil
     var resetFeedback: FeatureFeedback?
     var forgetFeedback: FeatureFeedback? = nil
     var connectionFeedback: FeatureFeedback?
     var connect: () -> Void
     var setAutomaticallyConnects: (Bool) -> Void
+    var setReminderAppEnabled: (Bool) -> Void
     var disconnect: () -> Void
     var reset: (ResetKind) -> Void
     var forget: () -> Void
     @ViewBuilder var firmwareDestination: () -> FirmwareDestination
     @ViewBuilder var languageDestination: () -> LanguageDestination
-    @ViewBuilder var settingsDestination: () -> SettingsDestination
+    @ViewBuilder var settingsDestination: (WatchSettingsPage) -> SettingsDestination
     @ViewBuilder var diagnosticsDestination: () -> DiagnosticsDestination
 
     // A version is a version in any language, so it is not translated.
@@ -164,15 +292,66 @@ struct WatchDetailContent<
                     LabeledContent("Language") { languageSummary }
                 }
                 NavigationLink {
-                    settingsDestination()
-                } label: {
-                    Text("Watch Settings")
-                }
-                NavigationLink {
                     diagnosticsDestination()
                 } label: {
                     Text("Diagnostics")
                 }
+            }
+
+            Section {
+                // Above the rows rather than on the screens they open, so the
+                // reader knows before changing anything that it waits for the
+                // watch.
+                if !watch.isConnected {
+                    Label("Changes are kept and written when the watch connects.", systemImage: "info.circle")
+                        .foregroundStyle(.secondary)
+                }
+                // Not only on the screens these open: a write that fails after
+                // the reader has come back would answer where nobody looks.
+                FeedbackBanner(feedback: settingsFeedback)
+                NavigationLink {
+                    settingsDestination(.appearance)
+                } label: {
+                    Text("Appearance")
+                }
+                NavigationLink {
+                    settingsDestination(.backlight)
+                } label: {
+                    LabeledContent("Backlight") { Text(backlightSummary) }
+                }
+                NavigationLink {
+                    settingsDestination(.quietTime)
+                } label: {
+                    LabeledContent("Quiet Time") { Text(quietTimeSummary) }
+                }
+                NavigationLink {
+                    settingsDestination(.quickLaunch)
+                } label: {
+                    Text("Quick Launch")
+                }
+                NavigationLink {
+                    settingsDestination(.music)
+                } label: {
+                    Text("Music")
+                }
+                NavigationLink {
+                    settingsDestination(.health)
+                } label: {
+                    Text("Health")
+                }
+            } header: {
+                Text("Watch Settings")
+            } footer: {
+                Text("These are the watch's own settings. They are written again whenever it connects, so this is the copy that wins.")
+            }
+
+            Section {
+                Toggle("Reminders App", isOn: Binding(
+                    get: { isReminderAppEnabled },
+                    set: { isOn in setReminderAppEnabled(isOn) }
+                ))
+            } footer: {
+                Text("Turns the watch's own Reminders app on, which is where the reminders added on the Timeline screen appear.")
             }
 
             Section("Connection") {
@@ -272,16 +451,20 @@ struct WatchDetailContent<
             firmwareJournalPhase: nil,
             downloadedFirmwareVersion: nil,
             languageName: "日本語",
+            backlightSummary: BacklightSettingsContent.summary(of: [.backlight: 1]),
+            quietTimeSummary: QuietTimeSettingsContent.summary(of: [.quietTimeWeekdayScheduleEnabled: 1]),
+            isReminderAppEnabled: true,
             resetFeedback: nil,
             connectionFeedback: nil,
             connect: {},
             setAutomaticallyConnects: { _ in },
+            setReminderAppEnabled: { _ in },
             disconnect: {},
             reset: { _ in },
             forget: {},
             firmwareDestination: { EmptyView() },
             languageDestination: { EmptyView() },
-            settingsDestination: { EmptyView() },
+            settingsDestination: { _ in EmptyView() },
             diagnosticsDestination: { EmptyView() }
         )
     }
@@ -294,16 +477,21 @@ struct WatchDetailContent<
             firmwareJournalPhase: .validated,
             downloadedFirmwareVersion: PreviewSamples.firmwareRelease.versionTag,
             languageName: nil,
+            backlightSummary: BacklightSettingsContent.summary(of: [:]),
+            quietTimeSummary: QuietTimeSettingsContent.summary(of: [:]),
+            isReminderAppEnabled: false,
+            settingsFeedback: .failure("Pebble 5209 did not accept the setting."),
             resetFeedback: nil,
             connectionFeedback: .failure("The watch does not expose the expected Pebble connection service."),
             connect: {},
             setAutomaticallyConnects: { _ in },
+            setReminderAppEnabled: { _ in },
             disconnect: {},
             reset: { _ in },
             forget: {},
             firmwareDestination: { EmptyView() },
             languageDestination: { EmptyView() },
-            settingsDestination: { EmptyView() },
+            settingsDestination: { _ in EmptyView() },
             diagnosticsDestination: { EmptyView() }
         )
     }
@@ -316,16 +504,20 @@ struct WatchDetailContent<
             firmwareJournalPhase: nil,
             downloadedFirmwareVersion: nil,
             languageName: nil,
+            backlightSummary: BacklightSettingsContent.summary(of: [:]),
+            quietTimeSummary: QuietTimeSettingsContent.summary(of: [:]),
+            isReminderAppEnabled: false,
             resetFeedback: .progress("The watch is erasing itself. It has forgotten this device, so it cannot reconnect until it is forgotten here too."),
             connectionFeedback: nil,
             connect: {},
             setAutomaticallyConnects: { _ in },
+            setReminderAppEnabled: { _ in },
             disconnect: {},
             reset: { _ in },
             forget: {},
             firmwareDestination: { EmptyView() },
             languageDestination: { EmptyView() },
-            settingsDestination: { EmptyView() },
+            settingsDestination: { _ in EmptyView() },
             diagnosticsDestination: { EmptyView() }
         )
     }
@@ -338,17 +530,21 @@ struct WatchDetailContent<
             firmwareJournalPhase: nil,
             downloadedFirmwareVersion: nil,
             languageName: nil,
+            backlightSummary: BacklightSettingsContent.summary(of: [.backlight: 0]),
+            quietTimeSummary: QuietTimeSettingsContent.summary(of: [.quietTimeManual: 1]),
+            isReminderAppEnabled: true,
             resetFeedback: nil,
             forgetFeedback: .failure("The watch could not be forgotten."),
             connectionFeedback: nil,
             connect: {},
             setAutomaticallyConnects: { _ in },
+            setReminderAppEnabled: { _ in },
             disconnect: {},
             reset: { _ in },
             forget: {},
             firmwareDestination: { EmptyView() },
             languageDestination: { EmptyView() },
-            settingsDestination: { EmptyView() },
+            settingsDestination: { _ in EmptyView() },
             diagnosticsDestination: { EmptyView() }
         )
     }

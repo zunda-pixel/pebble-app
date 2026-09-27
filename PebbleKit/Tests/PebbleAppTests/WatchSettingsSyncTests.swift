@@ -528,18 +528,18 @@ struct WatchBoardSettingsTests {
     }
 }
 
-/// The main list is grouped by hand, and a hand-kept list can silently drop
-/// whatever is added after it was written. Every setting has to be somewhere:
-/// in one of the four groups, or on the Backlight or Quiet Time screen.
+/// The Appearance and Music screens are grouped by hand, and a hand-kept list
+/// can silently drop whatever is added after it was written. Every setting has
+/// to be somewhere: in one of those lists, or on the Backlight or Quiet Time
+/// screen.
 @Suite
 @MainActor
 struct WatchSettingGroupingTests {
-    // On the main actor because the grouping lists live on the view, which is.
+    // On the main actor because the grouping lists live on the views, which are.
     @Test func everySettingHasARowSomewhere() {
-        let grouped = WatchSettingsContent.appearanceSettings
-            + WatchSettingsContent.unitSettings
-            + WatchSettingsContent.musicSettings
-            + WatchSettingsContent.generalSettings
+        let grouped = AppearanceSettingsContent.appearanceSettings
+            + AppearanceSettingsContent.unitSettings
+            + MusicWatchSettingsContent.musicSettings
 
         for setting in WatchSetting.allCases {
             #expect(

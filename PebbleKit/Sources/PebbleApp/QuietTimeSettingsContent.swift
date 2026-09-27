@@ -10,6 +10,20 @@ struct QuietTimeSettingsContent: View {
     var feedback: FeatureFeedback?
     var setWatchSetting: (WatchSetting, Int) -> Void
 
+    /// "On" while switched on by hand, "Scheduled" while only a schedule or
+    /// the calendar could turn it on, "Off" otherwise.
+    static func summary(of watchSettings: [WatchSetting: Int]) -> LocalizedStringKey {
+        func isOn(_ setting: WatchSetting) -> Bool {
+            (watchSettings[setting] ?? setting.defaultRawValue) != 0
+        }
+        if isOn(.quietTimeManual) { return "On" }
+        if isOn(.quietTimeSmart) || isOn(.quietTimeWeekdayScheduleEnabled)
+            || isOn(.quietTimeWeekendScheduleEnabled) {
+            return "Scheduled"
+        }
+        return "Off"
+    }
+
     private func row(_ setting: WatchSetting) -> WatchSettingRow {
         WatchSettingRow(
             setting: setting,

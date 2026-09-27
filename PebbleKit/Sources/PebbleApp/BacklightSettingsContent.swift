@@ -15,6 +15,20 @@ struct BacklightSettingsContent: View {
     var feedback: FeatureFeedback?
     var setWatchSetting: (WatchSetting, Int) -> Void
 
+    /// What the one backlight row says at a glance: "Off" when the backlight
+    /// is off, the preset's name otherwise — the same summary the watch's own
+    /// Display screen puts under its Backlight row (`display.c:666`).
+    static func summary(of watchSettings: [WatchSetting: Int]) -> LocalizedStringKey {
+        guard watchSettings[.backlight] ?? WatchSetting.backlight.defaultRawValue != 0 else {
+            return "Off"
+        }
+        let preset = watchSettings[.backlightPreset]
+            ?? WatchSetting.backlightPreset.defaultRawValue
+        return WatchSetting.backlightPreset.optionTitles.indices.contains(preset)
+            ? WatchSetting.backlightPreset.optionTitles[preset]
+            : "Custom"
+    }
+
     /// The rows below the preset, in the order of `WatchSetting.allCases`.
     ///
     /// The colour is not one of them, although it is a backlight setting: the
@@ -39,8 +53,8 @@ struct BacklightSettingsContent: View {
 
     var body: some View {
         Form {
-            // The same banner the main screen shows: a write these rows caused
-            // should not answer on a screen the reader has left.
+            // The same banner the watch's detail screen shows: a write these
+            // rows caused should not answer on a screen the reader has left.
             if feedback != nil {
                 Section { FeedbackBanner(feedback: feedback) }
             }

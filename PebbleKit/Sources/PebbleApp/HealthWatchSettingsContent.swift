@@ -1,8 +1,8 @@
 import PebbleProtocol
 import SwiftUI
 
-/// The watch's health settings, on a page of their own so the main Watch
-/// Settings screen stays short. Activity tracking and the body metrics it works
+/// The watch's health settings, on a page of their own so the watch's detail
+/// screen stays short. Activity tracking and the body metrics it works
 /// from are on every watch; heart rate and blood oxygen only appear on a watch
 /// whose board carries the sensor.
 struct HealthWatchSettingsContent: View {

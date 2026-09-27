@@ -2,7 +2,7 @@ import PebbleProtocol
 import SwiftUI
 
 /// The watch music app's own display switches, on a page of their own so the
-/// main Watch Settings screen is not a wall of toggles. Each row is one of the
+/// watch's detail screen is not a wall of toggles. Each row is one of the
 /// syncable `WatchSetting`s the firmware keeps for the music app.
 struct MusicWatchSettingsContent: View {
     var watchSettings: [WatchSetting: Int]
@@ -10,13 +10,17 @@ struct MusicWatchSettingsContent: View {
     var feedback: FeatureFeedback?
     var setWatchSetting: (WatchSetting, Int) -> Void
 
+    static let musicSettings: [WatchSetting] = [
+        .musicShowVolumeControls, .musicShowProgressBar, .musicShowAlbumArt,
+    ]
+
     var body: some View {
         Form {
             if feedback != nil {
                 Section { FeedbackBanner(feedback: feedback) }
             }
             Section {
-                ForEach(WatchSettingsContent.musicSettings.filter { $0.isOffered(on: board) }, id: \.self) { setting in
+                ForEach(Self.musicSettings.filter { $0.isOffered(on: board) }, id: \.self) { setting in
                     WatchSettingRow(
                         setting: setting,
                         rawValue: watchSettings[setting] ?? setting.defaultRawValue,
