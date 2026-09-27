@@ -20,6 +20,7 @@ public struct ForwardedNotification: Equatable, Sendable {
     public var subtitle: String?
     public var body: String?
     public var sourceName: String?
+    public var sourceIdentifier: String?
     public var shouldAlert: Bool
     public var actions: [Action]
 
@@ -29,6 +30,7 @@ public struct ForwardedNotification: Equatable, Sendable {
         subtitle: String?,
         body: String?,
         sourceName: String?,
+        sourceIdentifier: String?,
         shouldAlert: Bool,
         actions: [Action]
     ) {
@@ -37,6 +39,7 @@ public struct ForwardedNotification: Equatable, Sendable {
         self.subtitle = subtitle
         self.body = body
         self.sourceName = sourceName
+        self.sourceIdentifier = sourceIdentifier
         self.shouldAlert = shouldAlert
         self.actions = actions
     }
@@ -78,6 +81,7 @@ public enum AccessoryNotificationCodec {
     static let identifierTag: UInt8 = 0x05
     static let alertTag: UInt8 = 0x06
     static let actionTag: UInt8 = 0x07
+    static let sourceIdentifierTag: UInt8 = 0x08
 
     static let textInputFlag: UInt8 = 0x01
 
@@ -130,6 +134,10 @@ public enum AccessoryNotificationCodec {
         append(subtitleTag, text(notification.subtitle, maximumByteCount: 64))
         append(bodyTag, text(notification.body, maximumByteCount: 255))
         append(sourceTag, text(notification.sourceName, maximumByteCount: 64))
+        // Not the length byte's 255: the watch keys the app's notification
+        // preferences by it, and ignores one longer than a settings key
+        // (`SETTINGS_KEY_MAX_LEN`), which leaves the reader no Mute.
+        append(sourceIdentifierTag, text(notification.sourceIdentifier, maximumByteCount: 127))
         append(identifierTag, identifierBytes(notification.identifier))
         append(alertTag, [notification.shouldAlert ? 1 : 0])
         for action in notification.actions.compactMap(actionEntry).prefix(maximumActionCount) {

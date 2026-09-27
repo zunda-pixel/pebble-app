@@ -113,6 +113,7 @@ extension ForwardedNotification {
             subtitle: notification.subtitle,
             body: notification.body?.string,
             sourceName: notification.sourceName,
+            sourceIdentifier: notification.identifier.sourceIdentifier,
             shouldAlert: shouldAlert,
             actions: notification.actions.map { action in
                 let collectsText = if case .textInput = action.type { true } else { false }

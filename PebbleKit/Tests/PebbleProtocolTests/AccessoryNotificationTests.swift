@@ -7,6 +7,7 @@ struct AccessoryNotificationCodecTests {
     private func notification(
         title: String? = "Mia",
         body: String? = "Lunch?",
+        sourceIdentifier: String? = "com.apple.MobileSMS",
         actions: [ForwardedNotification.Action] = []
     ) -> ForwardedNotification {
         ForwardedNotification(
@@ -15,6 +16,7 @@ struct AccessoryNotificationCodecTests {
             subtitle: nil,
             body: body,
             sourceName: "Messages",
+            sourceIdentifier: sourceIdentifier,
             shouldAlert: true,
             actions: actions
         )
@@ -31,9 +33,33 @@ struct AccessoryNotificationCodecTests {
             + [0x01, 3] + Array("Mia".utf8)
             + [0x03, 6] + Array("Lunch?".utf8)
             + [0x04, 8] + Array("Messages".utf8)
+            + [0x08, 19] + Array("com.apple.MobileSMS".utf8)
             + [0x05, 2] + Array("n1".utf8)
             + [0x06, 1, 1]
             + [0x07, 9, 0x01, 1] + Array("r".utf8) + [5] + Array("Reply".utf8))
+    }
+
+    @Test
+    func aNotificationWithNoSourceIdentifierLeavesItsTagOut() {
+        let unnamed = AccessoryNotificationCodec.encode(.present(notification(sourceIdentifier: nil)))
+        let empty = AccessoryNotificationCodec.encode(.present(notification(sourceIdentifier: "")))
+
+        #expect(unnamed == [0x01]
+            + [0x01, 3] + Array("Mia".utf8)
+            + [0x03, 6] + Array("Lunch?".utf8)
+            + [0x04, 8] + Array("Messages".utf8)
+            + [0x05, 2] + Array("n1".utf8)
+            + [0x06, 1, 1])
+        #expect(empty == unnamed)
+    }
+
+    @Test
+    func aSourceIdentifierIsCutToWhatTheWatchCanKeyItsPreferencesBy() {
+        let identifier = "com.example." + String(repeating: "x", count: 200)
+        let bytes = AccessoryNotificationCodec.encode(.present(notification(sourceIdentifier: identifier)))
+
+        // `SETTINGS_KEY_MAX_LEN` in settings_raw_iter.h.
+        #expect(tlvs(bytes).first { $0.tag == 0x08 }?.value == Array(identifier.utf8.prefix(127)))
     }
 
     @Test
