@@ -71,6 +71,69 @@ struct ReconnectPolicyTests {
     }
 
     @Test
+    func aWatchOutOfRangeNeverUsesUpTheHandshakeBudget() {
+        // A connect that no link ever answered is CoreBluetooth waiting for the
+        // watch to come back, not a handshake that failed.
+        let policy = ReconnectPolicy()
+        policy.follow(watch)
+
+        for attempt in 1...(ReconnectPolicy.maximumFailedHandshakes * 4) {
+            policy.beginAutomaticAttempt()
+            #expect(policy.noteDropBeforeSession(), "gave up on attempt \(attempt)")
+        }
+
+        #expect(policy.failedHandshakes == 0)
+    }
+
+    @Test
+    func onlyLinksThatCameUpAndDiedEndTheChase() {
+        let policy = ReconnectPolicy()
+        policy.follow(watch)
+
+        for attempt in 1..<ReconnectPolicy.maximumFailedHandshakes {
+            policy.beginAutomaticAttempt()
+            policy.noteLinkUp()
+            #expect(policy.noteDropBeforeSession(), "gave up on attempt \(attempt)")
+            // Attempts in between that never reached a link change nothing.
+            policy.beginAutomaticAttempt()
+            #expect(policy.noteDropBeforeSession())
+        }
+        policy.beginAutomaticAttempt()
+        policy.noteLinkUp()
+
+        #expect(!policy.noteDropBeforeSession())
+        #expect(policy.failedHandshakes == ReconnectPolicy.maximumFailedHandshakes)
+    }
+
+    @Test
+    func oneLinkIsCountedOnceHoweverOftenItIsReportedDropped() {
+        let policy = ReconnectPolicy()
+        policy.follow(watch)
+        policy.beginAutomaticAttempt()
+        policy.noteLinkUp()
+
+        _ = policy.noteDropBeforeSession()
+        _ = policy.noteDropBeforeSession()
+
+        #expect(policy.failedHandshakes == 1)
+    }
+
+    @Test
+    func aNewAttemptStartsWithoutALink() {
+        let policy = ReconnectPolicy()
+        policy.follow(watch)
+        policy.beginAutomaticAttempt()
+        policy.noteLinkUp()
+
+        policy.beginAutomaticAttempt()
+
+        #expect(!policy.linkCameUp)
+        policy.noteLinkUp()
+        policy.stop()
+        #expect(!policy.linkCameUp)
+    }
+
+    @Test
     func aSessionThatOpensForgivesTheFailuresBeforeIt() {
         // A watch that needed four goes and then worked gets the whole budget
         // again the next time it drops, rather than one.

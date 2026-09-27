@@ -18,6 +18,10 @@ struct PendingNotificationQueue: Equatable, Sendable {
         packets.first
     }
 
+    func count(for centralID: String) -> Int {
+        packets.count(where: { $0.centralID == centralID })
+    }
+
     func holdsPackets(for centralID: String) -> Bool {
         packets.contains { $0.centralID == centralID }
     }

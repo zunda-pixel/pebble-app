@@ -53,6 +53,10 @@ final class ReconnectPolicy {
     /// the reader asked for. The handshake takes a different path for each.
     private(set) var isAutomatic = false
     private(set) var failedHandshakes = 0
+    /// Whether the automatic attempt in flight got as far as a link. Only one
+    /// that did can fail a handshake; a watch that is simply out of range has
+    /// a connect pending and nothing else.
+    private(set) var linkCameUp = false
 
     private var backoff = ReconnectBackoff()
     private var scheduled: Task<Void, Never>?
@@ -62,6 +66,7 @@ final class ReconnectPolicy {
     func follow(_ watch: WatchConnectionTarget) {
         self.watch = watch
         isAutomatic = false
+        linkCameUp = false
         backoff.reset()
         failedHandshakes = 0
     }
@@ -72,6 +77,7 @@ final class ReconnectPolicy {
         cancelSchedule()
         watch = nil
         isAutomatic = false
+        linkCameUp = false
         backoff.reset()
         failedHandshakes = 0
     }
@@ -88,12 +94,32 @@ final class ReconnectPolicy {
         return failedHandshakes < Self.maximumFailedHandshakes
     }
 
+    /// A drop, or an abandoned attempt, before any session opened. False when
+    /// enough links have died in the handshake to stop.
+    ///
+    /// Only an attempt whose link came up is counted. Counting every drop let
+    /// a watch left in another room use up the budget on connects that were
+    /// never answered, and the reader was then told its links kept dying in
+    /// the handshake when none had come up at all.
+    func noteDropBeforeSession() -> Bool {
+        guard linkCameUp else { return true }
+        linkCameUp = false
+        return noteHandshakeFailed()
+    }
+
     func isFollowingOrIdle(_ watchID: WatchID) -> Bool {
         watch == nil || watch?.id == watchID
     }
 
     func beginAutomaticAttempt() {
         isAutomatic = true
+        linkCameUp = false
+    }
+
+    /// The link for the attempt in flight is up: from here to the watch's
+    /// version answer is the handshake.
+    func noteLinkUp() {
+        linkCameUp = true
     }
 
     /// Waits out the next delay and then runs `attempt`, replacing any attempt

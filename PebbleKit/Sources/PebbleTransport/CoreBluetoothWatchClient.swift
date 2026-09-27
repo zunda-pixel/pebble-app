@@ -100,6 +100,9 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     var isInstallingFirmware = false
     var pendingInstallCookie: UInt32?
     let transferReply = PendingReply<UInt32>()
+    /// Whose turn it is to transfer. The same turn-taking as BlobDB's, for the
+    /// same reason.
+    let transferQueue = BlobDBQueue()
     var nextBlobDBToken: UInt16 = 1
     var pendingBlobDBToken: UInt16?
     var acceptedBlobDBStatuses: [BlobDBStatus] = []
@@ -300,10 +303,20 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
             ?? (connectedPeripheral?.watchID == watch.id ? connectedPeripheral : nil) else {
             return
         }
-        if peripheral.state != .disconnected {
+        switch peripheral.state {
+        case .connected, .disconnecting:
             // Only expect a disconnect callback when a link actually exists;
             // a stale marker would suppress reconnection after a later drop.
             reconnects.expectDisconnect(of: watch.id)
+        case .connecting:
+            // A pending connect being withdrawn may or may not come back as a
+            // disconnect, so no marker is left to go stale. The chase has
+            // already stopped above, which is all a callback would do.
+            if connectionContinuation == nil, pendingWatch?.id == watch.id {
+                pendingWatch = nil
+            }
+        default:
+            break
         }
         stopHealthChecks()
         cancelLink(peripheral, reason: "the app asked to disconnect")
@@ -514,9 +527,9 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         failWorkInFlight(error)
     }
 
-    func model(from advertisementData: [String: Any]) -> WatchModel? {
+    func advertisedWatch(from advertisementData: [String: Any]) -> WatchAdvertisement.AdvertisedWatch? {
         let serviceUUIDs = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] ?? []
-        return WatchAdvertisement.model(
+        return WatchAdvertisement.watch(
             advertisesPebbleService: serviceUUIDs.contains(Self.ppogService)
                 || serviceUUIDs.contains(Self.pairingService),
             localName: advertisementData[CBAdvertisementDataLocalNameKey] as? String,
@@ -955,6 +968,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         failTransfer(error)
         failBlobDBOperation(error)
         blobDBQueue.failAll(error)
+        transferQueue.failAll(error)
         failPulls(error)
         failAppReorder(error)
         finishFirmwareControl(throwing: error)
@@ -1019,14 +1033,28 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         reconnects.beginAutomaticAttempt()
         peripheral.delegate = self
         eventContinuation?.yield(.reconnecting(watchID: watch.id))
+        // No deadline yet. A watch that is out of range leaves this connect
+        // pending, which is CoreBluetooth waiting for it to come back — the
+        // right thing. A deadline here cancelled that wait every thirty
+        // seconds, counted each cancel as a failed handshake, and gave up on
+        // a watch merely left in another room. The handshake's own deadline
+        // is armed in `didConnect`, once there is a link to time.
+        connectionTimeoutTask?.cancel()
+        connectionTimeoutTask = nil
         centralManager.connect(peripheral, options: connectOptions(for: peripheral))
+    }
 
+    /// The deadline for an automatic attempt's handshake, from the link coming
+    /// up to the watch's version answer.
+    func armReconnectHandshakeDeadline(for peripheral: CBPeripheral) {
         connectionTimeoutTask?.cancel()
         connectionTimeoutTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(30))
             guard !Task.isCancelled else {
                 return
             }
+            // The link is up, so cancelling it comes back as a disconnect,
+            // and that is where the failure is counted.
             self?.cancelLink(peripheral, reason: "the reconnect handshake stalled for 30s")
         }
     }

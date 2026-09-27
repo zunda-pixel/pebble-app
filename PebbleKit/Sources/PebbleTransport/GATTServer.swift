@@ -159,11 +159,26 @@ public final class GATTServer: NSObject {
             )
         }
         manager.removeAllServices()
+        forgetPublishedDatabase()
+        start()
+    }
+
+    /// The local GATT database is empty: removed on purpose by `republish`, or
+    /// cleared by iOS, which drops every published service when the
+    /// peripheral manager leaves `poweredOn`. Believing the service survived a
+    /// power cycle meant `start()` never re-added it, and a subscription left
+    /// from before made the next link look subscribed, so the watchdog that
+    /// republishes for a watch that never subscribes stood down as well.
+    ///
+    /// The registered clients are not told their watch unsubscribed: the
+    /// central manager leaves `poweredOn` at the same moment and tears each
+    /// link down itself, and an abort from here would ask a central that is
+    /// not powered on to cancel a connection.
+    func forgetPublishedDatabase() {
+        isServicePublished = false
+        dataCharacteristic = nil
         subscribedCentrals.removeAll()
         pendingNotifications.removeAll()
-        dataCharacteristic = nil
-        isServicePublished = false
-        start()
     }
 
     func maximumPacketSize(centralID: String) -> Int {
@@ -178,10 +193,14 @@ public final class GATTServer: NSObject {
     /// what turned a dead session into thirty seconds of protocol
     /// retransmissions and then a bare timeout: the protocol's own window is at
     /// most 25 packets, so anything past that is not flow control.
+    ///
+    /// Counted per watch. One total across every subscriber let a watch that
+    /// had stopped reading fill it, and the healthy watch beside it was then
+    /// refused a send and had its link dropped for the other's silence.
     static let maximumBacklog = 32
 
-    var isBacklogged: Bool {
-        pendingNotifications.count >= Self.maximumBacklog
+    static func isBacklogged(_ queue: PendingNotificationQueue, for centralID: String) -> Bool {
+        queue.count(for: centralID) >= maximumBacklog
     }
 
     @discardableResult
@@ -191,7 +210,7 @@ public final class GATTServer: NSObject {
               let central = subscribedCentrals[centralID] else {
             return false
         }
-        guard !isBacklogged else {
+        guard !Self.isBacklogged(pendingNotifications, for: centralID) else {
             Task {
                 await DiagnosticLog.shared.record(
                     .warning,
@@ -235,6 +254,9 @@ public final class GATTServer: NSObject {
                 }
                 continue
             }
+            // Stopping here rather than trying the next watch's packet: a
+            // refusal means the manager's one transmit queue is full, not this
+            // watch's, so every other packet would be refused too.
             guard manager.updateValue(
                 pending.value,
                 for: dataCharacteristic,
@@ -250,6 +272,7 @@ public final class GATTServer: NSObject {
 extension GATTServer: CBPeripheralManagerDelegate {
     public func peripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
         guard peripheral.state == .poweredOn else {
+            forgetPublishedDatabase()
             return
         }
         // A service iOS restored from the previous launch is in the database, but no

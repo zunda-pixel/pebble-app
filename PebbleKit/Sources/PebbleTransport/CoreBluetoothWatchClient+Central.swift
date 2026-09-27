@@ -46,7 +46,7 @@ extension CoreBluetoothWatchClient: CBCentralManagerDelegate {
         advertisementData: [String: Any],
         rssi RSSI: NSNumber
     ) {
-        guard let model = model(from: advertisementData) else {
+        guard let advertised = advertisedWatch(from: advertisementData) else {
             return
         }
 
@@ -55,8 +55,8 @@ extension CoreBluetoothWatchClient: CBCentralManagerDelegate {
         discoveredPeripherals[id] = peripheral
         scanResults[id] = DiscoveredWatch(
             id: id,
-            name: advertisedName ?? peripheral.name ?? model.displayName,
-            model: model,
+            name: advertisedName ?? peripheral.name ?? advertised.model?.displayName ?? "Pebble",
+            model: advertised.model,
             signalStrength: RSSI.intValue
         )
     }
@@ -69,6 +69,10 @@ extension CoreBluetoothWatchClient: CBCentralManagerDelegate {
             return
         }
         setup.reset()
+        if reconnects.isAutomatic, connectionContinuation == nil {
+            reconnects.noteLinkUp()
+            armReconnectHandshakeDeadline(for: peripheral)
+        }
         // The link is up. Everything from here to the watch's version answer —
         // discovering services, pairing if it is not bonded, opening the PPoG
         // transport — is the handshake, and on a real watch it is where the
@@ -159,9 +163,9 @@ extension CoreBluetoothWatchClient: CBCentralManagerDelegate {
         if (wasConnected || wasAutomatic), let watchToReconnect {
             if wasConnected {
                 reconnect(to: watchToReconnect, using: peripheral)
-            } else if reconnects.noteHandshakeFailed() {
-                // The link came up and died before a session: worth another go,
-                // but not forever.
+            } else if reconnects.noteDropBeforeSession() {
+                // Worth another go, but not forever: only a link that came up
+                // and died before a session counts against the budget.
                 scheduleReconnect(to: watchToReconnect, using: peripheral)
             } else {
                 giveUpReconnecting(to: watchToReconnect)

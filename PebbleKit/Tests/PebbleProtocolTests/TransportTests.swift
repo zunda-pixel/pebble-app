@@ -311,11 +311,11 @@ struct TransportTests {
         manufacturerData.append(contentsOf: Array("EMERY1234567".utf8.prefix(12)))
         manufacturerData.append(contentsOf: [18, 0x00, 5, 1, 0, 0])
 
-        #expect(WatchAdvertisement.model(
+        #expect(WatchAdvertisement.watch(
             advertisesPebbleService: false,
             localName: "Pebble 1A2B",
             manufacturerData: manufacturerData
-        ) == .pebbleTime2)
+        )?.model == .pebbleTime2)
     }
 
     @Test
@@ -325,17 +325,76 @@ struct TransportTests {
         var manufacturerData: [UInt8] = [0xEA, 0x0E, 0x00]
         manufacturerData.append(contentsOf: Array("GABBRO123456".utf8.prefix(12)))
 
-        #expect(WatchAdvertisement.model(
+        #expect(WatchAdvertisement.watch(
             advertisesPebbleService: false,
             localName: "Pebble 1A2B",
             manufacturerData: manufacturerData
         ) != nil)
         // The pairing service alone is enough, without any manufacturer data.
-        #expect(WatchAdvertisement.model(
+        #expect(WatchAdvertisement.watch(
             advertisesPebbleService: true,
             localName: "Pebble 1A2B",
             manufacturerData: []
         ) != nil)
+    }
+
+    @Test
+    func advertisementLeavesTheModelUnknownWhenNothingSaysWhichItIs() {
+        // Neither an extended record nor a name that names a model: the watch is
+        // listed, and its model is left for the version response to settle.
+        var manufacturerData: [UInt8] = [0xEA, 0x0E, 0x00]
+        manufacturerData.append(contentsOf: Array("GABBRO123456".utf8.prefix(12)))
+
+        let fromManufacturerData = WatchAdvertisement.watch(
+            advertisesPebbleService: false,
+            localName: "Pebble 1A2B",
+            manufacturerData: manufacturerData
+        )
+        #expect(fromManufacturerData != nil)
+        #expect(fromManufacturerData?.model == nil)
+
+        let fromService = WatchAdvertisement.watch(
+            advertisesPebbleService: true,
+            localName: nil,
+            manufacturerData: []
+        )
+        #expect(fromService != nil)
+        #expect(fromService?.model == nil)
+    }
+
+    @Test
+    func advertisementFallsBackToTheModelItsNameGives() {
+        #expect(WatchAdvertisement.watch(
+            advertisesPebbleService: true,
+            localName: "Pebble Round 2 1A2B",
+            manufacturerData: []
+        )?.model == .pebbleRound2)
+        // Platform 0 is the watch not saying, so the name is still asked.
+        var manufacturerData: [UInt8] = [0x54, 0x01, 0x00]
+        manufacturerData.append(contentsOf: Array("ASTERIX12345".utf8.prefix(12)))
+        manufacturerData.append(contentsOf: [0, 0x00, 5, 1, 0, 0])
+        #expect(WatchAdvertisement.watch(
+            advertisesPebbleService: false,
+            localName: "Pebble 2 Duo 1A2B",
+            manufacturerData: manufacturerData
+        )?.model == .pebble2Duo)
+    }
+
+    @Test
+    func pendingNotificationsAreCountedPerWatch() {
+        // One stalled watch filling the backlog must not make a healthy one look
+        // backlogged: its link was dropped for the other's silence.
+        var queue = PendingNotificationQueue()
+        for _ in 0..<GATTServer.maximumBacklog {
+            queue.append(Data([1]), for: "stalled-watch")
+        }
+        queue.append(Data([2]), for: "healthy-watch")
+
+        #expect(queue.count(for: "stalled-watch") == GATTServer.maximumBacklog)
+        #expect(queue.count(for: "healthy-watch") == 1)
+        #expect(GATTServer.isBacklogged(queue, for: "stalled-watch"))
+        #expect(!GATTServer.isBacklogged(queue, for: "healthy-watch"))
+        #expect(!GATTServer.isBacklogged(queue, for: "unknown-watch"))
     }
 
     @Test
@@ -344,13 +403,13 @@ struct TransportTests {
         chalkWatch.append(contentsOf: Array("CHALK1234567".utf8.prefix(12)))
         chalkWatch.append(contentsOf: [11, 0x00, 3, 0, 0, 0])
         // Platform 11 is a Pebble Time Round, which this app cannot drive.
-        #expect(WatchAdvertisement.model(
+        #expect(WatchAdvertisement.watch(
             advertisesPebbleService: false,
             localName: "Pebble Time Round 1A2B",
             manufacturerData: chalkWatch
         ) == nil)
 
-        #expect(WatchAdvertisement.model(
+        #expect(WatchAdvertisement.watch(
             advertisesPebbleService: false,
             localName: "Someone's Headphones",
             manufacturerData: [0x4C, 0x00, 0x01, 0x02]

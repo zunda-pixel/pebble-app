@@ -17,20 +17,26 @@ public final class QEMUWatchClient: WatchClient {
     private var frameContinuation: AsyncStream<PebbleProtocolFrame>.Continuation?
     private var eventContinuation: AsyncStream<WatchClientEvent>.Continuation?
     private var openContinuation: CheckedContinuation<Void, any Error>?
-    private var versionContinuation: CheckedContinuation<WatchVersionInformation, any Error>?
-    private var operationContinuation: CheckedContinuation<Void, any Error>?
-    private var operationTimeoutTask: Task<Void, Never>?
+    // One reply per endpoint, and a queue in front of each that takes turns,
+    // as on the Bluetooth transport. A single shared continuation made a
+    // BlobDB write, an app message, a reorder and a transfer refuse one
+    // another, when they are unrelated features that only need to wait.
+    private let versionReply = PendingReply<WatchVersionInformation>()
+    private let blobDBReply = PendingReply<Void>()
+    private let blobDBQueue = BlobDBQueue()
     private var pendingBlobToken: UInt16?
     private var nextBlobToken: UInt16 = 1
     private var expectedBlobStatuses: [BlobDBStatus] = []
-    private var waitingForReorder = false
+    private let appReorderReply = PendingReply<Void>()
+    private let transferReply = PendingReply<UInt32>()
+    private let transferQueue = BlobDBQueue()
     private var transferSession: PutBytesTransferSession?
-    private var completedTransferCookie: UInt32?
+    private var transferCookie: UInt32?
+    private let firmwareReply = PendingReply<Void>()
     private var waitingForFirmwareStart = false
     private var isInstallingFirmware = false
     private var pendingInstallCookie: UInt32?
-    private var nextAppMessageTransactionID: UInt8 = 0
-    private var pendingAppMessageTransactionID: UInt8?
+    private let appMessages = AppMessageQueue()
     private var reconnectWatch: WatchConnectionTarget?
     private var connectedWatch: ConnectedWatch?
     private var reconnectTask: Task<Void, Never>?
@@ -40,6 +46,10 @@ public final class QEMUWatchClient: WatchClient {
     public init(host: String = "127.0.0.1", port: UInt16 = 12_344) {
         self.host = NWEndpoint.Host(host)
         self.port = NWEndpoint.Port(rawValue: port) ?? 12_344
+        appMessages.send = { [weak self] data in
+            guard let self else { throw WatchConnectionError.disconnected }
+            try write(AppMessageCodec.pushFrame(data))
+        }
     }
 
     public func scan() async throws -> [DiscoveredWatch] {
@@ -93,20 +103,8 @@ public final class QEMUWatchClient: WatchClient {
             // together and the emulator's connect looks instantaneous.
             reportingPhase(.linkOpen)
             reportingPhase(.transportOpen)
-            let information = try await withCheckedThrowingContinuation { continuation in
-                versionContinuation = continuation
-                Task {
-                    do {
-                        try await send(WatchVersionCodec.requestFrame())
-                    } catch {
-                        finishVersion(throwing: error)
-                    }
-                }
-                operationTimeoutTask = Task { [weak self] in
-                    try? await Task.sleep(for: .seconds(10))
-                    guard !Task.isCancelled else { return }
-                    self?.finishVersion(throwing: WatchConnectionError.connectionTimedOut)
-                }
+            let information = try await versionReply.wait(timeout: .seconds(10)) {
+                try write(WatchVersionCodec.requestFrame())
             }
             // Said out loud, as the Bluetooth transport does. It said nothing here,
             // which is how a watch arriving with no board and no capabilities went
@@ -130,9 +128,11 @@ public final class QEMUWatchClient: WatchClient {
                 version: information
             )
             connectedWatch = watch
+            appMessages.startNextIfPossible()
             return watch
         } catch {
             discardConnection()
+            failWorkInFlight(error)
             throw error
         }
     }
@@ -144,12 +144,12 @@ public final class QEMUWatchClient: WatchClient {
         discardConnection()
         connectedWatch = nil
         reconnectWatch = nil
-        failOperation(WatchConnectionError.disconnected)
+        failWorkInFlight(WatchConnectionError.disconnected)
     }
 
-    public func send(_ frame: PebbleProtocolFrame) async throws {
-        guard let connection else { throw WatchConnectionError.disconnected }
-        await DiagnosticLog.shared.recordFrame(direction: "out", frame: frame)
+    /// The emulator's framing around one Pebble Protocol frame: protocol 1 is
+    /// the protocol itself, and the length is the frame's.
+    private static func packet(for frame: PebbleProtocolFrame) throws -> [UInt8] {
         let frameBytes = try frame.encoded()
         guard frameBytes.count <= 2_048 else { throw QEMUTransportError.messageTooLarge }
         var bytes: [UInt8] = [0xFE, 0xED, 0x00, 0x01]
@@ -157,6 +157,27 @@ public final class QEMUWatchClient: WatchClient {
         bytes.append(UInt8(frameBytes.count & 0xFF))
         bytes.append(contentsOf: frameBytes)
         bytes.append(contentsOf: [0xBE, 0xEF])
+        return bytes
+    }
+
+    /// Puts a frame on the socket without waiting for it to leave, for a reply
+    /// whose request has to go out while its continuation is being stored. A
+    /// socket that cannot take it has failed, and is handled as one.
+    private func write(_ frame: PebbleProtocolFrame) throws {
+        guard let connection else { throw WatchConnectionError.disconnected }
+        let bytes = try Self.packet(for: frame)
+        Task { await DiagnosticLog.shared.recordFrame(direction: "out", frame: frame) }
+        let generation = connectionGeneration
+        connection.send(content: Data(bytes), completion: .contentProcessed { [weak self] error in
+            guard let error else { return }
+            Task { @MainActor in self?.handleConnectionState(.failed(error), from: generation) }
+        })
+    }
+
+    public func send(_ frame: PebbleProtocolFrame) async throws {
+        guard let connection else { throw WatchConnectionError.disconnected }
+        await DiagnosticLog.shared.recordFrame(direction: "out", frame: frame)
+        let bytes = try Self.packet(for: frame)
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
             connection.send(content: Data(bytes), completion: .contentProcessed { error in
                 if let error {
@@ -187,9 +208,13 @@ public final class QEMUWatchClient: WatchClient {
     }
 
     public func reorderApplications(_ applicationIDs: [UUID]) async throws {
-        guard operationContinuation == nil else { throw AppReorderClientError.operationAlreadyInProgress }
-        waitingForReorder = true
-        try await performOperation(frame: AppReorderCodec.frame(applicationIDs: applicationIDs))
+        guard connection != nil else { throw WatchConnectionError.disconnected }
+        guard !appReorderReply.isWaiting else {
+            throw AppReorderClientError.operationAlreadyInProgress
+        }
+        try await appReorderReply.wait(timeout: .seconds(20)) {
+            try write(AppReorderCodec.frame(applicationIDs: applicationIDs))
+        }
     }
 
     public func respondToAppFetch(with status: AppFetchResponseStatus) async throws {
@@ -197,15 +222,8 @@ public final class QEMUWatchClient: WatchClient {
     }
 
     public func sendAppMessage(applicationID: UUID, tuples: [AppMessageTuple]) async throws {
-        guard operationContinuation == nil else { throw QEMUTransportError.operationAlreadyInProgress }
-        let transactionID = nextAppMessageTransactionID
-        nextAppMessageTransactionID &+= 1
-        pendingAppMessageTransactionID = transactionID
-        try await performOperation(frame: try AppMessageCodec.pushFrame(AppMessageData(
-            transactionID: transactionID,
-            applicationID: applicationID,
-            tuples: tuples
-        )), timeout: .seconds(10))
+        guard connection != nil else { throw WatchConnectionError.disconnected }
+        try await appMessages.enqueue(applicationID: applicationID, tuples: tuples)
     }
 
     public func respondToAppMessage(transactionID: UInt8, acknowledged: Bool) async throws {
@@ -262,17 +280,7 @@ public final class QEMUWatchClient: WatchClient {
         objectType: PutBytesObjectType,
         appBankID: UInt32
     ) async throws {
-        completedTransferCookie = nil
-        guard operationContinuation == nil else { throw PutBytesClientError.transferAlreadyInProgress }
-        var session = PutBytesTransferSession(
-            bytes: bytes,
-            objectType: objectType,
-            appBankID: appBankID
-        )
-        let first = try session.start()
-        transferSession = session
-        guard case .send(let frame) = first else { throw PutBytesTransferError.invalidState }
-        try await performOperation(frame: frame, timeout: .seconds(20))
+        try await transferObject(bytes, objectType: objectType, appBankID: appBankID)
     }
 
     public func installFirmware(_ package: PBZFirmwarePackage) async throws {
@@ -283,60 +291,186 @@ public final class QEMUWatchClient: WatchClient {
         }
         isInstallingFirmware = true
         defer { isInstallingFirmware = false }
+        // One turn for the whole update rather than one per transfer: an app
+        // transfer let in between the firmware and its resources would run on
+        // a watch in the middle of replacing its firmware.
+        try await transferQueue.begin()
+        defer { transferQueue.finish() }
         let total = package.firmware.count + (package.resources?.count ?? 0)
         guard let byteCount = UInt32(exactly: total) else { throw PutBytesTransferError.invalidConfiguration }
-        waitingForFirmwareStart = true
-        try await performOperation(frame: SystemMessageCodec.firmwareUpdateStartFrame(bytesToSend: byteCount), timeout: .seconds(10))
+        try await sendFirmwareControl(
+            SystemMessageCodec.firmwareUpdateStartFrame(bytesToSend: byteCount),
+            waitingForStart: true
+        )
         // Bank 0, the way the Bluetooth transport and the official app send
         // it: `put_bytes.c` uses the index only to name app and resource bank
         // files, and `ObjectFirmware` writes to the scratch region whatever is
         // here. The slot chooses which manifest entry to send, never a bank —
         // and a slot number past MAX_APP_BANKS would be refused outright.
-        try await installApplicationObject([UInt8](package.firmware), objectType: package.manifest.firmware.type == "recovery" ? .recovery : .firmware, appBankID: 0)
-        guard let firmwareCookie = completedTransferCookie else { throw PutBytesTransferError.invalidState }
+        let firmwareCookie = try await transferObjectHoldingTheTurn(
+            [UInt8](package.firmware),
+            objectType: package.manifest.firmware.objectType,
+            appBankID: 0
+        )
         var cookies = [firmwareCookie]
         if let resources = package.resources {
-            try await installApplicationObject([UInt8](resources), objectType: .systemResource, appBankID: 0)
-            guard let resourceCookie = completedTransferCookie else { throw PutBytesTransferError.invalidState }
-            cookies.append(resourceCookie)
+            cookies.append(try await transferObjectHoldingTheTurn(
+                [UInt8](resources),
+                objectType: .systemResource,
+                appBankID: 0
+            ))
         }
         for cookie in cookies {
             pendingInstallCookie = cookie
-            try await performOperation(frame: PutBytesCodec.installFrame(cookie: cookie), timeout: .seconds(10))
+            try await sendFirmwareControl(PutBytesCodec.installFrame(cookie: cookie), waitingForStart: false)
         }
         try await send(SystemMessageCodec.firmwareUpdateCompleteFrame())
     }
 
+    /// Takes its turn behind any transfer already in flight: the emulator,
+    /// like the watch, runs one put-bytes transfer at a time.
+    @discardableResult
+    private func transferObject(
+        _ bytes: [UInt8],
+        objectType: PutBytesObjectType,
+        appBankID: UInt32
+    ) async throws -> UInt32 {
+        try await transferQueue.begin()
+        defer { transferQueue.finish() }
+        return try await transferObjectHoldingTheTurn(bytes, objectType: objectType, appBankID: appBankID)
+    }
+
+    /// For a caller already holding `transferQueue`'s turn.
+    private func transferObjectHoldingTheTurn(
+        _ bytes: [UInt8],
+        objectType: PutBytesObjectType,
+        appBankID: UInt32
+    ) async throws -> UInt32 {
+        guard connection != nil else { throw WatchConnectionError.disconnected }
+        guard transferSession == nil else { throw PutBytesClientError.transferAlreadyInProgress }
+        var session = PutBytesTransferSession(
+            bytes: bytes,
+            objectType: objectType,
+            appBankID: appBankID
+        )
+        let first = try session.start()
+        transferSession = session
+        do {
+            return try await transferReply.wait(timeout: .seconds(20)) {
+                try handleTransferActions([first])
+            }
+        } catch {
+            abandonTransfer()
+            throw error
+        }
+    }
+
+    /// Clears a transfer whose reply settled without passing through
+    /// `.finished` or `failTransfer`: the deadline, or a chunk that could not
+    /// be sent. The watch would otherwise hold it open until `PUT_TIMEOUT_MS`
+    /// (`services/put_bytes/put_bytes.c`) and refuse the next init meanwhile.
+    private func abandonTransfer() {
+        guard transferSession != nil, !transferReply.isWaiting else { return }
+        if let transferCookie {
+            try? write(PutBytesCodec.abortFrame(cookie: transferCookie))
+        }
+        transferSession = nil
+        transferCookie = nil
+    }
+
+    private func handleTransferActions(_ actions: [PutBytesTransferAction]) throws {
+        for action in actions {
+            switch action {
+            case .send(let frame):
+                try write(frame)
+            case .progress(let progress):
+                eventContinuation?.yield(.transferProgress(progress))
+            case .finished:
+                let cookie = transferSession?.completedCookie
+                transferSession = nil
+                transferCookie = nil
+                if let cookie {
+                    transferReply.finish(cookie)
+                } else {
+                    transferReply.fail(PutBytesTransferError.invalidState)
+                }
+            }
+        }
+    }
+
+    private func processPutBytesResponse(_ frame: PebbleProtocolFrame) throws {
+        guard var session = transferSession else { return }
+        let response = try PutBytesCodec.decodeResponse(frame)
+        do {
+            let actions = try session.receive(response)
+            transferSession = session
+            transferCookie = response.cookie
+            try handleTransferActions(actions)
+            // Each acknowledged chunk puts the deadline back: only silence
+            // means a transfer has stopped.
+            if transferSession != nil {
+                transferReply.extendDeadline(.seconds(20))
+            }
+        } catch {
+            try? write(PutBytesCodec.abortFrame(cookie: response.cookie))
+            failTransfer(error)
+        }
+    }
+
+    private func failTransfer(_ error: any Error) {
+        transferSession = nil
+        transferCookie = nil
+        transferReply.fail(error)
+    }
+
+    private func sendFirmwareControl(_ frame: PebbleProtocolFrame, waitingForStart: Bool) async throws {
+        guard connection != nil else { throw WatchConnectionError.disconnected }
+        guard !firmwareReply.isWaiting else {
+            throw PutBytesClientError.firmwareUpdateAlreadyInProgress
+        }
+        waitingForFirmwareStart = waitingForStart
+        do {
+            try await firmwareReply.wait(timeout: .seconds(10)) {
+                try write(frame)
+            }
+        } catch {
+            if !firmwareReply.isWaiting {
+                waitingForFirmwareStart = false
+                pendingInstallCookie = nil
+            }
+            throw error
+        }
+    }
+
+    private func finishFirmwareControl(throwing error: (any Error)? = nil) {
+        waitingForFirmwareStart = false
+        pendingInstallCookie = nil
+        if let error { firmwareReply.fail(error) } else { firmwareReply.finish() }
+    }
+
     private func performBlobOperation(_ write: BlobDBWrite) async throws {
-        guard operationContinuation == nil else { throw BlobDBClientError.operationAlreadyInProgress }
+        // Callers take turns rather than being turned away, as on the
+        // Bluetooth transport.
+        try await blobDBQueue.begin()
+        defer { blobDBQueue.finish() }
+        guard connection != nil else { throw WatchConnectionError.disconnected }
         let token = nextBlobToken
         nextBlobToken &+= 1
         pendingBlobToken = token
         expectedBlobStatuses = write.acceptedStatuses
-        try await performOperation(frame: try write.makeFrame(token))
+        defer {
+            pendingBlobToken = nil
+            expectedBlobStatuses = []
+        }
+        try await blobDBReply.wait(timeout: .seconds(20)) {
+            try self.write(try write.makeFrame(token))
+        }
     }
 
-    private func performOperation(
-        frame: PebbleProtocolFrame,
-        timeout: Duration = .seconds(20)
-    ) async throws {
-        // Every caller guards this too, in the error its own API documents. The
-        // guard belongs here as well: overwriting the continuation would leave
-        // the first caller waiting on a reply that goes to the second.
-        guard operationContinuation == nil else {
-            throw QEMUTransportError.operationAlreadyInProgress
-        }
-        try await withCheckedThrowingContinuation { continuation in
-            operationContinuation = continuation
-            Task {
-                do { try await send(frame) } catch { failOperation(error) }
-            }
-            operationTimeoutTask = Task { [weak self] in
-                try? await Task.sleep(for: timeout)
-                guard !Task.isCancelled else { return }
-                self?.failOperation(WatchConnectionError.connectionTimedOut)
-            }
-        }
+    private func failBlobOperation(_ error: any Error) {
+        pendingBlobToken = nil
+        expectedBlobStatuses = []
+        blobDBReply.fail(error)
     }
 
     private func handleConnectionState(_ state: NWConnection.State, from generation: Int) {
@@ -351,8 +485,7 @@ public final class QEMUWatchClient: WatchClient {
             let shouldReconnect = (connectedWatch != nil || reconnectTask != nil) && !isManualDisconnect
             openContinuation?.resume(throwing: error)
             openContinuation = nil
-            finishVersion(throwing: error)
-            failOperation(error)
+            failWorkInFlight(error)
             discardConnection()
             connectedWatch = nil
             if shouldReconnect {
@@ -468,10 +601,8 @@ public final class QEMUWatchClient: WatchClient {
                 try process(frame)
             } catch {
                 recordUnreadable(error, endpoint: frame.endpoint)
-                if frame.endpoint == WatchVersionCodec.endpoint, awaited {
-                    finishVersion(throwing: error)
-                } else if awaited {
-                    failOperation(error)
+                if awaited {
+                    failAwaitedReply(on: frame.endpoint, error)
                 }
             }
             frameContinuation?.yield(frame)
@@ -480,13 +611,32 @@ public final class QEMUWatchClient: WatchClient {
 
     private func isAwaitedReply(_ frame: PebbleProtocolFrame) -> Bool {
         switch frame.endpoint {
-        case WatchVersionCodec.endpoint: versionContinuation != nil
+        case WatchVersionCodec.endpoint: versionReply.isWaiting
         case BlobDBCodec.endpoint: pendingBlobToken != nil
-        case AppReorderCodec.endpoint: waitingForReorder
+        case AppReorderCodec.endpoint: appReorderReply.isWaiting
         case PutBytesCodec.endpoint: transferSession != nil || pendingInstallCookie != nil
         case SystemMessageCodec.endpoint: waitingForFirmwareStart
-        case AppMessageCodec.endpoint: pendingAppMessageTransactionID != nil
+        case AppMessageCodec.endpoint: appMessages.outstandingTransactionID != nil
         default: false
+        }
+    }
+
+    /// Fails only the request whose reply could not be read. The rest are
+    /// answered on endpoints of their own and are still coming.
+    private func failAwaitedReply(on endpoint: UInt16, _ error: any Error) {
+        switch endpoint {
+        case WatchVersionCodec.endpoint: versionReply.fail(error)
+        case BlobDBCodec.endpoint: failBlobOperation(error)
+        case AppReorderCodec.endpoint: appReorderReply.fail(error)
+        case PutBytesCodec.endpoint:
+            if transferSession != nil {
+                failTransfer(error)
+            } else {
+                finishFirmwareControl(throwing: error)
+            }
+        case SystemMessageCodec.endpoint: finishFirmwareControl(throwing: error)
+        case AppMessageCodec.endpoint: appMessages.finishActive(throwing: error)
+        default: break
         }
     }
 
@@ -504,8 +654,8 @@ public final class QEMUWatchClient: WatchClient {
 
     private func process(_ frame: PebbleProtocolFrame) throws {
         Task { await DiagnosticLog.shared.recordFrame(direction: "in", frame: frame) }
-        if frame.endpoint == WatchVersionCodec.endpoint, versionContinuation != nil {
-            finishVersion(returning: try WatchVersionCodec.decode(frame))
+        if frame.endpoint == WatchVersionCodec.endpoint, versionReply.isWaiting {
+            versionReply.finish(try WatchVersionCodec.decode(frame))
         } else if frame.endpoint == PingPongCodec.endpoint {
             if case .ping(let cookie) = try PingPongCodec.decode(frame) {
                 Task { try? await send(PingPongCodec.frame(for: .pong(cookie: cookie))) }
@@ -532,83 +682,62 @@ public final class QEMUWatchClient: WatchClient {
             let response = try BlobDBCodec.decodeResponse(frame)
             guard response.token == token else { return }
             guard expectedBlobStatuses.contains(response.status) else {
-                failOperation(BlobDBClientError.rejected(response.status))
+                failBlobOperation(BlobDBClientError.rejected(response.status))
                 return
             }
             pendingBlobToken = nil
             expectedBlobStatuses = []
-            finishOperation()
-        } else if frame.endpoint == AppReorderCodec.endpoint, waitingForReorder {
+            blobDBReply.finish()
+        } else if frame.endpoint == AppReorderCodec.endpoint, appReorderReply.isWaiting {
             let result = try AppReorderCodec.decodeResult(frame)
-            waitingForReorder = false
-            result == .success ? finishOperation() : failOperation(AppReorderClientError.rejected(result))
-        } else if frame.endpoint == PutBytesCodec.endpoint, var session = transferSession {
-            let actions = try session.receive(try PutBytesCodec.decodeResponse(frame))
-            transferSession = session
-            for action in actions {
-                switch action {
-                case .send(let nextFrame): Task { try? await send(nextFrame) }
-                case .progress(let progress): eventContinuation?.yield(.transferProgress(progress))
-                case .finished:
-                    completedTransferCookie = session.completedCookie
-                    transferSession = nil
-                    finishOperation()
-                }
-            }
-        } else if frame.endpoint == PutBytesCodec.endpoint, let cookie = pendingInstallCookie {
+            result == .success
+                ? appReorderReply.finish()
+                : appReorderReply.fail(AppReorderClientError.rejected(result))
+        } else if frame.endpoint == PutBytesCodec.endpoint, transferSession != nil {
+            try processPutBytesResponse(frame)
+        } else if frame.endpoint == PutBytesCodec.endpoint, pendingInstallCookie != nil {
+            // Not matched against the cookie that was installed: the firmware
+            // answers an install from `prv_cleanup_and_send_response`, whose
+            // transfer state the preceding commit already cleared, so the
+            // cookie comes back as zero (issue #10). Matching it left every
+            // install here waiting out its deadline.
             let response = try PutBytesCodec.decodeResponse(frame)
-            guard response.cookie == cookie else { return }
             pendingInstallCookie = nil
-            response.result == .acknowledgement ? finishOperation() : failOperation(PutBytesTransferError.negativeAcknowledgement)
+            response.result == .acknowledgement
+                ? finishFirmwareControl()
+                : finishFirmwareControl(throwing: PutBytesTransferError.negativeAcknowledgement)
         } else if frame.endpoint == SystemMessageCodec.endpoint, waitingForFirmwareStart {
             waitingForFirmwareStart = false
             try SystemMessageCodec.decodeFirmwareUpdateStartResponse(frame)
-                ? finishOperation()
-                : failOperation(SystemMessageCodecError.updateRejected)
+                ? finishFirmwareControl()
+                : finishFirmwareControl(throwing: SystemMessageCodecError.updateRejected)
         } else if frame.endpoint == AppMessageCodec.endpoint {
             switch try AppMessageCodec.decode(frame) {
-            case .push(let message): eventContinuation?.yield(.appMessageReceived(message))
-            case .acknowledgement(let transactionID) where transactionID == pendingAppMessageTransactionID:
-                pendingAppMessageTransactionID = nil
-                finishOperation()
-            case .negativeAcknowledgement(let transactionID) where transactionID == pendingAppMessageTransactionID:
-                pendingAppMessageTransactionID = nil
-                failOperation(AppMessageClientError.negativeAcknowledgement)
-            default: break
+            case .push(let message):
+                eventContinuation?.yield(.appMessageReceived(message))
+            case .acknowledgement(let transactionID):
+                guard transactionID == appMessages.outstandingTransactionID else { return }
+                appMessages.finishActive()
+            case .negativeAcknowledgement(let transactionID):
+                guard transactionID == appMessages.outstandingTransactionID else { return }
+                appMessages.finishActive(throwing: AppMessageClientError.negativeAcknowledgement)
             }
         }
     }
 
-    private func finishVersion(returning information: WatchVersionInformation? = nil, throwing error: (any Error)? = nil) {
-        operationTimeoutTask?.cancel()
-        operationTimeoutTask = nil
-        if let error { versionContinuation?.resume(throwing: error) }
-        else if let information { versionContinuation?.resume(returning: information) }
-        versionContinuation = nil
-    }
-
-    private func finishOperation() {
-        operationTimeoutTask?.cancel()
-        operationTimeoutTask = nil
-        operationContinuation?.resume()
-        operationContinuation = nil
-    }
-
-    private func failOperation(_ error: any Error) {
-        operationTimeoutTask?.cancel()
-        operationTimeoutTask = nil
-        pendingBlobToken = nil
-        expectedBlobStatuses = []
-        waitingForReorder = false
-        transferSession = nil
-        pendingAppMessageTransactionID = nil
-        pendingInstallCookie = nil
-        waitingForFirmwareStart = false
-        operationContinuation?.resume(throwing: error)
-        operationContinuation = nil
-        // The version handshake shares this one timeout task, so anything that gives
-        // up on an operation has given up on the handshake too.
-        finishVersion(throwing: error)
+    /// Fails everything the emulator was in the middle of answering: a token,
+    /// a transfer or a queued turn means something only on the socket that
+    /// started it. Both teardown paths — a socket that failed and a disconnect
+    /// that was asked for — and a connect that gave up come through here.
+    private func failWorkInFlight(_ error: any Error) {
+        versionReply.fail(error)
+        failBlobOperation(error)
+        blobDBQueue.failAll(error)
+        appReorderReply.fail(error)
+        failTransfer(error)
+        transferQueue.failAll(error)
+        finishFirmwareControl(throwing: error)
+        appMessages.failAll(error)
     }
 }
 

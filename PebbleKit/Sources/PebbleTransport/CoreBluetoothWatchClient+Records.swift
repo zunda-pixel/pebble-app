@@ -45,6 +45,11 @@ extension CoreBluetoothWatchClient {
         try await transferObject(bytes, objectType: .file, appBankID: 0, filename: filename)
     }
 
+    /// Takes its turn behind any transfer already in flight. The watch runs one
+    /// put-bytes transfer at a time, and the callers — an install the reader
+    /// asked for, an app the watch fetched on its own, a language pack — are
+    /// unrelated, so the one that lost the race used to be told the transfer
+    /// was refused.
     @discardableResult
     func transferObject(
         _ bytes: [UInt8],
@@ -52,7 +57,26 @@ extension CoreBluetoothWatchClient {
         appBankID: UInt32,
         filename: String?
     ) async throws -> UInt32 {
+        try await transferQueue.begin()
+        defer { transferQueue.finish() }
+        return try await transferObjectHoldingTheTurn(
+            bytes,
+            objectType: objectType,
+            appBankID: appBankID,
+            filename: filename
+        )
+    }
+
+    /// For a caller already holding `transferQueue`'s turn.
+    func transferObjectHoldingTheTurn(
+        _ bytes: [UInt8],
+        objectType: PutBytesObjectType,
+        appBankID: UInt32,
+        filename: String?
+    ) async throws -> UInt32 {
         let peripheral = try linkedPeripheral()
+        // Unreachable while every caller holds the turn; kept so a caller that
+        // does not reads as this error rather than as a stranded transfer.
         guard activeTransferSession == nil else {
             throw PutBytesClientError.transferAlreadyInProgress
         }
@@ -103,21 +127,26 @@ extension CoreBluetoothWatchClient {
         }
         isInstallingFirmware = true
         defer { isInstallingFirmware = false }
+        // One turn for the whole update rather than one per transfer: an app
+        // transfer let in between the firmware and its resources would run
+        // on a watch that is in the middle of replacing its firmware.
+        try await transferQueue.begin()
+        defer { transferQueue.finish() }
         let total = package.firmware.count + (package.resources?.count ?? 0)
         guard let byteCount = UInt32(exactly: total) else { throw PutBytesTransferError.invalidConfiguration }
         try await sendFirmwareControl(
             SystemMessageCodec.firmwareUpdateStartFrame(bytesToSend: byteCount),
             waitingForStart: true
         )
-        let firmwareCookie = try await transferObject(
+        let firmwareCookie = try await transferObjectHoldingTheTurn(
             [UInt8](package.firmware),
-            objectType: package.manifest.firmware.type == "recovery" ? .recovery : .firmware,
+            objectType: package.manifest.firmware.objectType,
             appBankID: 0,
             filename: nil
         )
         var cookies = [firmwareCookie]
         if let resources = package.resources {
-            cookies.append(try await transferObject(
+            cookies.append(try await transferObjectHoldingTheTurn(
                 [UInt8](resources),
                 objectType: .systemResource,
                 appBankID: 0,
