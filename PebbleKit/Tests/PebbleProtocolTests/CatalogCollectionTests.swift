@@ -39,19 +39,6 @@ struct CatalogCollectionTests {
         #expect(faces.id != apps.id)
     }
 
-    /// A catalogue cached before shelves were kept still opens, with none.
-    @Test func aCacheWrittenBeforeShelvesDecodesWithNone() throws {
-        let json = """
-        {
-          "sourceURL": "https://example.com/api",
-          "applications": []
-        }
-        """
-        let decoded = try JSONDecoder().decode(CatalogSnapshot.self, from: Data(json.utf8))
-
-        #expect(decoded.collections.isEmpty)
-    }
-
     /// The shelf's path is server-relative and already carries the `/api`
     /// prefix, so it resolves against the feed's host rather than being
     /// appended to the feed's base — which would double the prefix.
@@ -70,7 +57,7 @@ struct CatalogCollectionTests {
             for: collection,
             offset: 40,
             limit: 20,
-            hardware: "emery",
+            hardware: .emery,
             baseURL: URL(string: "https://appstore-api.repebble.com/api")!
         )
 

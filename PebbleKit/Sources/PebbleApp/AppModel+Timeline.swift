@@ -332,15 +332,15 @@ extension AppModel {
     /// After a reinstall it remembers nothing, and this is the only way to reach
     /// what is left — at the cost of removing pins from any other source too,
     /// which is why it is asked for rather than done.
-    public func clearWatchTimeline(watchID: WatchID? = nil) async {
+    public func clearWatchTimeline(watchID: WatchID) async {
         guard let connection = connection(for: watchID), connection.isConnected else {
-            diagnostics.feedback[.timeline] = .failure("Connect the watch before clearing its timeline.")
+            diagnostics[watchID].feedback[.timeline] = .failure("Connect the watch before clearing its timeline.")
             return
         }
         do {
             try await connection.client.remove(.allTimelinePins)
         } catch {
-            diagnostics.feedback[.timeline] = .failure(
+            diagnostics[watchID].feedback[.timeline] = .failure(
                 "\(connection.watch.name) did not clear its timeline. \(Text(refusalReason(for: error)))"
             )
             return
@@ -351,9 +351,9 @@ extension AppModel {
             category: "timeline",
             message: "\(connection.watch.name): cleared the pin database"
         )
-        diagnostics.feedback[.timeline] = .progress("The watch's timeline was cleared. Sending what the app has…")
+        diagnostics[watchID].feedback[.timeline] = .progress("The watch's timeline was cleared. Sending what the app has…")
         await synchronizeTimeline()
-        diagnostics.feedback[.timeline] = .success("The watch's timeline was cleared and written again from the app.")
+        diagnostics[watchID].feedback[.timeline] = .success("The watch's timeline was cleared and written again from the app.")
     }
 
     func queueTimelineOperation(_ operation: PendingTimelineOperation) async throws {
@@ -477,12 +477,17 @@ extension AppModel {
                 return
             }
         }
-        await reloadCalendar()
+        await reloadCalendar(reportsToReader: true)
     }
 
     /// Reads the calendars into the timeline under whatever permission already
-    /// stands, for the paths nobody on this side started.
-    func reloadCalendar() async {
+    /// stands, for the paths nobody on this side started as well.
+    ///
+    /// - Parameter reportsToReader: Whether the Timeline screen hears how it
+    ///   went. Not for an EventKit change notice: every edit in Calendar put
+    ///   "synchronized" on a screen where nobody had asked for anything, so
+    ///   that one says it in the log.
+    func reloadCalendar(reportsToReader: Bool) async {
         do {
             // The master switch empties the fetch rather than skipping the
             // sync: absence is what queues the deletions, on the watch too.
@@ -530,7 +535,9 @@ extension AppModel {
             for connection in activeConnections {
                 await synchronizeCalendarReminders(on: connection)
             }
-            timeline.feedback = .success("Calendar synchronized with Timeline.")
+            if reportsToReader {
+                timeline.feedback = .success("Calendar synchronized with Timeline.")
+            }
         } catch CalendarBridgeError.accessDenied {
             // Not a banner: whoever asked for calendar access was answered at
             // the time, and this read was not the reader's doing.
@@ -538,7 +545,16 @@ extension AppModel {
                 category: "timeline",
                 message: "the calendar was not read: access has not been granted"
             )
-        } catch { timeline.feedback = .failure("Calendar access or synchronization failed.") }
+        } catch {
+            if reportsToReader {
+                timeline.feedback = .failure("Calendar access or synchronization failed.")
+            }
+            await DiagnosticLog.shared.record(
+                .error,
+                category: "timeline",
+                message: "the calendar could not be synchronized: \(String(reflecting: error))"
+            )
+        }
     }
 
     /// Brings this watch's Reminder database to the calendar reminders the app
@@ -566,7 +582,9 @@ extension AppModel {
             }
             // One in the past has already buzzed or been missed — `reminder_db.c`
             // refuses anything older than fifteen minutes outright.
-            for reminder in reminders where reminder.timestamp > .now {
+            // The digest is of the labelled bytes, so a reader who changes
+            // language has every reminder written again in it.
+            for reminder in reminders.map(\.labelledForWatch) where reminder.timestamp > .now {
                 guard digests[reminder.id] != reminder.writtenDigest else { continue }
                 try await retry(with: .watchWork) { try await client.write(.timelineReminder(reminder)) }
                 digests[reminder.id] = reminder.writtenDigest
@@ -608,8 +626,8 @@ extension AppModel {
             }
             for await _ in ticks.debounce(for: .seconds(2)) {
                 guard !Task.isCancelled else { return }
-                await self?.reloadCalendar()
-                await self?.reloadRemindersApp()
+                await self?.reloadCalendar(reportsToReader: false)
+                await self?.reloadRemindersApp(reportsToReader: false)
             }
         }
     }

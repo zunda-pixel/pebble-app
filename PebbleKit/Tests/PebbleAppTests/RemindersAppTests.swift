@@ -179,7 +179,7 @@ struct RemindersAppTests {
         dictated.isFromWatch = true
 
         await model.storeItemMadeOnWatch(dictated, from: connection)
-        await model.reloadRemindersApp()
+        await model.reloadRemindersApp(reportsToReader: false)
 
         #expect(remindersApp.accessRequests == 0)
     }

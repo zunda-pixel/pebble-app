@@ -12,7 +12,7 @@ extension AppModel {
             timeline.reminderFeedback = .failure("The Reminders app could not be read.")
             return
         }
-        await reloadRemindersApp()
+        await reloadRemindersApp(reportsToReader: true)
     }
 
     /// Brings the phone's Reminders app and the watch to the same reminders,
@@ -21,7 +21,10 @@ extension AppModel {
     ///
     /// What the watch made goes there first, so that the reading which follows
     /// finds it and does not take it for one the reader has finished with.
-    func reloadRemindersApp() async {
+    ///
+    /// - Parameter reportsToReader: False for a change notice, whose failure
+    ///   is the log's to hold rather than a banner nobody asked for.
+    func reloadRemindersApp(reportsToReader: Bool) async {
         guard await loadReminders() else { return }
         for reminder in timeline.reminders where reminder.isFromWatch && reminder.timestamp > .now {
             await mirrorInRemindersApp(reminder)
@@ -36,7 +39,9 @@ extension AppModel {
             )
             return
         } catch {
-            timeline.reminderFeedback = .failure("The Reminders app could not be read.")
+            if reportsToReader {
+                timeline.reminderFeedback = .failure("The Reminders app could not be read.")
+            }
             await DiagnosticLog.shared.record(
                 .error,
                 category: "timeline",
@@ -58,7 +63,7 @@ extension AppModel {
         for reminder in outcome.finished { mirrored[reminder.id] = nil }
         try? await reminderStore.save(timeline.reminders)
         try? await reminderStore.setMirroredIdentifiers(mirrored)
-        timeline.reminderFeedback = nil
+        if reportsToReader { timeline.reminderFeedback = nil }
         for connection in activeConnections {
             await synchronizeReminders(on: connection)
         }

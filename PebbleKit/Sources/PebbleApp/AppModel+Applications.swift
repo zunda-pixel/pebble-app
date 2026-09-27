@@ -143,14 +143,16 @@ extension AppModel {
                 try await retry(with: .watchWork) {
                     try await client.launchApplication(id: application.id)
                 }
+                applications.activeWatchfaceIDs[connection.watch.id] = application.id
             }
-            applications.activeWatchfaceID = application.id
-            Defaults[.activeWatchfaceID] = application.id
+            Defaults[.activeWatchfaceIDs] = applications.activeWatchfaceIDs
             // Beside its failure, so the one never sits on screen under the
             // other: `managementFeedback` is the running operation's, and the
             // next one to start or finish replaces it.
             applications.libraryFeedback = .success("\(application.displayName) is active.")
         } catch {
+            // The watches that did launch it are showing it.
+            Defaults[.activeWatchfaceIDs] = applications.activeWatchfaceIDs
             applications.libraryFeedback = .failure("The watchface could not be activated.")
         }
     }
@@ -161,24 +163,31 @@ extension AppModel {
         applications.configurationApplication = nil
     }
 
-    public func removeApplication(id: UUID) async {
-        if applications.activeWatchfaceID == id {
+    /// False when it is still in the library, with the reason in
+    /// `applications.libraryFeedback`.
+    @discardableResult
+    public func removeApplication(id: UUID) async -> Bool {
+        let showingIt = applications.activeWatchfaceIDs.filter { $0.value == id }.map(\.key)
+        if !showingIt.isEmpty {
             guard let fallback = applications.watchfaces.first(where: { $0.id != id }) else {
                 applications.libraryFeedback = .failure("Install and activate another watchface before removing the active one.")
-                return
+                return false
             }
-            if activeConnections.isEmpty {
-                // The active watchface is remembered from the last session, so this is the
-                // ordinary offline case: record the choice and let the next connection
-                // register the library as it then stands.
-                applications.activeWatchfaceID = fallback.id
-                Defaults[.activeWatchfaceID] = fallback.id
-            } else {
+            if !activeConnections.isEmpty {
                 await activateWatchface(fallback)
-                guard applications.activeWatchfaceID == fallback.id else { return }
+                guard activeConnections.allSatisfy({
+                    applications.activeWatchfaceIDs[$0.watch.id] == fallback.id
+                }) else { return false }
             }
+            // A watch that is away was showing it when last seen, which is the
+            // ordinary offline case: record the choice and let the next
+            // connection register the library as it then stands.
+            for watchID in showingIt where applications.activeWatchfaceIDs[watchID] == id {
+                applications.activeWatchfaceIDs[watchID] = fallback.id
+            }
+            Defaults[.activeWatchfaceIDs] = applications.activeWatchfaceIDs
         }
-        guard beginApplicationOperation(.removing(id)) else { return }
+        guard beginApplicationOperation(.removing(id)) else { return false }
         defer { finishApplicationOperation(.removing(id)) }
         do {
             let library = try await applicationLibrary.remove(applicationID: id)
@@ -189,8 +198,10 @@ extension AppModel {
             // app installed again.
             await PebbleCompanionRuntime.forget(applicationID: id)
             applications.libraryFeedback = nil
+            return true
         } catch {
             applications.libraryFeedback = .failure(applicationErrorMessage(error))
+            return !applications.all.contains { $0.id == id }
         }
     }
 

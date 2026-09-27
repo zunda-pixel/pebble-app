@@ -69,6 +69,34 @@ struct WatchIDTests {
         #expect(try await store.writtenPinIDs(watchID: WatchID("mock-emery")).isEmpty)
     }
 
+    /// Which reminder here is which one in the phone's Reminders app. A
+    /// `[UUID: String]` encodes as one flat array of alternating strings, so
+    /// the file is an array of pairs that say which is which.
+    @Test func theMirroredRemindersAreWrittenAsNamedPairs() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = TimelinePinStore(fileURL: directory.appending(path: "timeline.reminders.json"))
+        let reminderID = UUID()
+
+        try await store.setMirroredIdentifiers([reminderID: "x-apple-reminder://A1"])
+
+        let written = try Data(contentsOf: directory.appending(path: "timeline.reminders-mirrored.json"))
+        let pairs = try #require(try JSONSerialization.jsonObject(with: written) as? [[String: String]])
+        #expect(pairs == [["id": reminderID.uuidString, "externalIdentifier": "x-apple-reminder://A1"]])
+        #expect(try await store.mirroredIdentifiers() == [reminderID: "x-apple-reminder://A1"])
+    }
+
+    /// What `Defaults` keeps a dictionary keyed by watch under, which has to be
+    /// the identifier itself for the stored shape to be the one a
+    /// `[String: …]` keyed by the raw value had.
+    @Test func anIdentifierIsWrittenAndReadAsItsOwnText() {
+        let watchID = WatchID("5F1E2D3C-4B5A-6978-8765-4321ABCDEF00")
+
+        #expect(watchID.description == "5F1E2D3C-4B5A-6978-8765-4321ABCDEF00")
+        #expect(WatchID(watchID.description) == watchID)
+    }
+
     private func samplePin(title: String) -> TimelinePin {
         TimelinePin(
             parentApplicationID: UUID(),
@@ -97,6 +125,50 @@ struct WatchIDTests {
         var elsewhere = pin
         elsewhere.isFromWatch = !pin.isFromWatch
         #expect(elsewhere.writtenDigest == pin.writtenDigest)
+    }
+
+    /// A reminder's Dismiss is labelled in the reader's language, which the
+    /// watch draws as given. The label is part of the bytes, so changing it
+    /// changes the digest and the reminder is written again.
+    @Test func aRemindersDismissCarriesTheTitleItIsGiven() throws {
+        var reminder = samplePin(title: "歯医者")
+        reminder.kind = .reminder
+        reminder.dismissTitle = "閉じる"
+
+        let bytes = try reminder.encoded()
+        let label = TimelineItemHeader.textAttribute(id: 0x01, value: "閉じる", maximumByteCount: 64)
+        // `SerializedActionHeader`: id 1, type 0x04 (dismiss), one attribute.
+        #expect(Array(bytes.suffix(3 + label.count)) == [0x01, 0x04, 0x01] + label)
+        #expect(bytes[45] == 1)
+
+        var english = reminder
+        english.dismissTitle = "Dismiss"
+        #expect(english.writtenDigest != reminder.writtenDigest)
+    }
+
+    /// Without a title the action goes untitled, for the watch to label, rather
+    /// than with an English word no reader chose.
+    @Test func aRemindersDismissWithoutATitleCarriesNoAttribute() throws {
+        var reminder = samplePin(title: "歯医者")
+        reminder.kind = .reminder
+
+        let bytes = try reminder.encoded()
+
+        #expect(Array(bytes.suffix(3)) == [0x01, 0x04, 0x00])
+        #expect(!String(decoding: bytes, as: UTF8.self).contains("Dismiss"))
+    }
+
+    /// The label is the phone's language at the moment of writing, so it is
+    /// not kept with the reminder.
+    @Test func aDismissTitleIsNotStored() throws {
+        var reminder = samplePin(title: "歯医者")
+        reminder.kind = .reminder
+        reminder.dismissTitle = "閉じる"
+
+        let decoded = try JSONDecoder().decode(TimelinePin.self, from: JSONEncoder().encode(reminder))
+
+        #expect(decoded.dismissTitle == nil)
+        #expect(decoded.title == "歯医者")
     }
 
     @Test func aPinsDigestIsKeptUnderItsWatchsIdentifier() async throws {

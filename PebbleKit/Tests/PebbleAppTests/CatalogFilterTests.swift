@@ -26,7 +26,7 @@ struct CatalogFilterTests {
             developer: "Someone",
             version: "1.0",
             downloadURL: URL(string: "https://example.invalid/\(name).pbw")!,
-            supportedPlatforms: ["emery"],
+            supportedPlatforms: [.emery],
             kind: kind,
             category: category,
             summary: nil

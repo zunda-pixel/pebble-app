@@ -116,19 +116,50 @@ struct AppRootView: View {
     var model: AppModel
     @Default(.hasCompletedWatchSetup) private var hasCompletedWatchSetup
     @State private var setup: WatchSetupContext?
+    @State private var window = UUID()
+#if os(macOS)
+    @Environment(\.appearsActive) private var appearsActive
+#endif
+
+    /// Whether this window is the one that shows what the model asks for.
+    private var isFront: Bool {
+        FrontWindow.shared.isFront(window)
+    }
+
+    /// Something the model has asked every window to show is up. The window
+    /// showing it keeps it while the reader clicks elsewhere: handed to the
+    /// window clicked, it would vanish from under them and come up again there.
+    private var isShowingModelPresentation: Bool {
+        model.deepLinks.pendingPackage != nil
+            || model.deepLinks.storeApplication != nil
+            || model.deepLinks.feedback != nil
+    }
 
     var body: some View {
         Group {
 #if os(macOS)
-            MacRootView(model: model)
+            MacRootView(model: model, isFront: isFront)
 #else
-            IOSRootView(model: model)
+            IOSRootView(model: model, isFront: isFront)
 #endif
         }
+        .environment(\.windowIdentity, window)
+        .onAppear { FrontWindow.shared.bringForward(window) }
+        .onDisappear { FrontWindow.shared.close(window) }
+#if os(macOS)
+        .onChange(of: appearsActive) { _, active in
+            guard active, !isShowingModelPresentation else { return }
+            FrontWindow.shared.bringForward(window)
+        }
+        .onChange(of: isShowingModelPresentation) { _, showing in
+            guard !showing, appearsActive else { return }
+            FrontWindow.shared.bringForward(window)
+        }
+#endif
         // The permissions are read here rather than in the sheet, so that the
         // steps cannot be decided before the answers are known.
         .onChange(of: model.connections.filter(\.isConnected).map(\.watch.id)) { _, connectedIDs in
-            guard !hasCompletedWatchSetup, setup == nil, let watchID = connectedIDs.first else {
+            guard isFront, !hasCompletedWatchSetup, setup == nil, let watchID = connectedIDs.first else {
                 return
             }
             setup = WatchSetupContext(watchID: watchID, permissions: .current())
@@ -145,8 +176,8 @@ struct AppRootView: View {
         }
         // Dismissing is the reader's answer too: the copy is deleted either way.
         .sheet(item: Binding(
-            get: { model.deepLinks.pendingPackage },
-            set: { if $0 == nil { model.dismissPendingDeepLinkPackage() } }
+            get: { isFront ? model.deepLinks.pendingPackage : nil },
+            set: { if $0 == nil, isFront { model.dismissPendingDeepLinkPackage() } }
         )) { pending in
             DeepLinkPackageSheet(
                 package: pending,
@@ -155,8 +186,8 @@ struct AppRootView: View {
             )
         }
         .sheet(item: Binding(
-            get: { model.deepLinks.storeApplication },
-            set: { if $0 == nil { model.dismissDeepLinkStoreApplication() } }
+            get: { isFront ? model.deepLinks.storeApplication : nil },
+            set: { if $0 == nil, isFront { model.dismissDeepLinkStoreApplication() } }
         )) { application in
             NavigationStack {
                 CatalogApplicationDetailView(
@@ -172,8 +203,8 @@ struct AppRootView: View {
         .alert(
             Text("The link could not be opened."),
             isPresented: Binding(
-                get: { model.deepLinks.feedback != nil },
-                set: { if !$0 { model.clearDeepLinkFeedback() } }
+                get: { isFront && model.deepLinks.feedback != nil },
+                set: { if !$0, isFront { model.clearDeepLinkFeedback() } }
             ),
             presenting: model.deepLinks.feedback
         ) { _ in } message: { feedback in
@@ -185,6 +216,7 @@ struct AppRootView: View {
 #if os(macOS)
 struct MacRootView: View {
     var model: AppModel
+    var isFront: Bool
     @State private var selection: AppSection? = .watches
 
     var body: some View {
@@ -213,7 +245,8 @@ struct MacRootView: View {
         }
         // A deep link's navigation. Settings is its own window on the Mac and
         // not in the sidebar, so that one request has nowhere to go here.
-        .onChange(of: model.deepLinks.requestedSection, initial: true) { _, requested in
+        // Asked of the front window alone, which takes it up once it is front.
+        .onChange(of: isFront ? model.deepLinks.requestedSection : nil, initial: true) { _, requested in
             guard let requested else { return }
             if requested != .settings { selection = requested }
             model.consumeRequestedDeepLinkSection()
@@ -223,6 +256,7 @@ struct MacRootView: View {
 #else
 struct IOSRootView: View {
     var model: AppModel
+    var isFront: Bool
     @State private var selection: AppSection = .watches
 
     var body: some View {
@@ -249,7 +283,7 @@ struct IOSRootView: View {
         }
         // `initial:` because a cold start from a link sets the request before
         // this view exists, and waiting for a change would wait forever.
-        .onChange(of: model.deepLinks.requestedSection, initial: true) { _, requested in
+        .onChange(of: isFront ? model.deepLinks.requestedSection : nil, initial: true) { _, requested in
             guard let requested else { return }
             selection = requested
             model.consumeRequestedDeepLinkSection()

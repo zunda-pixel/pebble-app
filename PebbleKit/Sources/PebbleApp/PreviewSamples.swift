@@ -214,7 +214,7 @@ enum PreviewSamples {
             companyName: "Core Devices",
             versionLabel: "1.3",
             capabilities: ["configurable"],
-            targetPlatforms: ["emery", "obelix"],
+            targetPlatforms: [.emery],
             kind: .watchapp,
             hasCompanionJavaScript: true
         ),
@@ -225,7 +225,7 @@ enum PreviewSamples {
             companyName: "zunda",
             versionLabel: "0.4",
             capabilities: [],
-            targetPlatforms: ["emery"],
+            targetPlatforms: [.emery],
             kind: .watchapp
         ),
     ]
@@ -238,7 +238,7 @@ enum PreviewSamples {
             companyName: "Pebble",
             versionLabel: "2.0",
             capabilities: [],
-            targetPlatforms: ["emery", "obelix", "gabbro"],
+            targetPlatforms: [.emery, .gabbro],
             kind: .watchface
         ),
     ]
@@ -250,7 +250,7 @@ enum PreviewSamples {
         developer: "Rebble",
         version: "2.1",
         downloadURL: URL(string: "https://example.invalid/simply-light.pbw")!,
-        supportedPlatforms: ["emery", "obelix"],
+        supportedPlatforms: [.emery],
         kind: .watchface,
         category: "Faces",
         summary: "A watchface with nothing on it but the time."
@@ -310,8 +310,7 @@ enum PreviewSamples {
 
     static let downloadedFirmware = DownloadedFirmware(
         versionTag: firmwareRelease.versionTag,
-        board: .obelixPVT,
-        url: URL(fileURLWithPath: "/tmp/normal_obelix_pvt_v4.37.0.pbz")
+        board: .obelixPVT
     )
 
     static func firmwareJournal(phase: FirmwareUpdatePhase) -> FirmwareUpdateJournal {
@@ -320,6 +319,7 @@ enum PreviewSamples {
             board: .obelixPVT,
             previousVersion: watch.firmwareVersion,
             targetVersion: firmwareRelease.versionTag,
+            packageFileName: downloadedFirmware.fileName,
             packageSHA256: String(repeating: "a", count: 64),
             phase: phase
         )

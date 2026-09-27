@@ -9,7 +9,11 @@
 /// `watchID` in thirteen, and a plain `id` elsewhere — and the compiler had
 /// nothing to say when one of them was handed an application's identifier or a
 /// bundle identifier instead.
-public struct WatchID: RawRepresentable, Hashable, Codable, Sendable, CustomStringConvertible {
+///
+/// `LosslessStringConvertible` so that a dictionary keyed by it can be kept in
+/// `Defaults`, which asks that of a key; the description is the raw value, so
+/// what is stored is what a `[String: …]` keyed by the raw value would store.
+public struct WatchID: RawRepresentable, Hashable, Codable, Sendable, LosslessStringConvertible {
     public var rawValue: String
 
     public init(rawValue: String) {

@@ -11,7 +11,7 @@ public struct PBWPackageObject: Equatable, Sendable {
 @MemberwiseInit(.public)
 public struct PBWPackage: Equatable, Sendable {
     public var application: WatchApplication
-    public var variant: String
+    public var variant: WatchPlatform
     public var binaryHeader: PBWBinaryHeader
     public var objects: [PBWPackageObject]
 
@@ -47,11 +47,11 @@ public enum PBWPackageImporter {
         let appInfoData = try data(for: "appinfo.json", in: archive)
         let application = try PBWApplicationDecoder.decodeAppInfo(from: appInfoData)
 
-        var manifestsByVariant: [String: Data] = [:]
-        for variant in model.compatibleApplicationVariants {
+        var manifestsByVariant: [WatchPlatform: Data] = [:]
+        for variant in model.compatiblePlatforms {
             if let manifestData = try optionalData(
                 for: platformPath(variant: variant, filename: "manifest.json"),
-                fallbackToRootForAplite: variant == "aplite",
+                fallbackToRootForAplite: variant == .aplite,
                 in: archive
             ) {
                 manifestsByVariant[variant] = manifestData
@@ -94,13 +94,13 @@ public enum PBWPackageImporter {
     }
 
     private static func requiredPlatformData(
-        variant: String,
+        variant: WatchPlatform,
         filename: String,
         in archive: Archive
     ) throws -> Data {
         guard let data = try optionalData(
             for: platformPath(variant: variant, filename: filename),
-            fallbackToRootForAplite: variant == "aplite",
+            fallbackToRootForAplite: variant == .aplite,
             in: archive
         ) else {
             throw PBWPackageImportError.missingEntry(filename)
@@ -108,8 +108,8 @@ public enum PBWPackageImporter {
         return data
     }
 
-    private static func platformPath(variant: String, filename: String) -> String {
-        "\(variant)/\(filename)"
+    private static func platformPath(variant: WatchPlatform, filename: String) -> String {
+        "\(variant.rawValue)/\(filename)"
     }
 
     private static func optionalData(

@@ -62,7 +62,7 @@ struct CatalogUpdateReachTests {
         /// of the real one.
         var snapshotWithoutTheInstalledApplication: CatalogSnapshot {
             CatalogSnapshot(
-                sourceURL: base,
+                source: .pebble,
                 fetchedAt: Date(timeIntervalSince1970: 100),
                 applications: [
                     CatalogApplication(
@@ -72,7 +72,7 @@ struct CatalogUpdateReachTests {
                         developer: "Somebody",
                         version: "9.0",
                         downloadURL: URL(string: "https://store.invalid/featured.pbw")!,
-                        supportedPlatforms: ["emery"]
+                        supportedPlatforms: [.emery]
                     )
                 ]
             )
@@ -86,7 +86,7 @@ struct CatalogUpdateReachTests {
                 companyName: "Keynes",
                 versionLabel: version,
                 capabilities: [],
-                targetPlatforms: ["emery"],
+                targetPlatforms: [.emery],
                 kind: .watchapp
             )
         }
@@ -112,7 +112,12 @@ struct CatalogUpdateReachTests {
             client: MockWatchClient(),
             storageDirectory: StorageDirectory(url: directory),
             applicationLibrary: library,
-            appCatalog: ApplicationCatalog(cacheURL: cacheURL, session: StoreStubURLProtocol.session())
+            // The stub stands at the feed address the source would name.
+            appCatalog: ApplicationCatalog(
+                cacheURL: cacheURL,
+                session: StoreStubURLProtocol.session(),
+                feedURL: fixture.base
+            )
         )
         await model.loadApplications()
         await model.loadCatalog()
@@ -153,19 +158,21 @@ struct CatalogUpdateReachTests {
     @Test func switchingStoresForgetsWhatTheLastStoreSaidAboutTheLibrary() async throws {
         let fixture = Fixture()
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let previousSourceID = Defaults[.catalogSourceID]
+        let previousSource = Defaults[.catalogSource]
         defer {
             try? FileManager.default.removeItem(at: directory)
-            Defaults[.catalogSourceID] = previousSourceID
+            Defaults[.catalogSource] = previousSource
         }
         StoreStubURLProtocol.answer(fixture.lookupURL, with: fixture.storeAnswer(version: "2.0"))
         let model = try await makeModel(fixture, directory: directory, installedVersion: "1.0")
+        // Browsing Rebble, and switching back to the Pebble store: `Defaults`
+        // is shared by every suite running at once, and the Pebble store is
+        // the one they all expect to find there.
+        model.catalog.source = .rebble
         _ = await model.catalogUpdates()
         #expect(model.catalog.answeredStoreLookups.contains(fixture.installedID))
 
-        // A name no built-in store has, so a model built by a suite running
-        // alongside this one still browses the Pebble store.
-        await model.setCatalogSource("unlisted-\(UUID().uuidString)")
+        await model.setCatalogSource(.pebble)
 
         #expect(model.catalog.storeEntries.isEmpty)
         #expect(model.catalog.answeredStoreLookups.isEmpty)
@@ -215,7 +222,7 @@ struct CatalogUpdateLoopTests {
             developer: "Somebody",
             version: version,
             downloadURL: URL(string: "https://store.invalid/timer.pbw")!,
-            supportedPlatforms: ["emery"]
+            supportedPlatforms: [.emery]
         )
     }
 
@@ -227,7 +234,7 @@ struct CatalogUpdateLoopTests {
             companyName: "Somebody",
             versionLabel: label,
             capabilities: [],
-            targetPlatforms: ["emery"],
+            targetPlatforms: [.emery],
             kind: .watchapp,
             storeVersion: storeVersion
         )
@@ -324,7 +331,7 @@ struct CatalogUpdateLoopTests {
             companyName: "C",
             versionLabel: "1.2.5",
             capabilities: [],
-            targetPlatforms: ["emery"],
+            targetPlatforms: [.emery],
             kind: .watchface
         )
         application.storeVersion = "1.2.6"

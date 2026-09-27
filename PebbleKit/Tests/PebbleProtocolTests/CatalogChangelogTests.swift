@@ -63,6 +63,14 @@ struct CatalogChangelogTests {
         #expect(application.changelog[1].notes == "kept, dateless")
     }
 
+    /// A row that names no hardware is one the store serves to every watch.
+    @Test func aRowNamingNoHardwareRunsOnEveryPlatform() throws {
+        let application = try entry(changelog: "[]")
+
+        #expect(application.supportedPlatforms == WatchPlatform.allCases)
+        #expect(application.source == .pebble)
+    }
+
     /// A catalogue cached before the history was kept still opens, with none.
     @Test func aCacheWrittenBeforeTheHistoryDecodesWithNone() throws {
         let json = """

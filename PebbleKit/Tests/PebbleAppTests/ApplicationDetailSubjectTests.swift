@@ -15,7 +15,7 @@ struct ApplicationDetailSubjectTests {
 
     private func installed(
         companyName: String = "Keynes",
-        platforms: [String] = ["emery"]
+        platforms: [WatchPlatform] = [.emery]
     ) -> WatchApplication {
         WatchApplication(
             id: id,
@@ -37,7 +37,7 @@ struct ApplicationDetailSubjectTests {
             developer: "Keynes on the store",
             version: version,
             downloadURL: URL(string: "https://example.invalid/tools.pbw")!,
-            supportedPlatforms: ["aplite", "basalt", "emery"],
+            supportedPlatforms: [.aplite, .basalt, .emery],
             kind: .watchapp,
             category: "Tools & Utilities",
             summary: "Five watch utilities in one place."
@@ -56,7 +56,7 @@ struct ApplicationDetailSubjectTests {
         #expect(subject.version == "1.3.0")
         #expect(subject.name == "Watch Tools")
         #expect(subject.developer == "Keynes")
-        #expect(subject.platforms == ["emery"])
+        #expect(subject.platforms == [.emery])
     }
 
     /// And the store fills in only what a package cannot say about itself.
@@ -77,7 +77,7 @@ struct ApplicationDetailSubjectTests {
         )
 
         #expect(subject.developer == "Keynes on the store")
-        #expect(subject.platforms == ["aplite", "basalt", "emery"])
+        #expect(subject.platforms == [.aplite, .basalt, .emery])
     }
 
     /// Both ways into the screen agree. Reached from the catalogue, an
@@ -99,7 +99,7 @@ struct ApplicationDetailSubjectTests {
         #expect(subject.installed == nil)
         #expect(subject.version == "1.4.0")
         #expect(subject.name == "Watch Tools (Store)")
-        #expect(subject.platforms == ["aplite", "basalt", "emery"])
+        #expect(subject.platforms == [.aplite, .basalt, .emery])
     }
 
     /// Installed and never listed — a package someone had as a file. The

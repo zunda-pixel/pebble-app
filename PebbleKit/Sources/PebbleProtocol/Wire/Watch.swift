@@ -147,6 +147,22 @@ public extension WatchBoard {
     }
 }
 
+/// What an application is built for: the folder names inside a `.pbw` and the
+/// store's `hardware_platforms`, which are one vocabulary (libpebble3's
+/// `WatchType`).
+///
+/// Only the names a watch this app drives can run. A package or a store row
+/// naming anything else says nothing any of them could install, so the
+/// decoding boundaries drop such a name rather than carry it as a string.
+public enum WatchPlatform: String, CaseIterable, Codable, Sendable {
+    case aplite, basalt, chalk, diorite, emery, flint, gabbro
+
+    /// The names that are platforms, in the order given, and nothing else.
+    public static func known(in names: [String]) -> [WatchPlatform] {
+        names.compactMap(WatchPlatform.init(rawValue:))
+    }
+}
+
 public enum WatchModel: String, CaseIterable, Codable, Sendable {
     case pebble2Duo = "FLINT"
     case pebbleTime2 = "EMERY"
@@ -156,6 +172,24 @@ public enum WatchModel: String, CaseIterable, Codable, Sendable {
     public init?(hardwarePlatform: UInt8) {
         guard let board = WatchBoard(hardwarePlatform: hardwarePlatform) else { return nil }
         self = board.model
+    }
+
+    /// The platforms this watch runs, its own first and then the older ones it
+    /// is compatible with, in the order a package's variants are tried.
+    public var compatiblePlatforms: [WatchPlatform] {
+        switch self {
+        case .pebble2Duo:
+            [.flint, .diorite, .aplite]
+        case .pebbleTime2:
+            [.emery, .basalt, .diorite, .aplite]
+        case .pebbleRound2:
+            [.gabbro, .chalk]
+        }
+    }
+
+    /// The watch's own platform, which is what the store is asked for.
+    public var platform: WatchPlatform {
+        compatiblePlatforms[0]
     }
 
     public var displayName: String {

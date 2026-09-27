@@ -22,7 +22,7 @@ struct CompanionRuntimeTests {
             companyName: "nobody",
             versionLabel: "1.0",
             capabilities: ["configurable"],
-            targetPlatforms: ["emery"],
+            targetPlatforms: [.emery],
             kind: .watchapp,
             appKeys: ["kept": 1],
             hasCompanionJavaScript: true

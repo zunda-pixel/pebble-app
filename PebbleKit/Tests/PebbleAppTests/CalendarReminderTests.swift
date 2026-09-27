@@ -130,15 +130,20 @@ struct CalendarReminderTests {
             fireDates: [pin.timestamp.addingTimeInterval(-15 * 60)]
         )[0]
 
-        let bytes = try reminder.encoded()
+        // As a watch is sent it: labelled in the phone's language.
+        let sent = reminder.labelledForWatch
+        let title = try #require(sent.dismissTitle)
+        #expect(!title.isEmpty)
+        let bytes = try sent.encoded()
         // Byte 45 is the action count, after the attribute count at 44.
         #expect(bytes[45] == 1)
         // The action trails the attributes: `SerializedActionHeader` (id, type
         // Dismiss = 0x04, one attribute), then the label as attribute 0x01.
-        let action = Array(bytes.suffix(13))
+        let label = Array(title.utf8)
+        let action = Array(bytes.suffix(6 + label.count))
         #expect(Array(action.prefix(3)) == [0x01, 0x04, 0x01])
-        #expect(Array(action[3..<6]) == [0x01, 7, 0])
-        #expect(String(decoding: action.suffix(7), as: UTF8.self) == "Dismiss")
+        #expect(Array(action[3..<6]) == [0x01, UInt8(label.count), 0])
+        #expect(Array(action.suffix(label.count)) == label)
 
         #expect(try pin.encoded()[45] == 0)
     }

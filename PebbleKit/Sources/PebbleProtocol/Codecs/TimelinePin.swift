@@ -27,6 +27,20 @@ public struct TimelinePin: Codable, Equatable, Identifiable, Sendable {
     /// not model, so sending it back would replace what the watch has with a
     /// poorer copy of it. It is kept, shown and deletable; it is not written.
     public var isFromWatch: Bool = false
+    /// What a reminder's Dismiss says on the watch, in the reader's language.
+    ///
+    /// Given at the moment of writing rather than kept: the language is the
+    /// phone's, now, and a label stored with the reminder would go on in the
+    /// language it was made in. Nil sends the action without a title, which
+    /// firmware since fe7224b labels in the watch's own language
+    /// (`timeline_actions_add_action_to_root_level`, `timeline_actions.c`) —
+    /// and firmware before it labels "[Action]".
+    public var dismissTitle: String? = nil
+
+    private enum CodingKeys: String, CodingKey {
+        case id, parentApplicationID, timestamp, durationMinutes, title, subtitle, body
+        case isAllDay, kind, isFromWatch
+    }
 
     /// A digest of the bytes this pin is written to the watch as.
     ///
@@ -57,11 +71,17 @@ public struct TimelinePin: Codable, Equatable, Identifiable, Sendable {
         // all: `notification_window.c` hides the popup's action button unless
         // the item carries at least one, and Snooze — which the firmware adds
         // by itself — only ever appears inside that menu. So every reminder
-        // carries a Dismiss (`SerializedActionHeader`: id, type 0x04, one
-        // attribute for the label).
-        let actionBytes: [UInt8] = kind == .reminder
-            ? [0x01, 0x04, 0x01] + TimelineItemHeader.textAttribute(id: 0x01, value: "Dismiss", maximumByteCount: 64)
-            : []
+        // carries a Dismiss (`SerializedActionHeader`: id, type 0x04, then its
+        // attributes — the label, where there is one).
+        let actionBytes: [UInt8]
+        if kind == .reminder {
+            let label = dismissTitle.map {
+                TimelineItemHeader.textAttribute(id: 0x01, value: $0, maximumByteCount: 64)
+            }
+            actionBytes = [0x01, 0x04, label == nil ? 0x00 : 0x01] + (label ?? [])
+        } else {
+            actionBytes = []
+        }
         let actionCount: UInt8 = kind == .reminder ? 1 : 0
         guard let length = UInt16(exactly: attributeBytes.count + actionBytes.count) else {
             throw TimelinePinError.payloadTooLarge

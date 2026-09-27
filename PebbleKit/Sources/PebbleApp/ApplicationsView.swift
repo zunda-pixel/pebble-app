@@ -49,7 +49,7 @@ struct ApplicationsView: View {
         ApplicationsContent(
             watchApplications: model.applications.apps,
             watchfaces: model.applications.watchfaces,
-            activeWatchfaceID: model.applications.activeWatchfaceID,
+            activeWatchfaceID: model.applications.activeWatchfaceID(on: displayedWatchID),
             installedApplicationIDs: displayedWatchID.map { model.installedApplicationIDs(on: $0) },
             isLoading: model.applications.isLoading,
             libraryFeedback: model.applications.libraryFeedback,

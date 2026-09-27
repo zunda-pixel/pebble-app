@@ -5,13 +5,8 @@ struct WatchDetailView: View {
     var model: AppModel
     var watchID: WatchID
     @Environment(\.dismiss) private var dismiss
-
-    private var journal: FirmwareUpdateJournal? {
-        guard let journal = model.firmware.journal, journal.watchID == watchID else {
-            return nil
-        }
-        return journal
-    }
+    /// Why Forget did not, for the screen the reader is still on.
+    @State private var forgetFeedback: FeatureFeedback?
 
     // A language reads best in itself, so the name is not translated.
     private var languageName: String? {
@@ -25,10 +20,11 @@ struct WatchDetailView: View {
     var body: some View {
         WatchDetailContent(
             watch: WatchSummary(watchID: watchID, model: model),
-            firmwareJournalPhase: journal?.phase,
-            downloadedFirmwareVersion: model.firmware.downloaded?.versionTag,
+            firmwareJournalPhase: model.firmware[watchID].journal?.phase,
+            downloadedFirmwareVersion: model.downloadedFirmware(for: watchID)?.versionTag,
             languageName: languageName,
             resetFeedback: model.watches.resetFeedback[watchID],
+            forgetFeedback: forgetFeedback,
             connectionFeedback: model.connectionFailures[watchID].map { .failure($0.message) },
             connect: {
                 guard let saved = model.watches.saved.first(where: { $0.id == watchID }) else { return }
@@ -41,8 +37,11 @@ struct WatchDetailView: View {
             reset: { kind in Task { await model.resetWatch(kind, watchID: watchID) } },
             forget: {
                 Task {
-                    await model.forgetWatch(id: watchID)
-                    dismiss()
+                    if await model.forgetWatch(id: watchID) {
+                        dismiss()
+                    } else {
+                        forgetFeedback = model.watches.feedback
+                    }
                 }
             },
             firmwareDestination: { FirmwareView(model: model, watchID: watchID) },
@@ -64,6 +63,7 @@ struct WatchDetailContent<
     var downloadedFirmwareVersion: String?
     var languageName: String?
     var resetFeedback: FeatureFeedback?
+    var forgetFeedback: FeatureFeedback? = nil
     var connectionFeedback: FeatureFeedback?
     var connect: () -> Void
     var setAutomaticallyConnects: (Bool) -> Void
@@ -251,6 +251,7 @@ struct WatchDetailContent<
                     confirmationTitle: "Forget Watch",
                     action: forget
                 )
+                FeedbackBanner(feedback: forgetFeedback)
             } footer: {
                 #if os(macOS)
                 Text("A watch that has been factory reset no longer knows this Mac, and cannot be added again while the old pairing is around. Forget it here, then open System Settings › Bluetooth and forget it there too.")
@@ -316,6 +317,29 @@ struct WatchDetailContent<
             downloadedFirmwareVersion: nil,
             languageName: nil,
             resetFeedback: .progress("The watch is erasing itself. It has forgotten this device, so it cannot reconnect until it is forgotten here too."),
+            connectionFeedback: nil,
+            connect: {},
+            setAutomaticallyConnects: { _ in },
+            disconnect: {},
+            reset: { _ in },
+            forget: {},
+            firmwareDestination: { EmptyView() },
+            languageDestination: { EmptyView() },
+            settingsDestination: { EmptyView() },
+            diagnosticsDestination: { EmptyView() }
+        )
+    }
+}
+
+#Preview("Could not be forgotten") {
+    NavigationStack {
+        WatchDetailContent(
+            watch: PreviewSamples.savedSummary,
+            firmwareJournalPhase: nil,
+            downloadedFirmwareVersion: nil,
+            languageName: nil,
+            resetFeedback: nil,
+            forgetFeedback: .failure("The watch could not be forgotten."),
             connectionFeedback: nil,
             connect: {},
             setAutomaticallyConnects: { _ in },

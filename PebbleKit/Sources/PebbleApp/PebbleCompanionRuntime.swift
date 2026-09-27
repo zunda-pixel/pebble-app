@@ -935,8 +935,8 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
         running application: WatchApplication
     ) throws -> String {
         let info = ScriptWatchInfo(
-            platform: watch?.model.flatMap {
-                application.bestVariant(for: $0) ?? $0.compatibleApplicationVariants.first
+            platform: watch?.model.map {
+                (application.bestVariant(for: $0) ?? $0.platform).rawValue
             } ?? "unknown",
             model: watch?.model?.rawValue ?? "unknown",
             language: watch.map { $0.languageLocale.isEmpty ? "en_US" : $0.languageLocale } ?? "en_US",

@@ -43,7 +43,7 @@ public struct PBWInstallationObject: Equatable, Sendable {
 
 @MemberwiseInit(.public)
 public struct PBWInstallationPlan: Equatable, Sendable {
-    public var variant: String
+    public var variant: WatchPlatform
     public var objects: [PBWInstallationObject]
 }
 
@@ -62,9 +62,9 @@ public enum PBWManifestDecoder {
 
     public static func installationPlan(
         for model: WatchModel,
-        manifestsByVariant: [String: Data]
+        manifestsByVariant: [WatchPlatform: Data]
     ) throws -> PBWInstallationPlan {
-        for variant in model.compatibleApplicationVariants {
+        for variant in model.compatiblePlatforms {
             guard let data = manifestsByVariant[variant] else {
                 continue
             }

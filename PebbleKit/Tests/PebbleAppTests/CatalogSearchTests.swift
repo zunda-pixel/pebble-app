@@ -89,7 +89,7 @@ struct CatalogSearchTests {
         #expect(application.version == "3.1")
         #expect(application.kind == .watchface)
         #expect(application.downloadURL.absoluteString == "https://store.example/mario.pbw")
-        #expect(application.supportedPlatforms == ["basalt", "emery"])
+        #expect(application.supportedPlatforms == [.basalt, .emery])
         #expect(application.category == "Faces")
         #expect(answer.hasMore == false)
     }
@@ -140,7 +140,7 @@ struct CatalogSearchTests {
         """.utf8))
 
         let answer = try await stub.catalog(in: directory)
-            .search("mario", preferredHardware: ["emery", "basalt"])
+            .search("mario", preferredHardware: [.emery, .basalt])
 
         // The covered hit shows the watch's own board; the uncovered one keeps
         // the bulk entry's default.

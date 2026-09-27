@@ -51,7 +51,7 @@ extension AppModel {
         timeline.reminderFeedback = nil
         for connection in activeConnections {
             do {
-                try await connection.client.write(.timelineReminder(reminder))
+                try await connection.client.write(.timelineReminder(reminder.labelledForWatch))
                 // Written down before it can be deleted: a reminder added,
                 // then deleted while the watch is away, is one only this record
                 // can name when the watch comes back.
@@ -148,7 +148,7 @@ extension AppModel {
         var written = (try? await reminderStore.writtenPinIDs(watchID: watchID)) ?? []
         for reminder in timeline.reminders where reminder.timestamp > .now && !reminder.isFromWatch {
             do {
-                try await connection.client.write(.timelineReminder(reminder))
+                try await connection.client.write(.timelineReminder(reminder.labelledForWatch))
                 written.insert(reminder.id)
             } catch {
                 await DiagnosticLog.shared.record(
@@ -162,5 +162,15 @@ extension AppModel {
         // Whatever got through, so that a reminder deleted before the next
         // connection can still be named.
         try? await reminderStore.setWrittenPinIDs(written, watchID: watchID)
+    }
+}
+
+extension TimelinePin {
+    /// As a watch is sent it: a reminder's Dismiss labelled in the reader's
+    /// language, which the protocol layer has no way to look up.
+    var labelledForWatch: TimelinePin {
+        var pin = self
+        pin.dismissTitle = String(localized: "Dismiss", bundle: .module)
+        return pin
     }
 }

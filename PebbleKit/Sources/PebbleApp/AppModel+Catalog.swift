@@ -6,20 +6,20 @@ import SwiftUI
 
 /// The remote application catalog.
 extension AppModel {
-    /// The store being browsed. The chosen identifier survives launches; a
-    /// stored name no built-in matches falls back to the Pebble store.
+    /// The store being browsed. The choice survives launches; one this build
+    /// no longer has falls back to the Pebble store.
     var selectedCatalogSource: CatalogSource {
-        .named(catalog.sourceID)
+        catalog.source
     }
 
     /// Switches the catalog to another store: its own cache, feed, index and
     /// search, all at once. The search is cleared rather than re-run — the old
     /// results were the other store's answers, and so were the lookups made
     /// for installed applications.
-    public func setCatalogSource(_ id: String) async {
-        guard catalog.sourceID != id else { return }
-        catalog.sourceID = id
-        Defaults[.catalogSourceID] = id
+    public func setCatalogSource(_ source: CatalogSource) async {
+        guard catalog.source != source else { return }
+        catalog.source = source
+        Defaults[.catalogSource] = source
         clearCatalogSearch()
         catalog.applications = []
         catalog.storeEntries = [:]
@@ -33,7 +33,6 @@ extension AppModel {
             let snapshot = try await appCatalog.cachedSnapshot(source: selectedCatalogSource)
             catalog.applications = snapshot?.applications ?? []
             catalog.collections = snapshot?.collections ?? []
-            catalog.sourceURL = snapshot?.sourceURL
         }
         catch { catalog.feedback = .failure("The app catalog cache could not be loaded.") }
     }
@@ -44,12 +43,11 @@ extension AppModel {
         defer { catalog.isUpdating = false }
         do {
             let snapshot = try await appCatalog.update(
-                model: connectedWatch?.model,
+                platform: connectedWatch?.model?.platform,
                 source: selectedCatalogSource
             )
             catalog.applications = snapshot.applications
             catalog.collections = snapshot.collections
-            catalog.sourceURL = snapshot.sourceURL
             // Silent on success, like the installs (owner feedback,
             // 2026-09-12): the refreshed rows say it. Cleared so a stale
             // failure does not outlive the refresh that worked after it.
@@ -74,7 +72,7 @@ extension AppModel {
             return try await appCatalog.collectionPage(
                 collection,
                 offset: offset,
-                hardware: connectedWatch?.model?.compatibleApplicationVariants.first,
+                hardware: connectedWatch?.model?.platform,
                 source: selectedCatalogSource
             )
         } catch {
@@ -102,7 +100,7 @@ extension AppModel {
                 words,
                 kind: kind,
                 page: 0,
-                preferredHardware: connectedWatch?.model?.compatibleApplicationVariants ?? [],
+                preferredHardware: connectedWatch?.model?.compatiblePlatforms ?? [],
                 source: selectedCatalogSource
             )
             catalog.searchResults = answer.applications
@@ -130,7 +128,7 @@ extension AppModel {
                 catalog.searchQuery,
                 kind: catalog.searchKind,
                 page: catalog.searchPage,
-                preferredHardware: connectedWatch?.model?.compatibleApplicationVariants ?? [],
+                preferredHardware: connectedWatch?.model?.compatiblePlatforms ?? [],
                 source: selectedCatalogSource
             )
             // Deduplicated on the identifier: the index can shift under the
@@ -169,27 +167,20 @@ extension AppModel {
         guard !catalog.answeredStoreLookups.contains(applicationID) else {
             return catalog.storeEntries[applicationID]
         }
-        // The store the loaded catalogue came from, which for a cache written
-        // before the store moved is not today's. Asking the one the listing
-        // came from is what makes the comparison mean anything.
-        let baseURL = catalog.sourceURL ?? ApplicationCatalog.defaultSourceURL
-        guard baseURL.scheme?.lowercased() == "https" else { return nil }
-        // The source that owns the feed being asked, so the entry's store page
-        // link points at the store that answered — a Rebble listing sent every
-        // reader to the Pebble store before this was carried through (found in
-        // the 2026-09-12 audit).
-        let source = CatalogSource.builtIn.first { $0.feedURL == baseURL } ?? selectedCatalogSource
         do {
             // The connected watch's board, so a colour watch is answered colour
             // screenshots. The answer is cached per identifier for the session,
             // so a watch swapped mid-session keeps the earlier board's images
             // until the next launch — a smaller wrong than asking again on
             // every visit.
+            // The store being browsed, which is also the one the entry's store
+            // page link has to point at: a Rebble listing sent every reader to
+            // the Pebble store before the source was carried through (found in
+            // the 2026-09-12 audit).
             let entry = try await appCatalog.application(
                 uuid: applicationID,
-                from: baseURL,
-                hardware: connectedWatch?.model?.compatibleApplicationVariants.first,
-                sourceID: source.id
+                source: selectedCatalogSource,
+                hardware: connectedWatch?.model?.platform
             )
             if let entry { catalog.storeEntries[applicationID] = entry }
             // Recorded whichever way it went: "the store does not have this"
@@ -228,19 +219,22 @@ extension AppModel {
 
     @discardableResult
     public func installCatalogApplication(_ application: CatalogApplication) async -> Bool {
+        func report(_ feedback: FeatureFeedback?) {
+            catalog.report = feedback.map { CatalogReport(feedback: $0, applicationID: application.id) }
+        }
         guard application.downloadURL.scheme?.lowercased() == "https" else {
-            catalog.feedback = .failure("The catalog provided an unsafe download URL.")
+            report(.failure("The catalog provided an unsafe download URL."))
             return false
         }
         if catalogInstallationState(for: application) == .incompatible {
-            catalog.feedback = .failure("\(application.name) is not compatible with this watch.")
+            report(.failure("\(application.name) is not compatible with this watch."))
             return false
         }
         guard catalog.installingApplicationID == nil else { return false }
         catalog.installingApplicationID = application.id
         defer { catalog.installingApplicationID = nil }
         do {
-            catalog.feedback = .progress("Downloading \(application.name)…")
+            report(.progress("Downloading \(application.name)…"))
             let packageURL = try await appCatalog.download(application)
             let decoded = try await Task.detached { try PBWPackageImporter.application(from: packageURL) }.value
             guard decoded.id == application.id else { throw ApplicationCatalogError.applicationIDMismatch }
@@ -252,7 +246,7 @@ extension AppModel {
                 // fields, and the detail screen the reader pressed Install on
                 // draws only this one. An import refused for being busy wrote
                 // its reason to the library's field instead.
-                catalog.feedback = applications.importFeedback ?? applications.libraryFeedback
+                report(applications.importFeedback ?? applications.libraryFeedback)
                 applications.importFeedback = nil
                 return false
             }
@@ -269,10 +263,10 @@ extension AppModel {
             // Success is silent, the same bargain the file import struck (owner
             // feedback, 2026-09-12): the row's state flipping to Installed says
             // it, and setting nil is also what ends the Downloading banner above.
-            catalog.feedback = nil
+            report(nil)
             return true
         } catch {
-            catalog.feedback = .failure("The catalog package was rejected: \(failureReason(for: error))")
+            report(.failure("The catalog package was rejected: \(failureReason(for: error))"))
             return false
         }
     }

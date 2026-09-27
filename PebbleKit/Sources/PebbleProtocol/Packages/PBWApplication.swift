@@ -63,7 +63,7 @@ public struct WatchApplication: Identifiable, Codable, Equatable, Sendable {
     public var companyName: String
     public var versionLabel: String
     public var capabilities: [String]
-    public var targetPlatforms: [String]
+    public var targetPlatforms: [WatchPlatform]
     public var kind: WatchApplicationKind
     public var appKeys: [String: UInt32] = [:]
     public var hasCompanionJavaScript: Bool = false
@@ -107,7 +107,7 @@ public struct WatchApplication: Identifiable, Codable, Equatable, Sendable {
         companyName = try container.decode(String.self, forKey: .companyName)
         versionLabel = try container.decode(String.self, forKey: .versionLabel)
         capabilities = try container.decode([String].self, forKey: .capabilities)
-        targetPlatforms = try container.decode([String].self, forKey: .targetPlatforms)
+        targetPlatforms = WatchPlatform.known(in: try container.decode([String].self, forKey: .targetPlatforms))
         kind = try container.decode(WatchApplicationKind.self, forKey: .kind)
         appKeys = try container.decodeIfPresent([String: UInt32].self, forKey: .appKeys) ?? [:]
         hasCompanionJavaScript = try container.decodeIfPresent(
@@ -117,8 +117,8 @@ public struct WatchApplication: Identifiable, Codable, Equatable, Sendable {
         storeVersion = try container.decodeIfPresent(String.self, forKey: .storeVersion)
     }
 
-    public func bestVariant(for model: WatchModel) -> String? {
-        model.compatibleApplicationVariants.first { targetPlatforms.contains($0) }
+    public func bestVariant(for model: WatchModel) -> WatchPlatform? {
+        model.compatiblePlatforms.first { targetPlatforms.contains($0) }
     }
 }
 
@@ -135,7 +135,9 @@ public enum PBWApplicationDecoder {
             companyName: raw.companyName ?? "",
             versionLabel: raw.versionLabel,
             capabilities: raw.capabilities ?? [],
-            targetPlatforms: raw.targetPlatforms ?? ["aplite"],
+            // An appinfo without the list is from an SDK that built for aplite
+            // alone, so this is what it says rather than a guess.
+            targetPlatforms: raw.targetPlatforms.map(WatchPlatform.known(in:)) ?? [.aplite],
             kind: raw.watchapp?.watchface == true ? .watchface : .watchapp,
             appKeys: raw.appKeys ?? [:]
         )
@@ -160,17 +162,4 @@ private struct RawAppInfo: Decodable {
 
 private struct RawWatchapp: Decodable {
     var watchface: Bool?
-}
-
-public extension WatchModel {
-    var compatibleApplicationVariants: [String] {
-        switch self {
-        case .pebble2Duo:
-            ["flint", "diorite", "aplite"]
-        case .pebbleTime2:
-            ["emery", "basalt", "diorite", "aplite"]
-        case .pebbleRound2:
-            ["gabbro", "chalk"]
-        }
-    }
 }

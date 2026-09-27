@@ -19,7 +19,7 @@ struct ApplicationDetailSubject: Equatable, Sendable {
     var developer: String
     var version: String
     var kind: WatchApplicationKind
-    var platforms: [String]
+    var platforms: [WatchPlatform]
     /// What the application says it uses. The package's list where there is
     /// one, the store's row otherwise — the precedence above, for the same
     /// reason: the package describes the copy that will actually run.
@@ -193,7 +193,7 @@ struct ApplicationDetailContent: View {
                 }
                 if !subject.platforms.isEmpty {
                     LabeledContent("Built For") {
-                        Text(verbatim: subject.platforms.sorted().joined(separator: ", "))
+                        Text(verbatim: subject.platforms.map(\.rawValue).sorted().joined(separator: ", "))
                     }
                 }
                 if subject.installed?.hasCompanionJavaScript == true {
@@ -399,6 +399,8 @@ struct ApplicationDetailView: View {
     /// asked yet" and "the store does not have it": neither shows anything, so
     /// the screen does not have to tell them apart.
     @State private var storeEntry: CatalogApplication?
+    /// Why Remove did not, shown here where it was asked for.
+    @State private var removalFeedback: FeatureFeedback?
 
     /// Read from the library rather than held: a removal elsewhere, or a
     /// reinstall, should show here without going back first.
@@ -411,17 +413,15 @@ struct ApplicationDetailView: View {
             if let current {
                 ApplicationDetailContent(
                     subject: ApplicationDetailSubject(installed: current, catalogEntry: storeEntry),
-                    isActive: model.applications.activeWatchfaceID == current.id,
+                    isActive: model.applications.isActiveWatchface(current.id, on: watchID),
                     isInstalled: watchID.map { model.installedApplicationIDs(on: $0).contains(current.id) },
                     installationState: storeEntry.map { model.catalogInstallationState(for: $0) },
                     isInstalling: model.catalog.installingApplicationID == current.id,
                     isAnyInstallRunning: model.catalog.installingApplicationID != nil,
                     isOperationInProgress: model.isApplicationManagementBusy,
-                    // Only this application's own install, so that a catalogue
+                    // Only what was about this application, so that a catalogue
                     // banner about something else does not surface here.
-                    feedback: model.catalog.installingApplicationID == current.id
-                        ? model.catalog.feedback
-                        : nil,
+                    feedback: removalFeedback ?? model.catalog.feedback(about: current.id),
                     // Asked about this application, so a library synchronization
                     // that pushes it to a watch that just connected shows here
                     // too — `installingApplicationID` only knows about installs
@@ -429,6 +429,7 @@ struct ApplicationDetailView: View {
                     transfers: model.transfers(of: current.id),
                     install: {
                         if let storeEntry {
+                            removalFeedback = nil
                             Task { await model.installCatalogApplication(storeEntry) }
                         }
                     },
@@ -437,8 +438,11 @@ struct ApplicationDetailView: View {
                     activateWatchface: { Task { await model.activateWatchface(current) } },
                     removeApplication: {
                         Task {
-                            await model.removeApplication(id: current.id)
-                            dismiss()
+                            if await model.removeApplication(id: current.id) {
+                                dismiss()
+                            } else {
+                                removalFeedback = model.applications.libraryFeedback
+                            }
                         }
                     }
                 )
@@ -630,6 +634,26 @@ struct ApplicationDetailView: View {
             install: {},
             configureApplication: {},
             editGlance: nil,
+            activateWatchface: {},
+            removeApplication: {}
+        )
+    }
+}
+
+#Preview("Could not be removed") {
+    NavigationStack {
+        ApplicationDetailContent(
+            subject: ApplicationDetailSubject(installed: PreviewSamples.watchApplications[0], catalogEntry: nil),
+            isActive: false,
+            isInstalled: true,
+            installationState: nil,
+            isInstalling: false,
+            isAnyInstallRunning: false,
+            isOperationInProgress: false,
+            feedback: .failure("Another application operation is already in progress."),
+            install: {},
+            configureApplication: {},
+            editGlance: {},
             activateWatchface: {},
             removeApplication: {}
         )

@@ -85,6 +85,11 @@ public struct HealthDataLoggingProcessor: Sendable {
     /// | 13–15 | heart rate weight and zone | 12, 13 |
     /// | 16 | SpO2 percent | 14 |
     /// | 17 | SpO2 quality | 14 |
+    /// `AlgMinuteRecordHdr`, the nine bytes before a record's samples.
+    private enum MinuteRecordHeader {
+        static let localOffset = 6
+    }
+
     private enum MinuteSample {
         static let steps = 0
         static let heartRate = 12
@@ -93,8 +98,19 @@ public struct HealthDataLoggingProcessor: Sendable {
         static let firstVersionWithSpo2 = 14
     }
 
+    /// The day a minute belongs to is the watch's: the firmware rolls its own
+    /// day over at local midnight (`time_util_get_day`, `util/time/time.c`),
+    /// and each record says what local was when it was written —
+    /// `time_local_offset_15_min`, byte 6 of `AlgMinuteRecordHdr`. The phone's
+    /// zone split a traveller's steps across other days than their sleep, which
+    /// the session records file by the watch's offset too.
     private func stepSamples(from bytes: [UInt8], itemSize: Int) throws -> [WatchHealthSample] {
-        var daily: [Date: (steps: [StepReading], heartRates: [HeartRateReading], bloodOxygens: [BloodOxygenReading])] = [:]
+        var daily: [Date: (
+            steps: [StepReading],
+            heartRates: [HeartRateReading],
+            bloodOxygens: [BloodOxygenReading],
+            timeZone: TimeZone
+        )] = [:]
         for itemStart in stride(from: 0, to: bytes.count - (bytes.count % itemSize), by: itemSize) {
             let itemEnd = itemStart + itemSize
             guard itemEnd <= bytes.count, itemSize >= 9 else { continue }
@@ -110,11 +126,15 @@ public struct HealthDataLoggingProcessor: Sendable {
             let recordSize = Int(bytes[itemStart + 7])
             let recordCount = Int(bytes[itemStart + 8])
             guard recordSize > MinuteSample.steps else { continue }
+            let offsetQuarters = Int(Int8(bitPattern: bytes[itemStart + MinuteRecordHeader.localOffset]))
+            let timeZone = TimeZone(secondsFromGMT: offsetQuarters * 15 * 60) ?? .current
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = timeZone
             var cursor = itemStart + 9
             for _ in 0..<recordCount where cursor + recordSize <= itemEnd {
                 let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
-                let day = Calendar.current.startOfDay(for: date)
-                var entry = daily[day] ?? (steps: [], heartRates: [], bloodOxygens: [])
+                let day = calendar.startOfDay(for: date)
+                var entry = daily[day] ?? (steps: [], heartRates: [], bloodOxygens: [], timeZone: timeZone)
                 let steps = Int(bytes[cursor + MinuteSample.steps])
                 if steps > 0 {
                     entry.steps.append(StepReading(date: date, steps: steps))
@@ -156,6 +176,7 @@ public struct HealthDataLoggingProcessor: Sendable {
                 heartRateReadings: entry.heartRates,
                 bloodOxygen: .from(entry.bloodOxygens.map(\.percent)),
                 bloodOxygenReadings: entry.bloodOxygens,
+                timeZoneIdentifier: entry.timeZone.identifier,
                 source: .watch
             )
         }

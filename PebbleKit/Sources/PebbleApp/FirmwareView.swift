@@ -5,34 +5,28 @@ struct FirmwareView: View {
     var model: AppModel
     var watchID: WatchID
 
-    private var journal: FirmwareUpdateJournal? {
-        guard let journal = model.firmware.journal, journal.watchID == watchID else {
-            return nil
-        }
-        return journal
-    }
-
     var body: some View {
         let summary = WatchSummary(watchID: watchID, model: model)
+        let state = model.firmware[watchID]
         FirmwareContent(
             installedVersion: summary.firmwareVersion,
             board: summary.board,
             isConnected: summary.isConnected,
             isRunningRecoveryFirmware: summary.isRunningRecoveryFirmware,
-            availableRelease: model.firmware.availableRelease.flatMap { $0.board == summary.board ? $0 : nil },
-            downloadedFirmware: model.firmware.downloaded.flatMap { $0.board == summary.board ? $0 : nil },
-            journal: journal,
-            progress: journal == nil ? nil : model.firmwareTransferProgress(on: watchID),
-            feedback: model.firmware.feedback,
-            requiresConfirmation: model.firmware.requiresConfirmation,
+            availableRelease: state.availableRelease.flatMap { $0.board == summary.board ? $0 : nil },
+            downloadedFirmware: model.downloadedFirmware(for: watchID),
+            journal: state.journal,
+            progress: state.journal == nil ? nil : model.firmwareTransferProgress(on: watchID),
+            feedback: state.feedback,
+            requiresConfirmation: state.requiresConfirmation,
             checkForUpdates: { Task { await model.checkForFirmwareUpdate(watchID: watchID) } },
             download: { Task { await model.downloadAvailableFirmware(watchID: watchID) } },
             installDownloaded: { Task { await model.installDownloadedFirmware(watchID: watchID) } },
             installFile: { url in Task { await model.installFirmware(from: url, watchID: watchID) } },
-            confirmRecovery: { Task { await model.confirmRecoveryFirmwareUpdate() } },
+            confirmRecovery: { Task { await model.confirmRecoveryFirmwareUpdate(watchID: watchID) } },
             resume: { Task { await model.resumeFirmwareUpdate(watchID: watchID) } },
-            cancel: { Task { await model.cancelFirmwareUpdate() } },
-            discard: { Task { await model.discardPendingFirmwareUpdate() } }
+            cancel: { Task { await model.cancelFirmwareUpdate(watchID: watchID) } },
+            discard: { Task { await model.discardPendingFirmwareUpdate(watchID: watchID) } }
         )
     }
 }

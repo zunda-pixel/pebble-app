@@ -39,7 +39,7 @@ extension ApplicationCatalog {
         _ query: String,
         kind: WatchApplicationKind? = nil,
         page: Int = 0,
-        preferredHardware: [String] = [],
+        preferredHardware: [WatchPlatform] = [],
         source: CatalogSource = .pebble
     ) async throws -> CatalogSearchPage {
         // A source without an index cannot be searched past its shop window;
@@ -101,10 +101,10 @@ extension ApplicationCatalog {
     /// nothing where the collections do not cover this watch.
     static func screenshotURLs(
         from collections: [CatalogSearchAssetCollection],
-        preferred: [String]
+        preferred: [WatchPlatform]
     ) -> [URL]? {
-        for board in preferred {
-            guard let collection = collections.first(where: { $0.hardwarePlatform == board })
+        for platform in preferred {
+            guard let collection = collections.first(where: { $0.hardwarePlatform == platform.rawValue })
             else { continue }
             let urls = (collection.screenshots ?? []).compactMap(URL.init(string:)).filter(\.isHTTPS)
             if !urls.isEmpty { return urls }
@@ -135,7 +135,7 @@ extension ApplicationCatalog {
         let entries = try JSONDecoder().decode(OfficialCatalogLookup.self, from: data)
         let byID = Dictionary(
             entries.data.compactMap { entry -> (String, CatalogApplication)? in
-                guard let application = entry.application(kind: nil, sourceID: source.id),
+                guard let application = entry.application(kind: nil, source: source),
                       let id = application.storeID
                 else { return nil }
                 return (id, application)

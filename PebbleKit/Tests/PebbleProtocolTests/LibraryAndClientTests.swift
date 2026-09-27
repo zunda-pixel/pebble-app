@@ -23,7 +23,7 @@ struct LibraryAndClientTests {
             companyName: "Pebble",
             versionLabel: "1.0",
             capabilities: [],
-            targetPlatforms: ["aplite"],
+            targetPlatforms: [.aplite],
             kind: .watchapp
         )
         var second = first
@@ -53,7 +53,7 @@ struct LibraryAndClientTests {
             companyName: "Pebble",
             versionLabel: "1.0",
             capabilities: [],
-            targetPlatforms: ["aplite"],
+            targetPlatforms: [.aplite],
             kind: .watchapp
         )
         _ = try await library.upsert(application)
@@ -782,7 +782,7 @@ struct CompanionStorageTests {
     @Test func catalogVersionComparisonUsesNumericOrdering() {
         let application = CatalogApplication(
             id: UUID(), name: "App", developer: "Developer", version: "2.10",
-            downloadURL: URL(string: "https://example.com/app.pbw")!, supportedPlatforms: ["emery"]
+            downloadURL: URL(string: "https://example.com/app.pbw")!, supportedPlatforms: [.emery]
         )
         #expect(application.isNewer(than: "2.9"))
         #expect(!application.isNewer(than: "2.10"))
@@ -805,7 +805,7 @@ struct CompanionStorageTests {
         func application(storeID: String?) -> CatalogApplication {
             CatalogApplication(
                 id: UUID(), storeID: storeID, name: "App", developer: "Developer", version: "1.0",
-                downloadURL: URL(string: "https://example.com/app.pbw")!, supportedPlatforms: ["emery"]
+                downloadURL: URL(string: "https://example.com/app.pbw")!, supportedPlatforms: [.emery]
             )
         }
 
@@ -835,16 +835,18 @@ struct CompanionStorageTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let application = CatalogApplication(
             id: UUID(), name: "Cached", developer: "Developer", version: "1.0",
-            downloadURL: URL(string: "https://example.com/app.pbw")!, supportedPlatforms: ["emery"]
+            downloadURL: URL(string: "https://example.com/app.pbw")!, supportedPlatforms: [.emery]
         )
         let snapshot = CatalogSnapshot(
-            sourceURL: URL(string: "https://example.com/api")!, fetchedAt: Date(timeIntervalSince1970: 100),
+            source: .rebble, fetchedAt: Date(timeIntervalSince1970: 100),
             applications: [application]
         )
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try JSONEncoder().encode(snapshot).write(to: url, options: .atomic)
         let catalog = ApplicationCatalog(cacheURL: url)
-        #expect(try await catalog.cachedSnapshot() == snapshot)
+        // Asked for the source the cache file belongs to, and read back as the
+        // source it says it is.
+        #expect(try await catalog.cachedSnapshot(source: .pebble) == snapshot)
     }
 
     @Test func reconnectBackoffGrowsExponentiallyAndCaps() {
@@ -1221,10 +1223,11 @@ struct StoreLookupByUUIDTests {
     }
     """
 
-    private func catalog() -> ApplicationCatalog {
+    private func catalog(feedURL: URL) -> ApplicationCatalog {
         ApplicationCatalog(
             cacheURL: FileManager.default.temporaryDirectory.appending(path: "\(UUID().uuidString).json"),
-            session: StubURLProtocol.session()
+            session: StubURLProtocol.session(),
+            feedURL: feedURL
         )
     }
 
@@ -1240,7 +1243,7 @@ struct StoreLookupByUUIDTests {
             body: Data(Self.answer.utf8)
         )
 
-        let found = try #require(await catalog().application(uuid: uuid, from: base))
+        let found = try #require(await catalog(feedURL: base).application(uuid: uuid))
 
         #expect(found.id == uuid)
         #expect(found.storeID == "1b25cef73e2b471686672d07")
@@ -1248,7 +1251,7 @@ struct StoreLookupByUUIDTests {
         #expect(found.kind == .watchapp)
         #expect(found.version == "1.4.0")
         #expect(found.category == "Tools & Utilities")
-        #expect(found.supportedPlatforms.sorted() == ["basalt", "emery"])
+        #expect(Set(found.supportedPlatforms) == [.basalt, .emery])
     }
 
     /// An entry the store sent without a category.
@@ -1289,7 +1292,7 @@ struct StoreLookupByUUIDTests {
             body: Data(answer.utf8)
         )
 
-        let found = try #require(await catalog().application(uuid: uuid, from: base))
+        let found = try #require(await catalog(feedURL: base).application(uuid: uuid))
 
         #expect(found.name == "Watch Tools")
         #expect(found.category == nil)
@@ -1337,7 +1340,7 @@ struct StoreLookupByUUIDTests {
             body: Data(answer.utf8)
         )
 
-        let found = try #require(await catalog().application(uuid: uuid, from: base))
+        let found = try #require(await catalog(feedURL: base).application(uuid: uuid))
 
         #expect(found.category == nil)
         #expect(found.summary == nil)
@@ -1382,12 +1385,12 @@ struct StoreLookupByUUIDTests {
 
         // The lookup takes the entry's own word for its kind, so the untyped
         // one is skipped too — and the good one at the end still arrives.
-        let found = try #require(await catalog().application(uuid: uuid, from: base))
+        let found = try #require(await catalog(feedURL: base).application(uuid: uuid))
 
         #expect(found.name == "Watch Tools")
         #expect(found.storeID == "1b25cef73e2b471686672d07")
         // A platform entry with no name is dropped rather than taken as one.
-        #expect(found.supportedPlatforms == ["emery"])
+        #expect(found.supportedPlatforms == [.emery])
     }
 
     /// Not an error. Plenty of packages were never listed, and a reader who
@@ -1401,6 +1404,6 @@ struct StoreLookupByUUIDTests {
             status: 404
         )
 
-        #expect(try await catalog().application(uuid: uuid, from: base) == nil)
+        #expect(try await catalog(feedURL: base).application(uuid: uuid) == nil)
     }
 }

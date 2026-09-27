@@ -145,7 +145,7 @@ struct AppModelTests {
         // them, which is how the same preference came to be read two ways.
         #expect(Defaults.Keys.companionNotificationsEnabled.defaultValue)
         #expect(!Defaults.Keys.hasCompletedWatchSetup.defaultValue)
-        #expect(Defaults.Keys.activeWatchfaceID.defaultValue == nil)
+        #expect(Defaults.Keys.activeWatchfaceIDs.defaultValue.isEmpty)
         #expect(Defaults.Keys.healthKitLastExportDates.defaultValue.isEmpty)
     }
 
@@ -1023,8 +1023,8 @@ struct AppModelTests {
         // as #79).
         //
         // Nothing in the app advances past `.reconnecting` on its own —
-        // `refreshConnectionState` keeps it while the connection's phase says
-        // so — which is what makes waiting for it sound rather than a race
+        // `connectionState` is read off the connection's phase, which stays
+        // there — which is what makes waiting for it sound rather than a race
         // against a later transition. The loop is the assertion; with no
         // timeout of its own it is bounded by the suite's deadline, the same
         // choice `ChangeLog` makes in `ScriptedMusicTests`.
@@ -1153,7 +1153,7 @@ struct AppModelTests {
             companyName: "Somebody",
             versionLabel: "1.0",
             capabilities: [],
-            targetPlatforms: ["emery"],
+            targetPlatforms: [.emery],
             kind: .watchapp
         )
         try JSONEncoder().encode([application]).write(to: libraryURL)
@@ -1189,10 +1189,10 @@ struct AppModelTests {
     @Test
     func activatingAWatchfaceAnswersWhereItsFailureWouldHave() async throws {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        let previousWatchfaceID = Defaults[.activeWatchfaceID]
+        let previousWatchfaceIDs = Defaults[.activeWatchfaceIDs]
         defer {
             try? FileManager.default.removeItem(at: directory)
-            Defaults[.activeWatchfaceID] = previousWatchfaceID
+            Defaults[.activeWatchfaceIDs] = previousWatchfaceIDs
         }
         let model = AppModel(
             client: MockWatchClient(),
@@ -1207,7 +1207,7 @@ struct AppModelTests {
             companyName: "Somebody",
             versionLabel: "1.0",
             capabilities: [],
-            targetPlatforms: ["emery"],
+            targetPlatforms: [.emery],
             kind: .watchface
         )
         model.applications.libraryFeedback = .failure("The watchface could not be activated.")
@@ -1215,7 +1215,8 @@ struct AppModelTests {
         await model.activateWatchface(face)
 
         #expect(model.applications.libraryFeedback?.kind == .success)
-        #expect(model.applications.activeWatchfaceID == face.id)
+        let watchID = try #require(model.connectedWatch?.id)
+        #expect(model.applications.activeWatchfaceID(on: watchID) == face.id)
     }
 
     @Test
@@ -1230,11 +1231,11 @@ struct AppModelTests {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let pack = directory.appending(path: "ja.pbl")
         try Data([1, 2, 3]).write(to: pack)
-        model.language.isInstalling = true
+        model.language.installing.insert(discovered.id)
 
         await model.installLanguagePack(from: pack, watchID: discovered.id)
 
         #expect(client.installedFiles.isEmpty)
-        #expect(model.language.isInstalling)
+        #expect(model.language.isInstalling(on: discovered.id))
     }
 }

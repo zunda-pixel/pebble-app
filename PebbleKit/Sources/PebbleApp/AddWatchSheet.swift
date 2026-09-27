@@ -12,12 +12,29 @@ struct AddWatchSheet: View {
     /// sheet scans in a loop the whole time it is open, and a scan in progress
     /// outranks a failure there — which is how a refused connect came to leave
     /// the screen exactly as it was.
+    ///
+    /// Not `connectionState`'s `.failed` either, which is whichever watch last
+    /// failed: a watch reconnecting in the background put its failure here as
+    /// though it were this one's. What is shown besides this watch's own is the
+    /// scan's, which is about no watch — the radio being off is news to anyone
+    /// adding one.
     private var connectionFeedback: FeatureFeedback? {
-        if let watchBeingAdded, let failure = model.connectionFailures[watchBeingAdded] {
+        Self.connectionFeedback(
+            watchBeingAdded: watchBeingAdded,
+            connectionFailures: model.connectionFailures,
+            scanFailure: model.scanFailure
+        )
+    }
+
+    static func connectionFeedback(
+        watchBeingAdded: WatchID?,
+        connectionFailures: [WatchID: WatchConnectionError],
+        scanFailure: WatchConnectionError?
+    ) -> FeatureFeedback? {
+        if let watchBeingAdded, let failure = connectionFailures[watchBeingAdded] {
             return .failure(failure.message)
         }
-        guard case .failed(let error) = model.connectionState else { return nil }
-        return .failure(error.message)
+        return scanFailure.map { .failure($0.message) }
     }
 
     var body: some View {

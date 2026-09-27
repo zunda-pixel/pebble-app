@@ -25,7 +25,7 @@ struct SettingsView: View {
             weatherPlaceNames: model.weather.places.map(\.name),
             areCompanionNotificationsEnabled: model.notifications.companionEnabled,
             diagnosticReportURL: model.diagnostics.reportURL,
-            diagnosticsFeedback: model.diagnostics.feedback[.report],
+            diagnosticsFeedback: model.diagnostics.reportFeedback,
             voiceTranscription: model.voiceTranscriptionReadiness,
             voiceLanguages: model.voiceSupportedLanguages,
             phoneAlertsFeedback: model.phoneAlertsFeedback,

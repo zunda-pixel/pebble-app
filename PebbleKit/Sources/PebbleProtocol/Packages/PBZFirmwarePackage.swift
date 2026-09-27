@@ -17,10 +17,16 @@ public struct PBZFirmwareManifest: Codable, Equatable, Sendable {
     public var resources: PBZBlob?
 }
 
+/// The two kinds of image a `.pbz` carries, as its manifest spells them.
+public enum PBZFirmwareType: String, Codable, Equatable, Sendable {
+    case normal
+    case recovery
+}
+
 @MemberwiseInit(.public)
 public struct PBZFirmwareBlob: Codable, Equatable, Sendable {
     public var name: String
-    public var type: String
+    public var type: PBZFirmwareType
     /// `hwrev` in the manifest, which `tools/mkbundle.py` fills with the
     /// board the firmware was built for (`--board`), not the factory revision
     /// the watch reports as `hardwareRevision` in its version response.
@@ -37,6 +43,12 @@ public struct PBZFirmwareBlob: Codable, Equatable, Sendable {
 
     public var board: WatchBoard? {
         WatchBoard.allCases.first { $0.rawValue.caseInsensitiveCompare(boardName) == .orderedSame }
+    }
+
+    /// What PutBytes files the image as: recovery firmware goes to its own
+    /// slot, and the watch refuses one sent as the other.
+    public var objectType: PutBytesObjectType {
+        type == .recovery ? .recovery : .firmware
     }
 }
 
@@ -71,22 +83,27 @@ public enum PBZFirmwareImporter {
         let manifestEntries = archive.filter { $0.path.hasSuffix("manifest.json") }
         var sawWrongSlot = false
         for entry in manifestEntries {
-            let manifest = try JSONDecoder().decode(
-                PBZFirmwareManifest.self,
-                from: data(entry: entry, archive: archive)
-            )
+            let manifest: PBZFirmwareManifest
+            do {
+                manifest = try JSONDecoder().decode(
+                    PBZFirmwareManifest.self,
+                    from: data(entry: entry, archive: archive)
+                )
+            } catch is DecodingError {
+                // An image type other than the two the watch installs among them.
+                throw PBZFirmwareError.unsafeManifest
+            }
             guard manifest.firmware.board == board else {
                 continue
             }
             if let targetSlot,
-               manifest.firmware.type != "recovery",
+               manifest.firmware.type != .recovery,
                let slot = manifest.firmware.slot,
                slot != targetSlot {
                 sawWrongSlot = true
                 continue
             }
-            guard ["normal", "recovery"].contains(manifest.firmware.type),
-                  manifest.manifestVersion > 0,
+            guard manifest.manifestVersion > 0,
                   manifest.firmware.size > 0,
                   manifest.firmware.crc > 0,
                   (manifest.firmware.slot ?? 0) >= 0 else {

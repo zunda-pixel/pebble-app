@@ -17,55 +17,83 @@ public enum FirmwareUpdatePhase: String, Codable, Equatable, Sendable {
 public struct FirmwareUpdateJournal: Codable, Equatable, Sendable {
     public var watchID: WatchID
     public var board: WatchBoard
+    /// The slot the package was read for. A dual-slot package holds an image
+    /// per slot, so reading it again for no slot could pick the other one.
+    public var slot: Int? = nil
     public var previousVersion: String?
     public var targetVersion: String?
+    /// The package's name in `FirmwarePackageStore`'s folder, which holds the
+    /// only copy of it.
+    public var packageFileName: String
     public var packageSHA256: String
     public var phase: FirmwareUpdatePhase = .validated
     public var createdAt: Date = Date()
-
-    // Written as `hardwareRevision` when it held the board's raw value as a
-    // string; renaming the key would orphan a journal already on disk.
-    private enum CodingKeys: String, CodingKey {
-        case watchID, previousVersion, targetVersion, packageSHA256, phase, createdAt
-        case board = "hardwareRevision"
-    }
 }
 
+/// Which update each watch has waiting, and where it got to.
+///
+/// One per watch, because the updates are: a package staged for a watch that
+/// is away is no business of the one that is here.
 public actor PendingFirmwareUpdateStore {
-    private var fileURL: URL
-    private var journalURL: URL
+    private let journalsURL: URL
+    private let packageFolderURL: URL
 
     public init(directory: StorageDirectory = .applicationSupport) {
-        fileURL = directory.file("pending-firmware.json")
-        journalURL = directory.file("pending-firmware-journal.json")
+        journalsURL = directory.file("firmware-updates.json")
+        packageFolderURL = FirmwarePackageStore.folder(in: directory)
     }
 
-    public init(fileURL: URL, journalURL: URL) {
-        self.fileURL = fileURL
-        self.journalURL = journalURL
+    public func journals() throws -> [WatchID: FirmwareUpdateJournal] {
+        try PersistentJSON.loadRecovering([WatchID: FirmwareUpdateJournal].self, from: journalsURL) ?? [:]
     }
 
-    public func package() throws -> PBZFirmwarePackage? {
-        try PersistentJSON.loadRecovering(PBZFirmwarePackage.self, from: fileURL)
+    public func journal(for watchID: WatchID) throws -> FirmwareUpdateJournal? {
+        try journals()[watchID]
     }
 
-    public func journal() throws -> FirmwareUpdateJournal? {
-        try PersistentJSON.loadRecovering(FirmwareUpdateJournal.self, from: journalURL)
+    /// Replaces this watch's update. A copy the reader's file was kept as goes
+    /// with the update it belonged to; a download stays, for it is the
+    /// downloads' to keep.
+    public func save(_ journal: FirmwareUpdateJournal) throws {
+        var journals = try journals()
+        let replaced = journals[journal.watchID]
+        journals[journal.watchID] = journal
+        try PersistentJSON.save(journals, to: journalsURL)
+        if let replaced, replaced.packageFileName != journal.packageFileName {
+            removeChosenCopy(replaced.packageFileName, unlessUsedBy: journals)
+        }
     }
 
-    public func save(_ package: PBZFirmwarePackage, journal: FirmwareUpdateJournal) throws {
-        try PersistentJSON.save(package, to: fileURL)
-        try PersistentJSON.save(journal, to: journalURL)
+    /// The package this update is for, read again from its file and checked
+    /// against what was accepted. Nil where the file has gone.
+    public func package(for journal: FirmwareUpdateJournal) throws -> PBZFirmwarePackage? {
+        let url = packageFolderURL.appending(path: journal.packageFileName, directoryHint: .notDirectory)
+        guard FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) else { return nil }
+        let package = try PBZFirmwareImporter.load(from: url, board: journal.board, targetSlot: journal.slot)
+        guard package.sha256 == journal.packageSHA256 else { throw PBZFirmwareError.unsafeManifest }
+        return package
     }
 
-    public func updatePhase(_ phase: FirmwareUpdatePhase) throws {
-        guard var value = try journal() else { return }
-        value.phase = phase
-        try PersistentJSON.save(value, to: journalURL)
+    public func updatePhase(_ phase: FirmwareUpdatePhase, watchID: WatchID) throws {
+        var journals = try journals()
+        guard journals[watchID] != nil else { return }
+        journals[watchID]?.phase = phase
+        try PersistentJSON.save(journals, to: journalsURL)
     }
 
-    public func clear() {
-        try? FileManager.default.removeItem(at: fileURL)
-        try? FileManager.default.removeItem(at: journalURL)
+    public func clear(watchID: WatchID) {
+        guard var journals = try? journals(), let removed = journals.removeValue(forKey: watchID) else {
+            return
+        }
+        try? PersistentJSON.save(journals, to: journalsURL)
+        removeChosenCopy(removed.packageFileName, unlessUsedBy: journals)
+    }
+
+    private func removeChosenCopy(_ fileName: String, unlessUsedBy journals: [WatchID: FirmwareUpdateJournal]) {
+        guard DownloadedFirmware(fileName: fileName) == nil,
+              !journals.values.contains(where: { $0.packageFileName == fileName }) else { return }
+        try? FileManager.default.removeItem(
+            at: packageFolderURL.appending(path: fileName, directoryHint: .notDirectory)
+        )
     }
 }

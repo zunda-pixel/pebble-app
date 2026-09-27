@@ -16,12 +16,13 @@ struct HealthMinuteRecordTests {
         version: UInt16,
         sampleSize: Int,
         startingAt timestamp: UInt32,
+        localOffsetQuarters: Int8 = 0,
         samples: [[UInt8]]
     ) -> [UInt8] {
         var bytes: [UInt8] = []
         bytes += [UInt8(version & 0xFF), UInt8(version >> 8)]
         bytes += (0..<4).map { UInt8((timestamp >> (8 * UInt32($0))) & 0xFF) }
-        bytes += [0]                        // time_local_offset_15_min
+        bytes += [UInt8(bitPattern: localOffsetQuarters)]   // time_local_offset_15_min
         bytes += [UInt8(sampleSize)]        // sample_size
         bytes += [UInt8(samples.count)]     // num_samples
         for sample in samples {
@@ -53,6 +54,7 @@ struct HealthMinuteRecordTests {
     private func samples(
         version: UInt16,
         sampleSize: Int,
+        localOffsetQuarters: Int8 = 0,
         minutes: [[UInt8]]
     ) throws -> [WatchHealthSample] {
         var processor = HealthDataLoggingProcessor()
@@ -61,6 +63,7 @@ struct HealthMinuteRecordTests {
             version: version,
             sampleSize: sampleSize,
             startingAt: 1_757_000_000,
+            localOffsetQuarters: localOffsetQuarters,
             samples: minutes
         )
 
@@ -213,6 +216,62 @@ struct HealthMinuteRecordTests {
 
         #expect(try #require(read.first).steps == 7)
         #expect(try #require(read.first).heartRate?.average == 65)
+    }
+
+    /// 1_757_000_000 is 15:33 UTC on 4 September 2025, which is already the
+    /// 5th in Tokyo and still the 4th in California. The day is the watch's.
+    @Test(arguments: [
+        (Int8(36), TimeInterval(1_756_998_000)),    // UTC+9: from 15:00 UTC on the 4th
+        (Int8(-28), TimeInterval(1_756_969_200)),   // UTC−7: from 07:00 UTC on the 4th
+    ])
+    func aMinutesDayIsTheOneOnTheWatchsClock(offset: Int8, startOfDay: TimeInterval) throws {
+        let read = try samples(
+            version: 13,
+            sampleSize: 16,
+            localOffsetQuarters: offset,
+            minutes: [minute(steps: 10, heartRate: nil)]
+        )
+
+        let day = try #require(read.first)
+        #expect(day.date == Date(timeIntervalSince1970: startOfDay))
+        #expect(TimeZone(identifier: day.timeZoneIdentifier)?.secondsFromGMT() == Int(offset) * 15 * 60)
+    }
+
+    /// Steps and the night that ended in the same minute land on one day, both
+    /// counted in the zone the watch was in — the phone's own zone put the
+    /// steps a day away from the sleep for anyone travelling.
+    @Test func stepsAndSleepAreFiledUnderTheSameDay() throws {
+        let steps = try #require(try samples(
+            version: 13,
+            sampleSize: 16,
+            localOffsetQuarters: 36,
+            minutes: [minute(steps: 10, heartRate: nil)]
+        ).first)
+
+        var processor = HealthDataLoggingProcessor()
+        var open = [UInt8](repeating: 0, count: 29)
+        open[0] = 0x01
+        open[1] = 3
+        open[22] = 83
+        open[27] = 18
+        _ = try processor.process(PebbleProtocolFrame(endpoint: HealthDataLoggingCodec.endpoint, payload: open))
+        // `ActivitySessionDataLoggingRecord`: type 1 (sleep) at byte 4, the
+        // seconds east of UTC at 6, the start at 10 and the length at 14.
+        let night: [UInt8] = [0, 0, 0, 0]
+            + UInt16(1).littleEndianBytes
+            + Int32(9 * 3_600).littleEndianBytes
+            + UInt32(1_757_000_000 - 3_600).littleEndianBytes
+            + UInt32(3_600).littleEndianBytes
+        let data: [UInt8] = [0x02, 3] + [UInt8](repeating: 0, count: 8) + night
+        let sleep = try #require(try processor.process(
+            PebbleProtocolFrame(endpoint: HealthDataLoggingCodec.endpoint, payload: data)
+        ).samples.first)
+
+        #expect(sleep.date == steps.date)
+        #expect(
+            TimeZone(identifier: sleep.timeZoneIdentifier)?.secondsFromGMT()
+                == TimeZone(identifier: steps.timeZoneIdentifier)?.secondsFromGMT()
+        )
     }
 }
 

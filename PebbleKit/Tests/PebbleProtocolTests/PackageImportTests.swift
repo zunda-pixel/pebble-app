@@ -74,10 +74,10 @@ struct PackageImportTests {
 
         let plan = try PBWManifestDecoder.installationPlan(
             for: .pebbleTime2,
-            manifestsByVariant: ["basalt": basalt, "emery": emery]
+            manifestsByVariant: [.basalt: basalt, .emery: emery]
         )
 
-        #expect(plan.variant == "emery")
+        #expect(plan.variant == .emery)
         #expect(plan.objects.map(\.objectType) == [.appExecutable, .appResource, .worker])
         #expect(plan.objects.map(\.blob.name) == ["app.bin", "app.pbpack", "worker.bin"])
     }
@@ -90,7 +90,7 @@ struct PackageImportTests {
         #expect(throws: PBWManifestError.noCompatibleVariant) {
             try PBWManifestDecoder.installationPlan(
                 for: .pebble2Duo,
-                manifestsByVariant: ["chalk": chalk]
+                manifestsByVariant: [.chalk: chalk]
             )
         }
     }
@@ -114,8 +114,33 @@ struct PackageImportTests {
 
         #expect(application.displayName == "Orbit Face")
         #expect(application.kind == .watchface)
-        #expect(application.bestVariant(for: .pebbleTime2) == "emery")
+        #expect(application.bestVariant(for: .pebbleTime2) == .emery)
         #expect(application.bestVariant(for: .pebble2Duo) == nil)
+    }
+
+    /// A name no watch this app drives can run is dropped where it is read,
+    /// rather than carried along as a string nothing can match.
+    @Test func aPlatformNameNoWatchHereRunsIsDropped() throws {
+        #expect(WatchPlatform.known(in: ["emery", "obelix", "basalt"]) == [.emery, .basalt])
+        let json = Data(#"""
+        {
+          "uuid": "00112233-4455-6677-8899-aabbccddeeff",
+          "shortName": "Odd",
+          "versionLabel": "1.0",
+          "targetPlatforms": ["obelix", "emery"]
+        }
+        """#.utf8)
+
+        let application = try PBWApplicationDecoder.decodeAppInfo(from: json)
+
+        #expect(application.targetPlatforms == [.emery])
+    }
+
+    @Test func eachModelTriesItsOwnPlatformFirst() {
+        #expect(WatchModel.pebble2Duo.compatiblePlatforms == [.flint, .diorite, .aplite])
+        #expect(WatchModel.pebbleTime2.compatiblePlatforms == [.emery, .basalt, .diorite, .aplite])
+        #expect(WatchModel.pebbleRound2.compatiblePlatforms == [.gabbro, .chalk])
+        #expect(WatchModel.allCases.allSatisfy { $0.platform == $0.compatiblePlatforms[0] })
     }
 
     @Test func legacyPBWDefaultsToApliteAndWatchapp() throws {
@@ -129,9 +154,9 @@ struct PackageImportTests {
 
         let application = try PBWApplicationDecoder.decodeAppInfo(from: json)
 
-        #expect(application.targetPlatforms == ["aplite"])
+        #expect(application.targetPlatforms == [.aplite])
         #expect(application.kind == .watchapp)
-        #expect(application.bestVariant(for: .pebble2Duo) == "aplite")
+        #expect(application.bestVariant(for: .pebble2Duo) == .aplite)
     }
 
     @Test func firmwareImporterPicksTheManifestForTheTargetSlot() throws {
@@ -278,70 +303,196 @@ struct PackageImportTests {
         #expect(PebbleOSFirmwareCatalog.asset(for: .asterix, in: assets) == nil)
     }
 
-    @Test func firmwareJournalAndSHA256DetectPackageIdentity() async throws {
-        let bytes = Data([1, 2, 3, 4])
-        let blob = PBZFirmwareBlob(
-            name: "firmware.bin", type: "normal", boardName: "obelix_pvt",
-            size: bytes.count, crc: PebbleCRC32.calculate([UInt8](bytes)),
-            versionTag: nil, slot: nil
-        )
-        let package = PBZFirmwarePackage(
-            manifest: PBZFirmwareManifest(manifestVersion: 1, firmware: blob, resources: nil),
-            firmware: bytes,
-            resources: nil
-        )
-        try package.validateIntegrity()
-        #expect(package.sha256.count == 64)
-        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let library = PendingFirmwareUpdateStore(
-            fileURL: directory.appending(path: "package.json"),
-            journalURL: directory.appending(path: "journal.json")
-        )
-        let journal = FirmwareUpdateJournal(
-            watchID: WatchID("watch"), board: .obelixPVT, previousVersion: nil,
-            targetVersion: nil, packageSHA256: package.sha256
-        )
-        try await library.save(package, journal: journal)
-        #expect(try await library.journal() == journal)
-        try await library.updatePhase(.transferring)
-        #expect(try await library.journal()?.phase == .transferring)
+    /// Two slots with different bytes, so which one was read can be told.
+    private func makeFirmwareArchive(slotImages: [Data], in directory: URL) throws -> URL {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appending(path: "\(UUID().uuidString).pbz")
+        let archive = try Archive(url: url, accessMode: .create)
+        for (slot, firmware) in slotImages.enumerated() {
+            let manifest = Data("""
+            {
+              "manifestVersion": 1,
+              "firmware": {
+                "name": "firmware.bin",
+                "type": "normal",
+                "hwrev": "\(WatchBoard.obelixPVT.rawValue)",
+                "size": \(firmware.count),
+                "crc": \(PebbleCRC32.calculate([UInt8](firmware))),
+                "slot": \(slot),
+                "versionTag": "v4.37.0"
+              }
+            }
+            """.utf8)
+            try archive.addEntry(
+                with: "slot\(slot)/manifest.json",
+                type: .file,
+                uncompressedSize: Int64(manifest.count),
+                provider: { position, size in manifest.subdata(in: Int(position)..<Int(position) + size) }
+            )
+            try archive.addEntry(
+                with: "slot\(slot)/firmware.bin",
+                type: .file,
+                uncompressedSize: Int64(firmware.count),
+                provider: { position, size in firmware.subdata(in: Int(position)..<Int(position) + size) }
+            )
+        }
+        return url
     }
 
-    @Test func aJournalWrittenWithAHardwareRevisionStringStillDecodes() async throws {
-        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let journalURL = directory.appending(path: "journal.json")
-        // As `PersistentJSON.save` wrote it when the field was a `String`.
-        try Data("""
-        {
-          "createdAt" : 780000000,
-          "hardwareRevision" : "obelix_pvt",
-          "packageSHA256" : "abc",
-          "phase" : "validated",
-          "previousVersion" : "v4.9.142",
-          "targetVersion" : "v4.36.2",
-          "watchID" : "watch"
-        }
-        """.utf8).write(to: journalURL)
-        let store = PendingFirmwareUpdateStore(
-            fileURL: directory.appending(path: "package.json"),
-            journalURL: journalURL
+    private func journal(
+        for watchID: WatchID,
+        package: PBZFirmwarePackage,
+        fileName: String,
+        slot: Int? = nil
+    ) -> FirmwareUpdateJournal {
+        FirmwareUpdateJournal(
+            watchID: watchID,
+            board: .obelixPVT,
+            slot: slot,
+            previousVersion: nil,
+            targetVersion: package.manifest.firmware.versionTag,
+            packageFileName: fileName,
+            packageSHA256: package.sha256
+        )
+    }
+
+    /// The package is kept once, as a file in the storage directory, and the
+    /// journal names it: nothing of it is copied into JSON, and nothing points
+    /// at an absolute address that an update of the app would move.
+    @Test func aStagedUpdateIsReadAgainFromItsFileForTheSlotItWasChosenFor() async throws {
+        let root = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let directory = StorageDirectory(url: root)
+        let packages = FirmwarePackageStore(directory: directory)
+        let updates = PendingFirmwareUpdateStore(directory: directory)
+        let chosen = try makeFirmwareArchive(
+            slotImages: [Data([1, 1, 1, 1]), Data([2, 2, 2, 2])],
+            in: root.appending(path: "Downloads")
+        )
+        let package = try PBZFirmwareImporter.load(from: chosen, board: .obelixPVT, targetSlot: 1)
+
+        let fileName = try await packages.fileName(keeping: chosen)
+        try FileManager.default.removeItem(at: chosen)
+        try await updates.save(journal(for: WatchID("watch"), package: package, fileName: fileName, slot: 1))
+
+        #expect(FileManager.default.fileExists(atPath: packages.url(for: fileName).path(percentEncoded: false)))
+        let staged = try #require(try await updates.journal(for: WatchID("watch")))
+        #expect(staged.packageFileName == fileName)
+        let reread = try #require(try await updates.package(for: staged))
+        #expect(reread.firmware == Data([2, 2, 2, 2]))
+        #expect(reread.sha256 == package.sha256)
+        try await updates.updatePhase(.transferring, watchID: WatchID("watch"))
+        #expect(try await updates.journal(for: WatchID("watch"))?.phase == .transferring)
+    }
+
+    @Test func eachWatchKeepsItsOwnUpdateAndClearingOneTakesOnlyItsCopy() async throws {
+        let root = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let directory = StorageDirectory(url: root)
+        let packages = FirmwarePackageStore(directory: directory)
+        let updates = PendingFirmwareUpdateStore(directory: directory)
+        let chosen = try makeFirmwareArchive(slotImages: [Data([3, 3, 3, 3])], in: root.appending(path: "In"))
+        let package = try PBZFirmwareImporter.load(from: chosen, board: .obelixPVT)
+        let first = try await packages.fileName(keeping: chosen)
+        let second = try await packages.fileName(keeping: chosen)
+        try await updates.save(journal(for: WatchID("a"), package: package, fileName: first))
+        try await updates.save(journal(for: WatchID("b"), package: package, fileName: second))
+
+        await updates.clear(watchID: WatchID("a"))
+
+        #expect(try await updates.journal(for: WatchID("a")) == nil)
+        let remaining = try #require(try await updates.journal(for: WatchID("b")))
+        #expect(remaining.packageFileName == second)
+        #expect(!FileManager.default.fileExists(atPath: packages.url(for: first).path(percentEncoded: false)))
+        #expect(try await updates.package(for: remaining) != nil)
+    }
+
+    /// A download is the downloads' to keep: the update that read it going
+    /// away leaves it where it is.
+    @Test func aDownloadIsKnownByItsFileAndOutlivesAnUpdateThatUsedIt() async throws {
+        let root = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let directory = StorageDirectory(url: root)
+        let packages = FirmwarePackageStore(directory: directory)
+        let updates = PendingFirmwareUpdateStore(directory: directory)
+        let downloaded = DownloadedFirmware(versionTag: "v4.37.0-rc1", board: .obelixPVT)
+        let archive = try makeFirmwareArchive(slotImages: [Data([4, 4, 4, 4])], in: root.appending(path: "In"))
+        try FileManager.default.createDirectory(at: packages.folderURL, withIntermediateDirectories: true)
+        try FileManager.default.moveItem(at: archive, to: packages.url(for: downloaded))
+
+        #expect(await packages.downloads() == [downloaded])
+        let fileName = try await packages.fileName(keeping: packages.url(for: downloaded))
+        #expect(fileName == downloaded.fileName)
+        let package = try PBZFirmwareImporter.load(from: packages.url(for: downloaded), board: .obelixPVT)
+        try await updates.save(journal(for: WatchID("watch"), package: package, fileName: fileName))
+
+        await updates.clear(watchID: WatchID("watch"))
+
+        #expect(await packages.downloads() == [downloaded])
+    }
+
+    @Test func aStagedUpdateWhosePackageHasGoneHasNoPackage() async throws {
+        let root = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let directory = StorageDirectory(url: root)
+        let packages = FirmwarePackageStore(directory: directory)
+        let updates = PendingFirmwareUpdateStore(directory: directory)
+        let chosen = try makeFirmwareArchive(slotImages: [Data([5, 5, 5, 5])], in: root.appending(path: "In"))
+        let package = try PBZFirmwareImporter.load(from: chosen, board: .obelixPVT)
+        let fileName = try await packages.fileName(keeping: chosen)
+        let staged = journal(for: WatchID("watch"), package: package, fileName: fileName)
+        try await updates.save(staged)
+
+        await packages.remove(fileName: fileName)
+
+        #expect(try await updates.package(for: staged) == nil)
+    }
+
+    @Test func aDownloadedPackageNameReadsBackAsItsBoardAndVersion() {
+        let downloaded = DownloadedFirmware(versionTag: "v4.37.0", board: .obelixBigboard2)
+
+        #expect(downloaded.fileName == "pebbleos-obelix_bb2-v4.37.0.pbz")
+        #expect(DownloadedFirmware(fileName: downloaded.fileName) == downloaded)
+        #expect(DownloadedFirmware(fileName: "chosen-\(UUID().uuidString).pbz") == nil)
+        #expect(DownloadedFirmware(fileName: "pebbleos-nosuchboard-v1.pbz") == nil)
+    }
+
+    @Test func aManifestImageTypeTheWatchDoesNotInstallIsUnsafe() throws {
+        let root = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let url = root.appending(path: "odd.pbz")
+        let archive = try Archive(url: url, accessMode: .create)
+        let manifest = Data("""
+        {"manifestVersion": 1, "firmware": {"name": "firmware.bin", "type": "bootloader",
+         "hwrev": "obelix_pvt", "size": 1, "crc": 1}}
+        """.utf8)
+        try archive.addEntry(
+            with: "manifest.json",
+            type: .file,
+            uncompressedSize: Int64(manifest.count),
+            provider: { position, size in manifest.subdata(in: Int(position)..<Int(position) + size) }
         )
 
-        let journal = try #require(try await store.journal())
+        #expect(throws: PBZFirmwareError.unsafeManifest) {
+            try PBZFirmwareImporter.load(from: url, board: .obelixPVT)
+        }
+    }
 
-        #expect(journal.board == .obelixPVT)
-        #expect(journal.watchID == WatchID("watch"))
-        #expect(journal.targetVersion == "v4.36.2")
-        let reencoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(journal)) as? [String: Any]
-        #expect(reencoded?["hardwareRevision"] as? String == "obelix_pvt")
+    @Test func aRecoveryImageIsSentAsRecovery() {
+        let blob = PBZFirmwareBlob(
+            name: "firmware.bin", type: .recovery, boardName: "obelix_pvt",
+            size: 1, crc: 1, versionTag: nil, slot: nil
+        )
+        #expect(blob.objectType == .recovery)
+        var normal = blob
+        normal.type = .normal
+        #expect(normal.objectType == .firmware)
     }
 
     @Test func aManifestBoardNameMatchesItsBoardWhateverItsCase() {
         let blob = PBZFirmwareBlob(
-            name: "firmware.bin", type: "normal", boardName: "OBELIX_PVT",
+            name: "firmware.bin", type: .normal, boardName: "OBELIX_PVT",
             size: 1, crc: 1, versionTag: nil, slot: nil
         )
         #expect(blob.board == .obelixPVT)

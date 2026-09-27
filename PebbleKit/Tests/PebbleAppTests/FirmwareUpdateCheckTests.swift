@@ -88,6 +88,8 @@ struct FirmwareUpdateCheckTests {
             #expect(notifier.posted.count == 1)
             #expect(notifier.posted.first?.body.contains("v5.1.0") == true)
             #expect(notifier.posted.first?.body.contains(connection.watch.name) == true)
+            // Remembered under the watch's own identifier.
+            #expect(Defaults[.notifiedFirmwareVersions][connection.watch.id] == "v5.1.0")
 
             // The same release again is not news — even past the check cache.
             model.firmwareCheckedAt = [:]
@@ -186,7 +188,7 @@ struct FirmwareUpdateCheckTests {
                     manifestVersion: 1,
                     firmware: PBZFirmwareBlob(
                         name: "firmware.bin",
-                        type: "normal",
+                        type: .normal,
                         boardName: WatchBoard.obelixPVT.rawValue,
                         size: firmware.count,
                         crc: PebbleCRC32.calculate([UInt8](firmware)),

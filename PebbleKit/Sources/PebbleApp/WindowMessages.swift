@@ -36,15 +36,20 @@ where Message.Subject == AppModel {
 
     // The observation lives exactly as long as the token, so the view holds it.
     @State private var token: NotificationCenter.ObservationToken?
+    @Environment(\.windowIdentity) private var window
 
     func body(content: Content) -> some View {
         content
             .onAppear {
+                // A menu command is the front window's; every window observing
+                // the same model used to act on it.
                 token = NotificationCenter.default.addObserver(
                     of: model,
-                    for: Message.self,
-                    using: action
-                )
+                    for: Message.self
+                ) { [window, action] message in
+                    if let window, !FrontWindow.shared.isFront(window) { return }
+                    action(message)
+                }
             }
             .onDisappear {
                 if let token {

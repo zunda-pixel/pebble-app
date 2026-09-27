@@ -11,14 +11,31 @@ public final class CatalogModel {
     public internal(set) var applications: [CatalogApplication] = []
     /// The feed's shelves — Top Picks, Most Loved — in the feed's own order.
     public internal(set) var collections: [CatalogCollection] = []
-    /// Where these came from, so that asking the store about one application
-    /// goes to the store the rest of them came from.
-    public internal(set) var sourceURL: URL?
-    /// The store being browsed, by `CatalogSource.id`.
-    public internal(set) var sourceID = CatalogSource.pebble.id
+    /// The store being browsed, and so the one asked about any single
+    /// application.
+    public internal(set) var source: CatalogSource = .pebble
     public internal(set) var isUpdating = false
     public internal(set) var installingApplicationID: UUID?
-    public internal(set) var feedback: FeatureFeedback?
+    /// The catalogue's last word, and which application it was about — nil
+    /// for the catalogue as a whole: a refresh, a search.
+    ///
+    /// The application travels with the words rather than being read off
+    /// `installingApplicationID`, which is cleared the moment an install ends
+    /// and so took the install's own answer off its screen with it.
+    public internal(set) var report: CatalogReport?
+
+    /// What the catalogue screen shows, whoever it was about. Setting it says
+    /// something about the catalogue as a whole.
+    public internal(set) var feedback: FeatureFeedback? {
+        get { report?.feedback }
+        set { report = newValue.map { CatalogReport(feedback: $0, applicationID: nil) } }
+    }
+
+    /// What an application's own screen shows: only what was about it.
+    public func feedback(about applicationID: UUID) -> FeatureFeedback? {
+        guard let report, report.applicationID == applicationID else { return nil }
+        return report.feedback
+    }
 
     /// What the store said about applications already in the library, keyed by
     /// the identifier their package carries.
@@ -45,4 +62,10 @@ public final class CatalogModel {
     /// The next page to ask the index for.
     @ObservationIgnored var searchPage = 0
     @ObservationIgnored var searchKind: WatchApplicationKind?
+}
+
+/// Something the catalogue said, and the application it said it about.
+public struct CatalogReport: Equatable {
+    public var feedback: FeatureFeedback
+    public var applicationID: UUID?
 }

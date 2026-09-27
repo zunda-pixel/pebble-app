@@ -13,6 +13,9 @@ struct CatalogApplicationDetailView: View {
     /// which hides the row rather than showing a button that does nothing.
     var editGlance: ((WatchApplication) -> Void)?
     @Environment(\.dismiss) private var dismiss
+    /// Why Remove did not. The catalogue screen this came from does not show
+    /// the library's answers, so without this a refusal was shown nowhere.
+    @State private var removalFeedback: FeatureFeedback?
 
     private var installed: WatchApplication? {
         model.applications.all.first { $0.id == application.id }
@@ -21,15 +24,18 @@ struct CatalogApplicationDetailView: View {
     var body: some View {
         ApplicationDetailContent(
             subject: ApplicationDetailSubject(catalogEntry: application, installed: installed),
-            isActive: model.applications.activeWatchfaceID == application.id,
+            isActive: model.applications.isActiveWatchface(application.id, on: nil),
             isInstalled: nil,
             installationState: model.catalogInstallationState(for: application),
             isInstalling: model.catalog.installingApplicationID == application.id,
             isAnyInstallRunning: model.catalog.installingApplicationID != nil,
             isOperationInProgress: model.isApplicationManagementBusy,
-            feedback: model.catalog.feedback,
+            feedback: removalFeedback ?? model.catalog.feedback(about: application.id),
             transfers: model.transfers(of: application.id),
-            install: { Task { await model.installCatalogApplication(application) } },
+            install: {
+                removalFeedback = nil
+                Task { await model.installCatalogApplication(application) }
+            },
             configureApplication: {
                 if let installed { Task { await model.configureApplication(installed) } }
             },
@@ -42,8 +48,11 @@ struct CatalogApplicationDetailView: View {
             removeApplication: {
                 if let installed {
                     Task {
-                        await model.removeApplication(id: installed.id)
-                        dismiss()
+                        if await model.removeApplication(id: installed.id) {
+                            dismiss()
+                        } else {
+                            removalFeedback = model.applications.libraryFeedback
+                        }
                     }
                 }
             }

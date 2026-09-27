@@ -84,7 +84,10 @@ extension AppModel {
         }
     }
 
-    public func forgetWatch(id: WatchID) async {
+    /// False when the watch is still remembered, with the reason in
+    /// `watches.feedback`.
+    @discardableResult
+    public func forgetWatch(id: WatchID) async -> Bool {
         // A successful reconnect would otherwise re-save the forgotten entry.
         if let connection = connections.first(where: { $0.watch.id == id }) {
             await close(connection)
@@ -94,9 +97,13 @@ extension AppModel {
             applications.installedIDsByWatch[id] = nil
             connectionFailures[id] = nil
             watches.resetFeedback[id] = nil
+            diagnostics.watches[id] = nil
+            language.feedback[id] = nil
             watches.feedback = nil
+            return true
         } catch {
             watches.feedback = .failure("The watch could not be forgotten.")
+            return false
         }
     }
 
@@ -122,7 +129,6 @@ extension AppModel {
         if activeConnections.isEmpty { musicCoordinator.watchDisconnected() }
         needsApplicationSynchronization = true
         lastConnectionError = nil
-        refreshConnectionState()
     }
 
     public func prepareDiagnosticReport() async {
@@ -133,14 +139,14 @@ extension AppModel {
             )
             // Nothing to say on success: the Share row appearing is the answer,
             // and this clears whatever an earlier attempt left behind.
-            diagnostics.feedback[.report] = nil
+            diagnostics.reportFeedback = nil
         } catch {
             // The button for this is on the settings screen. This used to write
             // to `applications.libraryFeedback`, which only the Apps tab shows
             // — so a report that could not be written said so on a screen
             // nobody was looking at, and the settings screen sat there as
             // though nothing had been asked.
-            diagnostics.feedback[.report] = .failure("The diagnostic report could not be created.")
+            diagnostics.reportFeedback = .failure("The diagnostic report could not be created.")
             // And the earlier report goes with it. Leaving it would keep a
             // Share row offering a file from before whatever went wrong, next
             // to a message saying the report could not be created.

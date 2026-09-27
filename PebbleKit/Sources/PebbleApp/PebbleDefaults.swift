@@ -5,8 +5,6 @@ public import Defaults
 import Foundation
 
 extension Defaults.Keys {
-    static let downloadedFirmware = Key<DownloadedFirmware?>("downloadedFirmware")
-
     static let weatherPlaces = Key<[WeatherPlace]>("weatherPlaces", default: [])
     /// The watch stores a temperature with no unit attached, so the unit the
     /// numbers were converted to has to be remembered here.
@@ -44,7 +42,7 @@ extension Defaults.Keys {
     static let notifyAboutFirmwareUpdates = Key<Bool>("notifyAboutFirmwareUpdates", default: false)
     /// The firmware version each watch was last told about, so the same update
     /// is announced once — across launches, not just within one.
-    static let notifiedFirmwareVersions = Key<[String: String]>(
+    static let notifiedFirmwareVersions = Key<[WatchID: String]>(
         "notifiedFirmwareVersions",
         default: [:]
     )
@@ -81,7 +79,7 @@ extension Defaults.Keys {
     static let calendarPinsEnabled = Key<Bool>("calendarPinsEnabled", default: true)
     static let calendarIncludesDeclined = Key<Bool>("calendarIncludesDeclined", default: false)
     static let calendarRemindersEnabled = Key<Bool>("calendarRemindersEnabled", default: true)
-    static let catalogSourceID = Key<String>("catalogSourceID", default: "pebble")
+    static let catalogSource = Key<CatalogSource>("catalogSource", default: .pebble)
 
     static let companionNotificationsEnabled = Key<Bool>("companionNotificationsEnabled", default: true)
 
@@ -93,7 +91,9 @@ extension Defaults.Keys {
     /// one has still never been asked for anything.
     static let hasCompletedWatchSetup = Key<Bool>("hasCompletedPebbleWatchSetup", default: false)
 
-    static let activeWatchfaceID = Key<UUID?>("activeWatchfaceID")
+    /// The watchface each watch last said it was running. Per watch, because
+    /// two watches can be showing different ones.
+    static let activeWatchfaceIDs = Key<[WatchID: UUID]>("activeWatchfaceIDs", default: [:])
 
     /// Which language dictation listens for — a locale identifier, or nil to
     /// follow the phone's own language, which is where everyone starts.
@@ -105,8 +105,8 @@ extension Defaults.Keys {
     static let healthKitLastExportDates = Key<[String: Date]>("healthKitLastExportDates", default: [:])
 }
 
-extension DownloadedFirmware: Defaults.Serializable {}
 extension WeatherPlace: Defaults.Serializable {}
+extension CatalogSource: Defaults.Serializable {}
 extension ActivitySettings: Defaults.Serializable {}
 extension QuickLaunchAssignment: Defaults.Serializable {}
 extension HeartRateSettings: Defaults.Serializable {}

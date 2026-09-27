@@ -101,20 +101,19 @@ struct FeatureFeedbackTests {
         let model = makeModel(directory: directory, client: MockWatchClient())
 
         // As an earlier attempt would have left it.
-        model.diagnostics.feedback[.report] = .failure("The diagnostic report could not be created.")
+        model.diagnostics.reportFeedback = .failure("The diagnostic report could not be created.")
 
         await model.prepareDiagnosticReport()
 
         // The Share row appearing is the answer, so the words go rather than
         // being replaced — and an earlier failure does not outlive its cause.
         #expect(model.diagnostics.reportURL != nil)
-        #expect(model.diagnostics.feedback[.report] == nil)
+        #expect(model.diagnostics.reportFeedback == nil)
         // Not on the Apps tab, which is where this used to end up.
         #expect(model.applications.libraryFeedback == nil)
         #expect(model.applications.managementFeedback == nil)
-        // Nor is it any other diagnostic's answer.
-        #expect(model.diagnostics.feedback[.screenshot] == nil)
-        #expect(model.diagnostics.feedback[.watchLogs] == nil)
+        // Nor is it any watch's diagnostic answer.
+        #expect(model.diagnostics.watches.isEmpty)
     }
 
     /// A delivery setting answers on the settings screen, and a test

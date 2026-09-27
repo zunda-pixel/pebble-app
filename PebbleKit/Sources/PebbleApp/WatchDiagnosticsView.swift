@@ -10,19 +10,20 @@ struct WatchDiagnosticsView: View {
     }
 
     var body: some View {
+        let state = model.diagnostics[watchID]
         WatchDiagnosticsContent(
             isConnected: isConnected,
-            screenshot: model.diagnostics.latestScreenshot,
-            screenshotURL: model.diagnostics.screenshotURL,
-            isTakingScreenshot: model.diagnostics.isTakingScreenshot,
-            watchLogLineCount: model.diagnostics.watchLogLines.count,
-            watchLogsURL: model.diagnostics.watchLogsURL,
-            isGatheringWatchLogs: model.diagnostics.isGatheringWatchLogs,
+            screenshot: state.latestScreenshot,
+            screenshotURL: state.screenshotURL,
+            isTakingScreenshot: state.isTakingScreenshot,
+            watchLogLineCount: state.watchLogLines.count,
+            watchLogsURL: state.watchLogsURL,
+            isGatheringWatchLogs: state.isGatheringWatchLogs,
             isApplicationLoggingEnabled: model.diagnostics.isApplicationLoggingEnabled,
             applicationLogLines: model.diagnostics.applicationLogLines,
-            coredumpURL: model.diagnostics.coredumpURL,
-            isCollectingCoredump: model.diagnostics.isCollectingCoredump,
-            feedback: model.diagnostics.feedback,
+            coredumpURL: state.coredumpURL,
+            isCollectingCoredump: state.isCollectingCoredump,
+            feedback: state.feedback,
             takeScreenshot: { Task { await model.takeScreenshot(watchID: watchID) } },
             gatherWatchLogs: { Task { await model.gatherWatchLogs(watchID: watchID) } },
             setApplicationLogging: { isOn in Task { await model.setApplicationLoggingEnabled(isOn) } },

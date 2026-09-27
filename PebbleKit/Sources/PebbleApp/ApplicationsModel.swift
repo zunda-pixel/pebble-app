@@ -10,7 +10,8 @@ public import Observation
 public final class ApplicationsModel {
     public internal(set) var apps: [WatchApplication] = []
     public internal(set) var watchfaces: [WatchApplication] = []
-    public internal(set) var activeWatchfaceID: UUID?
+    /// The watchface each watch is showing, as it last said.
+    public internal(set) var activeWatchfaceIDs: [WatchID: UUID] = [:]
     public internal(set) var isLoading = false
     public internal(set) var isImporting = false
     /// The answer to importing a package from a file, which is asked for on the
@@ -34,6 +35,19 @@ public final class ApplicationsModel {
     public internal(set) var installedIDsByWatch: [WatchID: Set<UUID>] = [:]
 
     public var all: [WatchApplication] { apps + watchfaces }
+
+    /// The watchface this watch is showing — or, asked about no watch in
+    /// particular, whether any is showing it is the question, and this answers
+    /// with one of them.
+    public func activeWatchfaceID(on watchID: WatchID?) -> UUID? {
+        guard let watchID else { return activeWatchfaceIDs.values.first }
+        return activeWatchfaceIDs[watchID]
+    }
+
+    public func isActiveWatchface(_ applicationID: UUID, on watchID: WatchID?) -> Bool {
+        guard let watchID else { return activeWatchfaceIDs.values.contains(applicationID) }
+        return activeWatchfaceIDs[watchID] == applicationID
+    }
 
     /// The settings page that is showing, if one is.
     ///

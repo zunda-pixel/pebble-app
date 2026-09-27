@@ -65,6 +65,70 @@ struct HeartRateReadingTests {
         #expect(resolved.heartRate?.highest == 90)
     }
 
+    private func reading(_ epoch: TimeInterval, _ beats: Int) -> HeartRateReading {
+        HeartRateReading(date: Date(timeIntervalSince1970: epoch), beatsPerMinute: beats)
+    }
+
+    /// Each sync brings the minutes since the last one, so the evening's batch
+    /// for a day adds to the morning's instead of replacing it, and the day's
+    /// summary is of every minute measured.
+    @Test func twoBatchesForOneDayKeepBothBatchesReadings() async throws {
+        let fileURL = URL.temporaryDirectory.appending(path: "health-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        let store = WatchHealthStore(fileURL: fileURL)
+        _ = try await store.merge([day(86_400, readings: [reading(90_060, 72)])], now: now)
+
+        let merged = try await store.merge([
+            day(86_400, readings: [reading(93_600, 90)], updatedAt: Date(timeIntervalSince1970: 400)),
+        ], now: now)
+
+        let resolved = try #require(merged.first)
+        #expect(resolved.heartRateReadings == [reading(90_060, 72), reading(93_600, 90)])
+        #expect(resolved.heartRate == WatchHeartRateSummary(lowest: 72, average: 81, highest: 90, measuredMinutes: 2))
+    }
+
+    /// A minute both batches measured is read as the newer batch has it,
+    /// whichever order they arrive in.
+    @Test(arguments: [false, true])
+    func theNewerBatchWinsAMinuteBothMeasured(newerArrivesFirst: Bool) async throws {
+        let fileURL = URL.temporaryDirectory.appending(path: "health-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        let store = WatchHealthStore(fileURL: fileURL)
+        let older = day(86_400, readings: [reading(90_060, 72), reading(93_600, 80)])
+        let newer = day(86_400, readings: [reading(90_060, 76)], updatedAt: Date(timeIntervalSince1970: 400))
+        _ = try await store.merge([newerArrivesFirst ? newer : older], now: now)
+
+        let merged = try await store.merge([newerArrivesFirst ? older : newer], now: now)
+
+        let resolved = try #require(merged.first)
+        #expect(resolved.heartRateReadings == [reading(90_060, 76), reading(93_600, 80)])
+        #expect(resolved.heartRate?.average == 78)
+        #expect(resolved.heartRate?.measuredMinutes == 2)
+    }
+
+    /// Blood oxygen is measured and synchronized the same way, so it is
+    /// joined the same way.
+    @Test func bloodOxygenBatchesForOneDayAreJoinedToo() async throws {
+        let fileURL = URL.temporaryDirectory.appending(path: "health-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        let store = WatchHealthStore(fileURL: fileURL)
+        func batch(_ readings: [BloodOxygenReading], updatedAt: TimeInterval) -> WatchHealthSample {
+            var sample = day(86_400, readings: [], updatedAt: Date(timeIntervalSince1970: updatedAt))
+            sample.bloodOxygen = .from(readings.map(\.percent))
+            sample.bloodOxygenReadings = readings
+            return sample
+        }
+        let morning = BloodOxygenReading(date: Date(timeIntervalSince1970: 90_060), percent: 97)
+        let evening = BloodOxygenReading(date: Date(timeIntervalSince1970: 93_600), percent: 93)
+        _ = try await store.merge([batch([morning], updatedAt: 200)], now: now)
+
+        let merged = try await store.merge([batch([evening], updatedAt: 400)], now: now)
+
+        let resolved = try #require(merged.first)
+        #expect(resolved.bloodOxygenReadings == [morning, evening])
+        #expect(resolved.bloodOxygen == WatchBloodOxygenSummary(lowest: 93, average: 95, highest: 97, measuredMinutes: 2))
+    }
+
     /// A file written before readings existed still opens, with none.
     @Test func aLegacyFileDecodesWithNoReadings() throws {
         let json = """

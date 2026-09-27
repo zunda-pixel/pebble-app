@@ -51,7 +51,7 @@ struct CatalogSourceTests {
         )
 
         Self.answerHomeFeeds(base: feedURL, title: "Pebble Row")
-        _ = try await catalog.update(model: nil, source: .pebble)
+        _ = try await catalog.update(platform: nil, source: .pebble)
 
         // The other store has not been fetched, so it has nothing — not the
         // Pebble store's rows.
@@ -61,7 +61,7 @@ struct CatalogSourceTests {
         #expect(FileManager.default.fileExists(atPath: directory.appending(path: "catalog.json").path))
 
         Self.answerHomeFeeds(base: feedURL, title: "Rebble Row")
-        _ = try await catalog.update(model: nil, source: .rebble)
+        _ = try await catalog.update(platform: nil, source: .rebble)
 
         #expect(try await catalog.cachedSnapshot(source: .pebble)?.applications.first?.name == "Pebble Row")
         #expect(try await catalog.cachedSnapshot(source: .rebble)?.applications.first?.name == "Rebble Row")
@@ -69,8 +69,7 @@ struct CatalogSourceTests {
     }
 
     /// A row remembers which store listed it, and its store page follows: a
-    /// Rebble identifier means nothing to the Pebble store's site. A row cached
-    /// before sources existed can only have come from the Pebble store.
+    /// Rebble identifier means nothing to the Pebble store's site.
     @Test func aRowsStorePageBelongsToTheStoreThatListedIt() async throws {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -83,19 +82,43 @@ struct CatalogSourceTests {
         )
         Self.answerHomeFeeds(base: feedURL, title: "Row")
 
-        let rebble = try await catalog.update(model: nil, source: .rebble).applications[0]
-        #expect(rebble.sourceID == "rebble")
+        let rebble = try await catalog.update(platform: nil, source: .rebble).applications[0]
+        #expect(rebble.source == .rebble)
         #expect(rebble.storePageURL?.absoluteString
             == "https://apps.rebble.io/application/5f1e2d3c4b5a697887654321")
 
-        let pebble = try await catalog.update(model: nil, source: .pebble).applications[0]
+        let pebble = try await catalog.update(platform: nil, source: .pebble).applications[0]
         #expect(pebble.storePageURL?.absoluteString
             == "https://apps.repebble.com/5f1e2d3c4b5a697887654321")
+        #expect(pebble.source == .pebble)
+    }
 
-        var legacy = pebble
-        legacy.sourceID = nil
-        #expect(legacy.storePageURL?.absoluteString
-            == "https://apps.repebble.com/5f1e2d3c4b5a697887654321")
+    /// A source is written down as its name and read back as this build's
+    /// source of that name — never as the feed address it had when written.
+    @Test func aSourceIsStoredByNameAndReadBackWhole() throws {
+        let encoded = try JSONEncoder().encode(CatalogSource.rebble)
+
+        #expect(String(decoding: encoded, as: UTF8.self) == "\"rebble\"")
+        #expect(try JSONDecoder().decode(CatalogSource.self, from: encoded) == .rebble)
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(CatalogSource.self, from: Data("\"gone\"".utf8))
+        }
+    }
+
+    /// The snapshot says which store it is, and a row whose store this build
+    /// no longer knows keeps the row and falls back to the Pebble store.
+    @Test func aSnapshotNamesItsSourceAndARowOfAnUnknownStoreIsKept() throws {
+        let snapshot = CatalogSnapshot(source: .rebble, applications: [])
+        let decoded = try JSONDecoder().decode(CatalogSnapshot.self, from: JSONEncoder().encode(snapshot))
+        #expect(decoded.source == .rebble)
+        #expect(decoded.fetchedAt == nil)
+
+        let row = try JSONDecoder().decode(CatalogApplication.self, from: Data("""
+        {"id": "9AF9741D-28B9-4EC6-A978-F4265D988267", "name": "Zzz", "developer": "Z",
+         "version": "1.0", "downloadURL": "https://example.com/a.pbw",
+         "supportedPlatforms": ["emery"], "source": "gone"}
+        """.utf8))
+        #expect(row.source == .pebble)
     }
 
     /// A source that publishes no index cannot be searched past its shop

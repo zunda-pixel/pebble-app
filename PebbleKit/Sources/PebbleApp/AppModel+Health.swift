@@ -9,18 +9,52 @@ extension AppModel {
         catch { health.feedback = .failure("Health data could not be loaded.") }
     }
 
+    /// The Synchronize button: the reader asking, so the watch's answer is
+    /// theirs to see.
     public func requestHealthSync() async {
+        isHealthSyncRequestedByReader = true
         for connection in activeConnections {
-            await requestHealthSync(on: connection)
+            do {
+                try await sendHealthSyncRequest(on: connection)
+                health.feedback = .progress("Health synchronization requested.")
+            } catch {
+                health.feedback = .failure("Health synchronization will retry after reconnection.")
+            }
         }
     }
 
+    /// The one every connect sends. Nobody asked for it on this side, so it
+    /// writes to the log and leaves the Health screen's banner alone: a
+    /// "requested" that the watch never answered sat there for good.
     func requestHealthSync(on connection: WatchConnection) async {
         do {
-            try await connection.client.send(HealthDataLoggingCodec.reportOpenSessionsFrame())
-            try await connection.client.send(HealthSyncCodec.requestFrame(since: health.samples.map(\.date).max()))
-            health.feedback = .progress("Health synchronization requested.")
-        } catch { health.feedback = .failure("Health synchronization will retry after reconnection.") }
+            try await sendHealthSyncRequest(on: connection)
+        } catch {
+            await DiagnosticLog.shared.record(
+                .warning,
+                category: "health",
+                message: "\(connection.watch.name) was not asked for its health data: \(String(reflecting: error))"
+            )
+        }
+    }
+
+    private func sendHealthSyncRequest(on connection: WatchConnection) async throws {
+        try await connection.client.send(HealthDataLoggingCodec.reportOpenSessionsFrame())
+        try await connection.client.send(HealthSyncCodec.requestFrame(since: health.samples.map(\.date).max()))
+    }
+
+    /// Where something the watch sent about its health is said: on the Health
+    /// screen when the reader asked for it, in the log otherwise.
+    func reportHealth(_ feedback: FeatureFeedback, logging message: String) async {
+        if isHealthSyncRequestedByReader {
+            health.feedback = feedback
+        } else {
+            await DiagnosticLog.shared.record(
+                feedback.isFailure ? .error : .info,
+                category: "health",
+                message: message
+            )
+        }
     }
 
     #if os(iOS)

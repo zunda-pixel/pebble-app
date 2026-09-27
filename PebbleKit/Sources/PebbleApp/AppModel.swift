@@ -44,7 +44,6 @@ public enum CatalogInstallationState: Equatable, Sendable {
 @MainActor
 @Observable
 public final class AppModel {
-    public internal(set) var connectionState: WatchConnectionState = .idle
     public internal(set) var connections: [WatchConnection] = []
     /// The answer to flipping one of the phone-alert switches on the Settings
     /// screen — refused notification permission, mostly. Beside the switches,
@@ -58,10 +57,37 @@ public final class AppModel {
     public internal(set) var isScanning = false
     public internal(set) var discoveredWatches: [DiscoveredWatch] = []
     /// Which of the watches being connected have got past the link coming up.
-    ///
-    /// Not observable in its own right: it is only ever read by
-    /// `refreshConnectionState`, and `connectionState` is what a screen shows.
-    @ObservationIgnored var negotiatingWatchIDs: Set<WatchID> = []
+    var negotiatingWatchIDs: Set<WatchID> = []
+    /// Why the last scan could not look — the radio off or refused. Nothing to
+    /// do with any one watch, which is what lets the Add Watch sheet show it
+    /// beside a watch's own failure without showing another watch's.
+    public internal(set) var scanFailure: WatchConnectionError?
+    /// What the banner says went wrong when nothing is connected: the last
+    /// scan, connect or link to fail, whichever watch it was.
+    var lastConnectionError: WatchConnectionError?
+
+    /// Derived rather than kept: a stored copy had to be refreshed by hand at
+    /// every change to what it is made of, and each place that forgot left the
+    /// banner saying something that was no longer so.
+    public var connectionState: WatchConnectionState {
+        // `.negotiating` before `.connecting`: they are one connect at two
+        // stages, and the second is the one that takes the seconds.
+        if let negotiatingID = connectingWatchIDs.first(where: negotiatingWatchIDs.contains) {
+            return .negotiating(watchID: negotiatingID)
+        } else if let connectingID = connectingWatchIDs.first {
+            return .connecting(watchID: connectingID)
+        } else if let primary = activeConnections.first {
+            return .connected(primary.watch)
+        } else if let reconnecting = connections.first(where: { $0.phase == .reconnecting }) {
+            return .reconnecting(watchID: reconnecting.watch.id)
+        } else if isScanning {
+            return .scanning
+        } else if let error = lastConnectionError {
+            return .failed(error)
+        } else {
+            return .idle
+        }
+    }
 
     // Everything else a screen reads lives on the feature it belongs to.
     //
@@ -200,6 +226,7 @@ public final class AppModel {
     let pendingTimelineOperationStore: PendingTimelineOperationStore
     let pendingAppMessageStore: PendingAppMessageStore
     let pendingFirmwareUpdateStore: PendingFirmwareUpdateStore
+    let firmwarePackageStore: FirmwarePackageStore
     let localNotifier: any LocalNotifying
 
     /// The two phone-alert switches, held on the instance rather than read out
@@ -247,12 +274,16 @@ public final class AppModel {
         source: makeSystemMusicSource(),
         send: { [weak self] frame in try await self?.broadcast(frame) }
     )
-    @ObservationIgnored var lastConnectionError: WatchConnectionError?
+    /// Whether the health data arriving answers the reader's own request.
+    @ObservationIgnored var isHealthSyncRequestedByReader = false
     @ObservationIgnored var firmwareUpdateTask: Task<Void, any Error>?
     /// Which `performFirmwareUpdate` call holds the one update that may run.
     /// Taken before its first suspension, where `firmwareUpdateTask` can only be
     /// set after several.
     @ObservationIgnored var firmwareUpdateClaim: UUID?
+    /// Which watch the claimed update is for, so stopping one watch's update
+    /// cannot end another's.
+    @ObservationIgnored var firmwareUpdateWatchID: WatchID?
     @ObservationIgnored var hasLoadedApplications = false
     @ObservationIgnored var pendingImportSnapshots: [UUID: WatchApplicationLibrarySnapshot] = [:]
     @ObservationIgnored var pendingSnapshotExpiries: [UUID: Task<Void, Never>] = [:]
@@ -375,10 +406,11 @@ public final class AppModel {
         pendingTimelineOperationStore = PendingTimelineOperationStore(directory: storageDirectory)
         pendingAppMessageStore = PendingAppMessageStore(directory: storageDirectory)
         pendingFirmwareUpdateStore = PendingFirmwareUpdateStore(directory: storageDirectory)
+        firmwarePackageStore = FirmwarePackageStore(directory: storageDirectory)
         notificationSourceAppStore = NotificationSourceAppStore(directory: storageDirectory)
         notifications.companionEnabled = Defaults[.companionNotificationsEnabled]
-        applications.activeWatchfaceID = Defaults[.activeWatchfaceID]
-        catalog.sourceID = Defaults[.catalogSourceID]
+        applications.activeWatchfaceIDs = Defaults[.activeWatchfaceIDs]
+        catalog.source = Defaults[.catalogSource]
     }
 
     public func start() async {
@@ -391,8 +423,7 @@ public final class AppModel {
         await loadTimeline()
         await loadHealth()
         await loadCatalog()
-        firmware.journal = try? await pendingFirmwareUpdateStore.journal()
-        loadDownloadedFirmware()
+        await loadFirmwareState()
         loadWeatherPlaces()
         loadWatchSettings()
         notifications.sourceApps = (try? await notificationSourceAppStore.apps()) ?? []
@@ -448,13 +479,7 @@ public final class AppModel {
     public func scan() async {
         guard !isScanning else { return }
         isScanning = true
-        if connections.isEmpty, connectingWatchIDs.isEmpty {
-            connectionState = .scanning
-        }
-        defer {
-            isScanning = false
-            refreshConnectionState()
-        }
+        defer { isScanning = false }
 
         do {
             await loadSavedWatches()
@@ -472,7 +497,7 @@ public final class AppModel {
                 scanned.append(contentsOf: retrieved)
             }
             discoveredWatches = scanned.filter { !connectedIDs.contains($0.id) }
-            refreshConnectionState()
+            scanFailure = nil
             let automaticTargets = discoveredWatches.filter { discovered in
                 watches.saved.contains { $0.id == discovered.id && $0.automaticallyConnects }
             }
@@ -480,10 +505,13 @@ public final class AppModel {
                 await connect(to: watch)
             }
         } catch let error as WatchConnectionError {
+            // Another scan already looking is not the radio failing to.
+            if error != .scanAlreadyInProgress { scanFailure = error }
             if connections.isEmpty {
                 lastConnectionError = error
             }
         } catch {
+            scanFailure = .bluetoothUnavailable
             if connections.isEmpty {
                 lastConnectionError = .bluetoothUnavailable
             }
@@ -505,7 +533,6 @@ public final class AppModel {
         }
         connectingWatchIDs.insert(watch.id)
         connectionFailures[watch.id] = nil
-        refreshConnectionState()
         Task { [id = watch.id] in
             await DiagnosticLog.shared.record(
                 category: "connection",
@@ -515,7 +542,6 @@ public final class AppModel {
         defer {
             connectingWatchIDs.remove(watch.id)
             negotiatingWatchIDs.remove(watch.id)
-            refreshConnectionState()
         }
 
         let connectionClient = clientFactory(watch.id)
@@ -528,7 +554,6 @@ public final class AppModel {
                 // the log needs to tell those apart.
                 guard let self else { return }
                 self.negotiatingWatchIDs.insert(watch.id)
-                self.refreshConnectionState()
             }
             lastConnectionError = nil
             connectionFailures[watch.id] = nil
@@ -551,7 +576,6 @@ public final class AppModel {
             // Leaving the id here until this function returns would rank the whole
             // post-connect synchronization as "connecting".
             connectingWatchIDs.remove(watch.id)
-            refreshConnectionState()
             await recordConnectedWatch(connectedWatch)
             await DiagnosticLog.shared.record(category: "connection", message: "Watch connected")
             await synchronizeEverything(on: connection)
@@ -568,26 +592,6 @@ public final class AppModel {
         }
     }
 
-    func refreshConnectionState() {
-        // `.negotiating` before `.connecting`: they are one connect at two
-        // stages, and the second is the one that takes the seconds.
-        if let negotiatingID = connectingWatchIDs.first(where: negotiatingWatchIDs.contains) {
-            connectionState = .negotiating(watchID: negotiatingID)
-        } else if let connectingID = connectingWatchIDs.first {
-            connectionState = .connecting(watchID: connectingID)
-        } else if let primary = activeConnections.first {
-            connectionState = .connected(primary.watch)
-        } else if let reconnecting = connections.first(where: { $0.phase == .reconnecting }) {
-            connectionState = .reconnecting(watchID: reconnecting.watch.id)
-        } else if isScanning {
-            connectionState = .scanning
-        } else if let error = lastConnectionError {
-            connectionState = .failed(error)
-        } else {
-            connectionState = .idle
-        }
-    }
-
     /// Drops the work a watch was in the middle of when its link went, and the
     /// library operation that was driving it.
     func clearBusyOperationState(on connection: WatchConnection) {
@@ -601,7 +605,6 @@ public final class AppModel {
         switch event {
         case .watchUpdated(let watch):
             let needsResync = connection.consumePostReconnectSync()
-            refreshConnectionState()
             Task { [weak self] in
                 await self?.trackChargeLevel(of: watch)
                 await self?.recordConnectedWatch(watch)
@@ -617,7 +620,6 @@ public final class AppModel {
         case .transferProgress:
             break
         case .reconnecting:
-            refreshConnectionState()
             needsApplicationSynchronization = true
             // Operations interrupted by the drop would otherwise leave the
             // app-management UI busy forever.
@@ -634,14 +636,20 @@ public final class AppModel {
             lastConnectionError = error
             // On the watch's own screen, where its Connect button is.
             connectionFailures[connection.watch.id] = error
-            refreshConnectionState()
             needsApplicationSynchronization = true
             clearBusyOperationState(on: connection)
             if activeConnections.isEmpty { musicCoordinator.watchDisconnected() }
         case .healthSyncCompleted(let succeeded):
-            health.feedback = succeeded
-                ? .success("Health synchronization completed.")
-                : .failure("The watch rejected health synchronization.")
+            Task { [weak self] in
+                guard let self else { return }
+                await self.reportHealth(
+                    succeeded
+                        ? .success("Health synchronization completed.")
+                        : .failure("The watch rejected health synchronization."),
+                    logging: succeeded ? "synchronization completed" : "the watch rejected synchronization"
+                )
+                self.isHealthSyncRequestedByReader = false
+            }
         case .healthSamplesReceived(let samples):
             Task { [weak self] in
                 guard let self else { return }
@@ -660,10 +668,16 @@ public final class AppModel {
                 do {
                     self.health.samples = try await self.healthStore.merge(samples)
                 } catch {
-                    self.health.feedback = .failure("Watch health data could not be saved.")
+                    await self.reportHealth(
+                        .failure("Watch health data could not be saved."),
+                        logging: "the received health data could not be saved: \(String(reflecting: error))"
+                    )
                     return
                 }
-                self.health.feedback = .success("Received \(samples.count) health update(s) from the watch.")
+                await self.reportHealth(
+                    .success("Received \(samples.count) health update(s) from the watch."),
+                    logging: "saved \(samples.count) day(s) from the watch"
+                )
                 #if os(iOS)
                 do {
                     // The watch answered on its own account, so this must not raise the
@@ -674,7 +688,10 @@ public final class AppModel {
                     )
                 } catch HealthKitBridgeError.notGranted, HealthKitBridgeError.unavailable {
                 } catch {
-                    self.health.feedback = .failure("The watch's health data was saved, but Apple Health did not accept it.")
+                    await self.reportHealth(
+                        .failure("The watch's health data was saved, but Apple Health did not accept it."),
+                        logging: "Apple Health did not accept the watch's data: \(String(reflecting: error))"
+                    )
                 }
                 #endif
             }
@@ -682,8 +699,8 @@ public final class AppModel {
             switch event {
             case .started(let id):
                 if applications.watchfaces.contains(where: { $0.id == id }) {
-                    applications.activeWatchfaceID = id
-                    Defaults[.activeWatchfaceID] = id
+                    applications.activeWatchfaceIDs[connection.watch.id] = id
+                    Defaults[.activeWatchfaceIDs] = applications.activeWatchfaceIDs
                 }
                 // The PKJS lifecycle ties the script's life to the app's run,
                 // so a launch is what makes `ready` fire — every launch, not
@@ -692,7 +709,9 @@ public final class AppModel {
                     await self?.launchCompanionRuntime(applicationID: id)
                 }
             case .stopped(let id):
-                if applications.activeWatchfaceID == id { applications.activeWatchfaceID = nil }
+                if applications.activeWatchfaceIDs[connection.watch.id] == id {
+                    applications.activeWatchfaceIDs[connection.watch.id] = nil
+                }
             }
         case .timelineActionInvoked(let invocation):
             Task { [weak self] in

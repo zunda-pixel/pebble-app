@@ -33,11 +33,17 @@ public actor TimelinePinStore {
     }
 
     public func mirroredIdentifiers() throws -> [UUID: String] {
-        try PersistentJSON.loadRecovering([UUID: String].self, from: mirroredURL) ?? [:]
+        let pairs = try PersistentJSON.loadRecovering([MirroredReminder].self, from: mirroredURL) ?? []
+        return Dictionary(pairs.map { ($0.id, $0.externalIdentifier) }, uniquingKeysWith: { _, latest in latest })
     }
 
     public func setMirroredIdentifiers(_ identifiers: [UUID: String]) throws {
-        try PersistentJSON.save(identifiers, to: mirroredURL)
+        try PersistentJSON.save(
+            identifiers
+                .map { MirroredReminder(id: $0.key, externalIdentifier: $0.value) }
+                .sorted { $0.id.uuidString < $1.id.uuidString },
+            to: mirroredURL
+        )
     }
 
     public func writtenPinIDs(watchID: WatchID) throws -> Set<UUID> {
@@ -133,4 +139,14 @@ public actor TimelinePinStore {
 private struct WrittenPin: Codable, Sendable {
     var id: UUID
     var digest: String
+}
+
+/// One reminder as this app and the phone's Reminders app each name it.
+///
+/// An array of these for the reason `WrittenPin` is one: a `[UUID: String]`
+/// encodes as a flat array of alternating strings, which says nothing about
+/// which of them is a key.
+private struct MirroredReminder: Codable, Sendable {
+    var id: UUID
+    var externalIdentifier: String
 }

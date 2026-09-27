@@ -219,54 +219,24 @@ public actor WatchHealthStore {
             resolved.distanceMetres = max(existing.distanceMetres, normalized.distanceMetres)
             resolved.activeMinutes = max(existing.activeMinutes, normalized.activeMinutes)
             // The other way round from the calories above: only the watch
-            // measures this, so a HealthKit record for the same day carries
+            // measures these, so a HealthKit record for the same day carries
             // nil — and being the newer of the two would otherwise have wiped
-            // what the watch measured. Whichever record has one keeps it, and
-            // the newer wins only when both do.
-            // The summary and its readings travel together: they are two
-            // shapes of the same measurement, and splitting them across two
-            // records would pair one day's average with another's minutes.
-            switch (existing.heartRate, normalized.heartRate) {
-            case (let older?, let newer?):
-                if normalized.updatedAt >= existing.updatedAt {
-                    resolved.heartRate = newer
-                    resolved.heartRateReadings = normalized.heartRateReadings
-                } else {
-                    resolved.heartRate = older
-                    resolved.heartRateReadings = existing.heartRateReadings
-                }
-            case (let only?, nil):
-                resolved.heartRate = only
-                resolved.heartRateReadings = existing.heartRateReadings
-            case (nil, let only?):
-                resolved.heartRate = only
-                resolved.heartRateReadings = normalized.heartRateReadings
-            case (nil, nil):
-                resolved.heartRate = nil
-                resolved.heartRateReadings = []
-            }
-            // Blood oxygen travels with its readings the same way heart rate
-            // does, and for the same reason: only the watch measures it, so a
-            // HealthKit record carries nil and must not wipe what the watch saw.
-            switch (existing.bloodOxygen, normalized.bloodOxygen) {
-            case (let older?, let newer?):
-                if normalized.updatedAt >= existing.updatedAt {
-                    resolved.bloodOxygen = newer
-                    resolved.bloodOxygenReadings = normalized.bloodOxygenReadings
-                } else {
-                    resolved.bloodOxygen = older
-                    resolved.bloodOxygenReadings = existing.bloodOxygenReadings
-                }
-            case (let only?, nil):
-                resolved.bloodOxygen = only
-                resolved.bloodOxygenReadings = existing.bloodOxygenReadings
-            case (nil, let only?):
-                resolved.bloodOxygen = only
-                resolved.bloodOxygenReadings = normalized.bloodOxygenReadings
-            case (nil, nil):
-                resolved.bloodOxygen = nil
-                resolved.bloodOxygenReadings = []
-            }
+            // what the watch measured.
+            let incomingIsNewer = normalized.updatedAt >= existing.updatedAt
+            (resolved.heartRate, resolved.heartRateReadings) = Self.mergedMeasurements(
+                existing: (existing.heartRate, existing.heartRateReadings),
+                incoming: (normalized.heartRate, normalized.heartRateReadings),
+                incomingIsNewer: incomingIsNewer,
+                minute: { $0.date },
+                summarize: { WatchHeartRateSummary.from($0.map(\.beatsPerMinute)) }
+            )
+            (resolved.bloodOxygen, resolved.bloodOxygenReadings) = Self.mergedMeasurements(
+                existing: (existing.bloodOxygen, existing.bloodOxygenReadings),
+                incoming: (normalized.bloodOxygen, normalized.bloodOxygenReadings),
+                incomingIsNewer: incomingIsNewer,
+                minute: { $0.date },
+                summarize: { WatchBloodOxygenSummary.from($0.map(\.percent)) }
+            )
             // Workouts arrive one sync at a time — the morning walk in the
             // morning, the evening run in the evening — so the day is the
             // union of both records, keyed by when each workout started, and
@@ -303,6 +273,46 @@ public actor WatchHealthStore {
         try save(values)
         return values
     }
+    /// One day's measurement from two records of it.
+    ///
+    /// Each sync brings the minutes since the last, so where both records have
+    /// their minutes the day is the union of them — the newer record's reading
+    /// winning a minute both measured — and the summary is worked out again
+    /// from that union, the way the watch's record was made. Taking the newer
+    /// batch whole lost the morning's readings to the evening's.
+    ///
+    /// Where either has only a summary — a day whose minutes are past the
+    /// retention, or a HealthKit day with neither — the minutes cannot be
+    /// joined, so the summary and its readings are taken together from one
+    /// record: whichever has one, the newer when both do.
+    static func mergedMeasurements<Summary, Reading>(
+        existing: (summary: Summary?, readings: [Reading]),
+        incoming: (summary: Summary?, readings: [Reading]),
+        incomingIsNewer: Bool,
+        minute: (Reading) -> Date,
+        summarize: ([Reading]) -> Summary?
+    ) -> (Summary?, [Reading]) {
+        if !existing.readings.isEmpty, !incoming.readings.isEmpty {
+            let (older, newer) = incomingIsNewer ? (existing, incoming) : (incoming, existing)
+            var byMinute: [Date: Reading] = [:]
+            for reading in older.readings + newer.readings { byMinute[minute(reading)] = reading }
+            let union = byMinute.values.sorted { minute($0) < minute($1) }
+            return (summarize(union), union)
+        }
+        switch (existing.summary, incoming.summary) {
+        case (_?, _?):
+            return incomingIsNewer
+                ? (incoming.summary, incoming.readings)
+                : (existing.summary, existing.readings)
+        case (_?, nil):
+            return (existing.summary, existing.readings)
+        case (nil, _?):
+            return (incoming.summary, incoming.readings)
+        case (nil, nil):
+            return (nil, [])
+        }
+    }
+
     public func deleteAll() throws { try? FileManager.default.removeItem(at: fileURL) }
     public func export() throws -> URL {
         let output = FileManager.default.temporaryDirectory.appending(path: "pebble-health.json")

@@ -60,7 +60,10 @@ struct CatalogView: View {
             feedback: model.catalog.feedback,
             importFeedback: model.applications.importFeedback,
             selectedSourceID: model.selectedCatalogSource.id,
-            setSource: { id in await model.setCatalogSource(id) },
+            setSource: { id in
+                guard let source = CatalogSource.builtIn.first(where: { $0.id == id }) else { return }
+                await model.setCatalogSource(source)
+            },
             searchResults: model.catalog.searchResults,
             searchQuery: model.catalog.searchQuery,
             hasMoreSearchResults: model.catalog.hasMoreSearchResults,

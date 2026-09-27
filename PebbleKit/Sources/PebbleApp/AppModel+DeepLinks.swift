@@ -153,9 +153,17 @@ extension AppModel {
             await importApplication(from: pending.localURL)
         case .firmware:
             deepLinks.requestedSection = .watches
-            await installFirmware(from: pending.localURL)
+            if let watchID = defaultWatchID {
+                await installFirmware(from: pending.localURL, watchID: watchID)
+            } else {
+                deepLinks.feedback = .failure("Connect the watch this is for, then open the link again.")
+            }
         case .languagePack:
-            await installLanguagePack(from: pending.localURL)
+            if let watchID = activeConnections.first?.watch.id {
+                await installLanguagePack(from: pending.localURL, watchID: watchID)
+            } else {
+                deepLinks.feedback = .failure("Connect the watch this is for, then open the link again.")
+            }
         }
         try? FileManager.default.removeItem(at: pending.localURL)
     }

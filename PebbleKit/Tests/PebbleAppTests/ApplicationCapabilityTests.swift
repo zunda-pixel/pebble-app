@@ -18,7 +18,7 @@ struct ApplicationCapabilityTests {
             companyName: "Pebble",
             versionLabel: "1.0",
             capabilities: capabilities,
-            targetPlatforms: ["emery"],
+            targetPlatforms: [.emery],
             kind: .watchapp
         )
     }
@@ -30,7 +30,7 @@ struct ApplicationCapabilityTests {
             developer: "Pebble",
             version: "1.0",
             downloadURL: URL(string: "https://example.invalid/orbit.pbw")!,
-            supportedPlatforms: ["emery"],
+            supportedPlatforms: [.emery],
             kind: .watchapp,
             capabilities: capabilities
         )

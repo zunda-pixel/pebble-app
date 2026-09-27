@@ -16,7 +16,7 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
     public var developer: String
     public var version: String
     public var downloadURL: URL
-    public var supportedPlatforms: [String]
+    public var supportedPlatforms: [WatchPlatform]
     public var kind: WatchApplicationKind = .watchapp
     /// What the store called it — `Games`, `Tools & Utilities`. Nil when the
     /// store did not say.
@@ -46,9 +46,9 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
     /// codes. Empty for a row that predates this field, and for one the store
     /// gave nothing for.
     public var capabilities: [String] = []
-    /// Which store listed it — `CatalogSource.id`. Nil for a row cached before
-    /// sources existed, which can only have come from the Pebble store.
-    public var sourceID: String? = nil
+    /// Which store listed it, so that its store page and any later lookup go
+    /// to that store.
+    public var source: CatalogSource = .pebble
     /// Every published version the store told of, newest first. Empty for a
     /// row cached before this was kept, and for a store that says nothing —
     /// which is also what hides the version-history entrance.
@@ -61,7 +61,7 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case id, storeID, name, developer, version, downloadURL, supportedPlatforms
         case kind, category, summary, releaseNotes, iconURL, screenshotURLs
-        case capabilities, sourceID, changelog
+        case capabilities, source, changelog
     }
 
     public init(from decoder: any Decoder) throws {
@@ -72,7 +72,7 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
         developer = try container.decode(String.self, forKey: .developer)
         version = try container.decode(String.self, forKey: .version)
         downloadURL = try container.decode(URL.self, forKey: .downloadURL)
-        supportedPlatforms = try container.decode([String].self, forKey: .supportedPlatforms)
+        supportedPlatforms = WatchPlatform.known(in: try container.decode([String].self, forKey: .supportedPlatforms))
         kind = try container.decodeIfPresent(WatchApplicationKind.self, forKey: .kind) ?? .watchapp
         // Normalised here, so no reader downstream has to treat "" as absence.
         // The cache these come out of was written by earlier versions of this
@@ -88,7 +88,9 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
         // Absent from every cache written before this field existed, which is
         // why it decodes to empty rather than refusing the whole row.
         capabilities = try container.decodeIfPresent([String].self, forKey: .capabilities) ?? []
-        sourceID = try container.decodeIfPresent(String.self, forKey: .sourceID)
+        // A store this build no longer knows costs the row its provenance, not
+        // the row itself.
+        source = (try? container.decodeIfPresent(CatalogSource.self, forKey: .source)) ?? .pebble
         changelog = try container.decodeIfPresent([CatalogChangelogEntry].self, forKey: .changelog) ?? []
     }
 
@@ -121,11 +123,11 @@ public struct CatalogApplication: Codable, Equatable, Identifiable, Sendable {
         // identifier means nothing to the Pebble store's site. Joined as a
         // string because `id` is already percent-encoded — `appending(path:)`
         // would encode the escapes themselves.
-        return URL(string: CatalogSource.named(sourceID).storePageBaseURL.absoluteString + "/" + id)
+        return URL(string: source.storePageBaseURL.absoluteString + "/" + id)
     }
 
     public func supports(_ model: WatchModel) -> Bool {
-        !Set(supportedPlatforms).isDisjoint(with: model.compatibleApplicationVariants)
+        !Set(supportedPlatforms).isDisjoint(with: model.compatiblePlatforms)
     }
 
     public func isNewer(than installedVersion: String?) -> Bool {
@@ -155,24 +157,12 @@ public struct CatalogCollection: Codable, Equatable, Identifiable, Sendable {
 
 @MemberwiseInit(.public)
 public struct CatalogSnapshot: Codable, Equatable, Sendable {
-    public var sourceURL: URL
-    public var fetchedAt: Date = Date()
+    public var source: CatalogSource
+    /// Nil when nothing recorded it, which is not the same as "just now".
+    public var fetchedAt: Date? = nil
     public var applications: [CatalogApplication]
     /// The feed's shelves, faces first to match the applications' own mixing.
-    /// Empty for a cache written before these were kept.
     public var collections: [CatalogCollection] = []
-
-    private enum CodingKeys: String, CodingKey {
-        case sourceURL, fetchedAt, applications, collections
-    }
-
-    public init(from decoder: any Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        sourceURL = try container.decode(URL.self, forKey: .sourceURL)
-        fetchedAt = try container.decodeIfPresent(Date.self, forKey: .fetchedAt) ?? Date()
-        applications = try container.decode([CatalogApplication].self, forKey: .applications)
-        collections = try container.decodeIfPresent([CatalogCollection].self, forKey: .collections) ?? []
-    }
 }
 
 /// One page of a collection's full listing, and whether the store has more.
@@ -183,20 +173,6 @@ public struct CatalogCollectionPage: Equatable, Sendable {
 }
 
 public actor ApplicationCatalog {
-    /// The store. The only one there is.
-    ///
-    /// This used to be a default the reader could replace in Settings, which
-    /// bought one thing — a hand-written feed of `[CatalogApplication]` under
-    /// a `.json` address — and cost every feature built on the store's own
-    /// API, each of which had to do nothing for such a feed. Installing a
-    /// package of one's own is what the file importer is for.
-    ///
-    /// If the store moves again, as it did once already, this is the line to
-    /// change.
-    public static var defaultSourceURL: URL {
-        URL(string: "https://appstore-api.repebble.com/api")!
-    }
-
     private var cacheURL: URL
     /// Internal for the search extension beside this file, which posts to the
     /// store's index with the same session the feed is fetched with.
@@ -240,22 +216,16 @@ public actor ApplicationCatalog {
         guard FileManager.default.fileExists(atPath: cacheURL.path) else { return nil }
         let data = try Data(contentsOf: cacheURL)
         if let snapshot = try? JSONDecoder().decode(CatalogSnapshot.self, from: data) { return snapshot }
-        if let applications = try? JSONDecoder().decode([CatalogApplication].self, from: data) {
-            // The array predates snapshots, and only the Pebble store ever
-            // wrote one — but the provenance is the asked-for source's, not
-            // hardcoded, or a misnamed legacy file would claim the wrong feed.
-            return CatalogSnapshot(sourceURL: source.feedURL, applications: applications)
-        }
         try PersistentJSON.quarantine(cacheURL)
         return nil
     }
 
-    public func update(model: WatchModel?, source: CatalogSource = .pebble) async throws -> CatalogSnapshot {
+    public func update(platform: WatchPlatform?, source: CatalogSource = .pebble) async throws -> CatalogSnapshot {
         // The test override wins where one was injected; the source names the
         // feed everywhere real.
         let sourceURL = feedURLOverride ?? source.feedURL
-        async let watchapps = fetchOfficialHome(sourceURL, kind: .watchapp, model: model, source: source)
-        async let watchfaces = fetchOfficialHome(sourceURL, kind: .watchface, model: model, source: source)
+        async let watchapps = fetchOfficialHome(sourceURL, kind: .watchapp, platform: platform, source: source)
+        async let watchfaces = fetchOfficialHome(sourceURL, kind: .watchface, platform: platform, source: source)
         let (apps, faces) = try await (watchapps, watchfaces)
         let applications = apps.applications + faces.applications
         // Later entries win, so the newest description of an application is
@@ -263,7 +233,8 @@ public actor ApplicationCatalog {
         let unique = applications.reversed().uniqued(on: \.id)
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         let snapshot = CatalogSnapshot(
-            sourceURL: sourceURL,
+            source: source,
+            fetchedAt: Date(),
             applications: unique,
             collections: faces.collections + apps.collections
         )
@@ -272,13 +243,13 @@ public actor ApplicationCatalog {
     }
 
     /// One page of a collection's full listing, from the path the feed gave.
-    /// - Parameter hardware: The connected watch's board, which decides the
+    /// - Parameter hardware: The connected watch's platform, which decides the
     ///   screenshots and the compatibility filter, as everywhere else.
     public func collectionPage(
         _ collection: CatalogCollection,
         offset: Int,
         limit: Int = 20,
-        hardware: String? = nil,
+        hardware: WatchPlatform? = nil,
         source: CatalogSource = .pebble
     ) async throws -> CatalogCollectionPage {
         guard let url = collectionPageURL(
@@ -293,7 +264,7 @@ public actor ApplicationCatalog {
             applications: response.data.compactMap {
                 // The entry's own word first: an apps shelf can hold faces and
                 // the other way round is not this app's to rule out.
-                $0.application(kind: $0.declaredKind ?? collection.kind, sourceID: source.id)
+                $0.application(kind: $0.declaredKind ?? collection.kind, source: source)
             },
             hasMore: response.links?.nextPage != nil
         )
@@ -306,7 +277,7 @@ public actor ApplicationCatalog {
         for collection: CatalogCollection,
         offset: Int,
         limit: Int,
-        hardware: String?,
+        hardware: WatchPlatform?,
         baseURL: URL
     ) -> URL? {
         guard let appsPath = collection.appsPath,
@@ -318,7 +289,7 @@ public actor ApplicationCatalog {
             URLQueryItem(name: "offset", value: String(offset)),
             URLQueryItem(name: "limit", value: String(limit)),
         ]
-        if let hardware { queryItems.append(URLQueryItem(name: "hardware", value: hardware)) }
+        if let hardware { queryItems.append(URLQueryItem(name: "hardware", value: hardware.rawValue)) }
         components?.queryItems = queryItems
         return components?.url
     }
@@ -358,33 +329,34 @@ public actor ApplicationCatalog {
     ///
     /// Nil where the store does not have it, which is an answer worth keeping:
     /// plenty of packages were never listed.
-    /// - Parameter hardware: The connected watch's board, which the endpoint
+    /// - Parameter hardware: The connected watch's platform, which the endpoint
     ///   honours (measured 2026-09-12: `?hardware=aplite` answers aplite
     ///   screenshots where the default was basalt). Nil asks for the store's
     ///   default, which is right when no watch is connected.
     public func application(
         uuid: UUID,
-        from baseURL: URL,
-        hardware: String? = nil,
-        sourceID: String? = nil
+        source: CatalogSource = .pebble,
+        hardware: WatchPlatform? = nil
     ) async throws -> CatalogApplication? {
-        var url = baseURL.appending(path: "v1/apps/uuid").appending(path: uuid.uuidString.lowercased())
+        var url = (feedURLOverride ?? source.feedURL)
+            .appending(path: "v1/apps/uuid")
+            .appending(path: uuid.uuidString.lowercased())
         if let hardware {
             var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-            components?.queryItems = [URLQueryItem(name: "hardware", value: hardware)]
+            components?.queryItems = [URLQueryItem(name: "hardware", value: hardware.rawValue)]
             if let value = components?.url { url = value }
         }
         guard let data = try await responseDataAllowingNotFound(from: url) else { return nil }
         let response = try JSONDecoder().decode(OfficialCatalogLookup.self, from: data)
         // The kind comes off the entry rather than the endpoint here: this one
         // is asked by identifier, so it answers with whatever that is.
-        return response.data.lazy.compactMap { $0.application(kind: nil, sourceID: sourceID) }.first
+        return response.data.lazy.compactMap { $0.application(kind: nil, source: source) }.first
     }
 
     private func fetchOfficialHome(
         _ baseURL: URL,
         kind: WatchApplicationKind,
-        model: WatchModel?,
+        platform: WatchPlatform?,
         source: CatalogSource
     ) async throws -> (applications: [CatalogApplication], collections: [CatalogCollection]) {
         // `apps` and `faces`, the official application's own spelling
@@ -395,12 +367,12 @@ public actor ApplicationCatalog {
         var url = baseURL.appending(path: "v1/home").appending(path: kind == .watchapp ? "apps" : "faces")
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
         var queryItems = [URLQueryItem(name: "platform", value: "ios"), URLQueryItem(name: "filter_hardware", value: "true")]
-        if let model { queryItems.append(URLQueryItem(name: "hardware", value: model.compatibleApplicationVariants.first)) }
+        if let platform { queryItems.append(URLQueryItem(name: "hardware", value: platform.rawValue)) }
         components?.queryItems = queryItems
         if let value = components?.url { url = value }
         let response = try JSONDecoder().decode(OfficialCatalogHome.self, from: await responseData(from: url))
         return (
-            applications: response.applications.compactMap { $0.application(kind: kind, sourceID: source.id) },
+            applications: response.applications.compactMap { $0.application(kind: kind, source: source) },
             collections: response.catalogCollections(kind: kind)
         )
     }
@@ -539,7 +511,7 @@ struct OfficialCatalogApplication: Decodable {
 
     /// - Parameter kind: What the endpoint this came from was asked for, or nil
     ///   to take the entry's own word for it.
-    func application(kind: WatchApplicationKind?, sourceID: String? = nil) -> CatalogApplication? {
+    func application(kind: WatchApplicationKind?, source: CatalogSource = .pebble) -> CatalogApplication? {
         guard let kind = kind ?? declaredKind else { return nil }
         guard let uuid, let applicationID = UUID(uuidString: uuid),
               uuid.lowercased() != "00000000-0000-0000-0000-000000000000", let release = latestRelease,
@@ -559,7 +531,11 @@ struct OfficialCatalogApplication: Decodable {
             developer: author,
             version: release.version ?? "0",
             downloadURL: downloadURL,
-            supportedPlatforms: hardwarePlatforms?.compactMap(\.name) ?? ["aplite", "basalt", "chalk", "diorite", "emery", "flint", "gabbro"],
+            // A row that names no hardware is one the store serves to every
+            // watch, unlike an appinfo without `targetPlatforms`, which is from
+            // an SDK that built for aplite alone.
+            supportedPlatforms: hardwarePlatforms.map { WatchPlatform.known(in: $0.compactMap(\.name)) }
+                ?? WatchPlatform.allCases,
             kind: kind,
             // The store sends `"category": ""` as readily as it omits the key,
             // and both mean the same thing to a reader.
@@ -569,7 +545,7 @@ struct OfficialCatalogApplication: Decodable {
             iconURL: iconImage?.values.compactMap(URL.init(string:)).first(where: \.isHTTPS),
             screenshotURLs: screenshotImages?.flatMap { $0.values }.compactMap(URL.init(string:)).filter(\.isHTTPS) ?? [],
             capabilities: capabilities ?? [],
-            sourceID: sourceID,
+            source: source,
             // Newest first however the store ordered them; an entry that names
             // no version has nothing to head its row and costs itself alone.
             changelog: (changelog ?? [])

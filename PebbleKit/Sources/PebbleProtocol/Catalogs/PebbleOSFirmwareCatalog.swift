@@ -5,13 +5,6 @@ import MemberwiseInit
 import Retry
 
 @MemberwiseInit(.public)
-public struct DownloadedFirmware: Codable, Equatable, Sendable {
-    public var versionTag: String
-    public var board: WatchBoard
-    public var url: URL
-}
-
-@MemberwiseInit(.public)
 public struct PebbleOSFirmwareRelease: Equatable, Sendable {
     public var versionTag: String
     public var board: WatchBoard
@@ -115,8 +108,9 @@ public struct PebbleOSFirmwareCatalog: Sendable {
     }
 
     /// Kept on disk so it can be installed later — on a watch that is not here
-    /// yet, or after a first attempt failed.
-    public func download(_ release: PebbleOSFirmwareRelease) async throws -> DownloadedFirmware {
+    /// yet, or after a first attempt failed. `destination` is where the
+    /// verified package ends up, replacing whatever was there.
+    public func download(_ release: PebbleOSFirmwareRelease, to destination: URL) async throws {
         guard release.sizeInBytes <= Self.maximumPackageSize else {
             throw PebbleOSFirmwareCatalogError.packageTooLarge
         }
@@ -140,30 +134,12 @@ public struct PebbleOSFirmwareCatalog: Sendable {
         guard try downloadedFileSize(at: temporaryURL) == release.sizeInBytes else {
             throw PebbleOSFirmwareCatalogError.incompleteDownload
         }
-        let directory = try Self.downloadDirectory()
-        let output = directory
-            .appending(path: "pebbleos-\(release.board.rawValue)-\(release.versionTag).pbz")
-        try? FileManager.default.removeItem(at: output)
-        try FileManager.default.moveItem(at: temporaryURL, to: output)
-        return DownloadedFirmware(
-            versionTag: release.versionTag,
-            board: release.board,
-            url: output
+        try FileManager.default.createDirectory(
+            at: destination.deletingLastPathComponent(),
+            withIntermediateDirectories: true
         )
-    }
-
-    // Not the temporary directory: the system empties that whenever it likes, and
-    // a package waiting for a watch may wait days.
-    private static func downloadDirectory() throws -> URL {
-        let directory = try FileManager.default.url(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        )
-        .appending(path: "Firmware", directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        return directory
+        try? FileManager.default.removeItem(at: destination)
+        try FileManager.default.moveItem(at: temporaryURL, to: destination)
     }
 }
 

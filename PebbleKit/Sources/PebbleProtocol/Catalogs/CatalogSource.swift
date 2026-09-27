@@ -7,7 +7,7 @@ public import Foundation
 /// credentials included — the Algolia pairs are search-only public keys
 /// shipped in its binary. A source with no index browses and installs but
 /// cannot be searched past its shop window.
-public struct CatalogSource: Identifiable, Equatable, Sendable {
+public struct CatalogSource: Identifiable, Equatable, Sendable, Codable {
     /// Stable across launches — the stored selection and the per-source cache
     /// file are both named by it.
     public var id: String
@@ -50,8 +50,29 @@ public struct CatalogSource: Identifiable, Equatable, Sendable {
     )
 
     public static let builtIn: [CatalogSource] = [.pebble, .rebble]
+}
 
-    public static func named(_ id: String?) -> CatalogSource {
-        builtIn.first { $0.id == id } ?? .pebble
+/// Written as its identifier and read back as today's built-in of that name.
+///
+/// Not the whole value: the feed address, the index and its key are this
+/// build's to know, and a copy written by an earlier one would keep asking a
+/// store that has since moved — which is what storing the feed's address and
+/// looking the source up by it came to.
+extension CatalogSource {
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let id = try container.decode(String.self)
+        guard let source = Self.builtIn.first(where: { $0.id == id }) else {
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "No built-in catalog source is named \(id)."
+            )
+        }
+        self = source
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(id)
     }
 }

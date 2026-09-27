@@ -1719,6 +1719,16 @@
         }
       }
     },
+    "Connect the watch this is for, then open the link again." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このリンクの対象のウォッチを接続してから、もう一度リンクを開いてください。"
+          }
+        }
+      }
+    },
     "Connect the watch to change its language." : {
       "localizations" : {
         "ja" : {
@@ -2035,6 +2045,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "接続解除"
+          }
+        }
+      }
+    },
+    "Dismiss" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "閉じる"
           }
         }
       }
