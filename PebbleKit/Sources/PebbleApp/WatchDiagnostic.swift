@@ -9,4 +9,5 @@ public enum WatchDiagnostic: Sendable, CaseIterable {
     case watchLogs
     case coredump
     case timeline
+    case testNotification
 }

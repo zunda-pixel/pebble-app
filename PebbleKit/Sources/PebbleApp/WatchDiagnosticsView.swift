@@ -30,7 +30,7 @@ struct WatchDiagnosticsView: View {
             collectCoredump: { Task { await model.collectCoredump(watchID: watchID) } },
             clearTimeline: { Task { await model.clearWatchTimeline(watchID: watchID) } },
             sendTestNotification: { Task { await model.sendTestNotification(watchID: watchID) } },
-            notificationFeedback: model.notifications.feedback
+            notificationFeedback: state.feedback[.testNotification]
         )
     }
 }

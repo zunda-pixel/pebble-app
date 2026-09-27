@@ -130,14 +130,18 @@ struct FeatureFeedbackTests {
         model.setCompanionNotificationsEnabled(false)
 
         #expect(model.notifications.settingsFeedback == .success("Watch app notifications are disabled."))
-        // The field a watch's detail screen shows stays empty.
-        #expect(model.notifications.feedback == nil)
+        // The field a watch's diagnostics screen shows stays empty.
+        let watchID = WatchID("away")
+        #expect(model.diagnostics[watchID].feedback[.testNotification] == nil)
 
         // And the other way round: the test notification is the watch page's,
         // and says nothing in Settings.
-        await model.sendTestNotification()
+        await model.sendTestNotification(watchID: watchID)
 
-        #expect(model.notifications.feedback == .failure("Connect a Pebble before sending a test notification."))
+        #expect(
+            model.diagnostics[watchID].feedback[.testNotification]
+                == .failure("Connect a Pebble before sending a test notification.")
+        )
         #expect(model.notifications.settingsFeedback == .success("Watch app notifications are disabled."))
     }
 

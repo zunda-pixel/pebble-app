@@ -54,9 +54,11 @@ extension AppModel {
         }
     }
 
-    public func sendTestNotification(watchID: WatchID? = nil) async {
+    public func sendTestNotification(watchID: WatchID) async {
         guard let connection = connection(for: watchID), connection.isConnected else {
-            notifications.feedback = .failure("Connect a Pebble before sending a test notification.")
+            diagnostics[watchID].feedback[.testNotification] = .failure(
+                "Connect a Pebble before sending a test notification."
+            )
             return
         }
         let notification = TimelineNotification(
@@ -65,16 +67,17 @@ extension AppModel {
             body: String(localized: "Notifications are reaching your watch.", bundle: .module),
             appName: "Pebble"
         )
+        let client = connection.client
         do {
-            try await connection.client.write(.notification(notification))
-            notifications.feedback = .success("Test notification sent.")
+            try await retry(with: .watchWork) { try await client.write(.notification(notification)) }
+            diagnostics[watchID].feedback[.testNotification] = .success("Test notification sent.")
             await record(notification, sentTo: [connection.watch.name])
             await DiagnosticLog.shared.record(
                 category: "notification",
                 message: "Test notification sent"
             )
         } catch {
-            notifications.feedback = .failure("The test notification could not be sent.")
+            diagnostics[watchID].feedback[.testNotification] = .failure("The test notification could not be sent.")
             await DiagnosticLog.shared.record(
                 .error,
                 category: "notification",
@@ -145,14 +148,16 @@ extension AppModel {
         if !watchNames.isEmpty {
             await record(notification, sentTo: watchNames)
         }
-        guard activeConnections.allSatisfy({ delivered.contains($0.watch.id) }) else {
-            // The only caller is a `try?`-ed task in the companion runtime, which has
-            // nowhere to put a throw. A watch that would not take it now is in the same
-            // position as one that was not there at all — but the watches that did take
-            // it are written down, so the flush does not show it to them twice.
+        // Owed to every watch the app knows, connected or not — the same rule
+        // the queue flushes by, so whether a watch that is away gets it does
+        // not depend on whether another happened to be connected.
+        guard watchesOwed(delivered).isEmpty else {
+            // The script's call takes no callback, so the queue is the only
+            // answer. The watches that did take it are written down, so the
+            // flush does not show it to them twice.
             await queue(
                 PendingDelivery(work: notification, deliveredTo: delivered),
-                reason: "a watch would not take it"
+                reason: "a watch has not had it yet"
             )
             return
         }
@@ -170,8 +175,28 @@ extension AppModel {
             sentAt: notification.timestamp,
             watchNames: watchNames
         )
-        if let history = try? await sentNotificationStore.record(sent) {
-            notifications.sent = history
+        do {
+            notifications.sent = try await sentNotificationStore.record(sent)
+        } catch {
+            await DiagnosticLog.shared.record(
+                .error,
+                category: "notification",
+                message: "the notification history could not be saved: \(String(reflecting: error))"
+            )
+        }
+    }
+
+    /// The queue on disk is what a relaunch delivers from: one that did not
+    /// save loses a notification, or sends one twice, and says so here.
+    private func savePendingNotifications() async {
+        do {
+            try await pendingNotificationStore.save(pendingNotifications)
+        } catch {
+            await DiagnosticLog.shared.record(
+                .error,
+                category: "notification",
+                message: "the notification queue could not be saved: \(String(reflecting: error))"
+            )
         }
     }
 
@@ -201,7 +226,7 @@ extension AppModel {
         if pendingNotifications.count > 20 {
             pendingNotifications.removeFirst(pendingNotifications.count - 20)
         }
-        try? await pendingNotificationStore.save(pendingNotifications)
+        await savePendingNotifications()
         await DiagnosticLog.shared.record(
             category: "notification",
             message: "Watch app notification queued: \(reason)"
@@ -538,13 +563,22 @@ extension AppModel {
         await flush.value
     }
 
+    /// A watch that refuses one entry is not asked again this pass, and the
+    /// others go on: stopping at the first refusal left the entries owed only
+    /// to another watch unsent while it sat there connected.
     private func deliverPendingNotifications() async {
+        var attempted: Set<UUID> = []
+        var refusing: Set<WatchID> = []
+        func willing(_ queued: PendingDelivery<TimelineNotification>) -> [WatchConnection] {
+            activeConnections.filter { queued.isOwed(by: $0.watch.id) && !refusing.contains($0.watch.id) }
+        }
         while let next = pendingNotifications.first(where: { queued in
-            activeConnections.contains { queued.isOwed(by: $0.watch.id) }
+            !attempted.contains(queued.work.id) && !willing(queued).isEmpty
         }) {
+            attempted.insert(next.work.id)
             var delivered = next.deliveredTo
             var watchNames: [String] = []
-            for connection in activeConnections where next.isOwed(by: connection.watch.id) {
+            for connection in willing(next) {
                 let client = connection.client
                 do {
                     try await retry(with: .watchWork) {
@@ -553,6 +587,7 @@ extension AppModel {
                     delivered.insert(connection.watch.id)
                     watchNames.append(connection.watch.name)
                 } catch {
+                    refusing.insert(connection.watch.id)
                     continue
                 }
             }
@@ -564,17 +599,13 @@ extension AppModel {
             guard let index = pendingNotifications.firstIndex(where: { $0.work.id == next.work.id }) else {
                 continue
             }
-            guard delivered != pendingNotifications[index].deliveredTo else {
-                // Nothing got through. Another pass would ask the same watches
-                // the same question.
-                break
-            }
+            guard delivered != pendingNotifications[index].deliveredTo else { continue }
             pendingNotifications[index].deliveredTo = delivered
             if watchesOwed(pendingNotifications[index].deliveredTo).isEmpty {
                 pendingNotifications.remove(at: index)
             }
         }
-        try? await pendingNotificationStore.save(pendingNotifications)
+        await savePendingNotifications()
         if pendingNotifications.isEmpty {
             await DiagnosticLog.shared.record(
                 category: "notification",

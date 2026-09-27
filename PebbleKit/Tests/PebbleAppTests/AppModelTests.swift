@@ -337,6 +337,8 @@ struct AppModelTests {
         await model.sendTestNotification(watchID: second.id)
         #expect(connectionClients[second.id]?.sentNotifications.count == 1)
         #expect(connectionClients[first.id]?.sentNotifications.isEmpty == true)
+        #expect(model.diagnostics[second.id].feedback[.testNotification] == .success("Test notification sent."))
+        #expect(model.diagnostics[first.id].feedback[.testNotification] == nil)
 
         await model.disconnect(watchID: first.id)
         #expect(model.connectedWatches.map(\.id) == [second.id])
