@@ -71,13 +71,19 @@ public enum WatchConnectionError: Error, Equatable, Sendable {
     /// peripheral manager that takes, so forgetting the watch in the system's
     /// settings — which throws the copy away with the bond — is the way back.
     case watchServicesOutOfDate
+    /// The watch is bonded and hosts no protocol service of its own: its
+    /// firmware predates watches serving the protocol themselves, and expects the
+    /// phone to host the service, which iOS forbids for the reason above. Only
+    /// new firmware, installed from somewhere that can still host it, helps.
+    case watchFirmwareTooOldForiOS
 
     /// A link that is gone, or a radio that is off, will not come back
     /// within the few hundred milliseconds a retry waits.
     public var isWorthAnotherAttempt: Bool {
         switch self {
         case .bluetoothUnavailable, .bluetoothUnsupported, .permissionDenied, .disconnected,
-             .handshakeKeptFailing, .pairingRemovedByWatch, .watchServicesOutOfDate:
+             .handshakeKeptFailing, .pairingRemovedByWatch, .watchServicesOutOfDate,
+             .watchFirmwareTooOldForiOS:
             false
         case .scanAlreadyInProgress, .watchNotFound, .connectionAlreadyInProgress,
              .connectionFailed, .connectionTimedOut, .protocolNegotiationFailed:

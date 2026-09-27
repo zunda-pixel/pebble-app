@@ -22,9 +22,12 @@ struct LinkState {
     var pairingTimeoutTask: Task<Void, Never>?
     var subscriptionWatchdog: Task<Void, Never>?
     var hasRepublishedForThisLink = false
-    /// Set once this link has been given up on for services iOS holds out of
-    /// date, which three separate callbacks can each find.
-    var hasGivenUpOnOutOfDateServices = false
+    /// Set once this link has been given up on for services that cannot carry
+    /// the protocol, which several separate callbacks can each find.
+    var hasGivenUpOnTheWatchsServices = false
+    /// How long a bonded watch has left to publish its own protocol service
+    /// where the phone cannot host one.
+    var protocolServiceDeadline: Task<Void, Never>?
     var ppogSession: PPoGSession?
     var frameDecoder = PebbleProtocolFrameDecoder()
     var pendingGattWrites: Deque<Data> = []
@@ -50,5 +53,6 @@ struct LinkState {
         subscriptionWatchdog?.cancel()
         acknowledgementTimeoutTask?.cancel()
         sessionRestartTimeoutTask?.cancel()
+        protocolServiceDeadline?.cancel()
     }
 }

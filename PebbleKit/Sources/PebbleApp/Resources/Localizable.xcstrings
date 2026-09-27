@@ -7031,6 +7031,16 @@
         }
       }
     },
+    "This watch's firmware is too old to connect to the iPhone app. Update its firmware from the Pebble app on a Mac, then connect it here again." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このウォッチのファームウェアは古いため、iPhoneアプリには接続できません。MacのPebbleアプリでファームウェアをアップデートしてから、ここでもう一度接続してください。"
+          }
+        }
+      }
+    },
     "This watch's firmware plays the buzz its own settings choose and cannot be told another." : {
       "localizations" : {
         "ja" : {

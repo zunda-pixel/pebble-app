@@ -899,6 +899,7 @@ struct CompanionStorageTests {
         #expect(!WatchConnectionError.permissionDenied.isWorthAnotherAttempt)
         // Another attempt is exactly what has been tried.
         #expect(!WatchConnectionError.handshakeKeptFailing.isWorthAnotherAttempt)
+        #expect(!WatchConnectionError.watchFirmwareTooOldForiOS.isWorthAnotherAttempt)
 
         #expect(WatchConnectionError.connectionTimedOut.isWorthAnotherAttempt)
         #expect(WatchConnectionError.connectionFailed.isWorthAnotherAttempt)
