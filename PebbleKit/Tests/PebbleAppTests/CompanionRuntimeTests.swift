@@ -337,6 +337,60 @@ struct CompanionRuntimeTests {
         #expect(answered.first?.value == .string("status 200 answer 42"))
     }
 
+    @Test func aLargeAnswerReachesTheScriptWhole() async throws {
+        let body = String(repeating: "0123456789abcdef", count: 65_536)
+        let server = MiniHTTPServer(responseBody: body)
+        let port = try await server.start()
+        defer { server.stop() }
+        let id = UUID()
+        defer { Task { await PebbleCompanionRuntime.forget(applicationID: id) } }
+
+        let answered = try await run(
+            """
+            Pebble.addEventListener('ready', function () {
+              var req = new XMLHttpRequest();
+              req.open('GET', 'http://127.0.0.1:\(port)/large', true);
+              req.onload = function () {
+                var whole = req.responseText.length === \(body.utf8.count)
+                  && req.responseText.slice(-16) === '0123456789abcdef';
+                Pebble.sendAppMessage({kept: 'whole ' + whole});
+              };
+              req.onerror = function () { Pebble.sendAppMessage({kept: 'error'}); };
+              req.send(null);
+            });
+            """,
+            for: makeApplication(id: id)
+        )
+
+        #expect(answered.first?.value == .string("whole true"))
+    }
+
+    /// Past the limit with no length given, so only counting the bytes as they
+    /// arrive can refuse it.
+    @Test func anAnswerPastTheLimitWithNoLengthIsAnError() async throws {
+        let body = String(repeating: "0123456789abcdef", count: 11 * 65_536)
+        let server = MiniHTTPServer(responseBody: body, declaresLength: false)
+        let port = try await server.start()
+        defer { server.stop() }
+        let id = UUID()
+        defer { Task { await PebbleCompanionRuntime.forget(applicationID: id) } }
+
+        let answered = try await run(
+            """
+            Pebble.addEventListener('ready', function () {
+              var req = new XMLHttpRequest();
+              req.open('GET', 'http://127.0.0.1:\(port)/endless', true);
+              req.onload = function () { Pebble.sendAppMessage({kept: 'loaded'}); };
+              req.onerror = function () { Pebble.sendAppMessage({kept: 'error'}); };
+              req.send(null);
+            });
+            """,
+            for: makeApplication(id: id)
+        )
+
+        #expect(answered.first?.value == .string("error"))
+    }
+
     /// A payload off the watch reads under both spellings: the name the
     /// appKeys declare, which is how the SDK's own samples read it, and the
     /// number, which is how the older scripts do. Numbers alone left every
@@ -434,11 +488,13 @@ private final class MiniHTTPServer: @unchecked Sendable {
     private let listener: NWListener
     private let queue = DispatchQueue(label: "mini-http-server")
 
-    init(responseBody: String) {
+    /// Without `declaresLength` the body is ended by closing the connection,
+    /// which is how a server that does not know the length in advance sends it.
+    init(responseBody: String, declaresLength: Bool = true) {
         listener = try! NWListener(using: .tcp, on: .any)
         let response = "HTTP/1.1 200 OK\r\n"
             + "Content-Type: application/json\r\n"
-            + "Content-Length: \(responseBody.utf8.count)\r\n"
+            + (declaresLength ? "Content-Length: \(responseBody.utf8.count)\r\n" : "")
             + "Connection: close\r\n\r\n"
             + responseBody
         listener.newConnectionHandler = { [queue] connection in

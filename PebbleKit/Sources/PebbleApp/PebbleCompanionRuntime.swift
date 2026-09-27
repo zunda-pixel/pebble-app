@@ -723,24 +723,12 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
         if script.timeoutMilliseconds > 0 { request.timeoutInterval = script.timeoutMilliseconds / 1000 }
         if let body = script.body { request.httpBody = Data(body.utf8) }
         let session = scriptSession(for: applicationID)
-        // Far beyond any API answer a watch app could hold, and a bound on
-        // what a hostile page could make the shim buffer — counted as the
-        // bytes arrive, since reading the whole body first bounds nothing.
-        let limit = 10 * 1_024 * 1_024
         do {
-            let (bytes, response) = try await session.bytes(for: request)
-            guard let http = response as? HTTPURLResponse, response.expectedContentLength <= limit else {
-                bytes.task.cancel()
-                return
-            }
-            var data = Data()
-            for try await byte in bytes {
-                data.append(byte)
-                guard data.count <= limit else {
-                    bytes.task.cancel()
-                    return
-                }
-            }
+            guard let (data, http) = try await Self.fetchBody(
+                request,
+                session: session,
+                limit: Self.scriptResponseLimit
+            ) else { return }
             let headerText = http.allHeaderFields
                 .compactMap { name, value -> String? in
                     guard let name = name as? String else { return nil }
@@ -765,6 +753,42 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
                 message: "a script's request could not be made: \(String(reflecting: error))"
             )
         }
+    }
+
+    /// Far beyond any API answer a watch app could hold, and a bound on what a
+    /// hostile page could make the shim buffer.
+    private static let scriptResponseLimit = 10 * 1_024 * 1_024
+
+    /// Nil when the answer is not HTTP or runs past `limit`. Counted as the
+    /// bytes arrive rather than read whole with `data(for:)` and measured
+    /// after: a body that gives no length is bounded by nothing until it has
+    /// all been held.
+    ///
+    /// `@concurrent` so the millions of iterations a large body takes run off
+    /// the main actor; a plain `nonisolated` function would run on its
+    /// caller's, which is the main actor, under `NonisolatedNonsendingByDefault`.
+    @concurrent
+    private static func fetchBody(
+        _ request: URLRequest,
+        session: URLSession,
+        limit: Int
+    ) async throws -> (Data, HTTPURLResponse)? {
+        let (bytes, response) = try await session.bytes(for: request)
+        let expected = response.expectedContentLength
+        guard let http = response as? HTTPURLResponse, expected <= limit else {
+            bytes.task.cancel()
+            return nil
+        }
+        var data = Data()
+        if expected > 0 { data.reserveCapacity(Int(min(expected, Int64(limit)))) }
+        for try await byte in bytes {
+            data.append(byte)
+            guard data.count <= limit else {
+                bytes.task.cancel()
+                return nil
+            }
+        }
+        return (data, http)
     }
 
     private func scriptSession(for applicationID: UUID) -> URLSession {
