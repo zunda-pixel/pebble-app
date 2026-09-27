@@ -658,7 +658,9 @@ extension AppModel {
     }
 
     /// One store, one notification: EventKit says a calendar or a reminder
-    /// changed without saying which, so both are read again.
+    /// changed without saying which, so both are read again. That includes
+    /// the changes this app writes to the Reminders app itself; reading them
+    /// back finds what was just written, and costs one read after the debounce.
     func observeEventKitChanges() {
         calendarChangesTask?.cancel()
         calendarChangesTask = Task { [weak self] in

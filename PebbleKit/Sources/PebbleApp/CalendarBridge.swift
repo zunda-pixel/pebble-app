@@ -71,13 +71,17 @@ struct CalendarTimelineRead {
 
 @MainActor
 final class CalendarBridge {
-    private var store = EKEventStore()
+    private let eventKit: EventKitStore
+
+    init(eventKit: EventKitStore = .shared) {
+        self.eventKit = eventKit
+    }
 
     /// The only place the system's question is asked. The reads below check
     /// the standing answer instead: they are reached from EventKit's own change
     /// notices too, and nothing the reader did not start may raise the sheet.
     func requestAccess() async throws {
-        guard try await store.requestFullAccessToEvents() else { throw CalendarBridgeError.accessDenied }
+        guard try await eventKit.requestFullAccessToEvents() else { throw CalendarBridgeError.accessDenied }
     }
 
     private func requireAccess() throws {
@@ -89,10 +93,8 @@ final class CalendarBridge {
     /// The calendars the phone has, for the settings screen.
     func calendars() async throws -> [PhoneCalendar] {
         try requireAccess()
-        return store.calendars(for: .event).map {
-            PhoneCalendar(id: $0.calendarIdentifier, title: $0.title, sourceTitle: $0.source.title)
-        }
-        .sorted { ($0.sourceTitle, $0.title) < ($1.sourceTitle, $1.title) }
+        return await eventKit.calendars()
+            .sorted { ($0.sourceTitle, $0.title) < ($1.sourceTitle, $1.title) }
     }
 
     func timelinePins(
@@ -104,26 +106,45 @@ final class CalendarBridge {
         let now = Date()
         let start = Calendar.current.date(byAdding: .day, value: -1, to: now) ?? now
         let end = Calendar.current.date(byAdding: .day, value: 30, to: now) ?? now
-        let events = store.events(matching: store.predicateForEvents(withStart: start, end: end, calendars: nil))
+        return await eventKit.timelineRead(
+            from: start,
+            to: end,
+            now: now,
+            disabledCalendarIdentifiers: disabledCalendarIdentifiers,
+            includeDeclined: includeDeclined,
+            remindersEnabled: remindersEnabled
+        )
+    }
+
+    /// The events as pins, and their alerts as reminders. Run where the store
+    /// is, which is not the main actor.
+    nonisolated static func timelineRead(
+        of events: [EKEvent],
+        now: Date,
+        disabledCalendarIdentifiers: Set<String>,
+        includeDeclined: Bool,
+        remindersEnabled: Bool
+    ) -> CalendarTimelineRead {
+        let events = events
             .filter { !disabledCalendarIdentifiers.contains($0.calendar.calendarIdentifier) }
             // A declined meeting is one the reader said they will not be at;
             // its pin would be a reminder of a decision already made. Kept
             // only when asked for.
-            .filter { includeDeclined || !Self.isDeclined($0) }
+            .filter { includeDeclined || !isDeclined($0) }
         // Reminders are read too, but as reminders: `RemindersBridge` puts them
         // in the database the watch buzzes from rather than on the timeline,
         // where they could only be looked at.
         var pins: [TimelinePin] = []
         var reminders: [TimelinePin] = []
         for event in events {
-            let key = Self.occurrenceKey(
+            let key = occurrenceKey(
                 identity: event.eventIdentifier ?? event.title ?? "Calendar Event",
                 occurrence: event.occurrenceDate ?? event.startDate
             )
             let pin = TimelinePin(
                 id: UUID(stableDigestOf: key),
-                parentApplicationID: Self.calendarApplicationID,
-                timestamp: event.isAllDay ? Self.anchoredToUTCMidnight(event.startDate) : event.startDate,
+                parentApplicationID: calendarApplicationID,
+                timestamp: event.isAllDay ? anchoredToUTCMidnight(event.startDate) : event.startDate,
                 durationMinutes: event.isAllDay
                     ? 0
                     : UInt16(clamping: Int(event.endDate.timeIntervalSince(event.startDate) / 60)),
@@ -134,11 +155,11 @@ final class CalendarBridge {
             )
             pins.append(pin)
             guard remindersEnabled else { continue }
-            reminders += Self.eventReminders(
+            reminders += eventReminders(
                 for: pin,
                 occurrenceKey: key,
                 fireDates: (event.alarms ?? [])
-                    .map { Self.fireDate(of: $0, eventStart: event.startDate) }
+                    .map { fireDate(of: $0, eventStart: event.startDate) }
                     .filter { $0 > now }
             )
         }
@@ -151,7 +172,7 @@ final class CalendarBridge {
     /// When an alarm goes off. EventKit keeps one of two shapes: a date of its
     /// own, or an offset from the event's start — negative for before, the
     /// usual case.
-    static func fireDate(of alarm: EKAlarm, eventStart: Date) -> Date {
+    nonisolated static func fireDate(of alarm: EKAlarm, eventStart: Date) -> Date {
         alarm.absoluteDate ?? eventStart.addingTimeInterval(alarm.relativeOffset)
     }
 
@@ -164,7 +185,7 @@ final class CalendarBridge {
     /// The identifier is derived from the occurrence and the alarm's moment, so
     /// reading the same alarm twice is the same reminder, and moving an alarm
     /// is one reminder leaving and another arriving.
-    static func eventReminders(
+    nonisolated static func eventReminders(
         for pin: TimelinePin,
         occurrenceKey: String,
         fireDates: [Date]
@@ -202,7 +223,7 @@ final class CalendarBridge {
     /// `occurrenceDate` rather than `startDate`: it stays put when an
     /// occurrence is detached and moved, so editing one week does not turn it
     /// into a new pin and orphan the old one on the watch.
-    static func occurrenceKey(identity: String, occurrence: Date) -> String {
+    nonisolated static func occurrenceKey(identity: String, occurrence: Date) -> String {
         "\(identity)|\(occurrence.timeIntervalSince1970)"
     }
 
@@ -227,7 +248,7 @@ final class CalendarBridge {
 
     /// Whether the phone's own account declined this event. An event with no
     /// attendees has nobody to have declined it.
-    static func isDeclined(_ event: EKEvent) -> Bool {
+    nonisolated static func isDeclined(_ event: EKEvent) -> Bool {
         event.attendees?.contains { $0.isCurrentUser && $0.participantStatus == .declined } ?? false
     }
 

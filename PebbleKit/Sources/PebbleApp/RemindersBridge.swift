@@ -35,7 +35,11 @@ extension RemindersAppStore {
 
 @MainActor
 final class RemindersBridge: RemindersAppStore {
-    private let store = EKEventStore()
+    private let eventKit: EventKitStore
+
+    init(eventKit: EventKitStore = .shared) {
+        self.eventKit = eventKit
+    }
 
     /// Reminders are read as far ahead as calendar events are, and no further:
     /// the watch keeps a window around the present and refuses what is outside
@@ -47,7 +51,7 @@ final class RemindersBridge: RemindersAppStore {
     /// watch sends and from EventKit's own change notices, and neither may put
     /// a permission sheet in front of the reader.
     func requestAccess() async throws {
-        guard try await store.requestFullAccessToReminders() else {
+        guard try await eventKit.requestFullAccessToReminders() else {
             throw RemindersBridgeError.accessDenied
         }
     }
@@ -63,48 +67,28 @@ final class RemindersBridge: RemindersAppStore {
         let now = Date()
         // From the start of today: a reminder with a date and no time is due
         // at midnight to EventKit, and would otherwise be missed on its own day.
-        let predicate = store.predicateForIncompleteReminders(
-            withDueDateStarting: Calendar.current.startOfDay(for: now),
-            ending: now.addingTimeInterval(Self.window),
-            calendars: nil
+        return await eventKit.incompleteReminders(
+            from: Calendar.current.startOfDay(for: now),
+            to: now.addingTimeInterval(Self.window)
         )
-        return await withCheckedContinuation { continuation in
-            store.fetchReminders(matching: predicate) { reminders in
-                continuation.resume(returning: (reminders ?? []).compactMap(Self.item(for:)))
-            }
-        }
     }
 
     func add(_ reminder: TimelinePin) async throws -> String {
         try requireAccess()
-        guard let list = store.defaultCalendarForNewReminders() else {
-            throw RemindersBridgeError.noList
-        }
-        let item = EKReminder(eventStore: store)
-        item.calendar = list
-        apply(reminder, to: item)
-        try store.save(item, commit: true)
-        return item.calendarItemIdentifier
+        return try await eventKit.addReminder(reminder)
     }
 
     func update(_ reminder: TimelinePin, identifier: String) async throws {
         try requireAccess()
-        guard let item = store.calendarItem(withIdentifier: identifier) as? EKReminder else {
-            throw RemindersBridgeError.gone
-        }
-        apply(reminder, to: item)
-        try store.save(item, commit: true)
+        try await eventKit.updateReminder(reminder, identifier: identifier)
     }
 
     func remove(identifier: String) async throws {
         try requireAccess()
-        guard let item = store.calendarItem(withIdentifier: identifier) as? EKReminder else {
-            return
-        }
-        try store.remove(item, commit: true)
+        try await eventKit.removeReminder(identifier: identifier)
     }
 
-    private func apply(_ reminder: TimelinePin, to item: EKReminder) {
+    nonisolated static func apply(_ reminder: TimelinePin, to item: EKReminder) {
         item.title = reminder.title
         item.notes = reminder.body
         item.dueDateComponents = Calendar.current.dateComponents(
@@ -115,9 +99,7 @@ final class RemindersBridge: RemindersAppStore {
         // alarm here would have the phone buzz for it as well.
     }
 
-    /// Read off the main actor, inside EventKit's own callback, so nothing of
-    /// this class is touched: a reminder is turned into the value that leaves.
-    private nonisolated static func item(for reminder: EKReminder) -> RemindersAppItem? {
+    nonisolated static func item(for reminder: EKReminder) -> RemindersAppItem? {
         guard var components = reminder.dueDateComponents else { return nil }
         // A reminder with a date and no time is one for that day, and the
         // Reminders app tells of it in the morning. Read as it stands it was
