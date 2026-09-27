@@ -28,9 +28,14 @@ package enum WatchAdvertisement {
 
         // Payload: type(1) + serial(12), then an extended record whose first byte is
         // the hardware platform. Older firmware omits it, and platform 0 means the
-        // watch did not say.
-        let hardwarePlatformOffset = (containsCompanyIdentifier ? 2 : 0) + 13
-        if manufacturerData.indices.contains(hardwarePlatformOffset),
+        // watch did not say. CoreBluetooth's manufacturer data always starts with
+        // a company identifier, so a watch found by its service under another
+        // company's data carries no layout of Pebble's to read: its name is
+        // asked instead. Reading two bytes short there took a serial number's
+        // letter for a platform and turned the watch away.
+        let hardwarePlatformOffset = 2 + 13
+        if containsCompanyIdentifier,
+           manufacturerData.indices.contains(hardwarePlatformOffset),
            manufacturerData[hardwarePlatformOffset] != 0 {
             // A watch that names its platform is trusted, even when that means rejecting
             // a model this app cannot drive.

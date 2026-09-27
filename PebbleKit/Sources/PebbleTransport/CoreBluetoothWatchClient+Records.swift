@@ -214,7 +214,9 @@ extension CoreBluetoothWatchClient {
         // The install cookie comes back as zero: the firmware answers from
         // `prv_cleanup_and_send_response`, whose transfer state the preceding
         // commit already cleared.
-        let response = try PutBytesCodec.decodeResponse(frame)
+        let response = try decodingAwaitedReply(frame) {
+            finishFirmwareControl(throwing: $0)
+        }
         pendingInstallCookie = nil
         response.result == .acknowledgement
             ? finishFirmwareControl()
@@ -235,7 +237,7 @@ extension CoreBluetoothWatchClient {
         guard var session = activeTransferSession else {
             return
         }
-        let response = try PutBytesCodec.decodeResponse(frame)
+        let response = try decodingAwaitedReply(frame) { failTransfer($0) }
         do {
             let actions = try session.receive(response)
             activeTransferSession = session
@@ -245,6 +247,21 @@ extension CoreBluetoothWatchClient {
         } catch {
             try? sendFrame(PutBytesCodec.abortFrame(cookie: response.cookie), to: peripheral)
             failTransfer(error)
+        }
+    }
+
+    /// A reply that cannot be read is still the reply being waited for: the
+    /// wait ends with the reason now, rather than as a timeout blaming the
+    /// watch for not answering. Thrown on as well, so the frame is logged.
+    private func decodingAwaitedReply(
+        _ frame: PebbleProtocolFrame,
+        failing fail: (any Error) -> Void
+    ) throws -> PutBytesResponse {
+        do {
+            return try PutBytesCodec.decodeResponse(frame)
+        } catch {
+            fail(error)
+            throw error
         }
     }
 

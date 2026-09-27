@@ -723,7 +723,16 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         case SystemMessageCodec.endpoint:
             guard waitingForFirmwareStart else { return false }
             waitingForFirmwareStart = false
-            try SystemMessageCodec.decodeFirmwareUpdateStartResponse(frame)
+            // Unreadable, it is still the answer being waited for: the start
+            // fails with the reason now rather than timing out as unanswered.
+            let started: Bool
+            do {
+                started = try SystemMessageCodec.decodeFirmwareUpdateStartResponse(frame)
+            } catch {
+                finishFirmwareControl(throwing: error)
+                throw error
+            }
+            started
                 ? finishFirmwareControl()
                 : finishFirmwareControl(throwing: SystemMessageCodecError.updateRejected)
 

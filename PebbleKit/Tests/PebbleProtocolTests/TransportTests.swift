@@ -416,6 +416,19 @@ struct TransportTests {
         ) == nil)
     }
 
+    @Test
+    func aWatchFoundByItsServiceUnderAnotherCompanysDataIsKnownByItsName() {
+        // Apple's company identifier, then sixteen bytes of something that is not
+        // Pebble's layout: byte 13 of it is not a platform.
+        let foreign: [UInt8] = [0x4C, 0x00] + Array(repeating: 0x41, count: 16)
+
+        #expect(WatchAdvertisement.watch(
+            advertisesPebbleService: true,
+            localName: "Pebble Time 2 1A2B",
+            manufacturerData: foreign
+        )?.model == .pebbleTime2)
+    }
+
     @Test(arguments: WatchModel.allCases)
     func theMockReportsABoardOfTheModelItWasAskedFor(model: WatchModel) async throws {
         let client = MockWatchClient()

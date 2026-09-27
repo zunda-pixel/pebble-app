@@ -44,7 +44,7 @@ final class PendingReply<Value: Sendable> {
         // are supposed to be serialized upstream, and a broken queue should
         // read as this error, not as a hang.
         guard continuation == nil else {
-            throw WatchConnectionError.connectionAlreadyInProgress
+            throw PendingReplyError.alreadyWaiting
         }
         return try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
@@ -104,4 +104,11 @@ extension PendingReply where Value == Void {
     func finish() {
         finish(())
     }
+}
+
+/// A second caller waiting for a reply the first is still waiting for. Its own
+/// error rather than a borrowed one: `connectionAlreadyInProgress` told the
+/// reader a second connection was being made when a queue had failed.
+public enum PendingReplyError: Error, Equatable, Sendable {
+    case alreadyWaiting
 }

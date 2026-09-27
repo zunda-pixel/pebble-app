@@ -67,6 +67,10 @@ public final class QEMUWatchClient: WatchClient {
     ) async throws -> ConnectedWatch {
         reconnectWatch = watch
         isManualDisconnect = false
+        // The loop's next attempt would find this link and, failing to open a
+        // second, close the one this opened.
+        reconnectTask?.cancel()
+        reconnectTask = nil
         return try await establishConnection(to: watch, reportingPhase: reportingPhase)
     }
 
@@ -280,7 +284,7 @@ public final class QEMUWatchClient: WatchClient {
     }
 
     public func installFile(_ bytes: [UInt8], filename: String) async throws {
-        throw PutBytesTransferError.invalidConfiguration
+        try await transferObject(bytes, objectType: .file, appBankID: 0, filename: filename)
     }
 
     public func installApplicationObject(
@@ -341,25 +345,33 @@ public final class QEMUWatchClient: WatchClient {
     private func transferObject(
         _ bytes: [UInt8],
         objectType: PutBytesObjectType,
-        appBankID: UInt32
+        appBankID: UInt32,
+        filename: String? = nil
     ) async throws -> UInt32 {
         try await transferQueue.begin()
         defer { transferQueue.finish() }
-        return try await transferObjectHoldingTheTurn(bytes, objectType: objectType, appBankID: appBankID)
+        return try await transferObjectHoldingTheTurn(
+            bytes,
+            objectType: objectType,
+            appBankID: appBankID,
+            filename: filename
+        )
     }
 
     /// For a caller already holding `transferQueue`'s turn.
     private func transferObjectHoldingTheTurn(
         _ bytes: [UInt8],
         objectType: PutBytesObjectType,
-        appBankID: UInt32
+        appBankID: UInt32,
+        filename: String? = nil
     ) async throws -> UInt32 {
         guard connection != nil else { throw WatchConnectionError.disconnected }
         guard transferSession == nil else { throw PutBytesClientError.transferAlreadyInProgress }
         var session = PutBytesTransferSession(
             bytes: bytes,
             objectType: objectType,
-            appBankID: appBankID
+            appBankID: appBankID,
+            filename: filename
         )
         let first = try session.start()
         transferSession = session
@@ -539,6 +551,10 @@ public final class QEMUWatchClient: WatchClient {
                     self.reconnectTask = nil
                     self.eventContinuation?.yield(.watchUpdated(watch))
                     return
+                } catch WatchConnectionError.connectionAlreadyInProgress {
+                    // Someone else's link, and a healthy one.
+                    self.reconnectTask = nil
+                    return
                 } catch {
                     self.discardConnection()
                 }
@@ -624,7 +640,9 @@ public final class QEMUWatchClient: WatchClient {
         case AppReorderCodec.endpoint: appReorderReply.isWaiting
         case PutBytesCodec.endpoint: transferSession != nil || pendingInstallCookie != nil
         case SystemMessageCodec.endpoint: waitingForFirmwareStart
-        case AppMessageCodec.endpoint: appMessages.outstandingTransactionID != nil
+        // Not while a message of the phone's waits: whether a frame here is its
+        // ack or a message of the watch's own is only known once it decodes,
+        // and an unreadable push used to fail the send it had nothing to do with.
         default: false
         }
     }
@@ -643,7 +661,6 @@ public final class QEMUWatchClient: WatchClient {
                 finishFirmwareControl(throwing: error)
             }
         case SystemMessageCodec.endpoint: finishFirmwareControl(throwing: error)
-        case AppMessageCodec.endpoint: appMessages.finishActive(throwing: error)
         default: break
         }
     }
