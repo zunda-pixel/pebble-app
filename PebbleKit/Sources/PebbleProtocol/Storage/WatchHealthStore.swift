@@ -226,6 +226,16 @@ public actor WatchHealthStore {
             // HealthKit sync identifiers are made from it, and a new one on
             // every sync would write the same minutes again beside the old.
             resolved.id = existing.id
+            // Kept apart from which record is newer: the source decides what
+            // is exported to Apple Health, and a HealthKit import that
+            // happened to be newer made a day the watch measured a HealthKit
+            // one, whose minutes were then never exported.
+            let sources = [existing.source, normalized.source]
+            if sources.contains(.watch) {
+                resolved.source = .watch
+            } else if sources.contains(.imported) {
+                resolved.source = .imported
+            }
             // Each sync brings the minutes since the last one, so the day is
             // the union of them, and taking the newer record's alone would
             // leave the morning out of the evening's total.

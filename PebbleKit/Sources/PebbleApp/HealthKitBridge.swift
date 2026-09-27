@@ -138,7 +138,11 @@ final class HealthKitBridge {
                 exported(.sleep, sample)
                 // The night as the watch measured it: real start and end, the
                 // nap as its own block, and the deep stretches as the stage
-                // they are. The synthetic block below misplaces all three.
+                // they are. A total with no sessions behind it is not written
+                // as a block of its own: the watch's records all carry their
+                // sessions, so such a total is a HealthKit night merged into a
+                // watch day, and writing it would hand Apple Health its own
+                // night back as the watch's.
                 // A day this app once exported as one synthetic block keeps
                 // that block even as the segments arrive — the identifiers
                 // differ, so nothing replaces it and the night counts twice.
@@ -159,20 +163,6 @@ final class HealthKitBridge {
                         ))
                     }
                 }
-            } else if owed(.sleep, sample), sample.sleepMinutes > 0 {
-                exported(.sleep, sample)
-                // A record from before sessions were kept knows only the
-                // total, so the block is synthetic — anchored to the day, not
-                // to when anybody slept.
-                var sleepMetadata = commonMetadata
-                sleepMetadata[HKMetadataKeySyncIdentifier] = "\(baseIdentifier).sleep"
-                healthSamples.append(HKCategorySample(
-                    type: sleepType,
-                    value: HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue,
-                    start: sample.date.addingTimeInterval(TimeInterval(-sample.sleepMinutes * 60)),
-                    end: sample.date,
-                    metadata: sleepMetadata
-                ))
             }
             if owed(.workouts, sample) {
                 exported(.workouts, sample)

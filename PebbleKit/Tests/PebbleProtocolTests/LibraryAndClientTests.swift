@@ -621,7 +621,7 @@ struct CompanionStorageTests {
         #expect(merged.count == 1)
         #expect(merged[0].steps == 8_000)
         #expect(merged[0].sleepMinutes == 450)
-        #expect(merged[0].source == .imported)
+        #expect(merged[0].source == .watch)
     }
 
     @Test(arguments: [false, true])

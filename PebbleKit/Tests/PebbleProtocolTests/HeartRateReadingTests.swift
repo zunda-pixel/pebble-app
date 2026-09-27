@@ -40,6 +40,39 @@ struct HeartRateReadingTests {
         let resolved = try #require(merged.first)
         #expect(resolved.heartRateReadings == [reading])
         #expect(resolved.heartRate?.average == 72)
+        #expect(resolved.source == .watch)
+    }
+
+    @Test func aNewerHealthKitNightLeavesTheDayTheWatchs() async throws {
+        let fileURL = URL.temporaryDirectory.appending(path: "health-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        let store = WatchHealthStore(fileURL: fileURL)
+        let reading = HeartRateReading(date: Date(timeIntervalSince1970: 90_060), beatsPerMinute: 72)
+        _ = try await store.merge([day(86_400, readings: [reading])], now: now)
+
+        var healthKitDay = day(86_400, readings: [], source: .healthKit, updatedAt: Date(timeIntervalSince1970: 300))
+        healthKitDay.heartRate = nil
+        healthKitDay.sleepMinutes = 420
+        let merged = try await store.merge([healthKitDay], now: now)
+
+        let resolved = try #require(merged.first)
+        #expect(resolved.source == .watch)
+        #expect(resolved.heartRateReadings == [reading])
+        #expect(resolved.sleepMinutes == 420)
+        #expect(resolved.sleepSessions.isEmpty)
+    }
+
+    @Test func anImportedDayStaysImportedWhenHealthKitIsNewer() async throws {
+        let fileURL = URL.temporaryDirectory.appending(path: "health-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        let store = WatchHealthStore(fileURL: fileURL)
+        _ = try await store.merge([day(86_400, readings: [], source: .imported)], now: now)
+
+        let merged = try await store.merge([
+            day(86_400, readings: [], source: .healthKit, updatedAt: Date(timeIntervalSince1970: 300)),
+        ], now: now)
+
+        #expect(try #require(merged.first).source == .imported)
     }
 
     /// The summary and its readings travel together: the newer watch record
