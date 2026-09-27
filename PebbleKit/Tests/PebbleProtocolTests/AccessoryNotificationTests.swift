@@ -177,15 +177,27 @@ struct AccessoryTransportFrameTests {
     @Test
     func aSessionCarriesTheKeyAndTheIdentifierTheWatchDerivesFrom() throws {
         let enc = [0x04] + [UInt8](repeating: 0x11, count: 64)
-        let accessory = UUID(uuidString: "FFFD2EEE-254F-E6EB-985F-49E78EAF5FD0")!
+        let accessory = "fffd2eee-254f-e6eb-985f-49e78eaf5fd0"
 
         let frame = try AccessoryTransportFrame.session(encapsulatedKey: enc, accessoryIdentifier: accessory)
 
-        // `prv_handle_session_frame`; the identifier upper-case, as in the HPKE
-        // info iOS derives with.
-        #expect(frame == [0x02] + enc + [36] + Array("FFFD2EEE-254F-E6EB-985F-49E78EAF5FD0".utf8))
+        // `prv_handle_session_frame`.
+        #expect(frame == [0x02] + enc + [36] + Array("fffd2eee-254f-e6eb-985f-49e78eaf5fd0".utf8))
         #expect(throws: AccessoryTransportFrameError.malformedKey) {
             try AccessoryTransportFrame.session(encapsulatedKey: Array(enc.dropFirst()), accessoryIdentifier: accessory)
+        }
+    }
+
+    @Test
+    func aSessionIdentifierTheWatchWouldRefuseIsNotSent() {
+        let enc = [0x04] + [UInt8](repeating: 0x11, count: 64)
+
+        // `ATS_MAX_UUID_LEN` in accessory_transport_service.c.
+        #expect(throws: AccessoryTransportFrameError.malformedIdentifier) {
+            try AccessoryTransportFrame.session(encapsulatedKey: enc, accessoryIdentifier: "")
+        }
+        #expect(throws: AccessoryTransportFrameError.malformedIdentifier) {
+            try AccessoryTransportFrame.session(encapsulatedKey: enc, accessoryIdentifier: String(repeating: "a", count: 65))
         }
     }
 

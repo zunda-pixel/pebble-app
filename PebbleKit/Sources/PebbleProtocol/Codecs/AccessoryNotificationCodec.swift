@@ -1,30 +1,30 @@
 /// A notification iOS forwarded through AccessoryNotifications, as the watch is
 /// sent it.
-public struct ForwardedNotification: Equatable, Sendable {
-    public struct Action: Equatable, Sendable {
-        public var identifier: String
-        public var title: String
+package struct ForwardedNotification: Equatable, Sendable {
+    package struct Action: Equatable, Sendable {
+        package var identifier: String
+        package var title: String
         /// A text-input action: the watch offers its reply menu and sends the
         /// chosen text back with the action.
-        public var collectsText: Bool
+        package var collectsText: Bool
 
-        public init(identifier: String, title: String, collectsText: Bool) {
+        package init(identifier: String, title: String, collectsText: Bool) {
             self.identifier = identifier
             self.title = title
             self.collectsText = collectsText
         }
     }
 
-    public var identifier: String
-    public var title: String?
-    public var subtitle: String?
-    public var body: String?
-    public var sourceName: String?
-    public var sourceIdentifier: String?
-    public var shouldAlert: Bool
-    public var actions: [Action]
+    package var identifier: String
+    package var title: String?
+    package var subtitle: String?
+    package var body: String?
+    package var sourceName: String?
+    package var sourceIdentifier: String?
+    package var shouldAlert: Bool
+    package var actions: [Action]
 
-    public init(
+    package init(
         identifier: String,
         title: String?,
         subtitle: String?,
@@ -45,7 +45,7 @@ public struct ForwardedNotification: Equatable, Sendable {
     }
 }
 
-public enum AccessoryNotificationMessage: Equatable, Sendable {
+package enum AccessoryNotificationMessage: Equatable, Sendable {
     case present(ForwardedNotification)
     case remove(sourceIdentifier: String, notificationIdentifier: String)
     case removeAll
@@ -53,13 +53,13 @@ public enum AccessoryNotificationMessage: Equatable, Sendable {
 
 /// What the watch sends back when an action of a forwarded notification is
 /// chosen.
-public struct AccessoryNotificationReply: Equatable, Sendable {
-    public var notificationIdentifier: String
-    public var actionIdentifier: String
+package struct AccessoryNotificationReply: Equatable, Sendable {
+    package var notificationIdentifier: String
+    package var actionIdentifier: String
     /// Nil for a plain action, and for a text-input one left empty.
-    public var text: String?
+    package var text: String?
 
-    public init(notificationIdentifier: String, actionIdentifier: String, text: String?) {
+    package init(notificationIdentifier: String, actionIdentifier: String, text: String?) {
         self.notificationIdentifier = notificationIdentifier
         self.actionIdentifier = actionIdentifier
         self.text = text
@@ -69,7 +69,7 @@ public struct AccessoryNotificationReply: Equatable, Sendable {
 /// The plaintext inside an AccessoryNotifications message — sealed by iOS, opened
 /// by the watch's `accessory_notifications.c`, whose parser is the other half of
 /// this file.
-public enum AccessoryNotificationCodec {
+package enum AccessoryNotificationCodec {
     static let presentType: UInt8 = 0x01
     static let removeType: UInt8 = 0x02
     static let removeAllType: UInt8 = 0x03
@@ -86,9 +86,9 @@ public enum AccessoryNotificationCodec {
     static let textInputFlag: UInt8 = 0x01
 
     /// `AN_MAX_ACTIONS`: the watch keeps the first four and drops the rest.
-    public static let maximumActionCount = 4
+    package static let maximumActionCount = 4
 
-    public static func encode(_ message: AccessoryNotificationMessage) -> [UInt8] {
+    package static func encode(_ message: AccessoryNotificationMessage) -> [UInt8] {
         switch message {
         case .present(let notification):
             present(notification)
@@ -104,7 +104,7 @@ public enum AccessoryNotificationCodec {
 
     /// `u8 notification_id_len | notification_id | u8 action_id_len | action_id |
     /// u16 text_len (LE) | text`, from `accessory_notifications_invoke_action`.
-    public static func decodeReply(_ bytes: [UInt8]) throws -> AccessoryNotificationReply {
+    package static func decodeReply(_ bytes: [UInt8]) throws -> AccessoryNotificationReply {
         var reader = bytes[...]
         let notificationIdentifier = try lengthPrefixed(&reader)
         let actionIdentifier = try lengthPrefixed(&reader)
@@ -165,7 +165,7 @@ public enum AccessoryNotificationCodec {
     }
 
     /// The identifier as the watch holds it, and as a reply names the notification.
-    public static func identifierOnTheWatch(sourceIdentifier: String, notificationIdentifier: String) -> String {
+    package static func identifierOnTheWatch(sourceIdentifier: String, notificationIdentifier: String) -> String {
         String(
             decoding: identifierBytes(sourceIdentifier: sourceIdentifier, notificationIdentifier: notificationIdentifier),
             as: UTF8.self
@@ -196,6 +196,6 @@ public enum AccessoryNotificationCodec {
     }
 }
 
-public enum AccessoryNotificationCodecError: Error, Equatable, Sendable {
+package enum AccessoryNotificationCodecError: Error, Equatable, Sendable {
     case truncated
 }

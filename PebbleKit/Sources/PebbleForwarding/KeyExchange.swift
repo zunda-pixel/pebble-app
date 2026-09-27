@@ -58,14 +58,15 @@ public enum KeyExchange {
             }
             let key = [UInt8](message.key)
             // The identifier iOS put in the HPKE info, which the watch has to put
-            // in its own; the peripheral the link reached is the same watch.
-            let identifier = message.identifier.flatMap(UUID.init(uuidString:))
+            // in its own byte for byte; the peripheral the link reached is the
+            // same watch, for an iOS that names none.
+            let identifier = message.identifier
             Task { @MainActor in
                 do {
                     try await WatchAccessoryLink.shared.write { connection in
                         [try AccessoryTransportFrame.session(
                             encapsulatedKey: key,
-                            accessoryIdentifier: identifier ?? connection.peripheralIdentifier
+                            accessoryIdentifier: identifier ?? connection.peripheralIdentifier.uuidString
                         )]
                     }
                     completion(.success)

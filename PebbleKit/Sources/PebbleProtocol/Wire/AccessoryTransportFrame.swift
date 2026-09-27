@@ -1,16 +1,17 @@
-public import Foundation
+package import Foundation
 
 /// The watch's AccessoryNotifications transport: the GATT service
 /// `accessory_transport_service.c` hosts, and the frames written to it and
 /// notified from it. Apple fixes neither, so both ends are this app's and the
 /// firmware's to agree on; everything inside a DATA or RESPONSE frame is sealed
 /// and opened by iOS and the watch, never by the app.
-public enum AccessoryTransportFrame {
-    public static let serviceUUID = "50000000-328E-0FBB-C642-1AA6699BDADA"
-    /// Watch to phone, by notification: PUBKEY and RESPONSE.
-    public static let notifyCharacteristicUUID = "50000001-328E-0FBB-C642-1AA6699BDADA"
+package enum AccessoryTransportFrame {
+    package static let serviceUUID = "50000000-328E-0FBB-C642-1AA6699BDADA"
+    /// Watch to phone: PUBKEY and RESPONSE by notification, and PUBKEY again by
+    /// a read.
+    package static let notifyCharacteristicUUID = "50000001-328E-0FBB-C642-1AA6699BDADA"
     /// Phone to watch, by write with response: SESSION and DATA.
-    public static let writeCharacteristicUUID = "50000002-328E-0FBB-C642-1AA6699BDADA"
+    package static let writeCharacteristicUUID = "50000002-328E-0FBB-C642-1AA6699BDADA"
 
     static let publicKeyType: UInt8 = 0x01
     static let sessionType: UInt8 = 0x02
@@ -22,9 +23,11 @@ public enum AccessoryTransportFrame {
 
     /// A P-256 point without its `0x04` prefix, as the watch notifies it and as
     /// `SecurityMessage` carries it.
-    public static let publicKeyByteCount = 64
+    package static let publicKeyByteCount = 64
     /// An uncompressed P-256 point: HPKE's `enc` for this suite.
-    public static let encapsulatedKeyByteCount = 65
+    package static let encapsulatedKeyByteCount = 65
+    /// `ATS_MAX_UUID_LEN`, beyond which the watch refuses the session.
+    static let maximumAccessoryIdentifierByteCount = 64
     /// `ATS_MAX_RX_WRITE`: the ATT attribute value limit, which the watch refuses
     /// a write beyond.
     static let maximumWriteByteCount = 512
@@ -33,23 +36,29 @@ public enum AccessoryTransportFrame {
     /// `ACCESSORY_TRANSPORT_MAX_PAYLOAD`, sealed: nonce, plaintext, tag.
     static let maximumSealedByteCount = 12 + 2_048 + 16
 
-    /// The watch's public key, from the first thing it notifies after a
-    /// subscription; nil for any other frame.
-    public static func publicKey(from frame: [UInt8]) -> [UInt8]? {
+    /// The watch's public key, from what it notifies after a subscription or
+    /// answers a read with; nil for any other frame.
+    package static func publicKey(from frame: [UInt8]) -> [UInt8]? {
         guard frame.count == 1 + publicKeyByteCount, frame.first == publicKeyType else { return nil }
         return Array(frame.dropFirst())
     }
 
-    /// `enc | u8 uuid_len | uuid`. The identifier is the CoreBluetooth peripheral
-    /// the watch was reached as: it is in the HPKE info both ends derive from.
-    public static func session(
+    /// `enc | u8 uuid_len | uuid`. The identifier is the one iOS put in the HPKE
+    /// info, and the watch puts these bytes in its own as they are: a UUID parsed
+    /// and printed again comes out in whatever case the printer chose, and the
+    /// two ends then derive different keys. Too long is refused rather than cut,
+    /// for the same reason.
+    package static func session(
         encapsulatedKey: [UInt8],
-        accessoryIdentifier: UUID
+        accessoryIdentifier: String
     ) throws -> [UInt8] {
         guard encapsulatedKey.count == encapsulatedKeyByteCount else {
             throw AccessoryTransportFrameError.malformedKey
         }
-        let identifier = Array(accessoryIdentifier.uuidString.utf8)
+        let identifier = Array(accessoryIdentifier.utf8)
+        guard !identifier.isEmpty, identifier.count <= maximumAccessoryIdentifierByteCount else {
+            throw AccessoryTransportFrameError.malformedIdentifier
+        }
         return [sessionType] + encapsulatedKey + [UInt8(identifier.count)] + identifier
     }
 
@@ -57,7 +66,7 @@ public enum AccessoryTransportFrame {
     /// `maximumWriteLength` bytes as `0x03 | flags | chunk`. The watch starts over
     /// on FIRST, so a message a restarted extension abandoned half way is not
     /// spliced onto the next one.
-    public static func dataWrites(
+    package static func dataWrites(
         featureID: UUID,
         sealed: [UInt8],
         maximumWriteLength: Int
@@ -79,27 +88,28 @@ public enum AccessoryTransportFrame {
     }
 }
 
-public enum AccessoryTransportFrameError: Error, Equatable, Sendable {
+package enum AccessoryTransportFrameError: Error, Equatable, Sendable {
     case malformedKey
+    case malformedIdentifier
     case messageTooLarge
 }
 
 /// A reply the watch sealed, reassembled from its RESPONSE notifications.
-public struct AccessoryTransportResponse: Equatable, Sendable {
-    public var featureID: UUID
-    public var sealed: [UInt8]
+package struct AccessoryTransportResponse: Equatable, Sendable {
+    package var featureID: UUID
+    package var sealed: [UInt8]
 }
 
 /// Puts `0x82 | flags | chunk` notifications back together. One per link: the
 /// watch has a single reply in flight to a phone at a time.
-public struct AccessoryTransportResponseReassembler: Sendable {
+package struct AccessoryTransportResponseReassembler: Sendable {
     private var pending: [UInt8] = []
 
-    public init() {}
+    package init() {}
 
     /// The reply the fragment completes; nil while more is to come, and for
     /// anything that is not a RESPONSE fragment or does not make a reply.
-    public mutating func receive(_ frame: [UInt8]) -> AccessoryTransportResponse? {
+    package mutating func receive(_ frame: [UInt8]) -> AccessoryTransportResponse? {
         guard frame.count >= 2, frame[0] == AccessoryTransportFrame.responseType else { return nil }
         let flags = frame[1]
         if flags & AccessoryTransportFrame.firstFlag != 0 {
