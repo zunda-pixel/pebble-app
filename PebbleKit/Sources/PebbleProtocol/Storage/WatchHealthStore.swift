@@ -7,6 +7,10 @@ public struct WatchHealthSample: Codable, Equatable, Identifiable, Sendable {
     public var id: UUID = UUID()
     public var date: Date
     public var steps: Int
+    /// The minutes the steps were counted in, for the HealthKit export: a
+    /// day's total cannot say when anybody walked. Empty for a day from
+    /// HealthKit, and once the day is older than `WatchHealthStore.minuteDataRetentionDays`.
+    public var stepReadings: [StepReading] = []
     /// Every minute asleep, counting each one once.
     public var sleepMinutes: Int
     /// The restful part of `sleepMinutes`, not extra on top of it.
@@ -31,14 +35,14 @@ public struct WatchHealthSample: Codable, Equatable, Identifiable, Sendable {
     public var heartRate: WatchHeartRateSummary? = nil
     /// The measured minutes themselves, for the HealthKit export: a summary
     /// cannot honestly become per-moment samples again. Empty wherever
-    /// `heartRate` is nil, and for files written before this existed.
+    /// `heartRate` is nil, and once the day is older than the retention.
     public var heartRateReadings: [HeartRateReading] = []
     /// The day's blood oxygen (SpO2) as the watch measured it, minute by minute.
     /// Nil under the same conditions as `heartRate`: nothing measured it — a day
     /// from HealthKit, an older file, a watch with no sensor, or the reading off.
     public var bloodOxygen: WatchBloodOxygenSummary? = nil
     /// The measured minutes themselves, for the HealthKit export. Empty wherever
-    /// `bloodOxygen` is nil, and for files written before this existed.
+    /// `bloodOxygen` is nil, and once the day is older than the retention.
     public var bloodOxygenReadings: [BloodOxygenReading] = []
     /// The walks, runs and open workouts the watch recorded, filed under the
     /// day they ended in. Empty for a day from HealthKit or an older file.
@@ -48,7 +52,7 @@ public struct WatchHealthSample: Codable, Equatable, Identifiable, Sendable {
     public var updatedAt: Date = Date()
 
     private enum CodingKeys: String, CodingKey {
-        case id, date, steps, sleepMinutes, deepSleepMinutes, sleepSessions
+        case id, date, steps, stepReadings, sleepMinutes, deepSleepMinutes, sleepSessions
         case activeKilocalories, restingKilocalories, distanceMetres, activeMinutes
         case heartRate, heartRateReadings, bloodOxygen, bloodOxygenReadings
         case workouts, timeZoneIdentifier, source, updatedAt
@@ -59,6 +63,7 @@ public struct WatchHealthSample: Codable, Equatable, Identifiable, Sendable {
         id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         date = try container.decode(Date.self, forKey: .date)
         steps = try container.decode(Int.self, forKey: .steps)
+        stepReadings = try container.decodeIfPresent([StepReading].self, forKey: .stepReadings) ?? []
         sleepMinutes = try container.decode(Int.self, forKey: .sleepMinutes)
         deepSleepMinutes = try container.decodeIfPresent(Int.self, forKey: .deepSleepMinutes) ?? 0
         sleepSessions = try container.decodeIfPresent([SleepSession].self, forKey: .sleepSessions) ?? []
@@ -163,6 +168,12 @@ public struct WatchHealthArchive: Codable, Equatable, Sendable {
 }
 
 public actor WatchHealthStore {
+    /// How long the minutes behind a day are kept. The day's own totals are
+    /// kept for good; the minutes are only there to be exported, which happens
+    /// as they arrive, and a year of them is tens of megabytes read and
+    /// rewritten on every sync.
+    public static let minuteDataRetentionDays = 30
+
     private var fileURL: URL
 
     public init(directory: StorageDirectory = .applicationSupport) {
@@ -175,7 +186,7 @@ public actor WatchHealthStore {
 
     public func samples() throws -> [WatchHealthSample] { try PersistentJSON.loadRecovering([WatchHealthSample].self, from: fileURL) ?? [] }
     public func save(_ samples: [WatchHealthSample]) throws { try PersistentJSON.save(samples, to: fileURL) }
-    public func merge(_ incoming: [WatchHealthSample]) throws -> [WatchHealthSample] {
+    public func merge(_ incoming: [WatchHealthSample], now: Date = Date()) throws -> [WatchHealthSample] {
         var merged: [String: WatchHealthSample] = [:]
         for sample in try samples() + incoming {
             let normalized = normalized(sample)
@@ -185,7 +196,21 @@ public actor WatchHealthStore {
                 continue
             }
             var resolved = normalized.updatedAt >= existing.updatedAt ? normalized : existing
-            resolved.steps = max(existing.steps, normalized.steps)
+            // The day keeps the identity it was first exported under: the
+            // HealthKit sync identifiers are made from it, and a new one on
+            // every sync would write the same minutes again beside the old.
+            resolved.id = existing.id
+            // Each sync brings the minutes since the last one, so the day is
+            // the union of them, and taking the newer record's alone would
+            // leave the morning out of the evening's total.
+            var stepsByMinute: [Date: StepReading] = [:]
+            for reading in existing.stepReadings + normalized.stepReadings { stepsByMinute[reading.date] = reading }
+            resolved.stepReadings = stepsByMinute.values.sorted { $0.date < $1.date }
+            resolved.steps = max(
+                existing.steps,
+                normalized.steps,
+                resolved.stepReadings.reduce(0) { $0 + $1.steps }
+            )
             // Only Apple Health has these, so a record that has them is the
             // only one that can say anything: the watch's own record for the
             // same day carries zeroes and must not wipe them.
@@ -273,7 +298,7 @@ public actor WatchHealthStore {
             }
             merged[key] = resolved
         }
-        var values = Array(merged.values)
+        var values = merged.values.map { withoutExpiredMinutes($0, now: now) }
         values.sort { $0.date < $1.date }
         try save(values)
         return values
@@ -308,6 +333,19 @@ public actor WatchHealthStore {
             value.source = .imported
             return value
         })
+    }
+
+    /// Measured back from now rather than from the newest day on file: a
+    /// watch whose clock once said 2037 would otherwise take every other
+    /// day's minutes with it.
+    private func withoutExpiredMinutes(_ sample: WatchHealthSample, now: Date) -> WatchHealthSample {
+        guard let cutoff = Calendar(identifier: .gregorian)
+            .date(byAdding: .day, value: -Self.minuteDataRetentionDays, to: now) else { return sample }
+        var value = sample
+        value.stepReadings.removeAll { $0.date < cutoff }
+        value.heartRateReadings.removeAll { $0.date < cutoff }
+        value.bloodOxygenReadings.removeAll { $0.date < cutoff }
+        return value
     }
 
     private func normalized(_ sample: WatchHealthSample) -> WatchHealthSample {

@@ -106,6 +106,7 @@ final class HealthKitBridge {
         }
         var healthSamples: [HKSample] = []
         var outgrownSleepIdentifiers: [String] = []
+        var rewrittenStepDays: [String] = []
         var workoutWrites: [(workout: WatchWorkout, metadata: [String: Any])] = []
         for sample in watchSamples {
             let version = max(1, Int(sample.updatedAt.timeIntervalSince1970))
@@ -114,17 +115,24 @@ final class HealthKitBridge {
                 HKMetadataKeyExternalUUID: sample.id.uuidString,
                 HKMetadataKeySyncVersion: version,
             ]
-            if owed(.steps, sample) {
+            if owed(.steps, sample), !sample.stepReadings.isEmpty {
                 exported(.steps, sample)
-                var stepsMetadata = commonMetadata
-                stepsMetadata[HKMetadataKeySyncIdentifier] = "\(baseIdentifier).steps"
-                healthSamples.append(HKQuantitySample(
-                    type: stepsType,
-                    quantity: HKQuantity(unit: .count(), doubleValue: Double(sample.steps)),
-                    start: sample.date,
-                    end: sample.date.addingTimeInterval(60),
-                    metadata: stepsMetadata
-                ))
+                // A later sync can join two stretches into one that starts
+                // where the first did, and the second's own sample would then
+                // count its minutes twice; the day is written again whole.
+                rewrittenStepDays.append(sample.id.uuidString)
+                for interval in StepInterval.coalescing(sample.stepReadings) {
+                    var stepsMetadata = commonMetadata
+                    stepsMetadata[HKMetadataKeySyncIdentifier] =
+                        "\(baseIdentifier).steps.\(Int(interval.start.timeIntervalSince1970))"
+                    healthSamples.append(HKQuantitySample(
+                        type: stepsType,
+                        quantity: HKQuantity(unit: .count(), doubleValue: Double(interval.steps)),
+                        start: interval.start,
+                        end: interval.end,
+                        metadata: stepsMetadata
+                    ))
+                }
             }
             if owed(.sleep, sample), !sample.sleepSessions.isEmpty {
                 exported(.sleep, sample)
@@ -223,6 +231,15 @@ final class HealthKitBridge {
                 predicate: HKQuery.predicateForObjects(
                     withMetadataKey: HKMetadataKeySyncIdentifier,
                     allowedValues: outgrownSleepIdentifiers
+                )
+            )
+        }
+        if !rewrittenStepDays.isEmpty {
+            try await deleteOwnObjects(
+                of: stepsType,
+                predicate: HKQuery.predicateForObjects(
+                    withMetadataKey: HKMetadataKeyExternalUUID,
+                    allowedValues: rewrittenStepDays
                 )
             )
         }

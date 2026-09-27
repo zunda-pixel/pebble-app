@@ -94,7 +94,7 @@ public struct HealthDataLoggingProcessor: Sendable {
     }
 
     private func stepSamples(from bytes: [UInt8], itemSize: Int) throws -> [WatchHealthSample] {
-        var daily: [Date: (steps: Int, heartRates: [HeartRateReading], bloodOxygens: [BloodOxygenReading])] = [:]
+        var daily: [Date: (steps: [StepReading], heartRates: [HeartRateReading], bloodOxygens: [BloodOxygenReading])] = [:]
         for itemStart in stride(from: 0, to: bytes.count - (bytes.count % itemSize), by: itemSize) {
             let itemEnd = itemStart + itemSize
             guard itemEnd <= bytes.count, itemSize >= 9 else { continue }
@@ -114,8 +114,11 @@ public struct HealthDataLoggingProcessor: Sendable {
             for _ in 0..<recordCount where cursor + recordSize <= itemEnd {
                 let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
                 let day = Calendar.current.startOfDay(for: date)
-                var entry = daily[day] ?? (steps: 0, heartRates: [], bloodOxygens: [])
-                entry.steps += Int(bytes[cursor + MinuteSample.steps])
+                var entry = daily[day] ?? (steps: [], heartRates: [], bloodOxygens: [])
+                let steps = Int(bytes[cursor + MinuteSample.steps])
+                if steps > 0 {
+                    entry.steps.append(StepReading(date: date, steps: steps))
+                }
                 // Zero is the watch saying it did not measure this minute, not
                 // a heart that stopped: averaging it in would halve the day.
                 if version >= MinuteSample.firstVersionWithHeartRate,
@@ -146,7 +149,8 @@ public struct HealthDataLoggingProcessor: Sendable {
         return daily.map { day, entry in
             WatchHealthSample(
                 date: day,
-                steps: entry.steps,
+                steps: entry.steps.reduce(0) { $0 + $1.steps },
+                stepReadings: entry.steps,
                 sleepMinutes: 0,
                 heartRate: .from(entry.heartRates.map(\.beatsPerMinute)),
                 heartRateReadings: entry.heartRates,
