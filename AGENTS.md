@@ -26,7 +26,7 @@ the weather all stay https.
 | &nbsp;&nbsp;`Catalogs/` | What is fetched from the network: apps, firmware, language packs, and the download and retry policy they share. |
 | &nbsp;&nbsp;`Packages/` | The package formats: `.pbw` and `.pbz`. |
 | &nbsp;&nbsp;`Diagnostics/` | `DiagnosticLog`, the app's own breadcrumb log and report writer — not a store, so not in `Storage/`. |
-| `PebbleKit/Sources/PebbleAudio` | What the watch's microphone sent, turned back into samples: the only place that imports `speex`. |
+| `PebbleKit/Sources/PebbleAudio` | What the watch's microphone sent, turned back into samples: the only place that imports `libspeex`. |
 | `PebbleKit/Sources/PebbleTransport` | How those bytes reach a watch: the CoreBluetooth client in both roles, the phone-hosted GATT server, the emulator socket, and the mock a test or a preview stands in. |
 | `PebbleKit/Sources/PebbleApp` | The app: `AppModel` (split across `AppModel+*.swift`), the screens, and the phone's own frameworks (HealthKit, EventKit, MediaPlayer, CallKit, WebKit). |
 | `PebbleKit/Tests/PebbleProtocolTests` | Swift Testing suites for the protocol and transport layers, grouped by what they exercise. |
@@ -305,7 +305,7 @@ swift-async-operations (`asyncMap` and friends, for concurrent work that has to
 stay in order), swift-http-types (typed `HTTPRequest` for every network call),
 swift-retry (`DMRetry`), Defaults (typed keys in `PebbleDefaults.swift`), Valet
 (keychain, in `PebbleTokenStore.swift`), MemberwiseInit, ZIPFoundation,
-CSpeex (libspeex, imported as `speex`, used only by `PebbleAudio`).
+speex (xiph's libspeex, imported as `libspeex`, used only by `PebbleAudio`).
 
 A C library is the last resort, for a format the watch dictates and no Apple
 framework reads: today only Speex. Prefer a package to a copy in this
@@ -319,11 +319,11 @@ trusted forever are not a test of a codec.
 
 Work sent to a watch is retried with `retry(with: .watchWork)`
 (`WatchWorkRetry.swift`), not with a hand-written loop. Add a reason to
-`PebbleConnectionError.isWorthAnotherAttempt` rather than a special case at a
+`WatchConnectionError.isWorthAnotherAttempt` rather than a special case at a
 call site.
 
 Notifications between the app's own parts are typed `NotificationCenter`
-messages (`PebbleWindowMessages.swift`), not `Notification.Name` plus an
+messages (`WindowMessages.swift`), not `Notification.Name` plus an
 untyped `object`. Foundation's message API needs a class as the subject, and the
 model a window shows is that class.
 
