@@ -2539,16 +2539,6 @@
         }
       }
     },
-    "Firmware transfer stopped and the pending update removed." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ファームウェアの転送を停止し、保留中のアップデートを削除しました。"
-          }
-        }
-      }
-    },
     "Firmware unknown" : {
       "localizations" : {
         "ja" : {
@@ -6607,6 +6597,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ウォッチのログの取得が途中で停止しました。"
+          }
+        }
+      }
+    },
+    "The watch was disconnected to stop the firmware transfer, and the pending update was removed. Connect it again from its screen." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファームウェアの転送を止めるためにウォッチの接続を切り、保留中のアップデートを削除しました。ウォッチの画面からもう一度接続してください。"
           }
         }
       }

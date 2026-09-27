@@ -309,7 +309,7 @@ struct FirmwareLifecycleTests {
         #expect(client.disconnectedWatches.map(\.id) == [watchID])
         await #expect(throws: CancellationError.self) { try await transfer.value }
         #expect(model.firmware[watchID].journal == nil)
-        #expect(model.firmware[watchID].feedback == .success("Firmware transfer stopped and the pending update removed."))
+        #expect(model.firmware[watchID].feedback == .success("The watch was disconnected to stop the firmware transfer, and the pending update was removed. Connect it again from its screen."))
 
         await model.connect(to: discovered)
         let reconnected = try #require(model.activeConnections.first)

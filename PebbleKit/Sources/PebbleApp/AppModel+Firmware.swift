@@ -212,7 +212,8 @@ extension AppModel {
         // Cancelling the task is not enough: the session's waits for the
         // watch's answers do not end on cancellation, and a watch left to
         // finish the transfer installs the update that was just forgotten.
-        // Only ending the link stops it.
+        // Only ending the link stops it, and the link stays down — a
+        // disconnect asked for is not chased — so the answer says so.
         let wasTransferring = stopFirmwareTransfer(for: watchID)
         if wasTransferring {
             await disconnect(watchID: watchID)
@@ -226,7 +227,7 @@ extension AppModel {
         firmware[watchID].journal = nil
         firmware[watchID].requiresConfirmation = false
         firmware[watchID].feedback = wasTransferring
-            ? .success("Firmware transfer stopped and the pending update removed.")
+            ? .success("The watch was disconnected to stop the firmware transfer, and the pending update was removed. Connect it again from its screen.")
             : .success("Pending firmware update removed.")
     }
 
