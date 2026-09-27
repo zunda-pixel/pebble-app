@@ -288,6 +288,36 @@ struct FirmwareLifecycleTests {
         await model.discardPendingFirmwareUpdate(watchID: watch().id)
     }
 
+    @Test(.timeLimit(.minutes(1)))
+    func forgettingAnUpdateMidTransferEndsTheLinkAndFreesTheNextInstall() async throws {
+        let client = SuspendingWatchClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = makeModel(client: client, directory: directory)
+        await model.scan()
+        let discovered = try #require(model.discoveredWatches.first)
+        await model.connect(to: discovered)
+        let connection = try #require(model.activeConnections.first)
+        let watchID = connection.watch.id
+        let package = try await stage(versionTag: "v4.36.2", for: watchID, on: model, in: directory)
+        client.nextFirmwareTransferEndsWithTheLink = true
+
+        let transfer = Task { try await model.performFirmwareUpdate(package, on: connection) }
+        while model.firmwareUpdateTask == nil { try await Task.sleep(for: .milliseconds(5)) }
+        await model.discardPendingFirmwareUpdate(watchID: watchID)
+
+        #expect(client.disconnectedWatches.map(\.id) == [watchID])
+        await #expect(throws: CancellationError.self) { try await transfer.value }
+        #expect(model.firmware[watchID].journal == nil)
+        #expect(model.firmware[watchID].feedback == .success("Firmware transfer stopped and the pending update removed."))
+
+        await model.connect(to: discovered)
+        let reconnected = try #require(model.activeConnections.first)
+        let next = try await stage(versionTag: "v4.36.2", for: watchID, on: model, in: directory)
+        try await model.performFirmwareUpdate(next, on: reconnected)
+        #expect(model.firmware[watchID].journal?.phase == .awaitingRestart)
+    }
+
     /// Stopping one watch's update is no business of another watch's transfer.
     @Test
     func stoppingOneWatchsUpdateLeavesAnothersTransferRunning() async throws {

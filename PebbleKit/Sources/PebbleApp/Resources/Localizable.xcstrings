@@ -2539,6 +2539,16 @@
         }
       }
     },
+    "Firmware transfer stopped and the pending update removed." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファームウェアの転送を停止し、保留中のアップデートを削除しました。"
+          }
+        }
+      }
+    },
     "Firmware unknown" : {
       "localizations" : {
         "ja" : {

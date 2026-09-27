@@ -184,13 +184,17 @@ extension AppModel {
     }
 
     /// Stops the transfer only if it is this watch's: the one update that may
-    /// run at a time can belong to another watch.
-    private func stopFirmwareTransfer(for watchID: WatchID) {
-        guard firmwareUpdateWatchID == nil || firmwareUpdateWatchID == watchID else { return }
+    /// run at a time can belong to another watch. True when this watch's
+    /// transfer was under way.
+    @discardableResult
+    private func stopFirmwareTransfer(for watchID: WatchID) -> Bool {
+        guard firmwareUpdateWatchID == nil || firmwareUpdateWatchID == watchID else { return false }
+        let wasTransferring = firmwareUpdateWatchID == watchID && firmwareUpdateTask != nil
         firmwareUpdateTask?.cancel()
         firmwareUpdateTask = nil
         firmwareUpdateClaim = nil
         firmwareUpdateWatchID = nil
+        return wasTransferring
     }
 
     public func cancelFirmwareUpdate(watchID: WatchID) async {
@@ -205,7 +209,14 @@ extension AppModel {
     }
 
     public func discardPendingFirmwareUpdate(watchID: WatchID) async {
-        stopFirmwareTransfer(for: watchID)
+        // Cancelling the task is not enough: the session's waits for the
+        // watch's answers do not end on cancellation, and a watch left to
+        // finish the transfer installs the update that was just forgotten.
+        // Only ending the link stops it.
+        let wasTransferring = stopFirmwareTransfer(for: watchID)
+        if wasTransferring {
+            await disconnect(watchID: watchID)
+        }
         do {
             try await pendingFirmwareUpdateStore.clear(watchID: watchID)
         } catch {
@@ -214,7 +225,9 @@ extension AppModel {
         }
         firmware[watchID].journal = nil
         firmware[watchID].requiresConfirmation = false
-        firmware[watchID].feedback = .success("Pending firmware update removed.")
+        firmware[watchID].feedback = wasTransferring
+            ? .success("Firmware transfer stopped and the pending update removed.")
+            : .success("Pending firmware update removed.")
     }
 
     var isFirmwareUpdateRunning: Bool {
@@ -298,6 +311,7 @@ extension AppModel {
             }
             throw error
         }
+        guard firmwareUpdateClaim == claim else { throw CancellationError() }
         try await pendingFirmwareUpdateStore.updatePhase(.awaitingRestart, watchID: watchID)
         firmware[watchID].journal = try await pendingFirmwareUpdateStore.journal(for: watchID)
         firmware[watchID].feedback = .progress("Firmware installed. Waiting for the watch to restart.")

@@ -72,6 +72,8 @@ final class SuspendingWatchClient: WatchClient {
 
     func disconnect(from watch: ConnectedWatch) async {
         disconnectedWatches.append(watch)
+        firmwareTransferHeldByTheLink?.resume(throwing: WatchConnectionError.disconnected)
+        firmwareTransferHeldByTheLink = nil
     }
 
     func send(_ frame: PebbleProtocolFrame) async throws {
@@ -165,8 +167,17 @@ final class SuspendingWatchClient: WatchClient {
     /// the end whatever happens to the task that asked, the way bytes already
     /// on the radio do, and only then reports the cancellation.
     var firmwareTransferTimes: [Duration] = []
+    /// Set, the next transfer ignores cancellation and ends only when the link
+    /// does, as a real session's waits for the watch's answers do.
+    var nextFirmwareTransferEndsWithTheLink = false
+    private var firmwareTransferHeldByTheLink: CheckedContinuation<Void, any Error>?
 
     func installFirmware(_ package: PBZFirmwarePackage) async throws {
+        if nextFirmwareTransferEndsWithTheLink {
+            nextFirmwareTransferEndsWithTheLink = false
+            try await withCheckedThrowingContinuation { firmwareTransferHeldByTheLink = $0 }
+            return
+        }
         guard !firmwareTransferTimes.isEmpty else { return }
         let time = firmwareTransferTimes.removeFirst()
         await Task { try? await Task.sleep(for: time) }.value
