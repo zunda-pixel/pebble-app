@@ -357,6 +357,17 @@ struct TransportTests {
         ) == nil)
     }
 
+    @Test(arguments: WatchModel.allCases)
+    func theMockReportsABoardOfTheModelItWasAskedFor(model: WatchModel) async throws {
+        let client = MockWatchClient()
+        let watch = try await client.connect(
+            to: WatchConnectionTarget(id: WatchID("mock"), name: "Mock", model: model),
+            reportingPhase: { _ in }
+        )
+
+        #expect(watch.board?.model == model)
+    }
+
     @Test
     func supportedModelsUseProtocolCodenames() {
         #expect(WatchModel.pebble2Duo.rawValue == "FLINT")

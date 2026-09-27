@@ -88,10 +88,10 @@ struct ReconnectPolicyTests {
     func nothingIsFollowedUntilAWatchIsConnected() {
         let policy = ReconnectPolicy()
         // With no watch to chase, any disconnect is this one's to act on.
-        #expect(policy.isFollowing(WatchID("anything")))
+        #expect(policy.isFollowingOrIdle(WatchID("anything")))
 
         policy.follow(watch)
-        #expect(policy.isFollowing(WatchID("watch")))
-        #expect(!policy.isFollowing(WatchID("another-watch")))
+        #expect(policy.isFollowingOrIdle(WatchID("watch")))
+        #expect(!policy.isFollowingOrIdle(WatchID("another-watch")))
     }
 }

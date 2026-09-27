@@ -88,7 +88,7 @@ final class ReconnectPolicy {
         return failedHandshakes < Self.maximumFailedHandshakes
     }
 
-    func isFollowing(_ watchID: WatchID) -> Bool {
+    func isFollowingOrIdle(_ watchID: WatchID) -> Bool {
         watch == nil || watch?.id == watchID
     }
 

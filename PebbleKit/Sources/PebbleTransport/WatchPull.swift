@@ -14,6 +14,7 @@ final class WatchPull<Collector: WatchPullCollector> {
     private let timeout: Duration
     private let reply: PendingReply<Collector.Value>
     private var collector: Collector?
+    private var runCount = 0
 
     init(
         timeout: Duration,
@@ -36,7 +37,18 @@ final class WatchPull<Collector: WatchPullCollector> {
             throw WatchPullError.operationAlreadyInProgress
         }
         self.collector = collector
-        return try await reply.wait(timeout: timeout, send: send)
+        runCount &+= 1
+        let run = runCount
+        do {
+            return try await reply.wait(timeout: timeout, send: send)
+        } catch {
+            // Not a `defer`: `finish` resumes this caller and clears the
+            // collector itself, and the next pull can have put its own in place
+            // before this one gets to run again. Only the deadline and a failed
+            // send settle the reply without passing through `finish`.
+            if runCount == run { self.collector = nil }
+            throw error
+        }
     }
 
     /// Takes a frame belonging to a pull in progress, and says whether it did: a

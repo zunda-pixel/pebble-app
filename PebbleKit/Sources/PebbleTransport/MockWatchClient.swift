@@ -126,6 +126,13 @@ public final class MockWatchClient: WatchClient {
         reportedHandshakePhases.append(.transportOpen)
         afterReportingPhase?(.transportOpen)
 
+        // The platform this mock's model would report, so the board and the
+        // model agree the way they do on a real watch.
+        let hardwarePlatform: UInt8 = switch watch.model {
+        case .pebble2Duo: 15
+        case .pebbleTime2, nil: 18
+        case .pebbleRound2: 21
+        }
         return ConnectedWatch(
             id: watch.id,
             name: watch.name,
@@ -134,9 +141,7 @@ public final class MockWatchClient: WatchClient {
             version: WatchVersionInformation(
                 firmwareVersion: "v5.0.0-mock",
                 serialNumber: "MOCK00000001",
-                // The platform this mock's model would report, so the board and
-                // the model agree the way they do on a real watch.
-                hardwarePlatform: watch.model == .pebble2Duo ? 15 : 18,
+                hardwarePlatform: hardwarePlatform,
                 isRunningRecoveryFirmware: connectsAsRecoveryFirmware
             )
         )

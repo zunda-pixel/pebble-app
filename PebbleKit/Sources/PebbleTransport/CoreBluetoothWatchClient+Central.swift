@@ -168,7 +168,7 @@ extension CoreBluetoothWatchClient: CBCentralManagerDelegate {
             }
             return
         }
-        if wasConnected && !wasIntentional {
+        if wasConnected {
             eventContinuation?.yield(.disconnected(.disconnected))
         }
     }

@@ -28,16 +28,16 @@ private final class NotificationObserverStorage: @unchecked Sendable {
 /// cut along. `internal` reaches no further than this module.
 @MainActor
 public final class CoreBluetoothWatchClient: NSObject, WatchClient {
-    static var ppogService = CBUUID(string: "40000000-328E-0FBB-C642-1AA6699BDADA")
+    static let ppogService = CBUUID(string: "40000000-328E-0FBB-C642-1AA6699BDADA")
     /// Advertised by watches that are not bonded yet, including after a reset.
-    static var pairingService = CBUUID(string: "0000FED9-0000-1000-8000-00805F9B34FB")
-    static var connectivityCharacteristic = CBUUID(string: "00000001-328E-0FBB-C642-1AA6699BDADA")
-    static var pairingTriggerCharacteristic = CBUUID(string: "00000002-328E-0FBB-C642-1AA6699BDADA")
-    static var connectionParametersCharacteristic = CBUUID(string: "00000005-328E-0FBB-C642-1AA6699BDADA")
-    static var ppogNotifyCharacteristic = CBUUID(string: "40000001-328E-0FBB-C642-1AA6699BDADA")
-    static var ppogWriteCharacteristic = CBUUID(string: "40000003-328E-0FBB-C642-1AA6699BDADA")
-    static var batteryService = CBUUID(string: "180F")
-    static var batteryLevelCharacteristic = CBUUID(string: "2A19")
+    static let pairingService = CBUUID(string: "0000FED9-0000-1000-8000-00805F9B34FB")
+    static let connectivityCharacteristic = CBUUID(string: "00000001-328E-0FBB-C642-1AA6699BDADA")
+    static let pairingTriggerCharacteristic = CBUUID(string: "00000002-328E-0FBB-C642-1AA6699BDADA")
+    static let connectionParametersCharacteristic = CBUUID(string: "00000005-328E-0FBB-C642-1AA6699BDADA")
+    static let ppogNotifyCharacteristic = CBUUID(string: "40000001-328E-0FBB-C642-1AA6699BDADA")
+    static let ppogWriteCharacteristic = CBUUID(string: "40000003-328E-0FBB-C642-1AA6699BDADA")
+    static let batteryService = CBUUID(string: "180F")
+    static let batteryLevelCharacteristic = CBUUID(string: "2A19")
 
     var centralManager: CBCentralManager!
     var discoveredPeripherals: [WatchID: CBPeripheral] = [:]
@@ -92,12 +92,14 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     let reconnects = ReconnectPolicy()
     private var isAwaitingHealthCheckReply = false
     var activeTransferSession: PutBytesTransferSession?
-    var completedTransferCookie: UInt32?
+    /// The token the watch gave the transfer in flight, which an abort has to
+    /// name.
+    var activeTransferCookie: UInt32?
     let firmwareReply = PendingReply<Void>()
     var waitingForFirmwareStart = false
     var isInstallingFirmware = false
     var pendingInstallCookie: UInt32?
-    let transferReply = PendingReply<Void>()
+    let transferReply = PendingReply<UInt32>()
     var nextBlobDBToken: UInt16 = 1
     var pendingBlobDBToken: UInt16?
     var acceptedBlobDBStatuses: [BlobDBStatus] = []
@@ -242,10 +244,6 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         guard connectionContinuation == nil else {
             throw WatchConnectionError.connectionAlreadyInProgress
         }
-        // Held for the length of the handshake, and cleared with the
-        // continuation: a phase reported against a connect that has already
-        // finished would move the app off `connected`.
-        handshakePhaseReporter = reportingPhase
         if let connectedWatch, connectedWatch.id == watch.id {
             return connectedWatch
         }
@@ -270,6 +268,10 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         )
         peripheral.delegate = self
 
+        // Held for the length of the handshake, and cleared with the
+        // continuation: a phase reported against a connect that has already
+        // finished would move the app off `connected`.
+        handshakePhaseReporter = reportingPhase
         return try await withCheckedThrowingContinuation { continuation in
             connectionContinuation = continuation
             centralManager.connect(peripheral, options: connectOptions(for: peripheral))
@@ -291,7 +293,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     public func disconnect(from watch: ConnectedWatch) async {
         // Stop the reconnection machinery first: a scheduled retry captured
         // its peripheral by value and would otherwise undo this disconnect.
-        if reconnects.isFollowing(watch.id) {
+        if reconnects.isFollowingOrIdle(watch.id) {
             reconnects.stop()
         }
         guard let peripheral = discoveredPeripherals[watch.id]
@@ -508,7 +510,6 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         acknowledgementTimeoutTask?.cancel()
         acknowledgementTimeoutTask = nil
         healthDataLoggingProcessor = HealthDataLoggingProcessor()
-        completedTransferCookie = nil
         stopHealthChecks()
         failWorkInFlight(error)
     }
@@ -659,7 +660,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
             eventContinuation?.yield(.appFetchRequested(try AppFetchCodec.decodeRequest(frame)))
 
         case HealthSyncCodec.endpoint:
-            eventContinuation?.yield(.healthSyncCompleted(try HealthSyncResponseCodec.decode(frame)))
+            eventContinuation?.yield(.healthSyncCompleted(try HealthSyncCodec.decode(frame)))
 
         case HealthDataLoggingCodec.endpoint:
             let result = try healthDataLoggingProcessor.process(frame)
@@ -784,6 +785,13 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
                 appMessages.finishActive(throwing: AppMessageClientError.negativeAcknowledgement)
             }
         } catch {
+            Task { [tag = clientTag, reason = String(describing: error)] in
+                await DiagnosticLog.shared.record(
+                    .warning,
+                    category: "appmessage",
+                    message: "[\(tag)] an app message could not be read: \(reason)"
+                )
+            }
         }
     }
 
@@ -933,7 +941,6 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         // records with an old session's tag and item size turns them into
         // nonsense instead of a rejection.
         healthDataLoggingProcessor = HealthDataLoggingProcessor()
-        completedTransferCookie = nil
         stopHealthChecks()
         failWorkInFlight(.disconnected)
     }
@@ -1136,9 +1143,4 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
             abortLink(peripheral, error: .connectionTimedOut, step: "resending unacknowledged packets")
         }
     }
-}
-
-public enum PutBytesClientError: Error, Equatable, Sendable {
-    case transferAlreadyInProgress
-    case firmwareUpdateAlreadyInProgress
 }

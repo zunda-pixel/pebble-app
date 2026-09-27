@@ -45,13 +45,13 @@ extension CoreBluetoothWatchClient {
         try await transferObject(bytes, objectType: .file, appBankID: 0, filename: filename)
     }
 
+    @discardableResult
     func transferObject(
         _ bytes: [UInt8],
         objectType: PutBytesObjectType,
         appBankID: UInt32,
         filename: String?
-    ) async throws {
-        completedTransferCookie = nil
+    ) async throws -> UInt32 {
         let peripheral = try linkedPeripheral()
         guard activeTransferSession == nil else {
             throw PutBytesClientError.transferAlreadyInProgress
@@ -66,9 +66,33 @@ extension CoreBluetoothWatchClient {
         let firstAction = try session.start()
         activeTransferSession = session
 
-        try await transferReply.wait(timeout: .seconds(20)) {
-            try handleTransferActions([firstAction], peripheral: peripheral)
+        do {
+            return try await transferReply.wait(timeout: .seconds(20)) {
+                try handleTransferActions([firstAction], peripheral: peripheral)
+            }
+        } catch {
+            abandonTransfer(on: peripheral)
+            throw error
         }
+    }
+
+    /// Clears a transfer whose reply settled without passing through
+    /// `.finished` or `failTransfer` — the deadline, or a chunk that could not
+    /// be sent.
+    ///
+    /// Not left to the watch: it holds the transfer open until its own
+    /// `PUT_TIMEOUT_MS` (30 s, `services/put_bytes/put_bytes.c`) and accepts an
+    /// init only from idle (`prv_is_valid_command_for_current_state`), so the
+    /// next transfer would be refused for ten seconds after this one gave up.
+    /// Before the init is acknowledged there is no token to name, and that
+    /// timer is all there is.
+    func abandonTransfer(on peripheral: CBPeripheral) {
+        guard activeTransferSession != nil, !transferReply.isWaiting else { return }
+        if let cookie = activeTransferCookie {
+            try? sendFrame(PutBytesCodec.abortFrame(cookie: cookie), to: peripheral)
+        }
+        activeTransferSession = nil
+        activeTransferCookie = nil
     }
 
     public func installFirmware(_ package: PBZFirmwarePackage) async throws {
@@ -85,17 +109,20 @@ extension CoreBluetoothWatchClient {
             SystemMessageCodec.firmwareUpdateStartFrame(bytesToSend: byteCount),
             waitingForStart: true
         )
-        try await installApplicationObject(
+        let firmwareCookie = try await transferObject(
             [UInt8](package.firmware),
             objectType: package.manifest.firmware.type == "recovery" ? .recovery : .firmware,
-            appBankID: 0
+            appBankID: 0,
+            filename: nil
         )
-        guard let firmwareCookie = completedTransferCookie else { throw PutBytesTransferError.invalidState }
         var cookies = [firmwareCookie]
         if let resources = package.resources {
-            try await installApplicationObject([UInt8](resources), objectType: .systemResource, appBankID: 0)
-            guard let resourceCookie = completedTransferCookie else { throw PutBytesTransferError.invalidState }
-            cookies.append(resourceCookie)
+            cookies.append(try await transferObject(
+                [UInt8](resources),
+                objectType: .systemResource,
+                appBankID: 0,
+                filename: nil
+            ))
         }
         for cookie in cookies {
             pendingInstallCookie = cookie
@@ -110,8 +137,16 @@ extension CoreBluetoothWatchClient {
             throw PutBytesClientError.firmwareUpdateAlreadyInProgress
         }
         self.waitingForFirmwareStart = waitingForStart
-        try await firmwareReply.wait(timeout: .seconds(10)) {
-            try sendFrame(frame, to: peripheral)
+        do {
+            try await firmwareReply.wait(timeout: .seconds(10)) {
+                try sendFrame(frame, to: peripheral)
+            }
+        } catch {
+            if !firmwareReply.isWaiting {
+                waitingForFirmwareStart = false
+                pendingInstallCookie = nil
+            }
+            throw error
         }
     }
 
@@ -175,6 +210,7 @@ extension CoreBluetoothWatchClient {
         do {
             let actions = try session.receive(response)
             activeTransferSession = session
+            activeTransferCookie = response.cookie
             try handleTransferActions(actions, peripheral: peripheral)
             updateTransferTimeout()
         } catch {
@@ -243,9 +279,14 @@ extension CoreBluetoothWatchClient {
             case .progress(let progress):
                 eventContinuation?.yield(.transferProgress(progress))
             case .finished:
-                completedTransferCookie = activeTransferSession?.completedCookie
+                let cookie = activeTransferSession?.completedCookie
                 activeTransferSession = nil
-                transferReply.finish()
+                activeTransferCookie = nil
+                if let cookie {
+                    transferReply.finish(cookie)
+                } else {
+                    transferReply.fail(PutBytesTransferError.invalidState)
+                }
             }
         }
     }
@@ -262,6 +303,7 @@ extension CoreBluetoothWatchClient {
 
     func failTransfer(_ error: any Error) {
         activeTransferSession = nil
+        activeTransferCookie = nil
         transferReply.fail(error)
     }
 }

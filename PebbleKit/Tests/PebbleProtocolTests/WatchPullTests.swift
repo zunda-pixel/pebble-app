@@ -95,6 +95,57 @@ struct WatchPullTests {
     }
 
     @Test
+    func aPullThatTimesOutLeavesTheNextOneFreeToRun() async throws {
+        let deadlines = OnlyTheFirstDeadlineFallsDue()
+        let pull = WatchPull<CountingCollector>(
+            timeout: .seconds(30),
+            sleep: { await deadlines.sleep(for: $0) }
+        )
+
+        await #expect(throws: WatchConnectionError.connectionTimedOut) {
+            try await pull.run(collecting: CountingCollector(total: 1)) {}
+        }
+        #expect(!pull.isInProgress)
+
+        let waiting = Task { try await pull.run(collecting: CountingCollector(total: 1)) {} }
+        while !pull.isInProgress { await Task.yield() }
+        #expect(pull.take(piece([7])))
+        #expect(try await waiting.value == [7])
+    }
+
+    @Test
+    func aRequestThatCannotBeSentLeavesTheNextPullFreeToRun() async throws {
+        let pull = WatchPull<CountingCollector>(timeout: .seconds(30))
+
+        await #expect(throws: WatchConnectionError.disconnected) {
+            try await pull.run(collecting: CountingCollector(total: 1)) {
+                throw WatchConnectionError.disconnected
+            }
+        }
+        #expect(!pull.isInProgress)
+
+        let waiting = Task { try await pull.run(collecting: CountingCollector(total: 1)) {} }
+        while !pull.isInProgress { await Task.yield() }
+        #expect(pull.take(piece([7])))
+        #expect(try await waiting.value == [7])
+    }
+
+    @Test
+    func aPullStartedStraightAfterAFailedOneKeepsItsCollector() async throws {
+        let pull = WatchPull<CountingCollector>(timeout: .seconds(30))
+        let first = Task { try await pull.run(collecting: CountingCollector(total: 3)) {} }
+        while !pull.isInProgress { await Task.yield() }
+
+        pull.finish(.failure(WatchConnectionError.disconnected))
+        let second = Task { try await pull.run(collecting: CountingCollector(total: 1)) {} }
+        await #expect(throws: WatchConnectionError.disconnected) { try await first.value }
+        while !pull.isInProgress { await Task.yield() }
+
+        #expect(pull.take(piece([7])))
+        #expect(try await second.value == [7])
+    }
+
+    @Test
     func everyPieceThatArrivesPutsTheDeadlineBack() async throws {
         let deadlines = DeadlineLog()
         let pull = WatchPull<CountingCollector>(
@@ -148,6 +199,18 @@ private struct CountingCollector: WatchPullCollector {
         guard !frame.payload.isEmpty else { throw CountingError.refused }
         received += frame.payload
         return received.count >= total ? received : nil
+    }
+}
+
+/// Lets the first deadline fall due at once and holds every later one for as
+/// long as it asks.
+private actor OnlyTheFirstDeadlineFallsDue {
+    private var count = 0
+
+    func sleep(for duration: Duration) async {
+        count += 1
+        guard count > 1 else { return }
+        try? await Task.sleep(for: duration)
     }
 }
 

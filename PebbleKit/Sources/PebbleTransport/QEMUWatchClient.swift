@@ -169,11 +169,17 @@ public final class QEMUWatchClient: WatchClient {
     }
 
     public func frames() -> AsyncStream<PebbleProtocolFrame> {
-        AsyncStream { continuation in frameContinuation = continuation }
+        AsyncStream { continuation in
+            frameContinuation?.finish()
+            frameContinuation = continuation
+        }
     }
 
     public func events() -> AsyncStream<WatchClientEvent> {
-        AsyncStream { continuation in eventContinuation = continuation }
+        AsyncStream { continuation in
+            eventContinuation?.finish()
+            eventContinuation = continuation
+        }
     }
 
     public func synchronizeTime() async throws {
@@ -191,7 +197,7 @@ public final class QEMUWatchClient: WatchClient {
     }
 
     public func sendAppMessage(applicationID: UUID, tuples: [AppMessageTuple]) async throws {
-        guard operationContinuation == nil else { throw AppReorderClientError.operationAlreadyInProgress }
+        guard operationContinuation == nil else { throw QEMUTransportError.operationAlreadyInProgress }
         let transactionID = nextAppMessageTransactionID
         nextAppMessageTransactionID &+= 1
         pendingAppMessageTransactionID = transactionID
@@ -357,14 +363,23 @@ public final class QEMUWatchClient: WatchClient {
         case .cancelled:
             openContinuation?.resume(throwing: WatchConnectionError.disconnected)
             openContinuation = nil
+        case .waiting(let error):
+            // A refused connection — no emulator listening — waits here and
+            // retries for as long as it is left, rather than failing. The open
+            // has no deadline of its own, so only this ends it.
+            openContinuation?.resume(throwing: error)
+            openContinuation = nil
         default:
             break
         }
     }
 
     /// Cancels the link and retires its stamp, so nothing it says afterwards is
-    /// taken for the next one's.
+    /// taken for the next one's — including the `.cancelled` that would have
+    /// ended an open still in flight, which is why that open is ended here.
     private func discardConnection() {
+        openContinuation?.resume(throwing: WatchConnectionError.disconnected)
+        openContinuation = nil
         connection?.cancel()
         connection = nil
         connectionGeneration += 1
@@ -439,25 +454,51 @@ public final class QEMUWatchClient: WatchClient {
     }
 
     private func consumePebbleProtocol(_ bytes: [UInt8]) {
-        // One unusable frame must not swallow the reply an operation is waiting for,
-        // which may well have arrived in the same read.
+        // One unusable frame must not swallow the reply an operation is waiting
+        // for, which may well have arrived in the same read — nor fail an
+        // operation whose reply it was not: a malformed app-run-state frame
+        // used to end the BlobDB write and the handshake beside it.
         let batch = frameDecoder.append(bytes)
-        var firstFailure: (any Error)?
         if let failure = batch.failure {
-            firstFailure = failure
+            recordUnreadable(failure)
         }
         for frame in batch.frames {
+            let awaited = isAwaitedReply(frame)
             do {
                 try process(frame)
             } catch {
-                if firstFailure == nil {
-                    firstFailure = error
+                recordUnreadable(error, endpoint: frame.endpoint)
+                if frame.endpoint == WatchVersionCodec.endpoint, awaited {
+                    finishVersion(throwing: error)
+                } else if awaited {
+                    failOperation(error)
                 }
             }
             frameContinuation?.yield(frame)
         }
-        if let firstFailure {
-            failOperation(firstFailure)
+    }
+
+    private func isAwaitedReply(_ frame: PebbleProtocolFrame) -> Bool {
+        switch frame.endpoint {
+        case WatchVersionCodec.endpoint: versionContinuation != nil
+        case BlobDBCodec.endpoint: pendingBlobToken != nil
+        case AppReorderCodec.endpoint: waitingForReorder
+        case PutBytesCodec.endpoint: transferSession != nil || pendingInstallCookie != nil
+        case SystemMessageCodec.endpoint: waitingForFirmwareStart
+        case AppMessageCodec.endpoint: pendingAppMessageTransactionID != nil
+        default: false
+        }
+    }
+
+    private func recordUnreadable(_ error: any Error, endpoint: UInt16? = nil) {
+        Task { [reason = String(describing: error)] in
+            await DiagnosticLog.shared.record(
+                .warning,
+                category: "connection",
+                message: "[qemu] unreadable frame"
+                    + (endpoint.map { " on endpoint \($0)" } ?? "")
+                    + ": \(reason)"
+            )
         }
     }
 
@@ -474,7 +515,7 @@ public final class QEMUWatchClient: WatchClient {
         } else if frame.endpoint == AppFetchCodec.endpoint {
             eventContinuation?.yield(.appFetchRequested(try AppFetchCodec.decodeRequest(frame)))
         } else if frame.endpoint == HealthSyncCodec.endpoint {
-            eventContinuation?.yield(.healthSyncCompleted(try HealthSyncResponseCodec.decode(frame)))
+            eventContinuation?.yield(.healthSyncCompleted(try HealthSyncCodec.decode(frame)))
         } else if frame.endpoint == HealthDataLoggingCodec.endpoint {
             let result = try healthDataLoggingProcessor.process(frame)
             if let response = result.response { Task { try? await send(response) } }
