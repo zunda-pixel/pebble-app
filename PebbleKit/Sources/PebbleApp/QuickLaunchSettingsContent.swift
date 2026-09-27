@@ -53,7 +53,7 @@ struct QuickLaunchSettingsContent: View {
                 ForEach(QuickLaunchButton.allCases, id: \.self) { button in
                     Picker(title(for: button), selection: binding(for: button)) {
                         Text("Off").tag(QuickLaunchAssignment.invalidID)
-                        Text("Quiet Time").tag(QuickLaunchAssignment.quietTimeToggleID)
+                        Text("Focus").tag(QuickLaunchAssignment.quietTimeToggleID)
                         ForEach(applications) { application in
                             Text(application.displayName).tag(application.id)
                         }

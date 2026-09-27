@@ -45,12 +45,12 @@ struct QuietTimeSettingsContent: View {
                 row(.quietTimeManual)
                 row(.quietTimeSmart)
             } footer: {
-                Text("Quiet Time silences the watch. What the phone forwards is decided by Quiet Hours on the Notifications screen.")
+                Text("Focus silences the watch. What the phone forwards is decided by Quiet Hours on the Notifications screen.")
             }
             Section {
                 row(.quietTimeAutoDismiss)
             } footer: {
-                Text("While Quiet Time is on, clear an arriving notification and return to the watchface instead of showing its popup.")
+                Text("While Focus is on, clear an arriving notification and return to the watchface instead of showing its popup.")
             }
             Section("Weekdays") {
                 row(.quietTimeWeekdayScheduleEnabled)
@@ -66,11 +66,11 @@ struct QuietTimeSettingsContent: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle(Text("Quiet Time"))
+        .navigationTitle(Text("Focus"))
     }
 }
 
-#Preview("Quiet Time") {
+#Preview("Focus") {
     NavigationStack {
         QuietTimeSettingsContent(
             watchSettings: [

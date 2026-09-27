@@ -1,7 +1,7 @@
 import PebbleProtocol
 import SwiftUI
 
-/// The screens the Watch Settings rows on a watch's detail screen open.
+/// The screens the Settings rows on a watch's detail screen open.
 enum WatchSettingsPage: Hashable {
     case appearance
     case backlight
@@ -24,7 +24,13 @@ struct WatchDetailView: View {
               !locale.isEmpty else {
             return nil
         }
-        return model.languagePacks(watchID: watchID).first { $0.locale == locale }?.localName ?? locale
+        if let pack = model.languagePacks(watchID: watchID).first(where: { $0.locale == locale }) {
+            return pack.localName
+        }
+        // The watch reports an identifier such as "ja_JP"; shown bare when no
+        // pack in the catalogue names it, it read as a code, not a language.
+        let language = Locale(identifier: locale)
+        return language.localizedString(forIdentifier: locale) ?? locale
     }
 
     private func currentWatchSettings(board: WatchBoard?) -> [WatchSetting: Int] {
@@ -321,7 +327,7 @@ struct WatchDetailContent<
                 NavigationLink {
                     settingsDestination(.quietTime)
                 } label: {
-                    LabeledContent("Quiet Time") { Text(quietTimeSummary) }
+                    LabeledContent("Focus") { Text(quietTimeSummary) }
                 }
                 NavigationLink {
                     settingsDestination(.quickLaunch)
@@ -339,7 +345,7 @@ struct WatchDetailContent<
                     Text("Health")
                 }
             } header: {
-                Text("Watch Settings")
+                Text("Settings")
             } footer: {
                 Text("These are the watch's own settings. They are written again whenever it connects, so this is the copy that wins.")
             }

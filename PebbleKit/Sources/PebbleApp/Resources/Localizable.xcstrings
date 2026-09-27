@@ -2579,6 +2579,26 @@
         }
       }
     },
+    "Focus" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "集中モード"
+          }
+        }
+      }
+    },
+    "Focus silences the watch. What the phone forwards is decided by Quiet Hours on the Notifications screen." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "集中モードはウォッチを消音する機能です。iPhoneが何を転送するかは、“通知”画面のサイレント時間帯で決まります。"
+          }
+        }
+      }
+    },
     "Follows the phone" : {
       "localizations" : {
         "ja" : {
@@ -4461,26 +4481,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "サイレント時間帯"
-          }
-        }
-      }
-    },
-    "Quiet Time" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "クワイエットタイム"
-          }
-        }
-      }
-    },
-    "Quiet Time silences the watch. What the phone forwards is decided by Quiet Hours on the Notifications screen." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "クワイエットタイムはウォッチを消音する機能です。iPhoneが何を転送するかは、“通知”画面のサイレント時間帯で決まります。"
           }
         }
       }
@@ -7231,16 +7231,6 @@
         }
       }
     },
-    "Watch Settings" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチ設定"
-          }
-        }
-      }
-    },
     "Watch app" : {
       "localizations" : {
         "ja" : {
@@ -7451,12 +7441,12 @@
         }
       }
     },
-    "While Quiet Time is on, clear an arriving notification and return to the watchface instead of showing its popup." : {
+    "While Focus is on, clear an arriving notification and return to the watchface instead of showing its popup." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "クワイエットタイム中は、届いた通知をポップアップ表示せず消して文字盤に戻ります。"
+            "state" : "translated",
+            "value" : "集中モード中は、届いた通知をポップアップ表示せず消して文字盤に戻ります。"
           }
         }
       }
