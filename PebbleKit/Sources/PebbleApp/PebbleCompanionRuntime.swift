@@ -1,6 +1,8 @@
 import CoreLocation
 import PebbleProtocol
 import Foundation
+import HTTPTypes
+import HTTPTypesFoundation
 import WebKit
 
 @MainActor
@@ -12,7 +14,7 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
     private var application: WatchApplication?
     private let openURLHandler: (URL) -> Void
     private let appMessageHandler: (UUID, [AppMessageTuple]) async throws -> Void
-    private let notificationHandler: (WatchApplication, String, String) async throws -> Void
+    private let notificationHandler: (WatchApplication, String, String) async -> Void
     private let activeWatchHandler: () -> ConnectedWatch?
     private let locationHandler: () async throws -> CLLocation
     /// A live stream of positions for `watchPosition`, or a throw where the
@@ -29,6 +31,11 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
     /// One task per `watchPosition` call, keyed by the script's own watch id,
     /// cancelled by `clearWatch` and when the page goes away.
     private var positionWatchers: [Int: Task<Void, Never>] = [:]
+    /// Each application's own session for its script's requests, as the web
+    /// view's store is. Sharing `URLSession.shared` sent a cookie one app was
+    /// handed along with every other app's requests. Ephemeral: a script's
+    /// cookies were never meant to outlive the process any more than a page's.
+    private var scriptSessions: [UUID: URLSession] = [:]
     private var loadContinuation: CheckedContinuation<Void, any Error>?
     private var loadedApplicationID: UUID?
     /// The load under way (or the finished one, which costs nothing to await).
@@ -49,7 +56,7 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
     init(
         openURLHandler: @escaping (URL) -> Void,
         appMessageHandler: @escaping (UUID, [AppMessageTuple]) async throws -> Void,
-        notificationHandler: @escaping (WatchApplication, String, String) async throws -> Void,
+        notificationHandler: @escaping (WatchApplication, String, String) async -> Void,
         activeWatchHandler: @escaping () -> ConnectedWatch?,
         locationHandler: @escaping () async throws -> CLLocation,
         locationUpdatesHandler: @escaping @MainActor () throws -> AsyncThrowingStream<CLLocation, any Error> = {
@@ -202,8 +209,12 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
             webkit.messageHandlers.pebble.postMessage({type:'timelineSubscription'});
             setTimeout(() => onFailure && onFailure(), 0);
           },
+          // As text whatever was passed: a number or a missing body used to
+          // fail the cast on the phone's side and the notification with it.
           showSimpleNotificationOnPebble: (title, body) =>
-            webkit.messageHandlers.pebble.postMessage({type:'notification', title, body})
+            webkit.messageHandlers.pebble.postMessage({
+              type:'notification', title: String(title ?? ''), body: String(body ?? '')
+            })
         };
         // `navigator.geolocation` is here but never answers: WebKit has no
         // public way for an app to grant it, on `WKUIDelegate` or on the newer
@@ -536,7 +547,7 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
         if type == "notification",
            let title = body["title"] as? String,
            let notificationBody = body["body"] as? String {
-            Task { try? await notificationHandler(application, title, notificationBody) }
+            Task { await notificationHandler(application, title, notificationBody) }
             return
         }
         guard type == "sendAppMessage",
@@ -696,22 +707,40 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
                 Task { await deliverScriptResponse(requestID: script.id, page: page, failure: failure) }
             }
         }
-        guard let url = URL(string: script.url),
+        guard let applicationID = application?.id,
+              let url = URL(string: script.url),
               let scheme = url.scheme?.lowercased(),
-              scheme == "https" || scheme == "http" else { return }
-        var request = URLRequest(url: url)
-        request.httpMethod = script.method
-        if script.timeoutMilliseconds > 0 { request.timeoutInterval = script.timeoutMilliseconds / 1000 }
+              scheme == "https" || scheme == "http",
+              let method = HTTPRequest.Method(script.method.uppercased()) else { return }
+        var fields = HTTPFields()
         for (name, value) in script.headers {
-            request.setValue(value, forHTTPHeaderField: name)
+            guard let name = HTTPField.Name(name) else { continue }
+            fields[name] = value
         }
+        guard var request = URLRequest(httpRequest: HTTPRequest(method: method, url: url, headerFields: fields)) else {
+            return
+        }
+        if script.timeoutMilliseconds > 0 { request.timeoutInterval = script.timeoutMilliseconds / 1000 }
         if let body = script.body { request.httpBody = Data(body.utf8) }
+        let session = scriptSession(for: applicationID)
+        // Far beyond any API answer a watch app could hold, and a bound on
+        // what a hostile page could make the shim buffer — counted as the
+        // bytes arrive, since reading the whole body first bounds nothing.
+        let limit = 10 * 1_024 * 1_024
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            // Far beyond any API answer a watch app could hold, and a bound on
-            // what a hostile page could make the shim buffer.
-            guard data.count <= 10 * 1_024 * 1_024,
-                  let http = response as? HTTPURLResponse else { return }
+            let (bytes, response) = try await session.bytes(for: request)
+            guard let http = response as? HTTPURLResponse, response.expectedContentLength <= limit else {
+                bytes.task.cancel()
+                return
+            }
+            var data = Data()
+            for try await byte in bytes {
+                data.append(byte)
+                guard data.count <= limit else {
+                    bytes.task.cancel()
+                    return
+                }
+            }
             let headerText = http.allHeaderFields
                 .compactMap { name, value -> String? in
                     guard let name = name as? String else { return nil }
@@ -736,6 +765,13 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
                 message: "a script's request could not be made: \(String(reflecting: error))"
             )
         }
+    }
+
+    private func scriptSession(for applicationID: UUID) -> URLSession {
+        if let session = scriptSessions[applicationID] { return session }
+        let session = URLSession(configuration: .ephemeral)
+        scriptSessions[applicationID] = session
+        return session
     }
 
     /// The body as the response's own charset says, then as UTF-8, then as

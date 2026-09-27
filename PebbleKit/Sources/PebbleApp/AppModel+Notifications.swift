@@ -105,7 +105,7 @@ extension AppModel {
         application: WatchApplication,
         title: String,
         body: String
-    ) async throws {
+    ) async {
         guard notifications.companionEnabled else { return }
         guard notifications.preferences.permits(applicationID: application.id, at: Date()) else {
             await DiagnosticLog.shared.record(category: "notification", message: "Notification suppressed by delivery preferences")

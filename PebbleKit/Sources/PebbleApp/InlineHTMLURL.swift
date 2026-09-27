@@ -39,7 +39,10 @@ extension URL {
             // wrapped and padded in whatever way the application chose; one
             // that is not base64 at all falls out as nothing, which the
             // emptiness check below refuses.
-            html = Data(base64Encoded: payload, options: .ignoreUnknownCharacters)
+            // Decoded first: a script that ran it through `encodeURIComponent`
+            // sends `+`, `/` and `=` as `%2B`, `%2F` and `%3D`, and only the `%`
+            // would be ignored.
+            html = Data(base64Encoded: payload.removingPercentEncoding ?? payload, options: .ignoreUnknownCharacters)
                 .flatMap { String(data: $0, encoding: .utf8) }
         } else {
             // Percent-encoding is how the markup survives being a URL at all.

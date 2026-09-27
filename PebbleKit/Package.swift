@@ -104,6 +104,8 @@ let package = Package(
         .product(name: "AsyncOperations", package: "swift-async-operations"),
         .product(name: "Defaults", package: "Defaults"),
         .product(name: "DMRetry", package: "swift-retry"),
+        .product(name: "HTTPTypes", package: "swift-http-types"),
+        .product(name: "HTTPTypesFoundation", package: "swift-http-types"),
         .product(name: "Valet", package: "Valet"),
       ],
       swiftSettings: swiftSettings,

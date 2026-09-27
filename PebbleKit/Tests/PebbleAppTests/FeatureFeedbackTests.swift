@@ -310,6 +310,9 @@ struct FeatureFeedbackTests {
         let encoded = try #require(URL(string: "data:text/html;base64,PGgxPlNldHRpbmdzPC9oMT4="))
         #expect(encoded.inlineHTML == "<h1>Settings</h1>")
         #expect(AppModel.mayOpenConfigurationURL(encoded))
+        // Base64 that went through `encodeURIComponent` on its way.
+        let escaped = try #require(URL(string: "data:text/html;base64,PHA%2BYT9iPmM8L3A%2B"))
+        #expect(escaped.inlineHTML == "<p>a?b>c</p>")
 
         // No media type at all: RFC 2397 calls that text/plain, and
         // applications leave it off while sending markup all the same.

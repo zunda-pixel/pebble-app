@@ -318,8 +318,7 @@ public final class AppModel {
             try await self.sendOrQueueAppMessage(applicationID: applicationID, tuples: tuples)
         },
         notificationHandler: { [weak self] application, title, body in
-            guard let self else { throw WatchConnectionError.disconnected }
-            try await self.sendCompanionNotification(
+            await self?.sendCompanionNotification(
                 application: application,
                 title: title,
                 body: body
