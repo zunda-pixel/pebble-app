@@ -1,6 +1,7 @@
 #if os(iOS)
 public import AccessoryNotifications
 public import AccessoryTransportExtension
+import DequeModule
 import Foundation
 import OSLog
 import PebbleProtocol
@@ -9,9 +10,22 @@ import Synchronization
 /// The AccessoryDataProvider's part: each notification iOS forwards is written
 /// in the form the watch parses, and each action the watch sends back is
 /// answered to iOS as the response to that notification.
+///
+/// Every message goes out through one queue, in the order iOS handed them over.
+/// A task per message raced: a removal could reach the watch before the update
+/// it followed, and the update then brought the notification back.
 public final class NotificationForwardingHandler: NotificationsForwarding.AccessoryNotificationsHandler {
+    private struct Outgoing: Sendable {
+        var message: AccessoryNotificationMessage
+        /// Told whether the watch took it, for the one call iOS waits on.
+        var delivered: CheckedContinuation<Bool, Never>?
+    }
+
     private struct State {
         var session: NotificationsForwarding.Session?
+        var queue: Deque<Outgoing> = []
+        /// Nil outside a session, which is what refuses a message then.
+        var wake: AsyncStream<Void>.Continuation?
         var sources = ReplySources()
     }
 
@@ -20,11 +34,35 @@ public final class NotificationForwardingHandler: NotificationsForwarding.Access
     public init() {}
 
     public func didActivate(for session: NotificationsForwarding.Session) {
-        state.withLock { $0.session = session }
+        let (wakes, wake) = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
+        // One queue has one reader: a second, started beside a first still
+        // draining, would take messages off the same front out of order.
+        let isAlreadyDraining = state.withLock { state in
+            state.session = session
+            guard state.wake == nil else { return true }
+            state.wake = wake
+            return false
+        }
+        guard !isAlreadyDraining else { return }
+        Task { [weak self] in
+            for await _ in wakes {
+                await self?.drain()
+            }
+        }
     }
 
     public func didInvalidate() {
-        state.withLock { $0.session = nil }
+        let (abandoned, wake) = state.withLock { state in
+            let taken = (state.queue, state.wake)
+            state.session = nil
+            state.queue = []
+            state.wake = nil
+            return taken
+        }
+        wake?.finish()
+        for outgoing in abandoned {
+            outgoing.delivered?.resume(returning: false)
+        }
     }
 
     public func addNotification(
@@ -32,33 +70,28 @@ public final class NotificationForwardingHandler: NotificationsForwarding.Access
         alertingContext: AlertingContext
     ) async throws -> Bool {
         remember(notification)
-        do {
-            try await send(.present(ForwardedNotification(notification, shouldAlert: alertingContext.shouldAlert)))
-            return true
-        } catch {
-            forwardingLog.error("a notification was not forwarded: \(String(describing: error), privacy: .public)")
-            return false
+        let forwarded = ForwardedNotification(notification, shouldAlert: alertingContext.shouldAlert)
+        return await withCheckedContinuation { delivered in
+            enqueue(Outgoing(message: .present(forwarded), delivered: delivered))
         }
     }
 
     public func updateNotification(_ notification: AccessoryNotification) {
         remember(notification)
-        let forwarded = ForwardedNotification(notification, shouldAlert: false)
-        Task { try? await send(.present(forwarded)) }
+        enqueue(Outgoing(message: .present(ForwardedNotification(notification, shouldAlert: false))))
     }
 
     public func removeNotification(identifier: AccessoryNotification.Identifier) {
         state.withLock { $0.sources.forget(identifier) }
-        let removal = AccessoryNotificationMessage.remove(
+        enqueue(Outgoing(message: .remove(
             sourceIdentifier: identifier.sourceIdentifier,
             notificationIdentifier: identifier.notificationIdentifier
-        )
-        Task { try? await send(removal) }
+        )))
     }
 
     public func removeAllNotifications() {
         state.withLock { $0.sources.forgetAll() }
-        Task { try? await send(.removeAll) }
+        enqueue(Outgoing(message: .removeAll))
     }
 
     public func messageHandler(_ message: TransportMessage) {
@@ -95,6 +128,35 @@ public final class NotificationForwardingHandler: NotificationsForwarding.Access
 
     private func remember(_ notification: AccessoryNotification) {
         state.withLock { $0.sources.remember(notification.identifier) }
+    }
+
+    private func enqueue(_ outgoing: Outgoing) {
+        let isQueued = state.withLock { state in
+            guard let wake = state.wake else { return false }
+            state.queue.append(outgoing)
+            wake.yield()
+            return true
+        }
+        if !isQueued {
+            forwardingLog.error("a message for the watch arrived outside a session")
+            outgoing.delivered?.resume(returning: false)
+        }
+    }
+
+    /// Takes each message off the front as it goes, so the one sent is the one
+    /// removed whatever was queued behind it meanwhile.
+    private func drain() async {
+        while let outgoing = state.withLock({ $0.queue.popFirst() }) {
+            let isDelivered: Bool
+            do {
+                try await send(outgoing.message)
+                isDelivered = true
+            } catch {
+                forwardingLog.error("a message did not reach the watch: \(String(describing: error), privacy: .public)")
+                isDelivered = false
+            }
+            outgoing.delivered?.resume(returning: isDelivered)
+        }
     }
 
     private func send(_ message: AccessoryNotificationMessage) async throws {
