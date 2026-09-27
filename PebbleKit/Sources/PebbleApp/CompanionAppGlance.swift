@@ -31,15 +31,9 @@ enum CompanionAppGlance {
                 // An icon this app cannot name stays nil, which leaves the
                 // watch the app's own icon — the same answer the editor gives.
                 icon: (layout["icon"] as? String).flatMap(TimelineIcon.init(systemImageURI:)),
-                expires: (slice["expirationTime"] as? String).flatMap(webDate)
+                expires: (slice["expirationTime"] as? String).flatMap(Date.init(webTimestamp:))
             )
         }
-    }
-
-    /// The SDK writes ISO 8601, with or without fractional seconds.
-    private static func webDate(_ string: String) -> Date? {
-        (try? Date(string, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)))
-            ?? (try? Date(string, strategy: .iso8601))
     }
 }
 

@@ -30,10 +30,29 @@ struct TimelinePinsContent: View {
     }
 
     private var days: [(date: Date, pins: [TimelinePin])] {
-        let calendar = Calendar.current
-        return Dictionary(grouping: matches) { calendar.startOfDay(for: $0.timestamp) }
+        Dictionary(grouping: matches, by: Self.day(of:))
             .sorted { $0.key < $1.key }
-            .map { (date: $0.key, pins: $0.value.sorted { $0.timestamp < $1.timestamp }) }
+            .map { (date: $0.key, pins: $0.value.sorted(by: Self.isOrderedBefore)) }
+    }
+
+    /// All-day pins head their day: their UTC-midnight timestamp is some
+    /// arbitrary hour of the local day, and would put them among the timed ones.
+    private static func isOrderedBefore(_ first: TimelinePin, _ second: TimelinePin) -> Bool {
+        if first.isAllDay != second.isAllDay { return first.isAllDay }
+        return first.timestamp < second.timestamp
+    }
+
+    /// The local midnight of the day a pin belongs to. An all-day pin's
+    /// timestamp is UTC midnight of its date (`CalendarBridge.anchoredToUTCMidnight`),
+    /// so its date is read in UTC; read locally it lands on the day before
+    /// anywhere west of Greenwich.
+    static func day(of pin: TimelinePin) -> Date {
+        let local = Calendar.current
+        guard pin.isAllDay else { return local.startOfDay(for: pin.timestamp) }
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = .gmt
+        let date = utc.dateComponents([.year, .month, .day], from: pin.timestamp)
+        return local.date(from: date) ?? local.startOfDay(for: pin.timestamp)
     }
 
     var body: some View {

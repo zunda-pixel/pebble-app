@@ -5,17 +5,21 @@ import Valet
 /// PebbleKit JS gives a configuration page an account token, stable for the
 /// user, and a watch token, stable for the watch.
 struct PebbleTokenStore {
-    private let valet: Valet
+    /// Nil for an empty identifier, which Valet cannot name a keychain after;
+    /// the tokens are then made fresh each time, as without a keychain.
+    private let valet: Valet?
 
     init(identifier: String = "dev.pebble.companion.tokens") {
         // A token that survived to a restored watch would identify the old install.
-        valet = Valet.valet(
-            with: Identifier(nonEmpty: identifier)!,
-            accessibility: .whenUnlockedThisDeviceOnly
-        )
+        valet = Identifier(nonEmpty: identifier).map {
+            Valet.valet(with: $0, accessibility: .whenUnlockedThisDeviceOnly)
+        }
     }
 
     func token(named name: String) -> String {
+        guard let valet else {
+            return UserDefaults.standard.string(forKey: name) ?? Self.makeToken()
+        }
         if let existing = try? valet.string(forKey: name) {
             return existing
         }

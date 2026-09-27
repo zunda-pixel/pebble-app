@@ -15,7 +15,8 @@ public enum PhonePermissionState: Equatable, Sendable {
     /// read.
     case partly
     case denied
-    /// Denied by a watch policy, or a phone with no such hardware.
+    /// Denied by a policy the reader cannot change — parental controls or
+    /// an MDM profile — or a phone with no such hardware.
     case restricted
     case unavailable
     /// Apple provides no way to read this one back.
@@ -178,7 +179,7 @@ func openPrivacySettings() {
 #if os(macOS)
     guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy") else { return }
     NSWorkspace.shared.open(url)
-#elseif os(iOS)
+#elseif os(iOS) || os(visionOS)
     guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
     UIApplication.shared.open(url)
 #endif

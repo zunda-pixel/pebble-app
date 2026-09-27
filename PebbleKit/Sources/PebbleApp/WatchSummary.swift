@@ -1,7 +1,7 @@
 import PebbleProtocol
 import Foundation
 
-/// One watch as the Devices screens show it, whether it is connected now or
+/// One watch as the Watches screens show it, whether it is connected now or
 /// only remembered.
 ///
 /// A screen that took `AppModel` and a watch id had to ask three questions —

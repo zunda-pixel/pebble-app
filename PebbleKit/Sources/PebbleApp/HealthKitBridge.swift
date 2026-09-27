@@ -79,8 +79,10 @@ final class HealthKitBridge {
                 read: [stepsType, sleepType]
             )
         case .onlyWhatIsAlreadyGranted:
-            // Writing is the one side HealthKit lets an app read back.
-            guard store.authorizationStatus(for: stepsType) == .sharingAuthorized else {
+            // Writing is the one side HealthKit lets an app read back. Any
+            // one type allowed is enough: the rest are skipped below.
+            let types: [HKObjectType] = [stepsType, sleepType, heartRateType, oxygenType, .workoutType()]
+            guard types.contains(where: { store.authorizationStatus(for: $0) == .sharingAuthorized }) else {
                 throw HealthKitBridgeError.notGranted
             }
         }
@@ -345,14 +347,17 @@ final class HealthKitBridge {
         let end = Date()
         async let stepSamples = query(type: stepsType, start: start, end: end)
         async let sleepSamples = query(type: sleepType, start: start, end: end)
-        var stepsBySource: [Date: [String: Int]] = [:]
-        var sleepBySource: [Date: [String: Int]] = [:]
+        // Summed as they come and rounded once at the end: an Apple Watch
+        // writes its energy a fraction of a kilocalorie at a time, and cutting
+        // each sample to a whole number first left a day's total near zero.
+        var stepsBySource: [Date: [String: Double]] = [:]
+        var sleepBySource: [Date: [String: Double]] = [:]
         var updatedAtByDay: [Date: Date] = [:]
         for case let sample as HKQuantitySample in try await stepSamples {
             guard !(sample.metadata?[HKMetadataKeySyncIdentifier] as? String ?? "").hasPrefix("pebble.") else { continue }
             let day = Calendar.current.startOfDay(for: sample.startDate)
             let source = sample.sourceRevision.source.bundleIdentifier
-            stepsBySource[day, default: [:]][source, default: 0] += Int(sample.quantity.doubleValue(for: .count()))
+            stepsBySource[day, default: [:]][source, default: 0] += sample.quantity.doubleValue(for: .count())
             updatedAtByDay[day] = max(updatedAtByDay[day] ?? .distantPast, sample.endDate)
         }
         let asleepValues: Set<Int> = [
@@ -365,10 +370,10 @@ final class HealthKitBridge {
             guard !(sample.metadata?[HKMetadataKeySyncIdentifier] as? String ?? "").hasPrefix("pebble.") else { continue }
             let day = Calendar.current.startOfDay(for: sample.endDate)
             let source = sample.sourceRevision.source.bundleIdentifier
-            sleepBySource[day, default: [:]][source, default: 0] += Int(sample.endDate.timeIntervalSince(sample.startDate) / 60)
+            sleepBySource[day, default: [:]][source, default: 0] += sample.endDate.timeIntervalSince(sample.startDate) / 60
             updatedAtByDay[day] = max(updatedAtByDay[day] ?? .distantPast, sample.endDate)
         }
-        var effortBySource: [EffortMeasure: [Date: [String: Int]]] = [:]
+        var effortBySource: [EffortMeasure: [Date: [String: Double]]] = [:]
         for (measure, type) in effortTypes {
             for case let sample as HKQuantitySample in try await query(type: type, start: start, end: end) {
                 // The watch's own workouts come back on these types too now,
@@ -377,7 +382,7 @@ final class HealthKitBridge {
                 let day = Calendar.current.startOfDay(for: sample.startDate)
                 let source = sample.sourceRevision.source.bundleIdentifier
                 effortBySource[measure, default: [:]][day, default: [:]][source, default: 0]
-                    += Int(sample.quantity.doubleValue(for: measure.unit))
+                    += sample.quantity.doubleValue(for: measure.unit)
                 updatedAtByDay[day] = max(updatedAtByDay[day] ?? .distantPast, sample.endDate)
             }
         }
@@ -389,13 +394,16 @@ final class HealthKitBridge {
             // The busiest source rather than the sum of them: a phone and a
             // watch both counting the same walk would otherwise report it
             // twice.
+            func whole(_ bySource: [String: Double]?) -> Int {
+                Int((bySource?.values.max() ?? 0).rounded())
+            }
             func effort(_ measure: EffortMeasure) -> Int {
-                effortBySource[measure]?[day]?.values.max() ?? 0
+                whole(effortBySource[measure]?[day])
             }
             return WatchHealthSample(
                 date: day,
-                steps: stepsBySource[day]?.values.max() ?? 0,
-                sleepMinutes: min(24 * 60, sleepBySource[day]?.values.max() ?? 0),
+                steps: whole(stepsBySource[day]),
+                sleepMinutes: min(24 * 60, whole(sleepBySource[day])),
                 activeKilocalories: effort(.activeEnergy),
                 restingKilocalories: effort(.restingEnergy),
                 distanceMetres: effort(.distance),

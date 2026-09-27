@@ -73,7 +73,7 @@ enum MusicScript {
         }
         return MusicSnapshot(
             playerPackage: bundleID,
-            playerName: "Music",
+            playerName: String(localized: "Music", bundle: .module),
             nowPlaying: MusicNowPlaying(
                 artist: fields[2],
                 album: fields[3],
@@ -206,12 +206,13 @@ final class ScriptedMusicSource: SystemMusicSource {
 
     /// Said once, not every two seconds.
     ///
-    /// This used to be a `try?`, and a refusal left nothing at all: the watch
-    /// was sent a track with no title — three length-zero strings, four bytes
-    /// on the wire — and there was no way to tell that from music that really
-    /// had stopped. What withholds it is the sandbox rather than the reader:
-    /// without `com.apple.security.automation.apple-events` the event never
-    /// reaches the permission system, so no prompt is ever shown.
+    /// Not a `try?`: a refusal swallowed sends the watch a track with no
+    /// title — three length-zero strings, four bytes on the wire — which
+    /// cannot be told from music that really has stopped. The app claims
+    /// `com.apple.security.automation.apple-events`, so the first script
+    /// raises the system's automation prompt, and a refusal is the reader's
+    /// answer to it: it stands until they change it in System Settings, and
+    /// asking again every two seconds changes nothing.
     private func sayItWasRefused(_ error: any Error, doing what: String) async {
         guard !wasRefused else { return }
         wasRefused = true

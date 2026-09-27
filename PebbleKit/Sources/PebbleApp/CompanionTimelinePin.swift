@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 import PebbleProtocol
 
@@ -31,7 +30,7 @@ struct CompanionTimelinePin: Equatable, Sendable {
         }
         guard let backingID = (object["id"] as? String)?.emptyAsAbsent,
               let timeString = object["time"] as? String,
-              let time = webDate(timeString),
+              let time = Date(webTimestamp: timeString),
               let layout = object["layout"] as? [String: Any] else {
             throw ParseError.missingEssentials
         }
@@ -49,26 +48,14 @@ struct CompanionTimelinePin: Equatable, Sendable {
         )
     }
 
-    /// The web API writes ISO 8601, with or without fractional seconds.
-    private static func webDate(_ string: String) -> Date? {
-        (try? Date(string, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)))
-            ?? (try? Date(string, strategy: .iso8601))
-    }
-
     /// One stable identifier per (application, pin id), so inserting the same
     /// pin twice updates it and a later delete finds it — across launches,
     /// which is why this is a digest and not a lookup table.
     static func pinID(applicationID: UUID, backingID: String) -> UUID {
-        let digest = SHA256.hash(data: Data("timeline-pin:\(applicationID.uuidString.lowercased()):\(backingID)".utf8))
-        var bytes = Array(digest.prefix(16))
-        // Stamped as a version-8 (custom) RFC 9562 UUID, so it can never
-        // collide with the random version-4 ones the rest of the app mints.
-        bytes[6] = (bytes[6] & 0x0F) | 0x80
-        bytes[8] = (bytes[8] & 0x3F) | 0x80
-        return UUID(uuid: (
-            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
-            bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
-        ))
+        UUID(
+            stableDigestOf: "timeline-pin:\(applicationID.uuidString.lowercased()):\(backingID)",
+            stampingVersion8: true
+        )
     }
 
     /// The pin as this app keeps pins, owned by the application that pushed it.
@@ -82,6 +69,16 @@ struct CompanionTimelinePin: Equatable, Sendable {
             subtitle: subtitle,
             body: body
         )
+    }
+}
+
+extension Date {
+    /// A time as the timeline web API and the app-glance SDK write one: ISO
+    /// 8601, with or without fractional seconds.
+    init?(webTimestamp string: String) {
+        guard let date = (try? Date(string, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)))
+            ?? (try? Date(string, strategy: .iso8601)) else { return nil }
+        self = date
     }
 }
 

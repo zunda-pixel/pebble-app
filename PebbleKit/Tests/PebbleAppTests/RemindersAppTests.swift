@@ -15,7 +15,13 @@ final class FakeRemindersApp: RemindersAppStore {
     var added: [TimelinePin] = []
     var updated: [TimelinePin] = []
     var removed: [String] = []
+    /// How often the system's permission question would have been raised.
+    var accessRequests = 0
     private var written = 0
+
+    func requestAccess() async throws {
+        accessRequests += 1
+    }
 
     func reminders() async throws -> [RemindersAppItem] { items }
 
@@ -88,6 +94,44 @@ struct RemindersAppTests {
         return model
     }
 
+    /// A store whose file cannot be read or written: a directory stands where
+    /// it should be.
+    private func unreadableReminderModel(in directory: URL) throws -> AppModel {
+        let storeURL = directory.appending(path: "reminders.json")
+        try FileManager.default.createDirectory(at: storeURL, withIntermediateDirectories: true)
+        return AppModel(
+            client: MockWatchClient(),
+            storageDirectory: StorageDirectory(url: directory),
+            reminderStore: TimelinePinStore(fileURL: storeURL)
+        )
+    }
+
+    @Test
+    func remindersThatCouldNotBeReadAreNotReplacedWithNone() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = try unreadableReminderModel(in: directory)
+        let kept = item("牛乳を買う", identifier: "milk").reminder
+        model.timeline.reminders = [kept]
+
+        let loaded = await model.loadReminders()
+
+        #expect(!loaded)
+        #expect(model.timeline.reminders.map(\.id) == [kept.id])
+    }
+
+    @Test
+    func aReminderThatCouldNotBeSavedIsNotShownOrSent() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = try unreadableReminderModel(in: directory)
+
+        await model.addReminder(title: "牛乳を買う", date: .now.addingTimeInterval(3600))
+
+        #expect(model.timeline.reminders.isEmpty)
+        #expect(model.timeline.reminderFeedback?.isFailure == true)
+    }
+
     @Test
     func aReminderInThePhonesAppIsSentToTheWatchAsAReminder() async throws {
         let client = MockWatchClient()
@@ -117,9 +161,40 @@ struct RemindersAppTests {
         dictated.parentApplicationID = UUID()
         dictated.isFromWatch = true
 
-        await model.keep(dictated, from: connection)
+        await model.storeItemMadeOnWatch(dictated, from: connection)
 
         #expect(remindersApp.added.map(\.title) == ["薬を飲む"])
+    }
+
+    @Test
+    func aReminderFromTheWatchOrAnEventKitChangeNeverAsksForPermission() async throws {
+        let client = MockWatchClient()
+        let remindersApp = FakeRemindersApp()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = try await connectedModel(in: directory, client: client, remindersApp: remindersApp)
+        let connection = try #require(model.activeConnections.first)
+        var dictated = item("薬を飲む", identifier: "unused").reminder
+        dictated.parentApplicationID = UUID()
+        dictated.isFromWatch = true
+
+        await model.storeItemMadeOnWatch(dictated, from: connection)
+        await model.reloadRemindersApp()
+
+        #expect(remindersApp.accessRequests == 0)
+    }
+
+    @Test
+    func theSynchronizeButtonAsksForPermissionBeforeReading() async throws {
+        let client = MockWatchClient()
+        let remindersApp = FakeRemindersApp()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = try await connectedModel(in: directory, client: client, remindersApp: remindersApp)
+
+        await model.synchronizeRemindersApp()
+
+        #expect(remindersApp.accessRequests == 1)
     }
 
     @Test
@@ -133,7 +208,7 @@ struct RemindersAppTests {
         var dictated = item("犬の散歩", identifier: "unused").reminder
         dictated.parentApplicationID = UUID()
         dictated.isFromWatch = true
-        await model.keep(dictated, from: connection)
+        await model.storeItemMadeOnWatch(dictated, from: connection)
 
         await model.synchronizeRemindersApp()
         await model.synchronizeRemindersApp()
@@ -175,7 +250,7 @@ struct RemindersAppTests {
         var dictated = item("洗濯", identifier: "unused").reminder
         dictated.parentApplicationID = UUID()
         dictated.isFromWatch = true
-        await model.keep(dictated, from: connection)
+        await model.storeItemMadeOnWatch(dictated, from: connection)
         await model.synchronizeRemindersApp()
 
         // Ticked off in the Reminders app: a completed reminder is not among

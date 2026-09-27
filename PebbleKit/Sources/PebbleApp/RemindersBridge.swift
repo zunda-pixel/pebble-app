@@ -1,5 +1,4 @@
 import PebbleProtocol
-import CryptoKit
 import EventKit
 import Foundation
 
@@ -24,7 +23,8 @@ protocol RemindersAppStore {
     func add(_ reminder: TimelinePin) async throws -> String
     func update(_ reminder: TimelinePin, identifier: String) async throws
     func remove(identifier: String) async throws
-    /// Asks without reading anything, for the setup flow.
+    /// The one call that may raise the system's question; the rest throw
+    /// `RemindersBridgeError.accessDenied` without asking.
     func requestAccess() async throws
 }
 
@@ -42,16 +42,24 @@ final class RemindersBridge: RemindersAppStore {
     /// it, so a reminder for next year is one to read again nearer the time.
     private static var window: TimeInterval { 30 * 24 * 60 * 60 }
 
+    /// The only place the system's question is asked. Everything below reads
+    /// the standing answer instead, because they are reached from what the
+    /// watch sends and from EventKit's own change notices, and neither may put
+    /// a permission sheet in front of the reader.
     func requestAccess() async throws {
         guard try await store.requestFullAccessToReminders() else {
             throw RemindersBridgeError.accessDenied
         }
     }
 
-    func reminders() async throws -> [RemindersAppItem] {
-        guard try await store.requestFullAccessToReminders() else {
+    private func requireAccess() throws {
+        guard EKEventStore.authorizationStatus(for: .reminder) == .fullAccess else {
             throw RemindersBridgeError.accessDenied
         }
+    }
+
+    func reminders() async throws -> [RemindersAppItem] {
+        try requireAccess()
         let start = Date()
         let predicate = store.predicateForIncompleteReminders(
             withDueDateStarting: start,
@@ -66,9 +74,7 @@ final class RemindersBridge: RemindersAppStore {
     }
 
     func add(_ reminder: TimelinePin) async throws -> String {
-        guard try await store.requestFullAccessToReminders() else {
-            throw RemindersBridgeError.accessDenied
-        }
+        try requireAccess()
         guard let list = store.defaultCalendarForNewReminders() else {
             throw RemindersBridgeError.noList
         }
@@ -80,9 +86,7 @@ final class RemindersBridge: RemindersAppStore {
     }
 
     func update(_ reminder: TimelinePin, identifier: String) async throws {
-        guard try await store.requestFullAccessToReminders() else {
-            throw RemindersBridgeError.accessDenied
-        }
+        try requireAccess()
         guard let item = store.calendarItem(withIdentifier: identifier) as? EKReminder else {
             throw RemindersBridgeError.gone
         }
@@ -91,9 +95,7 @@ final class RemindersBridge: RemindersAppStore {
     }
 
     func remove(identifier: String) async throws {
-        guard try await store.requestFullAccessToReminders() else {
-            throw RemindersBridgeError.accessDenied
-        }
+        try requireAccess()
         guard let item = store.calendarItem(withIdentifier: identifier) as? EKReminder else {
             return
         }
@@ -120,10 +122,10 @@ final class RemindersBridge: RemindersAppStore {
         return RemindersAppItem(
             identifier: identifier,
             reminder: TimelinePin(
-                id: stableID(identifier),
+                id: UUID(stableDigestOf: identifier),
                 parentApplicationID: applicationID,
                 timestamp: due,
-                title: reminder.title ?? "Reminder",
+                title: reminder.title ?? String(localized: "Reminder", bundle: .module),
                 subtitle: reminder.calendar.title,
                 body: reminder.notes,
                 kind: .reminder
@@ -131,21 +133,10 @@ final class RemindersBridge: RemindersAppStore {
         )
     }
 
-    /// The same reminder read twice is the same reminder: BlobDB is keyed by
-    /// this, so a name derived from the Reminders app's own is what keeps a
-    /// second reading from becoming a second reminder on the watch.
-    private nonisolated static func stableID(_ value: String) -> UUID {
-        let bytes = Array(SHA256.hash(data: Data(value.utf8)).prefix(16))
-        return UUID(uuid: (
-            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
-            bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
-        ))
-    }
-
     /// What the watch is told made these reminders.
-    nonisolated static var applicationID: UUID {
-        UUID(uuidString: "4D4F4249-4C45-5245-4D49-4E4445520001")!
-    }
+    nonisolated static let applicationID = UUID(uuid: (
+        0x4D, 0x4F, 0x42, 0x49, 0x4C, 0x45, 0x52, 0x45, 0x4D, 0x49, 0x4E, 0x44, 0x45, 0x52, 0x00, 0x01
+    ))
 }
 
 enum RemindersBridgeError: Error, Equatable, Sendable {

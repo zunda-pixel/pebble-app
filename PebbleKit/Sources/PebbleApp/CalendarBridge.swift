@@ -1,5 +1,4 @@
 import PebbleProtocol
-import CryptoKit
 import EventKit
 import Foundation
 
@@ -74,15 +73,22 @@ struct CalendarTimelineRead {
 final class CalendarBridge {
     private var store = EKEventStore()
 
-    /// Asks without reading anything, for the setup flow: everywhere else the
-    /// question comes with work to do the moment it is answered.
+    /// The only place the system's question is asked. The reads below check
+    /// the standing answer instead: they are reached from EventKit's own change
+    /// notices too, and nothing the reader did not start may raise the sheet.
     func requestAccess() async throws {
         guard try await store.requestFullAccessToEvents() else { throw CalendarBridgeError.accessDenied }
     }
 
+    private func requireAccess() throws {
+        guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else {
+            throw CalendarBridgeError.accessDenied
+        }
+    }
+
     /// The calendars the phone has, for the settings screen.
     func calendars() async throws -> [PhoneCalendar] {
-        guard try await store.requestFullAccessToEvents() else { throw CalendarBridgeError.accessDenied }
+        try requireAccess()
         return store.calendars(for: .event).map {
             PhoneCalendar(id: $0.calendarIdentifier, title: $0.title, sourceTitle: $0.source.title)
         }
@@ -94,9 +100,10 @@ final class CalendarBridge {
         includeDeclined: Bool = false,
         remindersEnabled: Bool = false
     ) async throws -> CalendarTimelineRead {
-        guard try await store.requestFullAccessToEvents() else { throw CalendarBridgeError.accessDenied }
-        let start = Date()
-        let end = Calendar.current.date(byAdding: .day, value: 30, to: start) ?? start
+        try requireAccess()
+        let now = Date()
+        let start = Calendar.current.date(byAdding: .day, value: -1, to: now) ?? now
+        let end = Calendar.current.date(byAdding: .day, value: 30, to: now) ?? now
         let events = store.events(matching: store.predicateForEvents(withStart: start, end: end, calendars: nil))
             .filter { !disabledCalendarIdentifiers.contains($0.calendar.calendarIdentifier) }
             // A declined meeting is one the reader said they will not be at;
@@ -114,11 +121,13 @@ final class CalendarBridge {
                 occurrence: event.occurrenceDate ?? event.startDate
             )
             let pin = TimelinePin(
-                id: Self.stableID(key),
+                id: UUID(stableDigestOf: key),
                 parentApplicationID: Self.calendarApplicationID,
-                timestamp: event.startDate,
-                durationMinutes: UInt16(clamping: Int(event.endDate.timeIntervalSince(event.startDate) / 60)),
-                title: event.title ?? "Calendar Event",
+                timestamp: event.isAllDay ? Self.anchoredToUTCMidnight(event.startDate) : event.startDate,
+                durationMinutes: event.isAllDay
+                    ? 0
+                    : UInt16(clamping: Int(event.endDate.timeIntervalSince(event.startDate) / 60)),
+                title: event.title ?? String(localized: "Calendar Event", bundle: .module),
                 subtitle: event.calendar.title,
                 body: event.location,
                 isAllDay: event.isAllDay
@@ -128,7 +137,9 @@ final class CalendarBridge {
             reminders += Self.eventReminders(
                 for: pin,
                 occurrenceKey: key,
-                fireDates: (event.alarms ?? []).map { Self.fireDate(of: $0, eventStart: event.startDate) }
+                fireDates: (event.alarms ?? [])
+                    .map { Self.fireDate(of: $0, eventStart: event.startDate) }
+                    .filter { $0 > now }
             )
         }
         return CalendarTimelineRead(
@@ -163,13 +174,16 @@ final class CalendarBridge {
         return fireDates.sorted(by: <).compactMap { fire in
             guard seen.insert(fire).inserted else { return nil }
             return TimelinePin(
-                id: stableID("reminder|\(occurrenceKey)|\(fire.timeIntervalSince1970)"),
+                id: UUID(stableDigestOf: "reminder|\(occurrenceKey)|\(fire.timeIntervalSince1970)"),
                 parentApplicationID: pin.id,
                 timestamp: fire,
                 title: pin.title,
                 subtitle: nil,
                 body: pin.body,
-                isAllDay: pin.isAllDay,
+                // The alarm's moment is absolute. Flagged all-day, the watch
+                // would take its own offset off it as it does off the pin's
+                // (`timeline_item_get_tz_timestamp`), and buzz hours early or late.
+                isAllDay: false,
                 kind: .reminder
             )
         }
@@ -192,9 +206,23 @@ final class CalendarBridge {
         "\(identity)|\(occurrence.timeIntervalSince1970)"
     }
 
-    private nonisolated static func stableID(_ value: String) -> UUID {
-        let bytes = Array(SHA256.hash(data: Data(value.utf8)).prefix(16))
-        return UUID(uuid: (bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7], bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]))
+    /// An all-day event's start as UTC midnight of its local date.
+    ///
+    /// The watch reads an all-day timestamp as local wall-clock time and takes
+    /// its own offset off it (`timeline_item_get_tz_timestamp` →
+    /// `time_local_to_utc`, `services/timeline/item.c`), and files an item as
+    /// all-day only when what is left is that day's midnight (`timeline.c:109`,
+    /// `node->all_day && node->timestamp == midnight`). The local midnight
+    /// EventKit hands over has the offset taken off twice — nine hours early in
+    /// Japan. The official app anchors the same way (`anchorAllDayToUtc`,
+    /// `CalendarEvent.kt`).
+    nonisolated static func anchoredToUTCMidnight(_ date: Date, in timeZone: TimeZone = .current) -> Date {
+        var local = Calendar(identifier: .gregorian)
+        local.timeZone = timeZone
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = .gmt
+        let wallClock = local.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
+        return utc.date(from: wallClock) ?? date
     }
 
     /// Whether the phone's own account declined this event. An event with no
@@ -203,7 +231,9 @@ final class CalendarBridge {
         event.attendees?.contains { $0.isCurrentUser && $0.participantStatus == .declined } ?? false
     }
 
-    static var calendarApplicationID: UUID { UUID(uuidString: "4D4F4249-4C45-4341-4C45-4E4441520001")! }
+    nonisolated static let calendarApplicationID = UUID(uuid: (
+        0x4D, 0x4F, 0x42, 0x49, 0x4C, 0x45, 0x43, 0x41, 0x4C, 0x45, 0x4E, 0x44, 0x41, 0x52, 0x00, 0x01
+    ))
 }
 
 enum CalendarBridgeError: Error { case accessDenied }

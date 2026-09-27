@@ -20,6 +20,8 @@ public enum VoiceTranscriptionReadiness: Equatable, Sendable {
 enum SpeechBridgeFailure: Error, Equatable, Sendable {
     /// No format both the recognizer and this app can hold the sound in.
     case noFormatInCommon
+    /// The decoded sound could not be put in a buffer for the recognizer.
+    case noBuffer
 }
 
 /// Turns what the watch heard into words, using the phone's own recognizer.
@@ -216,19 +218,22 @@ actor SpeechBridge: VoiceTranscriptionProvider {
         return spoken
     }
 
-    private static func buffer(of samples: [Int16], sampleRate: Double) -> AVAudioPCMBuffer {
-        let format = AVAudioFormat(
-            commonFormat: .pcmFormatInt16,
-            sampleRate: sampleRate,
-            channels: 1,
-            interleaved: true
-        )!
-        let buffer = AVAudioPCMBuffer(
-            pcmFormat: format,
-            frameCapacity: AVAudioFrameCount(samples.count)
-        )!
+    private static func buffer(of samples: [Int16], sampleRate: Double) throws -> AVAudioPCMBuffer {
+        guard let format = AVAudioFormat(
+                  commonFormat: .pcmFormatInt16,
+                  sampleRate: sampleRate,
+                  channels: 1,
+                  interleaved: true
+              ),
+              let buffer = AVAudioPCMBuffer(
+                  pcmFormat: format,
+                  frameCapacity: AVAudioFrameCount(samples.count)
+              ),
+              let channels = unsafe buffer.int16ChannelData else {
+            throw SpeechBridgeFailure.noBuffer
+        }
         buffer.frameLength = AVAudioFrameCount(samples.count)
-        let channel = unsafe buffer.int16ChannelData![0]
+        let channel = unsafe channels[0]
         for (index, sample) in samples.enumerated() {
             unsafe channel[index] = sample
         }

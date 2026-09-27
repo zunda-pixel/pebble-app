@@ -68,8 +68,21 @@ final class MusicCoordinator {
         source.stop()
     }
 
+    /// Starts following the player too, rather than from launch: on the Mac
+    /// following it is an Apple Event every two seconds, and the first one
+    /// raises the automation prompt — which, with no watch here, answers
+    /// nothing the reader asked for.
     func watchConnected() {
+        source.start()
         schedulePush(force: true)
+    }
+
+    /// Stops following the player while no watch is here to be told. A push
+    /// already under way is left to finish against the link that went: taking
+    /// its slot here would let the next connect start a second one beside it.
+    func watchDisconnected() {
+        lastSnapshot = nil
+        source.stop()
     }
 
     func artwork(width: Int, height: Int) -> EncodedImage? {
@@ -195,7 +208,7 @@ final class MediaPlayerMusicSource: SystemMusicSource {
         )
         return MusicSnapshot(
             playerPackage: "com.apple.Music",
-            playerName: "Apple Music",
+            playerName: String(localized: "Apple Music", bundle: .module),
             nowPlaying: nowPlaying,
             playback: playback,
             volumePercent: 100

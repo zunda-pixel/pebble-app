@@ -70,6 +70,53 @@ struct CalendarReminderTests {
         #expect(CalendarBridge.fireDate(of: absolute, eventStart: start) == Date(timeIntervalSince1970: 1_759_990_000))
     }
 
+    @Test func anAllDayEventInTokyoIsAnchoredAtUTCMidnightOfItsDate() throws {
+        let tokyo = try #require(TimeZone(identifier: "Asia/Tokyo"))
+        // 2026-08-13 00:00 in Tokyo is 2026-08-12 15:00 UTC.
+        let localMidnight = Date(timeIntervalSince1970: 1_786_546_800)
+
+        let anchored = CalendarBridge.anchoredToUTCMidnight(localMidnight, in: tokyo)
+
+        // 2026-08-13 00:00 UTC.
+        #expect(anchored == Date(timeIntervalSince1970: 1_786_579_200))
+    }
+
+    @Test func anAllDayEventInNewYorkIsAnchoredAtUTCMidnightOfItsDate() throws {
+        let newYork = try #require(TimeZone(identifier: "America/New_York"))
+        // 2026-08-13 00:00 in New York (EDT) is 2026-08-13 04:00 UTC.
+        let localMidnight = Date(timeIntervalSince1970: 1_786_593_600)
+
+        let anchored = CalendarBridge.anchoredToUTCMidnight(localMidnight, in: newYork)
+
+        #expect(anchored == Date(timeIntervalSince1970: 1_786_579_200))
+    }
+
+    @Test func anAllDayEventsReminderIsNotAllDay() {
+        var pin = eventPin()
+        pin.isAllDay = true
+
+        let reminders = CalendarBridge.eventReminders(
+            for: pin,
+            occurrenceKey: "key",
+            fireDates: [pin.timestamp.addingTimeInterval(-15 * 60)]
+        )
+
+        #expect(reminders.map(\.isAllDay) == [false])
+    }
+
+    @Test func anAlertsIdentifierIsTheUnstampedDigestItWasMintedWith() {
+        let pin = eventPin()
+
+        let reminder = CalendarBridge.eventReminders(
+            for: pin,
+            occurrenceKey: "key",
+            fireDates: [Date(timeIntervalSince1970: 1_760_000_000)]
+        )[0]
+
+        // The first sixteen bytes of SHA-256("reminder|key|1760000000.0").
+        #expect(reminder.id == UUID(uuidString: "FFD41010-B1A3-5163-86EF-4E39ACE0D998"))
+    }
+
     /// `notification_window.c` hides the popup's action button unless the item
     /// carries an action of its own, and the firmware's Snooze only appears
     /// inside that menu — a reminder with no actions can be neither dismissed

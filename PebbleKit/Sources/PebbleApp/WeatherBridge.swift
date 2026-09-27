@@ -74,8 +74,13 @@ public struct WeatherCredit: Equatable, Sendable {
 }
 
 struct WeatherBridge {
-    /// Two days are enough for what the watch shows, and asking for less than the
-    /// daily forecast is not something WeatherKit offers.
+    /// What the watch draws as "--°" rather than as a temperature
+    /// (`WEATHER_SERVICE_LOCATION_FORECAST_UNKNOWN_TEMP`,
+    /// `apps/system/weather/weather_types.h`; `prv_fill_high_low_buffer` in
+    /// `weather_app_layout.c`). A missing forecast sent as zero is drawn as a
+    /// real 0°.
+    static let unknownTemperature: Int16 = 32_767
+
     /// `location` is resolved by the caller: for a `.fixed` place it is the
     /// stored pair, and for `.phone` it is a fresh read whose failure the
     /// caller reports rather than papering over.
@@ -85,6 +90,8 @@ struct WeatherBridge {
         inFahrenheit: Bool,
         now: Date = .now
     ) async throws -> WeatherReport {
+        // Two days are enough for what the watch shows, and asking for less
+        // than the daily forecast is not something WeatherKit offers.
         let weather = try await WeatherService.shared.weather(
             for: location,
             including: .current, .daily
@@ -102,7 +109,7 @@ struct WeatherBridge {
         let dayAfter = day(offset: 2)
 
         func degrees(_ measurement: Measurement<UnitTemperature>?) -> Int16 {
-            guard let measurement else { return 0 }
+            guard let measurement else { return Self.unknownTemperature }
             let value = measurement.converted(to: inFahrenheit ? .fahrenheit : .celsius).value
             return Int16(clamping: Int(value.rounded()))
         }
@@ -163,8 +170,10 @@ struct WeatherBridge {
     }
 }
 
-/// Weather needs a rough position and nothing more, so this asks for the
-/// coarse authorization the system offers.
+/// Weather needs a rough position and nothing more, so this asks for a fix
+/// to the kilometre. That makes the fix cheaper, not the permission smaller:
+/// the authorization asked for is the ordinary one, and whether it is precise
+/// is the reader's choice in the system's dialog.
 @MainActor
 @Observable
 final class PhoneLocationSource: NSObject, CLLocationManagerDelegate {
