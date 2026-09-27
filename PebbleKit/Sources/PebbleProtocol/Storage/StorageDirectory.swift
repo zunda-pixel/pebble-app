@@ -22,6 +22,18 @@ public struct StorageDirectory: Hashable, Sendable {
         return StorageDirectory(url: base.appending(path: "Pebble", directoryHint: .isDirectory))
     }
 
+    /// The App Group the app and its notification extension both hold.
+    public static let appGroupIdentifier = "group.com.zunda.Pebble"
+
+    /// The App Group's container, which the extensions iOS runs in processes of
+    /// their own can read as well as the app. Nil for a process that holds no
+    /// such entitlement.
+    public static var sharedWithExtensions: StorageDirectory? {
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier).map {
+            StorageDirectory(url: $0.appending(path: "Pebble", directoryHint: .isDirectory))
+        }
+    }
+
     public func file(_ name: String) -> URL {
         url.appending(path: name, directoryHint: .notDirectory)
     }

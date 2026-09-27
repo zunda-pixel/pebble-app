@@ -30,8 +30,15 @@ public final class NotificationForwardingHandler: NotificationsForwarding.Access
     }
 
     private let state = Mutex(State())
+    private let replySuggester: any ReplySuggesting
 
-    public init() {}
+    public convenience init() {
+        self.init(replySuggester: StoredReplies())
+    }
+
+    init(replySuggester: any ReplySuggesting) {
+        self.replySuggester = replySuggester
+    }
 
     public func didActivate(for session: NotificationsForwarding.Session) {
         let (wakes, wake) = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
@@ -149,7 +156,7 @@ public final class NotificationForwardingHandler: NotificationsForwarding.Access
         while let outgoing = state.withLock({ $0.queue.popFirst() }) {
             let isDelivered: Bool
             do {
-                try await send(outgoing.message)
+                try await send(await withReplies(outgoing.message))
                 isDelivered = true
             } catch {
                 forwardingLog.error("a message did not reach the watch: \(String(describing: error), privacy: .public)")
@@ -157,6 +164,17 @@ public final class NotificationForwardingHandler: NotificationsForwarding.Access
             }
             outgoing.delivered?.resume(returning: isDelivered)
         }
+    }
+
+    /// Decided here rather than as the message is queued, so that a removal
+    /// queued while the replies are being chosen still follows the present.
+    private func withReplies(_ message: AccessoryNotificationMessage) async -> AccessoryNotificationMessage {
+        guard case .present(var notification) = message,
+              notification.actions.contains(where: \.collectsText) else {
+            return message
+        }
+        notification.replies = await replySuggester.replies(for: notification)
+        return .present(notification)
     }
 
     private func send(_ message: AccessoryNotificationMessage) async throws {
