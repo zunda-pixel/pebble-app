@@ -92,6 +92,11 @@ extension AppModel {
             // and a newer release already shows as the screen's status.
             firmware[watchID].feedback = nil
         } catch {
+            await DiagnosticLog.shared.record(
+                .error,
+                category: "firmware",
+                message: "The firmware check for \(board.rawValue) failed: \(error)"
+            )
             firmware[watchID].availableRelease = nil
             firmware[watchID].feedback = .failure("Published firmware could not be checked right now.")
         }

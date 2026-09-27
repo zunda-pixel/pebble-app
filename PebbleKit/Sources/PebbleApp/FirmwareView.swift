@@ -27,7 +27,11 @@ struct FirmwareView: View {
             cancel: { Task { await model.cancelFirmwareUpdate(watchID: watchID) } },
             discard: { Task { await model.discardPendingFirmwareUpdate(watchID: watchID) } }
         )
-        .task { await model.checkForFirmwareUpdate(watchID: watchID) }
+        // Once a launch: the list is megabytes, and pulling down asks again.
+        .task {
+            guard model.firmware[watchID].availableRelease == nil else { return }
+            await model.checkForFirmwareUpdate(watchID: watchID)
+        }
     }
 }
 

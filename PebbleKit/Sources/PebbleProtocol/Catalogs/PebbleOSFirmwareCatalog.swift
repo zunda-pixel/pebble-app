@@ -24,7 +24,11 @@ public struct PebbleOSFirmwareCatalog: Sendable {
     private let session: URLSession
 
     public init(
-        releasesURL: URL = URL(string: "https://api.github.com/repos/coredevices/PebbleOS/releases?per_page=100")!,
+        // Twenty, not a hundred: each release lists every board's package, about
+        // 220 KB apiece, and a hundred came to 20 MB (measured 2026-09-27) —
+        // past the size limit, so every check failed. The highest version is
+        // well within the newest twenty, older-line patches included.
+        releasesURL: URL = URL(string: "https://api.github.com/repos/coredevices/PebbleOS/releases?per_page=20")!,
         session: URLSession? = nil
     ) {
         self.releasesURL = releasesURL
