@@ -142,9 +142,7 @@ struct FirmwareContent: View {
         }
         .formStyle(.grouped)
         .navigationTitle(Text("Software Update"))
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .toolbarTitleDisplayMode(.inline)
         // Awaited, so the indicator stays up until the catalogue has answered.
         .refreshable { await checkForUpdates() }
         #if os(macOS)

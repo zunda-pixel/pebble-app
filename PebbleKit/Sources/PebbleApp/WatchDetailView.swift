@@ -427,6 +427,9 @@ struct WatchDetailContent<
         }
         .formStyle(.grouped)
         .navigationTitle(watch.name)
+        #if os(iOS)
+        .toolbar(.hidden, for: .tabBar)
+        #endif
     }
 }
 
