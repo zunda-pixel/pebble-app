@@ -216,7 +216,11 @@ extension AppModel {
         case .musicControl:
             musicCoordinator.handleFrame(frame)
         case .phoneControl:
-            phoneCallCoordinator.handleFrame(frame)
+            // Calls are left to ANCS, which gives the watch the caller's name;
+            // telling it over Pebble Protocol as well raced that and lost it,
+            // and iOS lets no app answer or end a carrier call (#80). With no
+            // call sent from here, the watch has nothing of ours to act on.
+            return
         case .voiceControl:
             await connection.voiceCoordinator.handleVoiceFrame(frame)
         case .audioStream:

@@ -97,61 +97,6 @@ struct MusicControlTests {
 
 @Suite
 @MainActor
-struct PhoneControlTests {
-    @Test func incomingCallFrameUsesOfficialLayout() {
-        let frame = PhoneControlCodec.incomingCallFrame(
-            cookie: 0x0102_0304,
-            callerNumber: "123",
-            callerName: "Ann"
-        )
-        #expect(frame.endpoint == 33)
-        #expect(frame.payload == [
-            0x04,
-            0x01, 0x02, 0x03, 0x04,
-            0x03, 0x31, 0x32, 0x33,
-            0x03, 0x41, 0x6E, 0x6E,
-        ])
-    }
-
-    @Test func missingCallerNameFallsBackToTheNumber() {
-        let frame = PhoneControlCodec.incomingCallFrame(cookie: 1, callerNumber: "555", callerName: nil)
-        #expect(Array(frame.payload.suffix(8)) == [0x03, 0x35, 0x35, 0x35, 0x03, 0x35, 0x35, 0x35])
-    }
-
-    @Test func callerStringsAreCutToThirtyOneBytesOnACharacterBoundary() throws {
-        let name = "山田太郎山田太郎山田太郎"
-        let frame = PhoneControlCodec.incomingCallFrame(
-            cookie: 1,
-            callerNumber: String(repeating: "9", count: 40),
-            callerName: name
-        )
-        let payload = Array(frame.payload.dropFirst(5))
-        #expect(payload[0] == 31)
-        #expect(Array(payload[1...31]) == Array(repeating: 0x39, count: 31))
-        let nameLength = Int(payload[32])
-        let nameBytes = Array(payload[33...])
-        #expect(nameLength == 30)
-        #expect(nameBytes.count == nameLength)
-        #expect(String(bytes: nameBytes, encoding: .utf8) == String(name.prefix(10)))
-    }
-
-    @Test func startAndEndFramesCarryTheCookie() {
-        #expect(PhoneControlCodec.callStartFrame(cookie: 0xAABB_CCDD).payload == [0x08, 0xAA, 0xBB, 0xCC, 0xDD])
-        #expect(PhoneControlCodec.callEndFrame(cookie: 0xAABB_CCDD).payload == [0x09, 0xAA, 0xBB, 0xCC, 0xDD])
-    }
-
-    @Test func decodesAnswerAndHangupActions() throws {
-        #expect(try PhoneControlCodec.decode(
-            PebbleProtocolFrame(endpoint: 33, payload: [0x01, 0x01, 0x02, 0x03, 0x04])
-        ) == .answer(cookie: 0x0102_0304))
-        #expect(try PhoneControlCodec.decode(
-            PebbleProtocolFrame(endpoint: 33, payload: [0x02, 0x00, 0x00, 0x00, 0x07])
-        ) == .hangup(cookie: 7))
-    }
-}
-
-@Suite
-@MainActor
 struct GattServerTests {
     @Test func serviceUsesTheForwardTransportUUIDs() {
         // The phone hosts these when the watch has no protocol service of its

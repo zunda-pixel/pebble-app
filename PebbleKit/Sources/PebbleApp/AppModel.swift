@@ -247,10 +247,6 @@ public final class AppModel {
         source: makeSystemMusicSource(),
         send: { [weak self] frame in try await self?.broadcast(frame) }
     )
-    @ObservationIgnored lazy var phoneCallCoordinator = PhoneCallCoordinator(
-        source: makeSystemCallSource(),
-        send: { [weak self] frame in try await self?.broadcast(frame) }
-    )
     @ObservationIgnored var lastConnectionError: WatchConnectionError?
     @ObservationIgnored var firmwareUpdateTask: Task<Void, any Error>?
     /// Which `performFirmwareUpdate` call holds the one update that may run.
@@ -402,7 +398,6 @@ public final class AppModel {
         notifications.sourceApps = (try? await notificationSourceAppStore.apps()) ?? []
         notifications.sent = (try? await sentNotificationStore.notifications()) ?? []
         await loadAppGlances()
-        phoneCallCoordinator.start()
         observeWatchesReconnectingThemselves()
         // A watch that has been set up reconnects on its own, so the radio has
         // to be open before it does — but only where there is a watch to expect.

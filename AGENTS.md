@@ -28,7 +28,7 @@ the weather all stay https.
 | &nbsp;&nbsp;`Diagnostics/` | `DiagnosticLog`, the app's own breadcrumb log and report writer — not a store, so not in `Storage/`. |
 | `PebbleKit/Sources/PebbleAudio` | What the watch's microphone sent, turned back into samples: the only place that imports `libspeex`. |
 | `PebbleKit/Sources/PebbleTransport` | How those bytes reach a watch: the CoreBluetooth client in both roles, the phone-hosted GATT server, the emulator socket, and the mock a test or a preview stands in. |
-| `PebbleKit/Sources/PebbleApp` | The app: `AppModel` (split across `AppModel+*.swift`), the screens, and the phone's own frameworks (HealthKit, EventKit, MediaPlayer, CallKit, WebKit). |
+| `PebbleKit/Sources/PebbleApp` | The app: `AppModel` (split across `AppModel+*.swift`), the screens, and the phone's own frameworks (HealthKit, EventKit, MediaPlayer, WebKit). |
 | `PebbleKit/Tests/PebbleProtocolTests` | Swift Testing suites for the protocol and transport layers, grouped by what they exercise. |
 | `PebbleKit/Tests/PebbleAppTests` | Swift Testing suites for `AppModel` and the content views, against `MockWatchClient`. |
 | `AllTests.xctestplan` | Covers both test targets. |
