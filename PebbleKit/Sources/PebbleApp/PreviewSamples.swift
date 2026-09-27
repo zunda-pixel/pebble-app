@@ -249,7 +249,7 @@ enum PreviewSamples {
         name: "Simply Light",
         developer: "Rebble",
         version: "2.1",
-        downloadURL: URL(string: "https://example.invalid/simply-light.pbw")!,
+        downloadURL: URL(literal: "https://example.invalid/simply-light.pbw"),
         supportedPlatforms: [.emery],
         kind: .watchface,
         category: "Faces",
@@ -295,15 +295,15 @@ enum PreviewSamples {
 
     static let weatherCredit = WeatherCredit(
         serviceName: "Weather",
-        lightMarkURL: URL(string: "https://example.invalid/light.png")!,
-        darkMarkURL: URL(string: "https://example.invalid/dark.png")!,
-        legalPageURL: URL(string: "https://example.invalid/legal")!
+        lightMarkURL: URL(literal: "https://example.invalid/light.png"),
+        darkMarkURL: URL(literal: "https://example.invalid/dark.png"),
+        legalPageURL: URL(literal: "https://example.invalid/legal")
     )
 
     static let firmwareRelease = PebbleOSFirmwareRelease(
         versionTag: "v4.37.0",
         board: .obelixPVT,
-        downloadURL: URL(string: "https://example.invalid/normal_obelix_pvt_v4.37.0.pbz")!,
+        downloadURL: URL(literal: "https://example.invalid/normal_obelix_pvt_v4.37.0.pbz"),
         sizeInBytes: 1_048_576,
         releaseNotesURL: nil
     )
@@ -330,7 +330,7 @@ enum PreviewSamples {
     /// two hundred.
     static let remotePackage = Package(
         name: "Defaults",
-        kind: .remoteSourceControl(location: URL(string: "https://github.com/sindresorhus/Defaults")!),
+        kind: .remoteSourceControl(location: URL(literal: "https://github.com/sindresorhus/Defaults")),
         license: """
         MIT License
 

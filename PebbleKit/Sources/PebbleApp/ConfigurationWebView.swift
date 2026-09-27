@@ -31,7 +31,7 @@ struct ConfigurationWebView: View {
     /// What a page handed over inline is loaded against. Relative links in a
     /// self-contained settings page have nothing to resolve to, which is the
     /// truth of it rather than a limitation.
-    static let inlineBaseURL = URL(string: "about:blank")!
+    static let inlineBaseURL = URL(literal: "about:blank")
 
     var url: URL
     var closeHandler: @MainActor @Sendable (String?) -> Void

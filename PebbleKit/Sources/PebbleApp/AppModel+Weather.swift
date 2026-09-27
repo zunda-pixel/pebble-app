@@ -310,7 +310,9 @@ extension AppModel {
     /// The watch's weather app and its timeline pins share this identity:
     /// `UUID_WEATHER_DATA_SOURCE` in PebbleOS's `timeline.h`, the UUID the
     /// firmware's own weather app registers under.
-    static let weatherDataSourceID = UUID(uuidString: "61B22BC8-1E29-460D-A236-3FE409A439FF")!
+    static let weatherDataSourceID = UUID(uuid: (
+        0x61, 0xB2, 0x2B, 0xC8, 0x1E, 0x29, 0x46, 0x0D, 0xA2, 0x36, 0x3F, 0xE4, 0x09, 0xA4, 0x39, 0xFF
+    ))
 
     /// Refreshes if the forecast has gone stale, and quietly does nothing
     /// otherwise. This is what the connect path and the foreground loop call:

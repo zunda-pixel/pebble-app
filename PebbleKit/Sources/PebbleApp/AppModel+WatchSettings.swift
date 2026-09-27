@@ -1,6 +1,7 @@
 public import PebbleProtocol
 import Defaults
 import Foundation
+import Retry
 import SwiftUI
 
 extension AppModel {
@@ -68,7 +69,7 @@ extension AppModel {
         for connection in activeConnections {
             for (setting, rawValue) in changed {
                 do {
-                    try await connection.client.write(.watchSetting(setting, rawValue: rawValue))
+                    try await writeRetrying(.watchSetting(setting, rawValue: rawValue), to: connection)
                 } catch {
                     // A watch built without this setting refusing it says
                     // nothing about what the reader did.
@@ -122,7 +123,7 @@ extension AppModel {
         watchSettings.feedback = nil
         for connection in activeConnections {
             do {
-                try await connection.client.write(.quickLaunch(button, assignment))
+                try await writeRetrying(.quickLaunch(button, assignment), to: connection)
             } catch {
                 watchSettings.feedback = .failure(settingsFailureMessage(connection, error))
             }
@@ -152,7 +153,7 @@ extension AppModel {
         watchSettings.feedback = nil
         for connection in activeConnections {
             do {
-                try await connection.client.write(.activitySettings(settings))
+                try await writeRetrying(.activitySettings(settings), to: connection)
             } catch {
                 watchSettings.feedback = .failure(settingsFailureMessage(connection, error))
             }
@@ -169,7 +170,7 @@ extension AppModel {
         watchSettings.feedback = nil
         for connection in activeConnections {
             do {
-                try await connection.client.write(.heartRateZones(preferences))
+                try await writeRetrying(.heartRateZones(preferences), to: connection)
             } catch {
                 watchSettings.feedback = .failure(settingsFailureMessage(connection, error))
             }
@@ -182,7 +183,7 @@ extension AppModel {
         watchSettings.feedback = nil
         for connection in activeConnections {
             do {
-                try await connection.client.write(.heartRateSettings(settings))
+                try await writeRetrying(.heartRateSettings(settings), to: connection)
             } catch {
                 watchSettings.feedback = .failure(settingsFailureMessage(connection, error))
             }
@@ -195,7 +196,7 @@ extension AppModel {
         watchSettings.feedback = nil
         for connection in activeConnections {
             do {
-                try await connection.client.write(.bloodOxygenSettings(settings))
+                try await writeRetrying(.bloodOxygenSettings(settings), to: connection)
             } catch {
                 watchSettings.feedback = .failure(settingsFailureMessage(connection, error))
             }
@@ -208,7 +209,7 @@ extension AppModel {
         watchSettings.feedback = nil
         for connection in activeConnections {
             do {
-                try await connection.client.write(.reminderAppState(isEnabled ? .enabled : .notEnabled))
+                try await writeRetrying(.reminderAppState(isEnabled ? .enabled : .notEnabled), to: connection)
             } catch {
                 // Said out loud like the three switches beside it. This one used
                 // to swallow the refusal, so the toggle stayed where the reader
@@ -231,12 +232,12 @@ extension AppModel {
         // the rest would be harmless today, but a default written is a default
         // this app now owns, and it has no reason to own what nobody touched.
         for (button, assignment) in watchSettings.quickLaunch {
-            try? await connection.client.write(.quickLaunch(button, assignment))
+            try? await writeRetrying(.quickLaunch(button, assignment), to: connection)
         }
-        try? await connection.client.write(.activitySettings(watchSettings.activity))
-        try? await connection.client.write(.heartRateSettings(watchSettings.heartRate))
-        try? await connection.client.write(.heartRateZones(watchSettings.heartRateZones))
-        try? await connection.client.write(.bloodOxygenSettings(watchSettings.bloodOxygen))
+        try? await writeRetrying(.activitySettings(watchSettings.activity), to: connection)
+        try? await writeRetrying(.heartRateSettings(watchSettings.heartRate), to: connection)
+        try? await writeRetrying(.heartRateZones(watchSettings.heartRateZones), to: connection)
+        try? await writeRetrying(.bloodOxygenSettings(watchSettings.bloodOxygen), to: connection)
         try? await connection.client.write(
             .reminderAppState(timeline.isReminderAppEnabled ? .enabled : .notEnabled)
         )
@@ -248,7 +249,7 @@ extension AppModel {
         let days = healthDays()
         for day in days {
             do {
-                try await connection.client.write(.healthDay(day))
+                try await writeRetrying(.healthDay(day), to: connection)
             } catch {
                 await DiagnosticLog.shared.record(
                     .error,
@@ -392,5 +393,14 @@ extension AppModel {
             sleep: UInt32(clamping: median(days.map { $0.sleepMinutes * 60 })),
             deep: UInt32(clamping: median(days.map { $0.deepSleepMinutes * 60 }))
         )
+    }
+}
+
+extension AppModel {
+    /// A watch that is busy answers `tryLater` or `locked`, and a moment later
+    /// takes the same setting; told once, the reader saw it refused.
+    func writeRetrying(_ record: BlobDBRecord, to connection: WatchConnection) async throws {
+        let client = connection.client
+        try await retry(with: .watchWork) { try await client.write(record) }
     }
 }
