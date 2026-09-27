@@ -40,7 +40,14 @@ public final class WatchConnection: Identifiable {
     /// Per watch because the request is: two watches launching two apps ask
     /// separately, and one of them waiting is no reason to answer the other with
     /// "busy".
-    @ObservationIgnored var appFetchTask: Task<Void, Never>?
+    @ObservationIgnored var appFetchTask: Task<Void, Never>? {
+        didSet { isFetchingApplication = appFetchTask != nil }
+    }
+    public private(set) var isFetchingApplication = false
+    /// The library operation this watch's fetch took, if it took one. Only
+    /// that one is this link's to end when it drops: the operation is shared by
+    /// every watch, and another's import may be holding it.
+    @ObservationIgnored var ownedApplicationOperation: ApplicationManagementOperation?
     /// Which fetch `appFetchTask` is, for the task itself to check: a task
     /// cannot compare itself against the handle it was stored under.
     @ObservationIgnored var appFetchToken: UUID?
@@ -60,10 +67,6 @@ public final class WatchConnection: Identifiable {
 
     public var isConnected: Bool {
         phase == .connected
-    }
-
-    public var isFetchingApplication: Bool {
-        appFetchTask != nil
     }
 
     public func transferProgress(for kind: WatchTransferKind) -> PutBytesTransferProgress? {

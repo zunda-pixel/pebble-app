@@ -127,7 +127,6 @@ extension AppModel {
         chargeNotified.remove(connection.watch.id)
         clearBusyOperationState(on: connection)
         if activeConnections.isEmpty { musicCoordinator.watchDisconnected() }
-        needsApplicationSynchronization = true
         lastConnectionError = nil
     }
 

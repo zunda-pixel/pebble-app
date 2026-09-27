@@ -287,7 +287,11 @@ public final class AppModel {
     @ObservationIgnored var hasLoadedApplications = false
     @ObservationIgnored var pendingImportSnapshots: [UUID: WatchApplicationLibrarySnapshot] = [:]
     @ObservationIgnored var pendingSnapshotExpiries: [UUID: Task<Void, Never>] = [:]
-    @ObservationIgnored var needsApplicationSynchronization = false
+    /// Watches whose applications were not registered when they last could
+    /// have been: refused while another operation ran, failed, or dropped
+    /// part-way. Per watch, because two watches arriving at once are two
+    /// synchronizations, and the second must wait its turn rather than be lost.
+    @ObservationIgnored var watchesAwaitingApplicationSynchronization: Set<WatchID> = []
     @ObservationIgnored var hasStarted = false
     @ObservationIgnored var recentNotificationFingerprints: [String: Date] = [:]
     @ObservationIgnored var pendingNotifications: [PendingDelivery<TimelineNotification>] = []
@@ -601,8 +605,13 @@ public final class AppModel {
     func clearBusyOperationState(on connection: WatchConnection) {
         connection.cancelApplicationFetch()
         connection.endTransfer()
-        applications.managementOperation = nil
-        applications.managementFeedback = nil
+        watchesAwaitingApplicationSynchronization.insert(connection.watch.id)
+        guard let owned = connection.ownedApplicationOperation else { return }
+        connection.ownedApplicationOperation = nil
+        if applications.managementOperation == owned {
+            applications.managementOperation = nil
+            applications.managementFeedback = nil
+        }
     }
 
     func handleEvent(_ event: WatchClientEvent, from connection: WatchConnection) {
@@ -624,7 +633,6 @@ public final class AppModel {
         case .transferProgress:
             break
         case .reconnecting:
-            needsApplicationSynchronization = true
             // Operations interrupted by the drop would otherwise leave the
             // app-management UI busy forever.
             clearBusyOperationState(on: connection)
@@ -640,7 +648,6 @@ public final class AppModel {
             lastConnectionError = error
             // On the watch's own screen, where its Connect button is.
             connectionFailures[connection.watch.id] = error
-            needsApplicationSynchronization = true
             clearBusyOperationState(on: connection)
             if activeConnections.isEmpty { musicCoordinator.watchDisconnected() }
         case .healthSyncCompleted(let succeeded):

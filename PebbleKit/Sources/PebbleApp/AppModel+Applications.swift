@@ -314,9 +314,17 @@ extension AppModel {
         return true
     }
 
-    func beginApplicationOperation(_ operation: ApplicationManagementOperation) -> Bool {
+    /// `reportingRefusal` is false for work nobody asked for: a watch arriving
+    /// while the library is busy waits its turn, and the reader, who did
+    /// nothing, is not told an operation was refused.
+    func beginApplicationOperation(
+        _ operation: ApplicationManagementOperation,
+        reportingRefusal: Bool = true
+    ) -> Bool {
         guard applications.managementOperation == nil, !isHandlingAppFetch else {
-            applications.libraryFeedback = .failure("Another app operation is already in progress.")
+            if reportingRefusal {
+                applications.libraryFeedback = .failure("Another app operation is already in progress.")
+            }
             return false
         }
         applications.managementOperation = operation
@@ -324,44 +332,56 @@ extension AppModel {
         return true
     }
 
-    func finishApplicationOperation(_ operation: ApplicationManagementOperation) {
+    /// Hands the library to the next watch waiting for it, one at a time: that
+    /// watch's own finish hands it on again. `synchronized` is the watch the
+    /// operation just synchronized, which is not retried at once — a watch
+    /// that failed would otherwise be asked again for as long as it failed.
+    func finishApplicationOperation(
+        _ operation: ApplicationManagementOperation,
+        synchronized watchID: WatchID? = nil
+    ) {
         guard applications.managementOperation == operation else { return }
-        let completedOperation = applications.managementOperation
         applications.managementOperation = nil
         applications.managementFeedback = nil
-        if needsApplicationSynchronization,
-           completedOperation != .synchronizing,
-           !activeConnections.isEmpty {
-            needsApplicationSynchronization = false
-            Task { [weak self] in
-                guard let self else { return }
-                for connection in self.activeConnections {
-                    await self.synchronizeApplications(on: connection)
-                }
-            }
+        guard let next = activeConnections.first(where: {
+            $0.watch.id != watchID && watchesAwaitingApplicationSynchronization.contains($0.watch.id)
+        }) else { return }
+        Task { [weak self] in
+            await self?.synchronizeApplications(on: next)
         }
     }
 
+    /// Every watch is tried, and the first failure thrown once they all have
+    /// been: stopping at it left the watches after it holding an app the
+    /// library had already let go of, with nothing to bring them round.
     func synchronizeApplicationsOnAllWatches() async throws {
+        var firstFailure: (any Error)?
         for connection in activeConnections {
-            try await performApplicationSynchronization(on: connection)
+            do {
+                try await performApplicationSynchronization(on: connection)
+            } catch {
+                watchesAwaitingApplicationSynchronization.insert(connection.watch.id)
+                firstFailure = firstFailure ?? error
+            }
         }
+        if let firstFailure { throw firstFailure }
     }
 
     func synchronizeApplications(on connection: WatchConnection) async {
         guard connection.isConnected else { return }
-        guard beginApplicationOperation(.synchronizing) else {
-            needsApplicationSynchronization = true
+        let watchID = connection.watch.id
+        guard beginApplicationOperation(.synchronizing, reportingRefusal: false) else {
+            watchesAwaitingApplicationSynchronization.insert(watchID)
             return
         }
-        needsApplicationSynchronization = false
-        defer { finishApplicationOperation(.synchronizing) }
+        watchesAwaitingApplicationSynchronization.remove(watchID)
+        defer { finishApplicationOperation(.synchronizing, synchronized: watchID) }
 
         do {
             try await performApplicationSynchronization(on: connection)
             applications.libraryFeedback = nil
         } catch {
-            needsApplicationSynchronization = true
+            watchesAwaitingApplicationSynchronization.insert(watchID)
             applications.libraryFeedback = .failure(applicationErrorMessage(error))
         }
     }
@@ -541,6 +561,7 @@ extension AppModel {
         if ownsOperation {
             applications.managementOperation = .installing(request.applicationID)
             applications.managementFeedback = .progress(statusMessage(for: .installing(request.applicationID)))
+            connection.ownedApplicationOperation = .installing(request.applicationID)
         }
         let token = UUID()
         connection.appFetchToken = token
@@ -556,6 +577,7 @@ extension AppModel {
             connection.appFetchTask = nil
             connection.appFetchToken = nil
             if ownsOperation {
+                connection.ownedApplicationOperation = nil
                 self.finishApplicationOperation(.installing(request.applicationID))
             }
         }
