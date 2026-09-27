@@ -5,10 +5,11 @@ import PebbleProtocol
 
 /// Which forwarded notification a reply from the watch is about.
 ///
-/// The watch answers with the notification's identifier alone, cut to what its
-/// length byte holds, and iOS wants the response keyed by source as well. The
-/// extension that asked is often not the process that hears the answer, so the
-/// mapping is kept in the extension's own defaults rather than in memory.
+/// The watch answers with the identifier it was sent — source and notification
+/// together, cut to what its length byte holds — and iOS wants the response
+/// keyed by the two apart. The extension that asked is often not the process
+/// that hears the answer, so the mapping is kept in the extension's own
+/// defaults rather than in memory.
 struct ReplySources {
     /// Well past what a watch keeps: `AN_MAX_TRACKED` forgets beyond 64.
     static let limit = 256
@@ -22,7 +23,7 @@ struct ReplySources {
     }
 
     func notification(onTheWatchAs identifier: String) -> AccessoryNotification.Identifier? {
-        identifiers.last { AccessoryNotificationCodec.identifierOnTheWatch($0.notificationIdentifier) == identifier }
+        identifiers.last { Self.identifierOnTheWatch($0) == identifier }
     }
 
     mutating func remember(_ identifier: AccessoryNotification.Identifier) {
@@ -32,14 +33,21 @@ struct ReplySources {
         save()
     }
 
-    mutating func forget(_ notificationIdentifier: String) {
-        identifiers.removeAll { $0.notificationIdentifier == notificationIdentifier }
+    mutating func forget(_ identifier: AccessoryNotification.Identifier) {
+        identifiers.removeAll { $0 == identifier }
         save()
     }
 
     mutating func forgetAll() {
         identifiers = []
         save()
+    }
+
+    static func identifierOnTheWatch(_ identifier: AccessoryNotification.Identifier) -> String {
+        AccessoryNotificationCodec.identifierOnTheWatch(
+            sourceIdentifier: identifier.sourceIdentifier,
+            notificationIdentifier: identifier.notificationIdentifier
+        )
     }
 
     private func save() {

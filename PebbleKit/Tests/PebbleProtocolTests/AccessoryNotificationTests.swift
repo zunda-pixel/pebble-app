@@ -34,9 +34,33 @@ struct AccessoryNotificationCodecTests {
             + [0x03, 6] + Array("Lunch?".utf8)
             + [0x04, 8] + Array("Messages".utf8)
             + [0x08, 19] + Array("com.apple.MobileSMS".utf8)
-            + [0x05, 2] + Array("n1".utf8)
+            + [0x05, 22] + Array("com.apple.MobileSMS".utf8) + [0x1F] + Array("n1".utf8)
             + [0x06, 1, 1]
             + [0x07, 9, 0x01, 1] + Array("r".utf8) + [5] + Array("Reply".utf8))
+    }
+
+    @Test
+    func twoAppsNotificationsWithOneIdentifierAreTwoOnTheWatch() {
+        let messages = AccessoryNotificationCodec.encode(.present(notification()))
+        let mail = AccessoryNotificationCodec.encode(.present(notification(sourceIdentifier: "com.apple.mobilemail")))
+
+        let fromMessages = tlvs(messages).first { $0.tag == 0x05 }?.value
+        let fromMail = tlvs(mail).first { $0.tag == 0x05 }?.value
+        #expect(fromMessages != nil)
+        #expect(fromMessages != fromMail)
+        #expect(fromMail == Array("com.apple.mobilemail".utf8) + [0x1F] + Array("n1".utf8))
+    }
+
+    @Test
+    func aReplyNamesTheNotificationByTheIdentifierItsPresentCarried() {
+        let bytes = AccessoryNotificationCodec.encode(.present(notification()))
+
+        let presented = tlvs(bytes).first { $0.tag == 0x05 }?.value
+        let onTheWatch = AccessoryNotificationCodec.identifierOnTheWatch(
+            sourceIdentifier: "com.apple.MobileSMS",
+            notificationIdentifier: "n1"
+        )
+        #expect(presented == Array(onTheWatch.utf8))
     }
 
     @Test
@@ -48,7 +72,7 @@ struct AccessoryNotificationCodecTests {
             + [0x01, 3] + Array("Mia".utf8)
             + [0x03, 6] + Array("Lunch?".utf8)
             + [0x04, 8] + Array("Messages".utf8)
-            + [0x05, 2] + Array("n1".utf8)
+            + [0x05, 3] + [0x1F] + Array("n1".utf8)
             + [0x06, 1, 1])
         #expect(empty == unnamed)
     }
@@ -90,9 +114,12 @@ struct AccessoryNotificationCodecTests {
     func aRemovalCutsTheIdentifierTheWayItsPresentDid() {
         let identifier = String(repeating: "通", count: 90)
         let present = AccessoryNotificationCodec.encode(.present(notification()).withIdentifier(identifier))
-        let removal = AccessoryNotificationCodec.encode(.remove(identifier: identifier))
+        let removal = AccessoryNotificationCodec.encode(
+            .remove(sourceIdentifier: "com.apple.MobileSMS", notificationIdentifier: identifier)
+        )
 
         let presented = tlvs(present).first { $0.tag == 0x05 }?.value
+        #expect(presented?.count == 254)
         #expect(removal.first == 0x02)
         #expect(Array(removal.dropFirst()) == presented)
         #expect(AccessoryNotificationCodec.encode(.removeAll) == [0x03])

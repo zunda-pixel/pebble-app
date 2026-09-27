@@ -48,9 +48,12 @@ public final class NotificationForwardingHandler: NotificationsForwarding.Access
     }
 
     public func removeNotification(identifier: AccessoryNotification.Identifier) {
-        let notificationIdentifier = identifier.notificationIdentifier
-        state.withLock { $0.sources.forget(notificationIdentifier) }
-        Task { try? await send(.remove(identifier: notificationIdentifier)) }
+        state.withLock { $0.sources.forget(identifier) }
+        let removal = AccessoryNotificationMessage.remove(
+            sourceIdentifier: identifier.sourceIdentifier,
+            notificationIdentifier: identifier.notificationIdentifier
+        )
+        Task { try? await send(removal) }
     }
 
     public func removeAllNotifications() {

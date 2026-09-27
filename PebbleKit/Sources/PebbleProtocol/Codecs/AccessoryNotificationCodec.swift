@@ -47,7 +47,7 @@ public struct ForwardedNotification: Equatable, Sendable {
 
 public enum AccessoryNotificationMessage: Equatable, Sendable {
     case present(ForwardedNotification)
-    case remove(identifier: String)
+    case remove(sourceIdentifier: String, notificationIdentifier: String)
     case removeAll
 }
 
@@ -92,8 +92,11 @@ public enum AccessoryNotificationCodec {
         switch message {
         case .present(let notification):
             present(notification)
-        case .remove(let identifier):
-            [removeType] + identifierBytes(identifier)
+        case .remove(let sourceIdentifier, let notificationIdentifier):
+            [removeType] + identifierBytes(
+                sourceIdentifier: sourceIdentifier,
+                notificationIdentifier: notificationIdentifier
+            )
         case .removeAll:
             [removeAllType]
         }
@@ -138,7 +141,10 @@ public enum AccessoryNotificationCodec {
         // preferences by it, and ignores one longer than a settings key
         // (`SETTINGS_KEY_MAX_LEN`), which leaves the reader no Mute.
         append(sourceIdentifierTag, text(notification.sourceIdentifier, maximumByteCount: 127))
-        append(identifierTag, identifierBytes(notification.identifier))
+        append(identifierTag, identifierBytes(
+            sourceIdentifier: notification.sourceIdentifier ?? "",
+            notificationIdentifier: notification.identifier
+        ))
         append(alertTag, [notification.shouldAlert ? 1 : 0])
         for action in notification.actions.compactMap(actionEntry).prefix(maximumActionCount) {
             append(actionTag, action)
@@ -159,14 +165,21 @@ public enum AccessoryNotificationCodec {
     }
 
     /// The identifier as the watch holds it, and as a reply names the notification.
-    public static func identifierOnTheWatch(_ identifier: String) -> String {
-        String(decoding: identifierBytes(identifier), as: UTF8.self)
+    public static func identifierOnTheWatch(sourceIdentifier: String, notificationIdentifier: String) -> String {
+        String(
+            decoding: identifierBytes(sourceIdentifier: sourceIdentifier, notificationIdentifier: notificationIdentifier),
+            as: UTF8.self
+        )
     }
 
-    /// The watch derives a notification's UUID from these bytes, so a present and
-    /// the remove that follows it have to cut the same identifier the same way.
-    private static func identifierBytes(_ identifier: String) -> [UInt8] {
-        identifier.utf8BytesEndingOnACharacter(maximumByteCount: 255)
+    /// The watch derives a notification's UUID from these bytes alone, so a
+    /// present and the remove that follows it have to cut the same identifier the
+    /// same way. The source is in it because iOS scopes an identifier to its app:
+    /// sent alone, two apps' "1" were one notification on the watch, each
+    /// overwriting the other. U+001F cannot occur in a bundle identifier, so no
+    /// two pairs make the same bytes.
+    private static func identifierBytes(sourceIdentifier: String, notificationIdentifier: String) -> [UInt8] {
+        (sourceIdentifier + "\u{1F}" + notificationIdentifier).utf8BytesEndingOnACharacter(maximumByteCount: 255)
     }
 
     private static func text(_ value: String?, maximumByteCount: Int) -> [UInt8] {
