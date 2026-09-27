@@ -167,12 +167,63 @@ public actor WatchApplicationLibrary {
     }
 
     public func synchronizedApplicationIDs(watchID: WatchID) throws -> [UUID] {
-        try synchronizationStates()[watchID] ?? []
+        try synchronizationStates()[watchID]?.map(\.id) ?? []
     }
 
+    /// The digest of the registration each application was last written to
+    /// this watch as. One whose digest still matches is one the watch holds as
+    /// it is, and writing it again is not free: the watch reads the insert as
+    /// an upgrade, closes the app if it is running and throws away its cached
+    /// binary.
+    public func writtenApplicationDigests(watchID: WatchID) throws -> [UUID: String] {
+        Dictionary(
+            (try synchronizationStates()[watchID] ?? []).map { ($0.id, $0.digest) },
+            uniquingKeysWith: { _, latest in latest }
+        )
+    }
+
+    /// Keeps the digest already recorded for each application that stays, so
+    /// recording what a watch holds without writing to it does not make the
+    /// next synchronization write everything again.
     public func setSynchronizedApplicationIDs(_ applicationIDs: [UUID], watchID: WatchID) throws {
+        let digests = try writtenApplicationDigests(watchID: watchID)
+        try setWrittenApplicationDigests(
+            applicationIDs.map { ($0, digests[$0] ?? "") },
+            watchID: watchID
+        )
+    }
+
+    /// In the watch's launcher order, which is the order the file is read in
+    /// when a person is diagnosing a fault.
+    public func setWrittenApplicationDigests(_ digests: [(UUID, String)], watchID: WatchID) throws {
         var states = try synchronizationStates()
-        states[watchID] = applicationIDs
+        states[watchID] = digests.map { WrittenApplication(id: $0.0, digest: $0.1) }
+        try PersistentJSON.save(states, to: synchronizationStateURL)
+    }
+
+    /// Every application stays recorded as given, so one the library lets go
+    /// of is still taken off the watch; only the digests go, so each is
+    /// written once more.
+    public func forgetWrittenApplicationDigests(watchID: WatchID) throws {
+        var states = try synchronizationStates()
+        guard let written = states[watchID] else { return }
+        states[watchID] = written.map { WrittenApplication(id: $0.id, digest: "") }
+        try PersistentJSON.save(states, to: synchronizationStateURL)
+    }
+
+    /// For every watch: a package imported over the top of one the watch holds
+    /// can carry a new binary behind the same registration, and only a fresh
+    /// registration makes the watch drop the old one it has cached.
+    public func forgetWrittenApplicationDigest(applicationID: UUID) throws {
+        var states = try synchronizationStates()
+        var changed = false
+        for (watchID, written) in states where written.contains(where: { $0.id == applicationID && !$0.digest.isEmpty }) {
+            states[watchID] = written.map {
+                $0.id == applicationID ? WrittenApplication(id: $0.id, digest: "") : $0
+            }
+            changed = true
+        }
+        guard changed else { return }
         try PersistentJSON.save(states, to: synchronizationStateURL)
     }
 
@@ -200,8 +251,21 @@ public actor WatchApplicationLibrary {
     /// Which applications each watch was last given. Nothing rebuilds this —
     /// only the watch knows — so a file that cannot be read is moved aside and
     /// every watch is synchronized again, which is work rather than a fault.
-    private func synchronizationStates() throws -> [WatchID: [UUID]] {
-        try PersistentJSON.loadRecovering([WatchID: [UUID]].self, from: synchronizationStateURL) ?? [:]
+    ///
+    /// The digests came after the plain identifiers, and a file from before
+    /// then still names every application its watch was given, which is the
+    /// only way to take one off that the library has since let go of. It is
+    /// read for its identifiers, each with a digest nothing matches.
+    private func synchronizationStates() throws -> [WatchID: [WrittenApplication]] {
+        do {
+            return try PersistentJSON.load([WatchID: [WrittenApplication]].self, from: synchronizationStateURL) ?? [:]
+        } catch where PersistentJSON.isCorrupt(error) {}
+        do {
+            let identifiers = try PersistentJSON.load([WatchID: [UUID]].self, from: synchronizationStateURL) ?? [:]
+            return identifiers.mapValues { $0.map { WrittenApplication(id: $0, digest: "") } }
+        } catch where PersistentJSON.isCorrupt(error) {}
+        try PersistentJSON.quarantine(synchronizationStateURL)
+        return [:]
     }
 
     private var synchronizationStateURL: URL {
@@ -209,4 +273,12 @@ public actor WatchApplicationLibrary {
             .appending(path: "application-sync.json", directoryHint: .notDirectory)
     }
 
+}
+
+/// An array of these rather than a `[UUID: String]`, for the reason
+/// `TimelinePinStore` gives: that dictionary encodes as alternating strings,
+/// which the array of identifiers this file used to hold would read as.
+private struct WrittenApplication: Codable, Sendable {
+    var id: UUID
+    var digest: String
 }

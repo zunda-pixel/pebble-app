@@ -39,6 +39,12 @@ public struct WatchVersionInformation: Equatable, Hashable, Sendable {
     /// Older firmware sends a shorter response and no capabilities at all, which
     /// reads as none.
     public var capabilities: UInt64 = 0
+    /// The watch may not hold what this phone last wrote to it: it has been
+    /// reset, or paired since (`bt_persistent_storage_set_unfaithful` in
+    /// PebbleOS's `bluetooth_persistent_storage_normal.c` and
+    /// `shell_event_loop.c`). It stays set until a BlobDB clear succeeds
+    /// (`blob_db/endpoint.c`).
+    public var isUnfaithful: Bool = false
 
     public var supportsLanguagePacks: Bool {
         WatchCapability.languagePack.isSet(in: capabilities)
@@ -72,6 +78,7 @@ public struct WatchVersionInformation: Equatable, Hashable, Sendable {
         if let hardwareRevision { parts.append("rev \(hardwareRevision)") }
         if let slot = runningFirmwareSlot { parts.append("slot \(slot)") }
         if !languageLocale.isEmpty { parts.append("lang \(languageLocale) v\(languageVersion)") }
+        if isUnfaithful { parts.append("unfaithful") }
         let named = WatchCapability.allCases.filter { $0.isSet(in: capabilities) }
         parts.append(named.isEmpty
             ? "no capabilities"
@@ -178,6 +185,9 @@ public enum WatchVersionCodec {
         // timestamp 95, hw_version 99 for `MFG_HW_VERSION_SIZE` = 9, serial 108
         // for 12, address 120 for 6. That is 126 in all, which is the length
         // the firmware's own `_Static_assert` calls the pre-v1.5 version info.
+        // Then the resource version at 126 for 8, the locale at 134 for 6, the
+        // language version at 140, the capabilities at 142 for 8, and the
+        // one-byte `is_unfaithful` at 150.
         return WatchVersionInformation(
             firmwareVersion: fixedString(frame.payload[5..<37]).nilWhenEmpty,
             serialNumber: fixedString(frame.payload[108..<120]).nilWhenEmpty,
@@ -191,7 +201,11 @@ public enum WatchVersionCodec {
                 : 0,
             capabilities: frame.payload.count >= 150
                 ? capabilityFlags(frame.payload[142..<150])
-                : 0
+                : 0,
+            // A response too short to say reads as unfaithful, as libpebble3's
+            // `WatchVersionResponse` reads it: nothing then vouches for what
+            // the watch holds, and writing it again is what was always done.
+            isUnfaithful: frame.payload.count > 150 ? frame.payload[150] != 0 : true
         )
     }
 

@@ -1,4 +1,5 @@
 public import Foundation
+import CryptoKit
 import MemberwiseInit
 
 public enum BlobDBStatus: UInt8, Equatable, Sendable {
@@ -31,6 +32,12 @@ public struct ApplicationMetadata: Equatable, Sendable {
     public var sdkVersionMajor: UInt8
     public var sdkVersionMinor: UInt8
     public var name: String
+
+    /// What `WatchApplicationLibrary` compares against the registration it
+    /// last wrote to a watch.
+    public var writtenDigest: String {
+        SHA256.hash(data: Data(encoded())).hexadecimalString
+    }
 
     public func encoded() -> [UInt8] {
         var bytes = applicationID.bytes

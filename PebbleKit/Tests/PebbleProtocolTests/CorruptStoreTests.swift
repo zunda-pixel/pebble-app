@@ -181,6 +181,24 @@ struct CorruptStoreTests {
         #expect(try await library.synchronizedApplicationIDs(watchID: WatchID("mock-flint")) == [applicationID])
     }
 
+    /// As the written-pin file below: the identifiers of an application record
+    /// from before the digests are the only way to take off the watch an
+    /// application the library has since let go of.
+    @Test func aSynchronizationRecordFromBeforeTheDigestKeepsItsIdentifiers() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let syncURL = directory.appending(path: "application-sync.json")
+        let applicationID = UUID()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data(#"{"mock-flint":["\#(applicationID.uuidString)"]}"#.utf8).write(to: syncURL)
+
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+
+        #expect(try await library.synchronizedApplicationIDs(watchID: WatchID("mock-flint")) == [applicationID])
+        #expect(try await library.writtenApplicationDigests(watchID: WatchID("mock-flint")) == [applicationID: ""])
+        #expect(try quarantinedFiles(besides: syncURL).isEmpty)
+    }
+
     /// The record of what each watch was given gained a digest beside every
     /// identifier. A file written before that still names every pin its watch
     /// holds, and that record is the only way to find one the app has since

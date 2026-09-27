@@ -87,6 +87,30 @@ struct LibraryAndClientTests {
         #expect(try await reloaded.synchronizedApplicationIDs(watchID: WatchID("unknown")) == [])
     }
 
+    @Test func applicationDigestsSurviveRecordingWhatTheWatchHolds() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        let kept = UUID()
+        let added = UUID()
+        let watch = WatchID("watch-a")
+        let other = WatchID("watch-b")
+        try await library.setWrittenApplicationDigests([(kept, "digest")], watchID: watch)
+        try await library.setWrittenApplicationDigests([(kept, "digest")], watchID: other)
+
+        try await library.setSynchronizedApplicationIDs([kept, added], watchID: watch)
+        #expect(try await library.writtenApplicationDigests(watchID: watch) == [kept: "digest", added: ""])
+        #expect(try await library.synchronizedApplicationIDs(watchID: watch) == [kept, added])
+
+        try await library.forgetWrittenApplicationDigest(applicationID: kept)
+        #expect(try await library.writtenApplicationDigests(watchID: other) == [kept: ""])
+
+        try await library.setWrittenApplicationDigests([(kept, "digest")], watchID: watch)
+        try await library.forgetWrittenApplicationDigests(watchID: watch)
+        #expect(try await library.writtenApplicationDigests(watchID: watch) == [kept: ""])
+    }
+
     @Test
     func mockClientDiscoversOnlySupportedModels() async throws {
         let client = MockWatchClient()

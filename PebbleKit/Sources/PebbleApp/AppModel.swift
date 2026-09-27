@@ -809,6 +809,12 @@ public final class AppModel {
         }
         musicCoordinator.watchConnected()
         await synchronizeNotificationSourceApps(on: connection)
+        // Once per link rather than on every synchronization: the flag is
+        // read from the version the watch gave as the link came up, and
+        // stays set on the watch until something clears a database.
+        if connection.watch.version.isUnfaithful {
+            try? await applicationLibrary.forgetWrittenApplicationDigests(watchID: connection.watch.id)
+        }
         await synchronizeApplications(on: connection)
         try? await connection.client.send(AppRunStateCodec.requestFrame())
         await flushPendingNotifications()

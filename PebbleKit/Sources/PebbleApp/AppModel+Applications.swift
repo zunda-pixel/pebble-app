@@ -225,6 +225,7 @@ extension AppModel {
             importedApplicationID = application.id
             let snapshot = try await applicationLibrary.snapshot(applicationID: application.id)
             let library = try await applicationLibrary.importPackage(from: url)
+            try await applicationLibrary.forgetWrittenApplicationDigest(applicationID: application.id)
             updateApplications(library)
             if !activeConnections.isEmpty {
                 pendingImportSnapshots[application.id] = snapshot
@@ -399,6 +400,7 @@ extension AppModel {
         }
         let installed = try await applicationLibrary.applications()
         let synchronizedIDs = try await applicationLibrary.synchronizedApplicationIDs(watchID: watch.id)
+        let writtenDigests = try await applicationLibrary.writtenApplicationDigests(watchID: watch.id)
         let compatibleApplications = compatibleApplications(installed, with: watchModel)
         let localIDs = Set(compatibleApplications.map(\.id))
         var dropped = 0
@@ -416,17 +418,24 @@ extension AppModel {
                 }
                 return try PBWPackageImporter.load(from: packageURL, for: watchModel)
             }
-        for package in packages {
-            try await connection.client.write(.application(package.appMetadata))
+        var digests: [(UUID, String)] = []
+        var registered = 0
+        for (application, package) in zip(compatibleApplications, packages) {
+            let metadata = package.appMetadata
+            let digest = metadata.writtenDigest
+            if writtenDigests[application.id] != digest {
+                try await connection.client.write(.application(metadata))
+                registered += 1
+            }
+            digests.append((application.id, digest))
         }
         try await connection.client.reorderApplications(compatibleApplications.map(\.id))
-        try await recordSynchronizedApplications(installed, watch: watch)
+        try await applicationLibrary.setWrittenApplicationDigests(digests, watchID: watch.id)
+        applications.installedIDsByWatch[watch.id] = localIDs
         updateApplications(installed)
-        // The whole compatible library is registered on every synchronization, so
-        // the count is the library as this watch now sees it, not a delta.
         await DiagnosticLog.shared.record(
             category: "application",
-            message: "\(watch.name) took \(packages.count) registration(s) and dropped \(dropped)"
+            message: "\(watch.name) took \(registered) of \(packages.count) registration(s) and dropped \(dropped)"
         )
     }
 

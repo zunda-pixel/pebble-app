@@ -407,6 +407,28 @@ struct ProtocolCodecTests {
         #expect(!older.supportsLanguagePacks)
     }
 
+    /// The byte after the capabilities, per `struct VersionsMessage` in
+    /// PebbleOS's `src/fw/kernel/system_versions.c`.
+    @Test(arguments: [(UInt8(0), false), (UInt8(1), true)])
+    func watchVersionResponseDecodesUnfaithfulness(byte: UInt8, isUnfaithful: Bool) throws {
+        var payload = [UInt8](repeating: 0, count: 155)
+        payload[0] = 0x01
+        payload[46] = 18
+        payload[150] = byte
+
+        let information = try WatchVersionCodec.decode(PebbleProtocolFrame(endpoint: 16, payload: payload))
+
+        #expect(information.isUnfaithful == isUnfaithful)
+    }
+
+    @Test func aVersionResponseTooShortToSayReadsAsUnfaithful() throws {
+        var payload = [UInt8](repeating: 0, count: 150)
+        payload[0] = 0x01
+        payload[46] = 18
+
+        #expect(try WatchVersionCodec.decode(PebbleProtocolFrame(endpoint: 16, payload: payload)).isUnfaithful)
+    }
+
     @Test
     func watchVersionResponseDecodesRunningFirmwareAndSerial() throws {
         var payload = [UInt8](repeating: 0, count: 120)

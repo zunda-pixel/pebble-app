@@ -55,6 +55,9 @@ public final class MockWatchClient: WatchClient {
     public private(set) var appGlanceWrites: [UUID] = []
     public private(set) var deletedTimelineReminderIDs: [UUID] = []
     public private(set) var registeredApplications: [ApplicationMetadata] = []
+    /// Every registration written, in order and duplicates included:
+    /// `registeredApplications` keeps one per application, as the watch does.
+    public private(set) var applicationRegistrationWrites: [UUID] = []
     public private(set) var unregisteredApplicationIDs: [UUID] = []
     public private(set) var disconnectedWatches: [ConnectedWatch] = []
     private var nextTransactionID: UInt8 = 0
@@ -104,6 +107,9 @@ public final class MockWatchClient: WatchClient {
 
     /// Makes the next connection report a watch running recovery firmware.
     public var connectsAsRecoveryFirmware = false
+    /// Makes the next connection report a watch that has been reset or paired
+    /// elsewhere since this phone last wrote to it.
+    public var connectsAsUnfaithful = false
     /// Makes connecting fail the way a watch out of range or with an unusable
     /// protocol service does.
     public var connectionFailure: WatchConnectionError?
@@ -142,7 +148,8 @@ public final class MockWatchClient: WatchClient {
                 firmwareVersion: "v5.0.0-mock",
                 serialNumber: "MOCK00000001",
                 hardwarePlatform: hardwarePlatform,
-                isRunningRecoveryFirmware: connectsAsRecoveryFirmware
+                isRunningRecoveryFirmware: connectsAsRecoveryFirmware,
+                isUnfaithful: connectsAsUnfaithful
             )
         )
     }
@@ -212,6 +219,7 @@ public final class MockWatchClient: WatchClient {
         case .application(let metadata):
             registeredApplications.removeAll { $0.applicationID == metadata.applicationID }
             registeredApplications.append(metadata)
+            applicationRegistrationWrites.append(metadata.applicationID)
         case .notification(let notification):
             sentNotifications.append(notification)
         case .timelinePin(let pin):
