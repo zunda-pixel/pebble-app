@@ -77,11 +77,20 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
                 [Self.ppogNotifyCharacteristic, Self.ppogWriteCharacteristic],
                 for: service
             )
-        } else {
+        } else if Self.servesTheProtocolItself {
             // The watch expects the phone to host the service and connects to it as a
             // GATT client. It inspects the phone right after connecting and does not come
             // back for a second look.
             startForwardTransport(on: peripheral, because: "the watch hosts none")
+        } else {
+            // An unbonded watch publishes its own once the link is encrypted, and
+            // `didModifyServices` says when; giving up here would refuse every new watch.
+            Task { [tag = clientTag] in
+                await DiagnosticLog.shared.record(
+                    category: "pairing",
+                    message: "[\(tag)] no protocol service yet; waiting for the watch to publish it"
+                )
+            }
         }
 
         if let batteryService = services.first(where: { $0.uuid == Self.batteryService }) {
@@ -216,7 +225,22 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
         }
     }
 
+    /// Whether the phone may host the protocol service when the watch's own is
+    /// unusable. The iOS app pairs through AccessorySetupKit, which refuses to
+    /// let a process that uses it make a `CBPeripheralManager` (issue #47).
+    static var servesTheProtocolItself: Bool {
+        #if os(iOS)
+        false
+        #else
+        true
+        #endif
+    }
+
     private func startForwardTransport(on peripheral: CBPeripheral, because reason: String) {
+        guard Self.servesTheProtocolItself else {
+            giveUpOnOutOfDateServices(peripheral, because: reason)
+            return
+        }
         guard link.setup.hostTransportOnPhone() else {
             return
         }
@@ -240,6 +264,33 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
                 self.abortLink(peripheral, error: .disconnected, step: "hosting the transport: the watch unsubscribed")
             }
         )
+    }
+
+    /// What is left on iOS when the watch's own service cannot be used: iOS is
+    /// holding the services as they were, and only forgetting the watch in the
+    /// system's settings throws that copy away. Another attempt would find the
+    /// same copy, so a reconnect in progress stops too.
+    private func giveUpOnOutOfDateServices(_ peripheral: CBPeripheral, because reason: String) {
+        guard !link.hasGivenUpOnOutOfDateServices else { return }
+        link.hasGivenUpOnOutOfDateServices = true
+        Task { [tag = clientTag] in
+            await DiagnosticLog.shared.record(
+                .error,
+                category: "pairing",
+                message: "[\(tag)] iOS's copy of the watch's services is out of date: \(reason)"
+            )
+        }
+        guard connectionContinuation == nil else {
+            failConnection(.watchServicesOutOfDate)
+            return
+        }
+        reconnects.stop()
+        connectionTimeoutTask?.cancel()
+        connectionTimeoutTask = nil
+        pendingWatch = nil
+        reconnects.expectDisconnect(of: peripheral.watchID)
+        eventContinuation?.yield(.disconnected(.watchServicesOutOfDate))
+        cancelLink(peripheral, reason: "iOS holds the watch's services out of date")
     }
 
     /// Torn down rather than merely deselected: the registration's unsubscribe

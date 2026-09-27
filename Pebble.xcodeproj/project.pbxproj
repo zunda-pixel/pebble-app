@@ -8,11 +8,58 @@
 
 /* Begin PBXBuildFile section */
 		2E004FAA303C7E4C001DFDE0 /* PebbleKit in Frameworks */ = {isa = PBXBuildFile; productRef = 2E004FA9303C7E4C001DFDE0 /* PebbleKit */; };
+		2EAC477D3069B3B40030043E /* NotificationKeyExchange.appex in Embed ExtensionKit Extensions */ = {isa = PBXBuildFile; fileRef = 2EAC47763069B3B40030043E /* NotificationKeyExchange.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		2EAC478E3069B3CD0030043E /* NotificationTransport.appex in Embed ExtensionKit Extensions */ = {isa = PBXBuildFile; fileRef = 2EAC47873069B3CD0030043E /* NotificationTransport.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		2EAC479E3069B3CD0030043E /* NotificationProvider.appex in Embed ExtensionKit Extensions */ = {isa = PBXBuildFile; fileRef = 2EAC47973069B3CD0030043E /* NotificationProvider.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		2EAC47A23069B3F00030043E /* PebbleForwarding in Frameworks */ = {isa = PBXBuildFile; productRef = 2EAC47A13069B3F00030043E /* PebbleForwarding */; };
+		2EAC47A43069B3F00030043E /* PebbleForwarding in Frameworks */ = {isa = PBXBuildFile; productRef = 2EAC47A33069B3F00030043E /* PebbleForwarding */; };
+		2EAC47A63069B3F00030043E /* PebbleForwarding in Frameworks */ = {isa = PBXBuildFile; productRef = 2EAC47A53069B3F00030043E /* PebbleForwarding */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		2EAC477B3069B3B40030043E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2EAC47753069B3B40030043E;
+			remoteInfo = NotificationKeyExchange;
+		};
+		2EAC478C3069B3CD0030043E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2EAC47863069B3CD0030043E;
+			remoteInfo = NotificationTransport;
+		};
+		2EAC479C3069B3CD0030043E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2EAC47963069B3CD0030043E;
+			remoteInfo = NotificationProvider;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		2EAC477E3069B3B40030043E /* Embed ExtensionKit Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			dstPath = "$(EXTENSIONS_FOLDER_PATH)";
+			dstSubfolder = Product;
+			files = (
+				2EAC479E3069B3CD0030043E /* NotificationProvider.appex in Embed ExtensionKit Extensions */,
+				2EAC477D3069B3B40030043E /* NotificationKeyExchange.appex in Embed ExtensionKit Extensions */,
+				2EAC478E3069B3CD0030043E /* NotificationTransport.appex in Embed ExtensionKit Extensions */,
+			);
+			name = "Embed ExtensionKit Extensions";
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* Pebble.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Pebble.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2E004FA7303C7E3A001DFDE0 /* PebbleKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = PebbleKit; sourceTree = "<group>"; };
+		2EAC47763069B3B40030043E /* NotificationKeyExchange.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.extensionkit-extension"; includeInIndex = 0; path = NotificationKeyExchange.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		2EAC47873069B3CD0030043E /* NotificationTransport.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.extensionkit-extension"; includeInIndex = 0; path = NotificationTransport.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		2EAC47973069B3CD0030043E /* NotificationProvider.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.extensionkit-extension"; includeInIndex = 0; path = NotificationProvider.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -22,6 +69,27 @@
 				Info.plist,
 			);
 			target = 000000000000000100000000 /* Pebble */;
+		};
+		2EAC47823069B3B40030043E /* Exceptions for "NotificationKeyExchange" folder in "NotificationKeyExchange" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 2EAC47753069B3B40030043E /* NotificationKeyExchange */;
+		};
+		2EAC47923069B3CD0030043E /* Exceptions for "NotificationTransport" folder in "NotificationTransport" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 2EAC47863069B3CD0030043E /* NotificationTransport */;
+		};
+		2EAC47A23069B3CD0030043E /* Exceptions for "NotificationProvider" folder in "NotificationProvider" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 2EAC47963069B3CD0030043E /* NotificationProvider */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -34,6 +102,30 @@
 			path = Pebble;
 			sourceTree = "<group>";
 		};
+		2EAC47773069B3B40030043E /* NotificationKeyExchange */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				2EAC47823069B3B40030043E /* Exceptions for "NotificationKeyExchange" folder in "NotificationKeyExchange" target */,
+			);
+			path = NotificationKeyExchange;
+			sourceTree = "<group>";
+		};
+		2EAC47883069B3CD0030043E /* NotificationTransport */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				2EAC47923069B3CD0030043E /* Exceptions for "NotificationTransport" folder in "NotificationTransport" target */,
+			);
+			path = NotificationTransport;
+			sourceTree = "<group>";
+		};
+		2EAC47983069B3CD0030043E /* NotificationProvider */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				2EAC47A23069B3CD0030043E /* Exceptions for "NotificationProvider" folder in "NotificationProvider" target */,
+			);
+			path = NotificationProvider;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -41,6 +133,24 @@
 			isa = PBXFrameworksBuildPhase;
 			files = (
 				2E004FAA303C7E4C001DFDE0 /* PebbleKit in Frameworks */,
+			);
+		};
+		2EAC47733069B3B40030043E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+				2EAC47A23069B3F00030043E /* PebbleForwarding in Frameworks */,
+			);
+		};
+		2EAC47843069B3CD0030043E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+				2EAC47A43069B3F00030043E /* PebbleForwarding in Frameworks */,
+			);
+		};
+		2EAC47943069B3CD0030043E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+				2EAC47A63069B3F00030043E /* PebbleForwarding in Frameworks */,
 			);
 		};
 /* End PBXFrameworksBuildPhase section */
@@ -51,6 +161,9 @@
 			children = (
 				2E004FA7303C7E3A001DFDE0 /* PebbleKit */,
 				000000000000000000000010 /* Pebble */,
+				2EAC47773069B3B40030043E /* NotificationKeyExchange */,
+				2EAC47883069B3CD0030043E /* NotificationTransport */,
+				2EAC47983069B3CD0030043E /* NotificationProvider */,
 				2E004FA8303C7E4C001DFDE0 /* Frameworks */,
 				000000000000000000000020 /* Products */,
 			);
@@ -60,6 +173,9 @@
 			isa = PBXGroup;
 			children = (
 				000000000000000000000120 /* Pebble.app */,
+				2EAC47763069B3B40030043E /* NotificationKeyExchange.appex */,
+				2EAC47873069B3CD0030043E /* NotificationTransport.appex */,
+				2EAC47973069B3CD0030043E /* NotificationProvider.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -81,8 +197,14 @@
 				000000000000000120000000 /* Sources */,
 				000000000000000130000000 /* Frameworks */,
 				000000000000000140000000 /* Resources */,
+				2EAC477E3069B3B40030043E /* Embed ExtensionKit Extensions */,
 			);
 			buildRules = (
+			);
+			dependencies = (
+				2EAC477C3069B3B40030043E /* PBXTargetDependency */,
+				2EAC478D3069B3CD0030043E /* PBXTargetDependency */,
+				2EAC479D3069B3CD0030043E /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				000000000000000000000010 /* Pebble */,
@@ -95,6 +217,69 @@
 			productReference = 000000000000000000000120 /* Pebble.app */;
 			productType = "com.apple.product-type.application";
 		};
+		2EAC47753069B3B40030043E /* NotificationKeyExchange */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2EAC47813069B3B40030043E /* Build configuration list for PBXNativeTarget "NotificationKeyExchange" */;
+			buildPhases = (
+				2EAC47723069B3B40030043E /* Sources */,
+				2EAC47733069B3B40030043E /* Frameworks */,
+				2EAC47743069B3B40030043E /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				2EAC47773069B3B40030043E /* NotificationKeyExchange */,
+			);
+			name = NotificationKeyExchange;
+			packageProductDependencies = (
+				2EAC47A13069B3F00030043E /* PebbleForwarding */,
+			);
+			productName = NotificationKeyExchange;
+			productReference = 2EAC47763069B3B40030043E /* NotificationKeyExchange.appex */;
+			productType = "com.apple.product-type.extensionkit-extension";
+		};
+		2EAC47863069B3CD0030043E /* NotificationTransport */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2EAC478F3069B3CD0030043E /* Build configuration list for PBXNativeTarget "NotificationTransport" */;
+			buildPhases = (
+				2EAC47833069B3CD0030043E /* Sources */,
+				2EAC47843069B3CD0030043E /* Frameworks */,
+				2EAC47853069B3CD0030043E /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				2EAC47883069B3CD0030043E /* NotificationTransport */,
+			);
+			name = NotificationTransport;
+			packageProductDependencies = (
+				2EAC47A33069B3F00030043E /* PebbleForwarding */,
+			);
+			productName = NotificationTransport;
+			productReference = 2EAC47873069B3CD0030043E /* NotificationTransport.appex */;
+			productType = "com.apple.product-type.extensionkit-extension";
+		};
+		2EAC47963069B3CD0030043E /* NotificationProvider */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2EAC479F3069B3CD0030043E /* Build configuration list for PBXNativeTarget "NotificationProvider" */;
+			buildPhases = (
+				2EAC47933069B3CD0030043E /* Sources */,
+				2EAC47943069B3CD0030043E /* Frameworks */,
+				2EAC47953069B3CD0030043E /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				2EAC47983069B3CD0030043E /* NotificationProvider */,
+			);
+			name = NotificationProvider;
+			packageProductDependencies = (
+				2EAC47A53069B3F00030043E /* PebbleForwarding */,
+			);
+			productName = NotificationProvider;
+			productReference = 2EAC47973069B3CD0030043E /* NotificationProvider.appex */;
+			productType = "com.apple.product-type.extensionkit-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -102,11 +287,20 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2700;
+				LastSwiftUpdateCheck = 2710;
 				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					000000000000000100000000 = {
 						CreatedOnToolsVersion = 26.3;
+					};
+					2EAC47753069B3B40030043E = {
+						CreatedOnToolsVersion = 27.1;
+					};
+					2EAC47863069B3CD0030043E = {
+						CreatedOnToolsVersion = 27.1;
+					};
+					2EAC47963069B3CD0030043E = {
+						CreatedOnToolsVersion = 27.1;
 					};
 				};
 			};
@@ -126,12 +320,30 @@
 			projectRoot = "";
 			targets = (
 				000000000000000100000000 /* Pebble */,
+				2EAC47753069B3B40030043E /* NotificationKeyExchange */,
+				2EAC47863069B3CD0030043E /* NotificationTransport */,
+				2EAC47963069B3CD0030043E /* NotificationProvider */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		000000000000000140000000 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		2EAC47743069B3B40030043E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		2EAC47853069B3CD0030043E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		2EAC47953069B3CD0030043E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
 			);
@@ -144,7 +356,43 @@
 			files = (
 			);
 		};
+		2EAC47723069B3B40030043E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		2EAC47833069B3CD0030043E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		2EAC47933069B3CD0030043E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		2EAC477C3069B3B40030043E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilter = ios;
+			target = 2EAC47753069B3B40030043E /* NotificationKeyExchange */;
+			targetProxy = 2EAC477B3069B3B40030043E /* PBXContainerItemProxy */;
+		};
+		2EAC478D3069B3CD0030043E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilter = ios;
+			target = 2EAC47863069B3CD0030043E /* NotificationTransport */;
+			targetProxy = 2EAC478C3069B3CD0030043E /* PBXContainerItemProxy */;
+		};
+		2EAC479D3069B3CD0030043E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilter = ios;
+			target = 2EAC47963069B3CD0030043E /* NotificationProvider */;
+			targetProxy = 2EAC479C3069B3CD0030043E /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		000000000000000011000000 /* Debug configuration for PBXProject "Pebble" */ = {
@@ -401,6 +649,246 @@
 			};
 			name = Release;
 		};
+		2EAC477F3069B3B40030043E /* Debug configuration for PBXNativeTarget "NotificationKeyExchange" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = NotificationKeyExchange/NotificationKeyExchange.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PU5HXZ4FZ2;
+				ENABLE_APP_SANDBOX = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NotificationKeyExchange/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = NotificationKeyExchange;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zunda.Pebble.NotificationKeyExchange;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Debug;
+		};
+		2EAC47803069B3B40030043E /* Release configuration for PBXNativeTarget "NotificationKeyExchange" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = NotificationKeyExchange/NotificationKeyExchange.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PU5HXZ4FZ2;
+				ENABLE_APP_SANDBOX = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NotificationKeyExchange/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = NotificationKeyExchange;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zunda.Pebble.NotificationKeyExchange;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Release;
+		};
+		2EAC47903069B3CD0030043E /* Debug configuration for PBXNativeTarget "NotificationTransport" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = NotificationTransport/NotificationTransport.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PU5HXZ4FZ2;
+				ENABLE_APP_SANDBOX = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NotificationTransport/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = NotificationTransport;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zunda.Pebble.NotificationTransport;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Debug;
+		};
+		2EAC47913069B3CD0030043E /* Release configuration for PBXNativeTarget "NotificationTransport" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = NotificationTransport/NotificationTransport.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PU5HXZ4FZ2;
+				ENABLE_APP_SANDBOX = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NotificationTransport/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = NotificationTransport;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zunda.Pebble.NotificationTransport;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Release;
+		};
+		2EAC47A03069B3CD0030043E /* Debug configuration for PBXNativeTarget "NotificationProvider" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = NotificationProvider/NotificationProvider.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PU5HXZ4FZ2;
+				ENABLE_APP_SANDBOX = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NotificationProvider/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = NotificationProvider;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zunda.Pebble.NotificationProvider;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Debug;
+		};
+		2EAC47A13069B3CD0030043E /* Release configuration for PBXNativeTarget "NotificationProvider" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = NotificationProvider/NotificationProvider.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PU5HXZ4FZ2;
+				ENABLE_APP_SANDBOX = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NotificationProvider/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = NotificationProvider;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zunda.Pebble.NotificationProvider;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -420,12 +908,48 @@
 			);
 			defaultConfigurationName = Release;
 		};
+		2EAC47813069B3B40030043E /* Build configuration list for PBXNativeTarget "NotificationKeyExchange" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2EAC477F3069B3B40030043E /* Debug configuration for PBXNativeTarget "NotificationKeyExchange" */,
+				2EAC47803069B3B40030043E /* Release configuration for PBXNativeTarget "NotificationKeyExchange" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		2EAC478F3069B3CD0030043E /* Build configuration list for PBXNativeTarget "NotificationTransport" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2EAC47903069B3CD0030043E /* Debug configuration for PBXNativeTarget "NotificationTransport" */,
+				2EAC47913069B3CD0030043E /* Release configuration for PBXNativeTarget "NotificationTransport" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		2EAC479F3069B3CD0030043E /* Build configuration list for PBXNativeTarget "NotificationProvider" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2EAC47A03069B3CD0030043E /* Debug configuration for PBXNativeTarget "NotificationProvider" */,
+				2EAC47A13069B3CD0030043E /* Release configuration for PBXNativeTarget "NotificationProvider" */,
+			);
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		2E004FA9303C7E4C001DFDE0 /* PebbleKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = PebbleKit;
+		};
+		2EAC47A13069B3F00030043E /* PebbleForwarding */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PebbleForwarding;
+		};
+		2EAC47A33069B3F00030043E /* PebbleForwarding */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PebbleForwarding;
+		};
+		2EAC47A53069B3F00030043E /* PebbleForwarding */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PebbleForwarding;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

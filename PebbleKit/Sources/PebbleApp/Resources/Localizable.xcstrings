@@ -529,6 +529,16 @@
         }
       }
     },
+    "A watch iOS has paired with this app that has not been added here yet." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOSがこのアプリとペアリング済みで、まだここに追加されていないウォッチです。"
+          }
+        }
+      }
+    },
     "A watch in recovery firmware disconnects often. The install picks itself up again on the next connection, so a drop part-way through is not a lost update." : {
       "localizations" : {
         "ja" : {
@@ -845,6 +855,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "終日のリマインダー"
+          }
+        }
+      }
+    },
+    "Allow Forwarding" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "転送を許可"
           }
         }
       }
@@ -1475,6 +1495,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アップデートを確認中…"
+          }
+        }
+      }
+    },
+    "Choose Apps" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appを選択"
           }
         }
       }
@@ -2475,6 +2505,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ファイル"
+          }
+        }
+      }
+    },
+    "Find a Watch" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ウォッチを探す"
           }
         }
       }
@@ -3939,6 +3979,26 @@
         }
       }
     },
+    "Not Set Up" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未設定"
+          }
+        }
+      }
+    },
+    "Not Supported" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "非対応"
+          }
+        }
+      }
+    },
     "Not connected" : {
       "localizations" : {
         "ja" : {
@@ -4491,6 +4551,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "パルス"
+          }
+        }
+      }
+    },
+    "Put the watch in pairing mode. iOS lists the watches it finds and pairs the one you choose with this app." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ウォッチをペアリングモードにしてください。iOSが見つけたウォッチを一覧に表示し、選んだウォッチをこのアプリとペアリングします。"
           }
         }
       }
@@ -5281,6 +5351,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ソフトウェアアップデート"
+          }
+        }
+      }
+    },
+    "Some Apps" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一部のApp"
           }
         }
       }
@@ -6081,6 +6161,16 @@
         }
       }
     },
+    "The system's accessory picker could not be shown." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システムのアクセサリ選択画面を表示できませんでした。"
+          }
+        }
+      }
+    },
     "The test notification could not be sent." : {
       "localizations" : {
         "ja" : {
@@ -6611,6 +6701,16 @@
         }
       }
     },
+    "The watch was forgotten here, but iOS still lists it. Remove it in Settings > Bluetooth." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリではウォッチの登録を解除しましたが、iOSにはまだ残っています。設定 > Bluetooth で削除してください。"
+          }
+        }
+      }
+    },
     "The watch works again once firmware is installed." : {
       "localizations" : {
         "ja" : {
@@ -6831,6 +6931,16 @@
         }
       }
     },
+    "This iPhone is holding an out-of-date copy of the watch's Bluetooth services. Forget the watch in Settings > Bluetooth, then add it again here." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このiPhoneが保持しているウォッチのBluetoothサービス情報が古くなっています。設定 > Bluetooth でウォッチの登録を解除してから、ここでもう一度追加してください。"
+          }
+        }
+      }
+    },
     "This link belongs to a settings page and only means something there." : {
       "localizations" : {
         "ja" : {
@@ -6897,6 +7007,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "このウォッチはリカバリファームウェアで起動しています。PebbleOSをインストールすると、また使えるようになります。"
+          }
+        }
+      }
+    },
+    "This watch was added before the app paired watches through iOS. Forget it and add it again to forward notifications to it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このウォッチは、アプリがiOS経由でウォッチをペアリングするようになる前に追加されました。通知を転送するには、登録を解除してからもう一度追加してください。"
           }
         }
       }
@@ -7707,6 +7827,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ゾーン3"
+          }
+        }
+      }
+    },
+    "iOS does not forward notifications to this watch. It needs firmware that supports it, and outside development iOS offers this only in the EU." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOSはこのウォッチに通知を転送しません。対応したファームウェアが必要で、開発時を除き、iOSはこの機能をEU内でのみ提供しています。"
+          }
+        }
+      }
+    },
+    "iOS does not take this watch as one it can forward notifications to." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOSはこのウォッチを通知の転送先として扱っていません。"
+          }
+        }
+      }
+    },
+    "iOS sends the watch its notifications encrypted, and the watch shows them in place of the ones it reads over Bluetooth itself." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOSが通知を暗号化してウォッチに送り、ウォッチは自分でBluetooth経由で読み取る通知の代わりにそれを表示します。"
+          }
+        }
+      }
+    },
+    "iPhone Notifications" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhoneの通知"
           }
         }
       }

@@ -130,6 +130,21 @@ struct WatchDetailView: View {
         }
     }
 
+    /// Only iOS forwards notifications to an accessory, and only to a watch
+    /// the app has added.
+    private func forwardingSection(isSaved: Bool) -> NotificationForwardingSection? {
+        #if os(iOS)
+        guard isSaved else { return nil }
+        return NotificationForwardingSection(
+            forwarding: model.notificationForwarding(watchID: watchID),
+            allow: { Task { await model.requestNotificationForwarding(watchID: watchID) } },
+            openSettings: { Task { await model.openNotificationForwardingSettings(watchID: watchID) } }
+        )
+        #else
+        return nil
+        #endif
+    }
+
     var body: some View {
         let watch = WatchSummary(watchID: watchID, model: model)
         let watchSettings = currentWatchSettings(board: watch.board)
@@ -143,6 +158,7 @@ struct WatchDetailView: View {
             resetFeedback: model.watches.resetFeedback[watchID],
             forgetFeedback: forgetFeedback,
             connectionFeedback: model.connectionFailures[watchID].map { .failure($0.message) },
+            forwardingSection: forwardingSection(isSaved: watch.isSaved),
             connect: {
                 guard let saved = model.watches.saved.first(where: { $0.id == watchID }) else { return }
                 Task { await model.connect(to: saved) }
@@ -176,6 +192,9 @@ struct WatchDetailView: View {
             },
             diagnosticsDestination: { WatchDiagnosticsView(model: model, watchID: watchID) }
         )
+        #if os(iOS)
+        .task { await model.refreshNotificationForwarding(watchID: watchID) }
+        #endif
     }
 }
 
@@ -194,6 +213,7 @@ struct WatchDetailContent<
     var resetFeedback: FeatureFeedback?
     var forgetFeedback: FeatureFeedback? = nil
     var connectionFeedback: FeatureFeedback?
+    var forwardingSection: NotificationForwardingSection? = nil
     var connect: () -> Void
     var setAutomaticallyConnects: (Bool) -> Void
     var setReminderAppEnabled: (Bool) -> Void
@@ -296,6 +316,10 @@ struct WatchDetailContent<
                     Button("Disconnect", role: .destructive, action: disconnect)
                 }
                 FeedbackBanner(feedback: connectionFeedback)
+            }
+
+            if let forwardingSection {
+                forwardingSection
             }
 
             Section {

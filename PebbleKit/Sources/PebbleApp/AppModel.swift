@@ -203,6 +203,9 @@ public final class AppModel {
 
     let scannerClient: any WatchClient
     let clientFactory: @MainActor (WatchID) -> any WatchClient
+    #if os(iOS)
+    let watchAccessories = WatchAccessories()
+    #endif
     let applicationLibrary: WatchApplicationLibrary
     let watchStore: SavedWatchStore
     let timelineStore: TimelinePinStore
@@ -475,7 +478,7 @@ public final class AppModel {
         // install with no watch yet would be asked for permission before it had
         // asked for anything.
         if !watches.saved.isEmpty {
-            scannerClient.startBluetooth()
+            await openRadio()
         }
         observeEventKitChanges()
         // The weather's clock, for as long as the app is running. Five minutes
@@ -524,7 +527,7 @@ public final class AppModel {
         do {
             await loadSavedWatches()
             // Asking for a watch is the moment the radio is worth its dialog.
-            scannerClient.startBluetooth()
+            await openRadio()
             var scanned = try await scannerClient.scan()
             let connectedIDs = Set(connections.map(\.watch.id))
             let missingSavedWatches = watches.saved
@@ -579,6 +582,10 @@ public final class AppModel {
         }
         connectingWatchIDs.insert(watch.id)
         connectionFailures[watch.id] = nil
+        #if os(iOS)
+        // Every client opens its own central on the way in.
+        await setUpAccessories()
+        #endif
         let attempt = UUID()
         connectionAttempts[watch.id] = attempt
         Task { [id = watch.id] in

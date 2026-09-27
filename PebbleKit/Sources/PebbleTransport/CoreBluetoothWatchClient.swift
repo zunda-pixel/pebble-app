@@ -112,7 +112,9 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         )
         // Watches inspect the phone's GATT database right after connecting, so
         // the phone-hosted protocol service has to exist before that.
-        GATTServer.shared.start()
+        if Self.servesTheProtocolItself {
+            GATTServer.shared.start()
+        }
     }
 
     /// The watch to write to, once there is a session to write into. A connected

@@ -22,6 +22,9 @@ struct LinkState {
     var pairingTimeoutTask: Task<Void, Never>?
     var subscriptionWatchdog: Task<Void, Never>?
     var hasRepublishedForThisLink = false
+    /// Set once this link has been given up on for services iOS holds out of
+    /// date, which three separate callbacks can each find.
+    var hasGivenUpOnOutOfDateServices = false
     var ppogSession: PPoGSession?
     var frameDecoder = PebbleProtocolFrameDecoder()
     var pendingGattWrites: Deque<Data> = []

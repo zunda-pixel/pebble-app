@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EXAppExtensionAttributes</key>
+	<dict>
+		<key>EXExtensionPointIdentifier</key>
+		<string>com.apple.accessory-transport-extension</string>
+	</dict>
+	<key>NSAccessorySetupBluetoothNames</key>
+	<array>
+		<string>Pebble</string>
+	</array>
+	<key>NSAccessorySetupBluetoothServices</key>
+	<array>
+		<string>0000FED9-0000-1000-8000-00805F9B34FB</string>
+	</array>
+	<key>NSAccessorySetupKitSupports</key>
+	<array>
+		<string>Bluetooth</string>
+	</array>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Pebble uses Bluetooth to hand the watch the notifications iOS forwards to it.</string>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data-access-protocol</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Pebble notification transport</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.zunda.Pebble.accessory-transport</string>
+		</dict>
+	</array>
+</dict>
+</plist>
