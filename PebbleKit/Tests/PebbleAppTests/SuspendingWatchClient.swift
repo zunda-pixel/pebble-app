@@ -21,6 +21,9 @@ final class SuspendingWatchClient: WatchClient {
     /// Refuses timeline-pin writes once this many are held, the way a link
     /// that dies part-way through a synchronization does. Nil takes them all.
     var timelinePinWritesAllowed: Int?
+    /// How long a settings write takes, apart from the rest: a watch slow to
+    /// take one of those is what holds up the answer to another watch.
+    var watchSettingWriteDelay: Duration = .zero
 
     private(set) var sentNotifications: [TimelineNotification] = []
     private(set) var sentAppMessages: [(applicationID: UUID, tuples: [AppMessageTuple])] = []
@@ -31,6 +34,7 @@ final class SuspendingWatchClient: WatchClient {
     /// keeps one entry per pin, which hides a pin written twice.
     private(set) var timelinePinWrites: [UUID] = []
     private(set) var deletedPinIDs: [UUID] = []
+    private(set) var writtenWatchSettings: [WatchSetting: Int] = [:]
     private(set) var clearedTimelineCount = 0
     private(set) var sentFrames: [PebbleProtocolFrame] = []
     private(set) var disconnectedWatches: [ConnectedWatch] = []
@@ -103,6 +107,9 @@ final class SuspendingWatchClient: WatchClient {
             timelinePinWrites.append(pin.id)
             upsertedPins.removeAll { $0.id == pin.id }
             upsertedPins.append(pin)
+        case .watchSetting(let setting, let rawValue):
+            try? await Task.sleep(for: watchSettingWriteDelay)
+            writtenWatchSettings[setting] = rawValue
         // Not what these tests are about: the watch takes it and says nothing.
         default:
             break

@@ -89,7 +89,8 @@ extension AppModel {
     /// and answering a push with a write is how two watches talk each other
     /// into a loop. Written to every *other* connected watch, because the app's
     /// settings are one set written to all of them — the same shape
-    /// `synchronizeNotificationSourceApps` uses for a record from one watch.
+    /// `synchronizeNotificationSourceApps` uses for a record from one watch —
+    /// but only once this one has had its answer: see `relayToOtherWatches`.
     ///
     /// No banner. Nobody on this side asked, so there is no question to answer;
     /// the toggle moving under the reader is the whole of it.
@@ -101,11 +102,11 @@ extension AppModel {
         _ setting: WatchSetting,
         rawValue: Int,
         from connection: WatchConnection
-    ) async -> Bool {
+    ) -> Bool {
         guard watchSettings.values[setting] != rawValue else { return true }
         watchSettings.values[setting] = rawValue
         persistWatchSettingValues()
-        for other in activeConnections where other !== connection {
+        relayToOtherWatches(from: connection) { other in
             try? await other.client.write(.watchSetting(setting, rawValue: rawValue))
         }
         return true
@@ -135,11 +136,11 @@ extension AppModel {
         _ button: QuickLaunchButton,
         assignment: QuickLaunchAssignment,
         from connection: WatchConnection
-    ) async -> Bool {
+    ) -> Bool {
         guard watchSettings.quickLaunch[button] != assignment else { return true }
         watchSettings.quickLaunch[button] = assignment
         persistQuickLaunchAssignments()
-        for other in activeConnections where other !== connection {
+        relayToOtherWatches(from: connection) { other in
             try? await other.client.write(.quickLaunch(button, assignment))
         }
         return true

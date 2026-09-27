@@ -256,8 +256,8 @@ extension AppModel {
                             .asUnderstoodBy(connection.watch)
                     )
                     succeeded = true
-                    for other in activeConnections where other !== connection {
-                        await synchronizeNotificationSourceApps(on: other)
+                    relayToOtherWatches(from: connection) { other in
+                        await self.synchronizeNotificationSourceApps(on: other)
                     }
                 }
             case WatchSettingsCodec.databaseID:
@@ -265,14 +265,14 @@ extension AppModel {
                     key: write.key,
                     value: write.value
                 ) {
-                    succeeded = await applyWatchSetting(setting, rawValue: rawValue, from: connection)
+                    succeeded = applyWatchSetting(setting, rawValue: rawValue, from: connection)
                 } else if let (button, assignment) = WatchSettingsCodec.decodeQuickLaunch(
                     key: write.key,
                     value: write.value
                 ) {
                     // A button held down on the wrist to assign whatever was
                     // running.
-                    succeeded = await applyQuickLaunch(button, assignment: assignment, from: connection)
+                    succeeded = applyQuickLaunch(button, assignment: assignment, from: connection)
                 } else {
                     // A key this app has no switch for, which is most of the
                     // firmware's seventy-odd syncable settings. Taken rather
@@ -302,6 +302,29 @@ extension AppModel {
             try? await connection.client.send(BlobDB2Codec.responseFrame(to: message, succeeded: succeeded))
         case .syncDone:
             try? await connection.client.send(BlobDB2Codec.responseFrame(to: message, succeeded: true))
+        }
+    }
+
+    /// Passes on to every other watch what one watch wrote to its own
+    /// database, once the caller has answered it.
+    ///
+    /// Not awaited before the answer. The watch sends the record again after
+    /// thirty seconds without one (`SYNC_TIMEOUT_SECONDS`,
+    /// `services/blob_db/sync.c`), and a write to another watch may take twenty
+    /// of those — all of them, for a watch that has just gone out of range. Nor
+    /// awaited by the caller at all: the frame loop the record came in on would
+    /// be held as long, and the next record the watch has queued behind this
+    /// one answered no sooner.
+    func relayToOtherWatches(
+        from source: WatchConnection,
+        _ relay: @escaping @MainActor (WatchConnection) async -> Void
+    ) {
+        let previous = watchDatabaseRelay
+        watchDatabaseRelay = Task {
+            await previous?.value
+            for other in activeConnections where other !== source {
+                await relay(other)
+            }
         }
     }
 

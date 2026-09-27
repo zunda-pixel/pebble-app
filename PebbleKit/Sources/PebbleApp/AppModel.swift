@@ -295,6 +295,10 @@ public final class AppModel {
     // for a flush; two at once hand the watch everything twice.
     @ObservationIgnored var pendingNotificationFlush: Task<Void, Never>?
     @ObservationIgnored var pendingAppMessageFlush: Task<Void, Never>?
+    /// The last record from one watch being passed on to the others, which the
+    /// next one waits behind so that two changes land in the order they were
+    /// made.
+    @ObservationIgnored var watchDatabaseRelay: Task<Void, Never>?
     @ObservationIgnored lazy var companionRuntime = PebbleCompanionRuntime(
         openURLHandler: { [weak self] url in self?.openConfigurationURL(url) },
         appMessageHandler: { [weak self] applicationID, tuples in

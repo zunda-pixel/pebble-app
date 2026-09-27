@@ -93,6 +93,7 @@ struct WatchSettingsSyncTests {
             pushed(key: WatchSetting.clock24Hour.rawValue, value: [wasOn ? 0 : 1]),
             on: source
         )
+        await model.watchDatabaseRelay?.value
 
         #expect(model.isWatchSettingOn(.clock24Hour) == !wasOn)
         #expect(Defaults[.watchSettingValues][WatchSetting.clock24Hour.rawValue] == (wasOn ? 0 : 1))
@@ -100,6 +101,48 @@ struct WatchSettingsSyncTests {
         #expect(clients[second.id]?.writtenWatchSettings[.clock24Hour] == (wasOn ? 0 : 1))
         // The one that told us is not written back to.
         #expect(clients[first.id]?.writtenWatchSettings[.clock24Hour] == (wasOn ? 1 : 0))
+    }
+
+    /// The watch that changed the setting hears back before any other watch is
+    /// told, however long the other one takes.
+    @Test func theWatchIsAnsweredBeforeTheOtherWatchIsTold() async throws {
+        let scanner = MockWatchClient()
+        let source = MockWatchClient()
+        let other = SuspendingWatchClient()
+        var clientsHandedOut = 0
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: scanner,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json")),
+            clientFactory: { _ in
+                clientsHandedOut += 1
+                return clientsHandedOut == 1 ? source as any WatchClient : other
+            }
+        )
+        await model.scan()
+        let first = try #require(model.discoveredWatches.first)
+        let second = try #require(model.discoveredWatches.dropFirst().first)
+        await model.connect(to: first)
+        await model.connect(to: second)
+        let connection = try #require(model.connections.first { $0.watch.id == first.id })
+        let wasOn = model.isWatchSettingOn(.clock24Hour)
+        // As long as the firmware waits before sending the record again
+        // (`SYNC_TIMEOUT_SECONDS`, `services/blob_db/sync.c`).
+        other.watchSettingWriteDelay = .seconds(30)
+
+        await model.handleWatchDatabaseWrite(
+            pushed(key: WatchSetting.clock24Hour.rawValue, value: [wasOn ? 0 : 1]),
+            on: connection
+        )
+
+        #expect(source.sentFrames.last?.payload == [0x88, 0x0C, 0x00, 0x01])
+        // Still the value it was given on connecting.
+        #expect(other.writtenWatchSettings[.clock24Hour] == (wasOn ? 1 : 0))
+        model.watchDatabaseRelay?.cancel()
+        await model.watchDatabaseRelay?.value
     }
 
     /// A key this app has no switch for.
