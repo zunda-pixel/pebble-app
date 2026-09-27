@@ -4,8 +4,23 @@ import Retry
 import SwiftUI
 
 extension AppModel {
-    public func loadReminders() async {
-        timeline.reminders = (try? await reminderStore.pins()) ?? []
+    /// False when the store could not be read, and `timeline.reminders` is
+    /// left as it was. An empty list in its place reads as "the reader deleted
+    /// every reminder", and the synchronization after it takes them all off
+    /// the watch.
+    @discardableResult
+    public func loadReminders() async -> Bool {
+        do {
+            timeline.reminders = try await reminderStore.pins()
+            return true
+        } catch {
+            await DiagnosticLog.shared.record(
+                .error,
+                category: "timeline",
+                message: "the reminders could not be read: \(String(reflecting: error))"
+            )
+            return false
+        }
     }
 
     public func addReminder(title: String, date: Date) async {
@@ -19,7 +34,13 @@ extension AppModel {
         )
         timeline.reminders.append(reminder)
         timeline.reminders.sort { $0.timestamp < $1.timestamp }
-        try? await reminderStore.save(timeline.reminders)
+        do {
+            try await reminderStore.save(timeline.reminders)
+        } catch {
+            timeline.reminders.removeAll { $0.id == reminder.id }
+            timeline.reminderFeedback = .failure("The change could not be saved.")
+            return
+        }
         // The watch keeps a fifteen-minute window — `MAX_REMINDER_AGE` in
         // `reminder_db.c` — and refuses anything older outright, which the list
         // already says about the ones that have passed.
@@ -57,7 +78,7 @@ extension AppModel {
         guard !removed.isEmpty else { return }
         let identifiers = Set(removed.map(\.id))
         timeline.reminders.removeAll { identifiers.contains($0.id) }
-        try? await reminderStore.save(timeline.reminders)
+        let saved = (try? await reminderStore.save(timeline.reminders)) != nil
         // One reminder kept in two places is let go of in both: leaving the
         // Reminders app's copy behind would only have the next read put the
         // reminder back.
@@ -66,6 +87,11 @@ extension AppModel {
             // Named here as well as swept, because one the watch made was never
             // written by this app and so is in nobody's record of what it holds.
             await removeRemindersTheWatchStillHas(on: connection, alsoRemoving: identifiers)
+        }
+        // After the watches rather than instead of them: the reader asked for
+        // these to be gone, and only the phone's copy failed to hear it.
+        if !saved {
+            timeline.reminderFeedback = .failure("The change could not be saved.")
         }
     }
 
@@ -116,8 +142,7 @@ extension AppModel {
     // One in the past has already been shown, or missed, and sending it would
     // only make the watch buzz for it now.
     func synchronizeReminders(on connection: WatchConnection) async {
-        guard connection.isConnected else { return }
-        await loadReminders()
+        guard connection.isConnected, await loadReminders() else { return }
         await removeRemindersTheWatchStillHas(on: connection)
         let watchID = connection.watch.id
         var written = (try? await reminderStore.writtenPinIDs(watchID: watchID)) ?? []

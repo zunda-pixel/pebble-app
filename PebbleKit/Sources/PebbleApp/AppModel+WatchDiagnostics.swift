@@ -72,7 +72,7 @@ extension AppModel {
     }
 
     func recordApplicationLogLine(_ line: WatchLogLine, from applicationID: UUID) {
-        let name = (applications.apps + applications.watchfaces)
+        let name = applications.all
             .first { $0.id == applicationID }?
             .displayName
         var line = line

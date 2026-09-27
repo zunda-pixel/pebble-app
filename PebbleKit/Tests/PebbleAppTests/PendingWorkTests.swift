@@ -821,4 +821,77 @@ struct PendingWorkTests {
         #expect(model.applications.libraryFeedback != nil)
         #expect(client.appFetchResponses.contains(.noData))
     }
+
+    @Test
+    func aFetchCancelledByAReconnectDoesNotEndTheOneThatReplacedIt() async throws {
+        let client = SuspendingWatchClient()
+        client.answerDelay = .milliseconds(300)
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        let model = AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: library,
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        )
+        let applicationID = UUID()
+        let package = try makeApplicationPackage(in: directory, applicationID: applicationID, versionLabel: "1.0")
+        model.updateApplications(try await library.importPackage(from: package))
+        let connection = WatchConnection(
+            client: client,
+            watch: ConnectedWatch(
+                id: WatchID("suspending-emery"),
+                name: "Pebble Time 2",
+                model: .pebbleTime2,
+                batteryLevel: 70,
+                version: WatchVersionInformation(
+                    firmwareVersion: "v5.0.0-test",
+                    serialNumber: "TEST00000001",
+                    hardwarePlatform: 18
+                )
+            )
+        )
+        let request = AppFetchRequest(applicationID: applicationID, appBankID: 0)
+
+        model.beginHandlingAppFetchRequest(request, from: connection)
+        let cancelled = try #require(connection.appFetchTask)
+        model.clearBusyOperationState(on: connection)
+        model.beginHandlingAppFetchRequest(request, from: connection)
+        await cancelled.value
+
+        #expect(connection.isFetchingApplication)
+        #expect(model.applications.managementOperation == .installing(applicationID))
+
+        await connection.appFetchTask?.value
+        #expect(!connection.isFetchingApplication)
+        #expect(model.applications.managementOperation == nil)
+    }
+
+    @Test
+    func comingForwardDoesNotRewindTheQueueToTheCopyOnDisk() async throws {
+        let client = SuspendingWatchClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = makeModel(client: client, directory: directory)
+        model.hasStarted = true
+        await model.scan()
+        let discovered = try #require(model.discoveredWatches.first)
+        await model.connect(to: discovered)
+        let notification = TimelineNotification(
+            parentApplicationID: UUID(),
+            title: "Already delivered",
+            body: "Before the save caught up",
+            appName: "Chat"
+        )
+        // Delivered in memory; the disk still has it owed, the way it stands
+        // between a delivery and the save at the end of the pass.
+        model.pendingNotifications = [PendingDelivery(work: notification, deliveredTo: [discovered.id])]
+        try await model.pendingNotificationStore.save([PendingDelivery(work: notification)])
+
+        await model.applicationDidBecomeActive()
+
+        #expect(client.sentNotifications.isEmpty)
+    }
 }

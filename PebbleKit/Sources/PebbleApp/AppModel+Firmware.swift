@@ -8,6 +8,12 @@ extension AppModel {
     /// connected for only a few seconds at a time, which is not long enough to
     /// choose a file in.
     public func installFirmware(from url: URL, watchID: WatchID? = nil) async {
+        // Before anything is staged: the package and journal on disk belong to
+        // the transfer under way, and its success clears whatever is there.
+        guard !isFirmwareUpdateRunning else {
+            firmware.feedback = .failure("This firmware is already being transferred.")
+            return
+        }
         let connection = connection(for: watchID).flatMap { $0.isConnected ? $0 : nil }
         let target: FirmwareTarget
         if let connection, let board = connection.watch.board {
@@ -44,7 +50,7 @@ extension AppModel {
             try package.validateIntegrity()
             let journal = FirmwareUpdateJournal(
                 watchID: target.watchID,
-                hardwareRevision: target.board.rawValue,
+                board: target.board,
                 previousVersion: target.firmwareVersion,
                 targetVersion: package.manifest.firmware.versionTag,
                 packageSHA256: package.sha256
@@ -63,8 +69,9 @@ extension AppModel {
                 return
             }
             try await performFirmwareUpdate(package, on: connection)
+        } catch is CancellationError {
         } catch {
-            firmware.feedback = .failure("Firmware update stopped safely: \(error.localizedDescription)")
+            firmware.feedback = .failure("Firmware update stopped safely: \(failureReason(for: error))")
         }
     }
 
@@ -89,9 +96,11 @@ extension AppModel {
     /// A separate step from installing: the download only needs the network, the
     /// install needs the watch.
     public func downloadAvailableFirmware(watchID: WatchID? = nil) async {
-        guard let release = firmware.availableRelease else {
+        // The release on hand may be another watch's: it is whichever board was
+        // checked last, and this watch's importer would refuse its package.
+        guard let release = firmware.availableRelease, release.board == board(for: watchID) else {
             await checkForFirmwareUpdate(watchID: watchID)
-            guard firmware.availableRelease != nil else { return }
+            guard let checked = firmware.availableRelease, checked.board == board(for: watchID) else { return }
             await downloadAvailableFirmware(watchID: watchID)
             return
         }
@@ -107,7 +116,7 @@ extension AppModel {
     }
 
     public func installDownloadedFirmware(watchID: WatchID? = nil) async {
-        guard let downloaded = firmware.downloaded else {
+        guard let downloaded = firmware.downloaded, downloaded.board == board(for: watchID) else {
             firmware.feedback = .failure("Download the firmware first.")
             return
         }
@@ -140,16 +149,21 @@ extension AppModel {
     public func confirmRecoveryFirmwareUpdate() async {
         guard firmware.requiresConfirmation,
               let package = try? await pendingFirmwareUpdateStore.package(),
-              let journal = try? await pendingFirmwareUpdateStore.journal(),
-              let connection = connection(for: journal.watchID) else { return }
+              let journal = try? await pendingFirmwareUpdateStore.journal() else { return }
+        guard let connection = connection(for: journal.watchID), connection.isConnected else {
+            firmware.feedback = .failure("Connect the watch to resume its firmware update.")
+            return
+        }
         firmware.requiresConfirmation = false
         do { try await performFirmwareUpdate(package, on: connection) }
-        catch { firmware.feedback = .failure("Recovery update stopped safely: \(error.localizedDescription)") }
+        catch is CancellationError {}
+        catch { firmware.feedback = .failure("Recovery update stopped safely: \(failureReason(for: error))") }
     }
 
     public func cancelFirmwareUpdate() async {
         firmwareUpdateTask?.cancel()
         firmwareUpdateTask = nil
+        firmwareUpdateClaim = nil
         firmware.requiresConfirmation = false
         try? await pendingFirmwareUpdateStore.updatePhase(.cancelled)
         firmware.journal = try? await pendingFirmwareUpdateStore.journal()
@@ -163,16 +177,38 @@ extension AppModel {
     public func discardPendingFirmwareUpdate() async {
         firmwareUpdateTask?.cancel()
         firmwareUpdateTask = nil
+        firmwareUpdateClaim = nil
         await pendingFirmwareUpdateStore.clear()
         firmware.journal = nil
         firmware.requiresConfirmation = false
         firmware.feedback = .success("Pending firmware update removed.")
     }
 
+    var isFirmwareUpdateRunning: Bool {
+        firmwareUpdateClaim != nil || firmwareUpdateTask != nil
+    }
+
+    /// Throws `CancellationError` when the reader cancelled it part-way, for a
+    /// caller to stay quiet about: `cancelFirmwareUpdate` has already said so.
     func performFirmwareUpdate(
         _ package: PBZFirmwarePackage,
         on connection: WatchConnection
     ) async throws {
+        // One at a time. Two can be asked for at once — a staged update starting
+        // itself as the watch reconnects, while the reader taps Install — and the
+        // second would take over the task and flags the first is using. Claimed
+        // before the first suspension: with one in the gap, both callers passed
+        // the guard and the loser's cleanup ended the winner's transfer (found in
+        // the 2026-09-12 audit).
+        guard !isFirmwareUpdateRunning else {
+            firmware.feedback = .failure("This firmware is already being transferred.")
+            return
+        }
+        let claim = UUID()
+        firmwareUpdateClaim = claim
+        defer {
+            if firmwareUpdateClaim == claim { firmwareUpdateClaim = nil }
+        }
         // The update this notification announced is now under way; a banner
         // for it outlived its purpose the moment the transfer started.
         await localNotifier.remove(
@@ -184,26 +220,22 @@ extension AppModel {
               journal.watchID == connection.watch.id else {
             throw PBZFirmwareError.unsafeManifest
         }
+        guard firmwareUpdateClaim == claim else { throw CancellationError() }
         try await pendingFirmwareUpdateStore.updatePhase(.transferring)
         firmware.journal = try await pendingFirmwareUpdateStore.journal()
-        // One at a time. Two can be asked for at once — a staged update starting
-        // itself as the watch reconnects, while the reader taps Install — and the
-        // second would take over the task and flags the first is using. The
-        // claim sits against the guard with no suspension between them: with a
-        // log line in the gap, both callers passed the guard and the loser's
-        // cleanup ended the winner's transfer (found in the 2026-09-12 audit).
-        guard firmwareUpdateTask == nil else {
-            firmware.feedback = .failure("This firmware is already being transferred.")
-            return
-        }
+        guard firmwareUpdateClaim == claim else { throw CancellationError() }
         firmware.feedback = .progress("Transferring verified firmware…")
         connection.beginTransfer(.firmware)
         let client = connection.client
         let task = Task { try await client.installFirmware(package) }
         firmwareUpdateTask = task
         defer {
-            firmwareUpdateTask = nil
-            connection.endTransfer()
+            // A cancelled transfer's handle and bar may already belong to the
+            // one started after it.
+            if firmwareUpdateClaim == claim {
+                firmwareUpdateTask = nil
+                connection.endTransfer()
+            }
         }
         await DiagnosticLog.shared.record(
             category: "firmware",
@@ -219,6 +251,7 @@ extension AppModel {
                 category: "firmware",
                 message: "the transfer stopped: \(error.localizedDescription)"
             )
+            guard firmwareUpdateClaim == claim else { throw CancellationError() }
             // So the next connection offers the update again instead of silently
             // starting the whole transfer over.
             let stopped = try? await pendingFirmwareUpdateStore.journal()
@@ -259,7 +292,7 @@ extension AppModel {
     func discardDownloadedFirmware(matching package: PBZFirmwarePackage) {
         guard let downloaded = firmware.downloaded,
               downloaded.versionTag == package.manifest.firmware.versionTag,
-              downloaded.board.rawValue == package.manifest.firmware.hardwareRevision else {
+              downloaded.board == package.manifest.firmware.board else {
             return
         }
         try? FileManager.default.removeItem(at: downloaded.url)
@@ -273,7 +306,7 @@ extension AppModel {
         guard let package = try? await pendingFirmwareUpdateStore.package(),
               let journal = try? await pendingFirmwareUpdateStore.journal(),
               journal.watchID == watch.id,
-              journal.hardwareRevision == watch.board?.rawValue,
+              journal.board == watch.board,
               journal.packageSHA256 == package.sha256,
               journal.phase != .cancelled else { return }
         firmware.journal = journal
@@ -289,23 +322,14 @@ extension AppModel {
         do {
             firmware.feedback = .progress("Installing the firmware chosen for this watch…")
             try await performFirmwareUpdate(package, on: connection)
+        } catch is CancellationError {
         } catch {
-            firmware.feedback = .failure("Firmware update stopped safely: \(error.localizedDescription)")
+            firmware.feedback = .failure("Firmware update stopped safely: \(failureReason(for: error))")
         }
     }
 
     static func firmwareNotificationIdentifier(for watchID: WatchID) -> String {
         "firmware-update-\(watchID.rawValue)"
-    }
-
-    /// Whether a published tag is ahead of what the watch is running.
-    ///
-    /// Both sides usually carry a `v` — the release tag is `v4.37.0` and the
-    /// version response says the same — but only usually, so it is stripped
-    /// rather than assumed. Numeric compare after that, the same way the app
-    /// versions in the store are judged.
-    static func isFirmwareVersion(_ candidate: String, newerThan running: String) -> Bool {
-        PebbleOSFirmwareCatalog.isVersion(candidate, newerThan: running)
     }
 
     /// The connect-time check, which tells the phone about an update instead
@@ -347,7 +371,7 @@ extension AppModel {
             return
         }
         firmwareCheckedAt[cacheKey] = Date()
-        guard Self.isFirmwareVersion(release.versionTag, newerThan: running) else { return }
+        guard PebbleOSFirmwareCatalog.isVersion(release.versionTag, newerThan: running) else { return }
         guard Defaults[.notifiedFirmwareVersions][watch.id.rawValue] != release.versionTag else {
             return
         }
@@ -394,8 +418,9 @@ extension AppModel {
         }
         do {
             try await performFirmwareUpdate(package, on: connection)
+        } catch is CancellationError {
         } catch {
-            firmware.feedback = .failure("Firmware update stopped safely: \(error.localizedDescription)")
+            firmware.feedback = .failure("Firmware update stopped safely: \(failureReason(for: error))")
         }
     }
 }

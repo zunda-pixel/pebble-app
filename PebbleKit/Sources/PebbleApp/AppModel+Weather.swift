@@ -316,6 +316,7 @@ extension AppModel {
             return UUID(uuid: bytes)
         }
         func pin(day: Int, high: Int16, low: Int16, phrase: String?) -> TimelinePin? {
+            guard high != WeatherBridge.unknownTemperature, low != WeatherBridge.unknownTemperature else { return nil }
             let calendar = Calendar.current
             guard let date = calendar.date(byAdding: .day, value: day, to: now),
                   // Where the watch files a day's card: the morning of it. A

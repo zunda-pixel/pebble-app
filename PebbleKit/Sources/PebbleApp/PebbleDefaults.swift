@@ -7,9 +7,9 @@ import Foundation
 extension Defaults.Keys {
     static let downloadedFirmware = Key<DownloadedFirmware?>("downloadedFirmware")
 
+    static let weatherPlaces = Key<[WeatherPlace]>("weatherPlaces", default: [])
     /// The watch stores a temperature with no unit attached, so the unit the
     /// numbers were converted to has to be remembered here.
-    static let weatherPlaces = Key<[WeatherPlace]>("weatherPlaces", default: [])
     static let weatherUsesFahrenheit = Key<Bool>(
         "weatherUsesFahrenheit",
         default: Locale.current.measurementSystem == .us

@@ -61,8 +61,8 @@ extension AppModel {
         }
         let notification = TimelineNotification(
             parentApplicationID: UUID(),
-            title: "Pebble Test",
-            body: "Notifications are reaching your watch.",
+            title: String(localized: "Pebble Test", bundle: .module),
+            body: String(localized: "Notifications are reaching your watch.", bundle: .module),
             appName: "Pebble"
         )
         do {
@@ -289,7 +289,7 @@ extension AppModel {
                     // endpoint the watch starts, so the watch already has it,
                     // and writing it back is never the right thing to do.
                     item.isFromWatch = true
-                    await keep(item, from: connection)
+                    await storeItemMadeOnWatch(item, from: connection)
                     succeeded = true
                 }
             default:
@@ -307,7 +307,7 @@ extension AppModel {
     /// a store that refused the change was swallowed by a `try?`, and nothing
     /// was said either way. One place to answer from, on the screens where
     /// those changes are made.
-    private func keep(_ app: NotificationSourceApp) async {
+    private func saveAndDistribute(_ app: NotificationSourceApp) async {
         guard let apps = try? await notificationSourceAppStore.update(app) else {
             notifications.sourceAppFeedback = .failure("The change could not be saved.")
             return
@@ -351,7 +351,7 @@ extension AppModel {
         }
         app.icon = icon
         app.stateUpdated = .now
-        await keep(app)
+        await saveAndDistribute(app)
     }
 
     public func setNotificationSourceAppColors(
@@ -365,7 +365,7 @@ extension AppModel {
         app.backgroundColor = background
         app.foregroundColor = foreground
         app.stateUpdated = .now
-        await keep(app)
+        await saveAndDistribute(app)
     }
 
     public func setNotificationSourceAppVibePattern(
@@ -377,7 +377,7 @@ extension AppModel {
         }
         app.vibePattern = pattern
         app.stateUpdated = .now
-        await keep(app)
+        await saveAndDistribute(app)
     }
 
     public func setNotificationSourceAppFilterRules(
@@ -389,7 +389,7 @@ extension AppModel {
         }
         app.filterRules = rules
         app.stateUpdated = .now
-        await keep(app)
+        await saveAndDistribute(app)
     }
 
     public func setNotificationSourceAppMute(bundleID: String, muteState: NotificationAppMuteState) async {
@@ -401,7 +401,7 @@ extension AppModel {
         app.stateUpdated = .now
         // `merge` is for records the watch sends, and its timestamp gate can
         // discard a change made in the same second.
-        await keep(app)
+        await saveAndDistribute(app)
     }
 
     // Named rather than numbered: the list they were picked from may have been
@@ -410,8 +410,13 @@ extension AppModel {
         guard !removed.isEmpty else { return }
         let identifiers = Set(removed.map(\.bundleID))
         let apps = notifications.sourceApps.filter { !identifiers.contains($0.bundleID) }
-        try? await notificationSourceAppStore.save(apps)
-        notifications.sourceApps = (try? await notificationSourceAppStore.apps()) ?? apps
+        do {
+            try await notificationSourceAppStore.save(apps)
+        } catch {
+            notifications.sourceAppFeedback = .failure("The change could not be saved.")
+            return
+        }
+        notifications.sourceApps = apps
         for app in removed {
             for connection in activeConnections {
                 connection.synchronizedNotificationAppRecords[app.bundleID] = nil
@@ -434,7 +439,7 @@ extension AppModel {
 
     func handleAppMessage(_ message: AppMessageData, from connection: WatchConnection) async {
         do {
-            guard let application = (applications.apps + applications.watchfaces).first(where: {
+            guard let application = applications.all.first(where: {
                 $0.id == message.applicationID
             }), let source = try await applicationLibrary.companionJavaScript(
                 applicationID: application.id

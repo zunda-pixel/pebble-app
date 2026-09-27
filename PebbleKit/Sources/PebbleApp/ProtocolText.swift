@@ -91,6 +91,20 @@ func refusalReason(for error: any Error) -> LocalizedStringKey {
     return "The watch did not accept it."
 }
 
+/// For a failure that may as well be a file or the network as the watch:
+/// the protocol layer's errors get their sentence, and anything else keeps
+/// what Foundation says, rather than `refusalReason`'s "the watch did not
+/// accept it" about a download that never reached the watch.
+func failureReason(for error: any Error) -> Text {
+    if let error = error as? BlobDBClientError {
+        return Text(error.message)
+    }
+    if let error = error as? WatchConnectionError {
+        return Text(error.message)
+    }
+    return Text(verbatim: error.localizedDescription)
+}
+
 public extension HealthAnalysisPeriod {
     var title: LocalizedStringKey {
         switch self {

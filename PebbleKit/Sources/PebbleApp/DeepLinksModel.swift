@@ -16,7 +16,6 @@ public final class DeepLinksModel {
     public internal(set) var storeApplication: CatalogApplication?
     /// A tab a link asked for; the root view consumes it and puts it back to nil.
     public internal(set) var requestedSection: AppSection?
-    public internal(set) var isPreparing = false
     public internal(set) var feedback: FeatureFeedback?
 }
 

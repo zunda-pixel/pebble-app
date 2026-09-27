@@ -20,6 +20,6 @@ public final class WeatherModel {
     /// The refresh in flight, if one is. The foreground handler, the periodic
     /// loop and the screen's pull can all ask at once; the extras join this
     /// instead of fetching every place again and writing every watch twice.
-    var refreshTask: Task<Void, Never>?
+    @ObservationIgnored var refreshTask: Task<Void, Never>?
     public internal(set) var feedback: FeatureFeedback?
 }

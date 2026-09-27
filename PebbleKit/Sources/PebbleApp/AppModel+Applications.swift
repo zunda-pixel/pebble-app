@@ -86,14 +86,14 @@ extension AppModel {
         guard !hasLoadedApplications else {
             return
         }
-        hasLoadedApplications = true
         applications.isLoading = true
         defer { applications.isLoading = false }
         do {
             updateApplications(try await applicationLibrary.applications())
+            hasLoadedApplications = true
             applications.libraryFeedback = nil
         } catch {
-            applications.libraryFeedback = .failure("The application library could not be read: \(error.localizedDescription)")
+            applications.libraryFeedback = .failure("The application library could not be read: \(failureReason(for: error))")
         }
     }
 
@@ -102,7 +102,7 @@ extension AppModel {
     /// configuration and on an incoming appmessage remain as the net under a
     /// run-state event that never came.
     func launchCompanionRuntime(applicationID: UUID) async {
-        guard let application = (applications.apps + applications.watchfaces)
+        guard let application = applications.all
             .first(where: { $0.id == applicationID }),
             application.hasCompanionJavaScript,
             let source = ((try? await applicationLibrary.companionJavaScript(applicationID: applicationID)) ?? nil)
@@ -146,7 +146,10 @@ extension AppModel {
             }
             applications.activeWatchfaceID = application.id
             Defaults[.activeWatchfaceID] = application.id
-            applications.managementFeedback = .success("\(application.displayName) is active.")
+            // Beside its failure, so the one never sits on screen under the
+            // other: `managementFeedback` is the running operation's, and the
+            // next one to start or finish replaces it.
+            applications.libraryFeedback = .success("\(application.displayName) is active.")
         } catch {
             applications.libraryFeedback = .failure("The watchface could not be activated.")
         }
@@ -180,7 +183,7 @@ extension AppModel {
         do {
             let library = try await applicationLibrary.remove(applicationID: id)
             updateApplications(library)
-            try await synchronizeAllWatches()
+            try await synchronizeApplicationsOnAllWatches()
             // What the application's own JavaScript kept goes with it. Left
             // behind, it would come back as the old settings of the same watch
             // app installed again.
@@ -191,8 +194,9 @@ extension AppModel {
         }
     }
 
-    public func importApplication(from url: URL) async {
-        guard beginApplicationOperation(.importing) else { return }
+    @discardableResult
+    public func importApplication(from url: URL) async -> Bool {
+        guard beginApplicationOperation(.importing) else { return false }
         applications.isImporting = true
         defer {
             applications.isImporting = false
@@ -215,7 +219,7 @@ extension AppModel {
             updateApplications(library)
             if !activeConnections.isEmpty {
                 pendingImportSnapshots[application.id] = snapshot
-                try await synchronizeAllWatches()
+                try await synchronizeApplicationsOnAllWatches()
                 // The watch only asks for the binary when it tries to run the app.
                 for connection in activeConnections {
                     guard let model = connection.watch.model,
@@ -230,6 +234,7 @@ extension AppModel {
             // Cleared rather than left, so a stale failure does not outlive
             // the import that succeeded after it. Failures still speak below.
             applications.importFeedback = nil
+            return true
         } catch {
             // The watch refused the registration, not the bytes, so nothing has been
             // transferred and the import stands.
@@ -237,6 +242,7 @@ extension AppModel {
                 expirePendingSnapshot(applicationID: importedApplicationID)
             }
             applications.importFeedback = .failure(applicationErrorMessage(error))
+            return false
         }
     }
 
@@ -262,13 +268,13 @@ extension AppModel {
             )
             updateApplications(reordered)
             do {
-                try await synchronizeAllWatches()
+                try await synchronizeApplicationsOnAllWatches()
             } catch {
                 let restored = try await applicationLibrary.reorder(
                     applicationIDs: previousApplications.map(\.id)
                 )
                 updateApplications(restored)
-                try? await synchronizeAllWatches()
+                try? await synchronizeApplicationsOnAllWatches()
                 throw error
             }
             applications.libraryFeedback = nil
@@ -325,7 +331,7 @@ extension AppModel {
         }
     }
 
-    func synchronizeAllWatches() async throws {
+    func synchronizeApplicationsOnAllWatches() async throws {
         for connection in activeConnections {
             try await performApplicationSynchronization(on: connection)
         }
@@ -421,12 +427,6 @@ extension AppModel {
         applications.filter { $0.bestVariant(for: model) != nil }
     }
 
-    func loadPackage(from url: URL, for model: WatchModel) async throws -> PBWPackage {
-        try await Task.detached(priority: .userInitiated) {
-            try PBWPackageImporter.load(from: url, for: model)
-        }.value
-    }
-
     func restorePendingSnapshot(applicationID: UUID) async {
         guard let snapshot = pendingImportSnapshots.removeValue(forKey: applicationID) else {
             return
@@ -443,11 +443,13 @@ extension AppModel {
         }
     }
 
-    func expirePendingSnapshot(applicationID: UUID) {
-        Task { [weak self] in
-            try? await Task.sleep(for: .seconds(300))
-            guard !Task.isCancelled else { return }
-            self?.pendingImportSnapshots[applicationID] = nil
+    func expirePendingSnapshot(applicationID: UUID, after delay: Duration = .seconds(300)) {
+        pendingSnapshotExpiries[applicationID]?.cancel()
+        pendingSnapshotExpiries[applicationID] = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled, let self else { return }
+            self.pendingImportSnapshots[applicationID] = nil
+            self.pendingSnapshotExpiries[applicationID] = nil
         }
     }
 
@@ -501,7 +503,7 @@ extension AppModel {
         case ApplicationManagementError.applicationIDMismatch:
             "The watch requested an application that does not match the stored PBW package."
         default:
-            "The application operation could not be completed. \(error.localizedDescription)"
+            "The application operation could not be completed. \(failureReason(for: error))"
         }
     }
 
@@ -529,12 +531,19 @@ extension AppModel {
             applications.managementOperation = .installing(request.applicationID)
             applications.managementFeedback = .progress(statusMessage(for: .installing(request.applicationID)))
         }
+        let token = UUID()
+        connection.appFetchToken = token
         connection.appFetchTask = Task { [weak self] in
             guard let self else {
                 return
             }
             await self.handleAppFetchRequest(request, from: connection)
+            // A fetch cancelled by a reconnect can finish after the watch has
+            // asked again on the same link; the handle and the operation are
+            // then the new fetch's, not this one's.
+            guard connection.appFetchToken == token else { return }
             connection.appFetchTask = nil
+            connection.appFetchToken = nil
             if ownsOperation {
                 self.finishApplicationOperation(.installing(request.applicationID))
             }

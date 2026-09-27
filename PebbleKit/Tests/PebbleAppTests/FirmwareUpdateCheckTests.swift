@@ -155,10 +155,10 @@ struct FirmwareUpdateCheckTests {
     }
 
     @Test func theVersionComparisonStripsTheTagPrefix() {
-        #expect(AppModel.isFirmwareVersion("v4.37.0", newerThan: "v4.36.2"))
-        #expect(!AppModel.isFirmwareVersion("v4.36.2", newerThan: "v4.36.2"))
-        #expect(!AppModel.isFirmwareVersion("v4.36.2", newerThan: "v4.37.0"))
-        #expect(AppModel.isFirmwareVersion("4.37.0", newerThan: "v4.36.2"))
+        #expect(PebbleOSFirmwareCatalog.isVersion("v4.37.0", newerThan: "v4.36.2"))
+        #expect(!PebbleOSFirmwareCatalog.isVersion("v4.36.2", newerThan: "v4.36.2"))
+        #expect(!PebbleOSFirmwareCatalog.isVersion("v4.36.2", newerThan: "v4.37.0"))
+        #expect(PebbleOSFirmwareCatalog.isVersion("4.37.0", newerThan: "v4.36.2"))
     }
 
     /// Starting the update takes its announcement down: the banner outlived
@@ -187,7 +187,7 @@ struct FirmwareUpdateCheckTests {
                     firmware: PBZFirmwareBlob(
                         name: "firmware.bin",
                         type: "normal",
-                        hardwareRevision: WatchBoard.obelixPVT.rawValue,
+                        boardName: WatchBoard.obelixPVT.rawValue,
                         size: firmware.count,
                         crc: PebbleCRC32.calculate([UInt8](firmware)),
                         versionTag: "v5.1.0",

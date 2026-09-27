@@ -42,8 +42,6 @@ extension AppModel {
     }
 
     private func presentStoreApplication(id: String) async {
-        deepLinks.isPreparing = true
-        defer { deepLinks.isPreparing = false }
         do {
             guard let row = try await appCatalog.applications(
                 ids: [id],
@@ -67,8 +65,6 @@ extension AppModel {
         _ kind: PebbleDeepLink.PackageKind,
         from source: URL
     ) async {
-        deepLinks.isPreparing = true
-        defer { deepLinks.isPreparing = false }
         do {
             let local = try await copyPackage(from: source)
             var pending = PendingDeepLinkPackage(
@@ -93,7 +89,7 @@ extension AppModel {
                 if let board = connectedWatch?.board,
                    let package = try? PBZFirmwareImporter.load(from: local, board: board) {
                     pending.title = package.manifest.firmware.versionTag
-                    pending.subtitle = package.manifest.firmware.hardwareRevision
+                    pending.subtitle = package.manifest.firmware.boardName
                 }
             case .languagePack:
                 break

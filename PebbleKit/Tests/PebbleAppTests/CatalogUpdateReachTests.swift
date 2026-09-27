@@ -1,3 +1,4 @@
+import Defaults
 import Foundation
 import Synchronization
 import Testing
@@ -149,6 +150,27 @@ struct CatalogUpdateReachTests {
         #expect(await model.catalogUpdates().isEmpty)
     }
 
+    @Test func switchingStoresForgetsWhatTheLastStoreSaidAboutTheLibrary() async throws {
+        let fixture = Fixture()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let previousSourceID = Defaults[.catalogSourceID]
+        defer {
+            try? FileManager.default.removeItem(at: directory)
+            Defaults[.catalogSourceID] = previousSourceID
+        }
+        StoreStubURLProtocol.answer(fixture.lookupURL, with: fixture.storeAnswer(version: "2.0"))
+        let model = try await makeModel(fixture, directory: directory, installedVersion: "1.0")
+        _ = await model.catalogUpdates()
+        #expect(model.catalog.answeredStoreLookups.contains(fixture.installedID))
+
+        // A name no built-in store has, so a model built by a suite running
+        // alongside this one still browses the Pebble store.
+        await model.setCatalogSource("unlisted-\(UUID().uuidString)")
+
+        #expect(model.catalog.storeEntries.isEmpty)
+        #expect(model.catalog.answeredStoreLookups.isEmpty)
+    }
+
     /// A package the store never listed. Asked about, answered 404, and not
     /// mistaken for something to update.
     @Test func anApplicationTheStoreNeverListedIsNotAnUpdate() async throws {
@@ -241,6 +263,41 @@ struct CatalogUpdateLoopTests {
 
         #expect(model.catalogInstallationState(for: storeEntry(id: id, version: "1.3")) == .installed)
         #expect(model.catalogInstallationState(for: storeEntry(id: id, version: "1.3.0")) == .updateAvailable)
+    }
+
+    @Test func aCatalogUpdateTheWatchRefusedIsNotRecordedAsInstalled() async throws {
+        struct Refusal: Error {}
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let id = UUID()
+        let downloadURL = URL(string: "https://store-\(UUID().uuidString.lowercased()).invalid/timer.pbw")!
+        let package = try makeApplicationPackage(in: directory, applicationID: id, versionLabel: "2.0")
+        StoreStubURLProtocol.answer(downloadURL, with: try Data(contentsOf: package))
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        _ = try await library.upsert(installed(id: id, label: "1.0", storeVersion: "1.0"))
+        let client = MockWatchClient()
+        let model = AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: library,
+            appCatalog: ApplicationCatalog(
+                cacheURL: directory.appending(path: "catalog.json"),
+                session: StoreStubURLProtocol.session()
+            )
+        )
+        await model.loadApplications()
+        await model.scan()
+        await model.connect(to: try #require(model.discoveredWatches.first { $0.model == .pebbleTime2 }))
+        client.writeFailure = Refusal()
+        var release = storeEntry(id: id, version: "2.0")
+        release.downloadURL = downloadURL
+
+        let didInstall = await model.installCatalogApplication(release)
+
+        #expect(!didInstall)
+        #expect(model.catalog.feedback?.isFailure == true)
+        #expect(model.applications.all.first { $0.id == id }?.storeVersion != "2.0")
     }
 
     /// The field is new and optional, so a library written before it exists

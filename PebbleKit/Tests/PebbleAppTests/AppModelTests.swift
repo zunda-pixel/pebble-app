@@ -3,6 +3,7 @@ import PebbleProtocol
 import Defaults
 import Foundation
 import Retry
+import SwiftUI
 import Testing
 @testable import PebbleApp
 
@@ -1083,5 +1084,113 @@ struct AppModelTests {
 
         #expect(model.connectedWatch?.id == discovered.id)
         #expect(client.reorderedApplicationIDs.last == [])
+    }
+
+    @Test
+    func aLibraryThatCouldNotBeReadIsReadAgainOnTheNextAsking() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let libraryURL = directory.appending(path: "applications.json")
+        // A directory where the file should be, which no read gets past.
+        try FileManager.default.createDirectory(at: libraryURL, withIntermediateDirectories: true)
+        let model = AppModel(
+            client: MockWatchClient(),
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: WatchApplicationLibrary(fileURL: libraryURL)
+        )
+        await model.loadApplications()
+        #expect(model.applications.libraryFeedback?.isFailure == true)
+
+        try FileManager.default.removeItem(at: libraryURL)
+        let application = WatchApplication(
+            id: UUID(),
+            shortName: "Timer",
+            longName: "Timer",
+            companyName: "Somebody",
+            versionLabel: "1.0",
+            capabilities: [],
+            targetPlatforms: ["emery"],
+            kind: .watchapp
+        )
+        try JSONEncoder().encode([application]).write(to: libraryURL)
+        await model.loadApplications()
+
+        #expect(model.applications.apps.map(\.id) == [application.id])
+        #expect(model.applications.libraryFeedback == nil)
+    }
+
+    @Test
+    func anEarlierImportsTimerDoesNotExpireTheNextImportsSnapshot() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let library = WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json"))
+        let model = AppModel(
+            client: MockWatchClient(),
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: library
+        )
+        let applicationID = UUID()
+        let snapshot = try await library.snapshot(applicationID: applicationID)
+        model.pendingImportSnapshots[applicationID] = snapshot
+        model.expirePendingSnapshot(applicationID: applicationID, after: .milliseconds(50))
+
+        model.pendingImportSnapshots[applicationID] = snapshot
+        model.expirePendingSnapshot(applicationID: applicationID, after: .seconds(60))
+        try await Task.sleep(for: .milliseconds(200))
+
+        #expect(model.pendingImportSnapshots[applicationID] != nil)
+        model.pendingSnapshotExpiries[applicationID]?.cancel()
+    }
+
+    @Test
+    func activatingAWatchfaceAnswersWhereItsFailureWouldHave() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let previousWatchfaceID = Defaults[.activeWatchfaceID]
+        defer {
+            try? FileManager.default.removeItem(at: directory)
+            Defaults[.activeWatchfaceID] = previousWatchfaceID
+        }
+        let model = AppModel(
+            client: MockWatchClient(),
+            storageDirectory: StorageDirectory(url: directory)
+        )
+        await model.scan()
+        await model.connect(to: try #require(model.discoveredWatches.first))
+        let face = WatchApplication(
+            id: UUID(),
+            shortName: "Face",
+            longName: "Face",
+            companyName: "Somebody",
+            versionLabel: "1.0",
+            capabilities: [],
+            targetPlatforms: ["emery"],
+            kind: .watchface
+        )
+        model.applications.libraryFeedback = .failure("The watchface could not be activated.")
+
+        await model.activateWatchface(face)
+
+        #expect(model.applications.libraryFeedback?.kind == .success)
+        #expect(model.applications.activeWatchfaceID == face.id)
+    }
+
+    @Test
+    func aLanguagePackIsNotStartedWhileAnotherIsInstalling() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let client = MockWatchClient()
+        let model = AppModel(client: client, storageDirectory: StorageDirectory(url: directory))
+        await model.scan()
+        let discovered = try #require(model.discoveredWatches.first)
+        await model.connect(to: discovered)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let pack = directory.appending(path: "ja.pbl")
+        try Data([1, 2, 3]).write(to: pack)
+        model.language.isInstalling = true
+
+        await model.installLanguagePack(from: pack, watchID: discovered.id)
+
+        #expect(client.installedFiles.isEmpty)
+        #expect(model.language.isInstalling)
     }
 }

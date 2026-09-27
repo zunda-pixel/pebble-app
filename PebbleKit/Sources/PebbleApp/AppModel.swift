@@ -118,7 +118,7 @@ public final class AppModel {
         }
         return ApplicationTransfer(
             applicationID: applicationID,
-            name: (applications.apps + applications.watchfaces).first { $0.id == applicationID }?.displayName,
+            name: applications.all.first { $0.id == applicationID }?.displayName,
             progress: progress
         )
     }
@@ -253,8 +253,13 @@ public final class AppModel {
     )
     @ObservationIgnored var lastConnectionError: WatchConnectionError?
     @ObservationIgnored var firmwareUpdateTask: Task<Void, any Error>?
+    /// Which `performFirmwareUpdate` call holds the one update that may run.
+    /// Taken before its first suspension, where `firmwareUpdateTask` can only be
+    /// set after several.
+    @ObservationIgnored var firmwareUpdateClaim: UUID?
     @ObservationIgnored var hasLoadedApplications = false
     @ObservationIgnored var pendingImportSnapshots: [UUID: WatchApplicationLibrarySnapshot] = [:]
+    @ObservationIgnored var pendingSnapshotExpiries: [UUID: Task<Void, Never>] = [:]
     @ObservationIgnored var needsApplicationSynchronization = false
     @ObservationIgnored var hasStarted = false
     @ObservationIgnored var recentNotificationFingerprints: [String: Date] = [:]
@@ -377,6 +382,7 @@ public final class AppModel {
         notificationSourceAppStore = NotificationSourceAppStore(directory: storageDirectory)
         notifications.companionEnabled = Defaults[.companionNotificationsEnabled]
         applications.activeWatchfaceID = Defaults[.activeWatchfaceID]
+        catalog.sourceID = Defaults[.catalogSourceID]
     }
 
     public func start() async {
@@ -396,7 +402,6 @@ public final class AppModel {
         notifications.sourceApps = (try? await notificationSourceAppStore.apps()) ?? []
         notifications.sent = (try? await sentNotificationStore.notifications()) ?? []
         await loadAppGlances()
-        musicCoordinator.start()
         phoneCallCoordinator.start()
         observeWatchesReconnectingThemselves()
         // A watch that has been set up reconnects on its own, so the radio has
@@ -435,8 +440,6 @@ public final class AppModel {
             for connection in activeConnections {
                 try? await connection.client.synchronizeTime()
             }
-            await restorePendingNotifications()
-            pendingAppMessages = (try? await pendingAppMessageStore.messages()) ?? pendingAppMessages
             await flushPendingNotifications()
             await flushPendingAppMessages()
             await synchronizeTimeline()
@@ -555,7 +558,6 @@ public final class AppModel {
             connectingWatchIDs.remove(watch.id)
             refreshConnectionState()
             await recordConnectedWatch(connectedWatch)
-            await restorePendingNotifications()
             await DiagnosticLog.shared.record(category: "connection", message: "Watch connected")
             await synchronizeEverything(on: connection)
         } catch let error as WatchConnectionError {
@@ -625,6 +627,7 @@ public final class AppModel {
             // Operations interrupted by the drop would otherwise leave the
             // app-management UI busy forever.
             clearBusyOperationState(on: connection)
+            if activeConnections.isEmpty { musicCoordinator.watchDisconnected() }
         case .disconnected(let error):
             connections.removeAll { $0 === connection }
             // The charge story starts over with the next connect: a level
@@ -639,6 +642,7 @@ public final class AppModel {
             refreshConnectionState()
             needsApplicationSynchronization = true
             clearBusyOperationState(on: connection)
+            if activeConnections.isEmpty { musicCoordinator.watchDisconnected() }
         case .healthSyncCompleted(let succeeded):
             health.feedback = succeeded
                 ? .success("Health synchronization completed.")

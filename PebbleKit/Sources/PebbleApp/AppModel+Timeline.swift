@@ -121,9 +121,12 @@ extension AppModel {
         guard !removed.isEmpty else { return }
         let identifiers = Set(removed.map(\.id))
         timeline.pins.removeAll { identifiers.contains($0.id) }
-        try? await timelineStore.save(timeline.pins)
+        let saved = (try? await timelineStore.save(timeline.pins)) != nil
         for pin in removed { try? await queueTimelineOperation(.delete(pin.id)) }
         if connectedWatch != nil { await synchronizeTimeline() }
+        if !saved {
+            timeline.feedback = .failure("The change could not be saved.")
+        }
     }
 
     public func synchronizeTimeline() async {
@@ -415,6 +418,8 @@ extension AppModel {
     /// Reads the calendar list for the settings screen, bringing the stored
     /// preferences' identifiers along — EventKit may have reissued them.
     public func loadCalendars() async {
+        // The screen that lists them is the reader asking to see them.
+        try? await calendarBridge.requestAccess()
         guard let calendars = try? await calendarBridge.calendars() else { return }
         timeline.calendars = calendars
         Defaults[.calendarPreferences] = CalendarPreference.migrated(
@@ -461,7 +466,23 @@ extension AppModel {
         await synchronizeCalendar()
     }
 
+    /// For what the reader did — the Synchronize button, the calendar settings —
+    /// and so allowed to ask for the calendar permission first.
     public func synchronizeCalendar() async {
+        if Defaults[.calendarPinsEnabled] {
+            do {
+                try await calendarBridge.requestAccess()
+            } catch {
+                timeline.feedback = .failure("Calendar access or synchronization failed.")
+                return
+            }
+        }
+        await reloadCalendar()
+    }
+
+    /// Reads the calendars into the timeline under whatever permission already
+    /// stands, for the paths nobody on this side started.
+    func reloadCalendar() async {
         do {
             // The master switch empties the fetch rather than skipping the
             // sync: absence is what queues the deletions, on the watch too.
@@ -510,6 +531,13 @@ extension AppModel {
                 await synchronizeCalendarReminders(on: connection)
             }
             timeline.feedback = .success("Calendar synchronized with Timeline.")
+        } catch CalendarBridgeError.accessDenied {
+            // Not a banner: whoever asked for calendar access was answered at
+            // the time, and this read was not the reader's doing.
+            await DiagnosticLog.shared.record(
+                category: "timeline",
+                message: "the calendar was not read: access has not been granted"
+            )
         } catch { timeline.feedback = .failure("Calendar access or synchronization failed.") }
     }
 
@@ -580,8 +608,8 @@ extension AppModel {
             }
             for await _ in ticks.debounce(for: .seconds(2)) {
                 guard !Task.isCancelled else { return }
-                await self?.synchronizeCalendar()
-                await self?.synchronizeRemindersApp()
+                await self?.reloadCalendar()
+                await self?.reloadRemindersApp()
             }
         }
     }

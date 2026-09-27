@@ -126,6 +126,29 @@ struct ChargeNotificationTests {
         #expect(notifier.posted.count == 2)
     }
 
+    @Test func aLevelFromBeforeTheReaderDisconnectedIsNotClimbedFrom() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let client = MockWatchClient()
+        let notifier = SpyNotifier()
+        let model = makeModel(directory: directory, client: client, notifier: notifier)
+        model.notifyWhenFullyChargedEnabled = true
+        await model.scan()
+        let discovered = try #require(model.discoveredWatches.first)
+        await model.connect(to: discovered)
+        let watch = try #require(model.connectedWatch)
+
+        await report(model, watch, level: 95)
+        await model.disconnect(watchID: watch.id)
+        #expect(model.chargeLevels[watch.id] == nil)
+
+        await model.connect(to: discovered)
+        let reconnected = try #require(model.connectedWatch)
+        await report(model, reconnected, level: 100)
+
+        #expect(notifier.posted.isEmpty)
+    }
+
     @Test func nothingIsSaidWhileTheSwitchIsOff() async throws {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }

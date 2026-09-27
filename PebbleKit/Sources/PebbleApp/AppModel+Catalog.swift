@@ -9,17 +9,21 @@ extension AppModel {
     /// The store being browsed. The chosen identifier survives launches; a
     /// stored name no built-in matches falls back to the Pebble store.
     var selectedCatalogSource: CatalogSource {
-        .named(Defaults[.catalogSourceID])
+        .named(catalog.sourceID)
     }
 
     /// Switches the catalog to another store: its own cache, feed, index and
     /// search, all at once. The search is cleared rather than re-run — the old
-    /// results were the other store's answers.
+    /// results were the other store's answers, and so were the lookups made
+    /// for installed applications.
     public func setCatalogSource(_ id: String) async {
-        guard Defaults[.catalogSourceID] != id else { return }
+        guard catalog.sourceID != id else { return }
+        catalog.sourceID = id
         Defaults[.catalogSourceID] = id
         clearCatalogSearch()
         catalog.applications = []
+        catalog.storeEntries = [:]
+        catalog.answeredStoreLookups = []
         await loadCatalog()
         if catalog.applications.isEmpty { await refreshCatalog() }
     }
@@ -30,7 +34,6 @@ extension AppModel {
             catalog.applications = snapshot?.applications ?? []
             catalog.collections = snapshot?.collections ?? []
             catalog.sourceURL = snapshot?.sourceURL
-            catalog.lastUpdated = snapshot?.fetchedAt
         }
         catch { catalog.feedback = .failure("The app catalog cache could not be loaded.") }
     }
@@ -47,7 +50,6 @@ extension AppModel {
             catalog.applications = snapshot.applications
             catalog.collections = snapshot.collections
             catalog.sourceURL = snapshot.sourceURL
-            catalog.lastUpdated = snapshot.fetchedAt
             // Silent on success, like the installs (owner feedback,
             // 2026-09-12): the refreshed rows say it. Cleared so a stale
             // failure does not outlive the refresh that worked after it.
@@ -210,7 +212,7 @@ extension AppModel {
            }) {
             return .incompatible
         }
-        guard let installed = (applications.apps + applications.watchfaces).first(where: { $0.id == application.id }) else {
+        guard let installed = applications.all.first(where: { $0.id == application.id }) else {
             return .available
         }
         // Against the store's own number for what was installed, where there is
@@ -224,16 +226,17 @@ extension AppModel {
             : .installed
     }
 
-    public func installCatalogApplication(_ application: CatalogApplication) async {
+    @discardableResult
+    public func installCatalogApplication(_ application: CatalogApplication) async -> Bool {
         guard application.downloadURL.scheme?.lowercased() == "https" else {
             catalog.feedback = .failure("The catalog provided an unsafe download URL.")
-            return
+            return false
         }
         if catalogInstallationState(for: application) == .incompatible {
             catalog.feedback = .failure("\(application.name) is not compatible with this watch.")
-            return
+            return false
         }
-        guard catalog.installingApplicationID == nil else { return }
+        guard catalog.installingApplicationID == nil else { return false }
         catalog.installingApplicationID = application.id
         defer { catalog.installingApplicationID = nil }
         do {
@@ -241,28 +244,36 @@ extension AppModel {
             let packageURL = try await appCatalog.download(application)
             let decoded = try await Task.detached { try PBWPackageImporter.application(from: packageURL) }.value
             guard decoded.id == application.id else { throw ApplicationCatalogError.applicationIDMismatch }
-            applications.libraryFeedback = nil
-            await importApplication(from: packageURL)
+            applications.importFeedback = nil
+            let imported = await importApplication(from: packageURL)
             try? FileManager.default.removeItem(at: packageURL)
+            guard imported else {
+                // Moved rather than copied: the catalogue list draws both
+                // fields, and the detail screen the reader pressed Install on
+                // draws only this one. An import refused for being busy wrote
+                // its reason to the library's field instead.
+                catalog.feedback = applications.importFeedback ?? applications.libraryFeedback
+                applications.importFeedback = nil
+                return false
+            }
             // Which store release this was, written onto the imported record.
             // The import itself only knows the package, and the package's own
             // label is not reliably the store's number (#117): without this,
             // the same release reads as an update again on the next check.
-            if applications.libraryFeedback == nil,
-               var imported = (applications.apps + applications.watchfaces)
-                   .first(where: { $0.id == application.id }) {
-                imported.storeVersion = application.version
-                if let library = try? await applicationLibrary.upsert(imported) {
+            if var record = applications.all.first(where: { $0.id == application.id }) {
+                record.storeVersion = application.version
+                if let library = try? await applicationLibrary.upsert(record) {
                     updateApplications(library)
                 }
             }
-            // The import speaks for itself when it went wrong. Success is
-            // silent, the same bargain the file import struck (owner feedback,
-            // 2026-09-12): the row's state flipping to Installed says it, and
-            // setting nil is also what ends the Downloading banner above.
-            catalog.feedback = applications.libraryFeedback
+            // Success is silent, the same bargain the file import struck (owner
+            // feedback, 2026-09-12): the row's state flipping to Installed says
+            // it, and setting nil is also what ends the Downloading banner above.
+            catalog.feedback = nil
+            return true
         } catch {
-            catalog.feedback = .failure("The catalog package was rejected: \(error.localizedDescription)")
+            catalog.feedback = .failure("The catalog package was rejected: \(failureReason(for: error))")
+            return false
         }
     }
 
@@ -283,7 +294,7 @@ extension AppModel {
     /// first, and remembers every answer including "no such application".
     public func catalogUpdates() async -> [CatalogApplication] {
         var updates: [CatalogApplication] = []
-        for installed in applications.apps + applications.watchfaces {
+        for installed in applications.all {
             guard let listed = await storeEntry(for: installed.id),
                   catalogInstallationState(for: listed) == .updateAvailable
             else { continue }
@@ -310,8 +321,10 @@ extension AppModel {
         }
         for application in updates {
             applications.managementFeedback = .progress("Downloading \(application.name)…")
-            await installCatalogApplication(application)
-            if applications.libraryFeedback != nil { return }
+            guard await installCatalogApplication(application) else {
+                applications.managementFeedback = catalog.feedback
+                return
+            }
         }
         applications.managementFeedback = .success("Installed \(updates.count) catalog update(s).")
     }

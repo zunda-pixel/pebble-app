@@ -129,6 +129,26 @@ struct WatchSettingsSyncTests {
     }
 
     /// The record is read, and only when it is a switch.
+    @Test func aSettingWrittenEverywhereClearsTheLastRefusal() async throws {
+        struct Refusal: Error {}
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let client = MockWatchClient()
+        let model = makeModel(directory: directory, client: client)
+        await model.scan()
+        await model.connect(to: try #require(model.discoveredWatches.first))
+        // Its own value again, so the process-wide stored copy is left as it was.
+        let unchanged = model.watchSettings.activity
+
+        client.writeFailure = Refusal()
+        await model.setActivitySettings(unchanged)
+        #expect(model.watchSettings.feedback?.isFailure == true)
+
+        client.writeFailure = nil
+        await model.setActivitySettings(unchanged)
+        #expect(model.watchSettings.feedback == nil)
+    }
+
     @Test func aRecordIsOnlyReadWhenItIsOneByteUnderAKnownName() {
         let key = WatchSettingsCodec.key(for: .backlight)
 

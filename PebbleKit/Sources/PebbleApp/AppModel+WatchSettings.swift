@@ -64,6 +64,7 @@ extension AppModel {
             watchSettings.values[setting] = rawValue
         }
         persistWatchSettingValues()
+        watchSettings.feedback = nil
         for connection in activeConnections {
             for (setting, rawValue) in changed {
                 do {
@@ -117,6 +118,7 @@ extension AppModel {
     public func setQuickLaunch(_ button: QuickLaunchButton, to assignment: QuickLaunchAssignment) async {
         watchSettings.quickLaunch[button] = assignment
         persistQuickLaunchAssignments()
+        watchSettings.feedback = nil
         for connection in activeConnections {
             do {
                 try await connection.client.write(.quickLaunch(button, assignment))
@@ -146,6 +148,7 @@ extension AppModel {
     public func setActivitySettings(_ settings: ActivitySettings) async {
         watchSettings.activity = settings
         Defaults[.activitySettings] = settings
+        watchSettings.feedback = nil
         for connection in activeConnections {
             do {
                 try await connection.client.write(.activitySettings(settings))
@@ -162,6 +165,7 @@ extension AppModel {
         guard preferences.isValid else { return }
         watchSettings.heartRateZones = preferences
         Defaults[.heartRateZonePreferences] = preferences
+        watchSettings.feedback = nil
         for connection in activeConnections {
             do {
                 try await connection.client.write(.heartRateZones(preferences))
@@ -174,6 +178,7 @@ extension AppModel {
     public func setHeartRateSettings(_ settings: HeartRateSettings) async {
         watchSettings.heartRate = settings
         Defaults[.heartRateSettings] = settings
+        watchSettings.feedback = nil
         for connection in activeConnections {
             do {
                 try await connection.client.write(.heartRateSettings(settings))
@@ -186,6 +191,7 @@ extension AppModel {
     public func setBloodOxygenSettings(_ settings: BloodOxygenSettings) async {
         watchSettings.bloodOxygen = settings
         Defaults[.bloodOxygenSettings] = settings
+        watchSettings.feedback = nil
         for connection in activeConnections {
             do {
                 try await connection.client.write(.bloodOxygenSettings(settings))
@@ -198,6 +204,7 @@ extension AppModel {
     public func setReminderAppEnabled(_ isEnabled: Bool) async {
         timeline.isReminderAppEnabled = isEnabled
         Defaults[.reminderAppEnabled] = isEnabled
+        watchSettings.feedback = nil
         for connection in activeConnections {
             do {
                 try await connection.client.write(.reminderAppState(isEnabled ? .enabled : .notEnabled))
@@ -340,35 +347,20 @@ extension AppModel {
         _ connection: WatchConnection,
         _ error: any Error
     ) -> LocalizedStringKey {
-        "\(connection.watch.name) did not accept the setting. \(error.localizedDescription)"
+        "\(connection.watch.name) did not accept the setting. \(Text(refusalReason(for: error)))"
     }
 }
 
 extension AppModel {
-    /// The mean day of the last thirty, over the days that had anything to
-    /// say: a watch off the wrist on Sunday should not drag the average down
-    /// as a Sunday of zero steps. Nil where there is no history at all —
+    /// Nil where there is no history at all, rather than an average of zero:
     /// half a comparison is worse than none.
     static func thirtyDayAverages(
         of samples: [WatchHealthSample],
         now: Date = .now
     ) -> (steps: UInt32, sleepSeconds: UInt32)? {
-        let calendar = Calendar.current
-        let startOfToday = calendar.startOfDay(for: now)
-        guard let oldest = calendar.date(byAdding: .day, value: -30, to: startOfToday) else {
-            return nil
-        }
-        let month = samples.filter { $0.date >= oldest && $0.date < startOfToday }
-        let stepDays = month.filter { $0.steps > 0 }
-        let sleepDays = month.filter { $0.sleepMinutes > 0 }
-        guard !stepDays.isEmpty || !sleepDays.isEmpty else { return nil }
-        let steps = stepDays.isEmpty
-            ? 0
-            : stepDays.reduce(0) { $0 + $1.steps } / stepDays.count
-        let sleepMinutes = sleepDays.isEmpty
-            ? 0
-            : sleepDays.reduce(0) { $0 + $1.sleepMinutes } / sleepDays.count
-        return (UInt32(clamping: steps), UInt32(clamping: sleepMinutes * 60))
+        let averages = samples.averages(over: 30, endingBefore: now)
+        guard !averages.isEmpty else { return nil }
+        return (UInt32(clamping: averages.steps), UInt32(clamping: averages.sleepMinutes * 60))
     }
 
     /// What this weekday usually looks like: the median over the past four

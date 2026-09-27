@@ -153,7 +153,18 @@ final class SuspendingWatchClient: WatchClient {
     func reorderApplications(_ applicationIDs: [UUID]) async throws {}
     func respondToAppMessage(transactionID: UInt8, acknowledged: Bool) async throws {}
     func launchApplication(id: UUID) async throws {}
-    func installFirmware(_ package: PBZFirmwarePackage) async throws {}
+    /// How long each firmware transfer takes, one entry per transfer in the
+    /// order they start; once they run out a transfer is instant. Each runs to
+    /// the end whatever happens to the task that asked, the way bytes already
+    /// on the radio do, and only then reports the cancellation.
+    var firmwareTransferTimes: [Duration] = []
+
+    func installFirmware(_ package: PBZFirmwarePackage) async throws {
+        guard !firmwareTransferTimes.isEmpty else { return }
+        let time = firmwareTransferTimes.removeFirst()
+        await Task { try? await Task.sleep(for: time) }.value
+        try Task.checkCancellation()
+    }
     func installFile(_ bytes: [UInt8], filename: String) async throws {}
     func sendImage(token: UInt8, kindValue: UInt8, image: EncodedImage?) async throws {}
     func declineImageKind(token: UInt8, kindValue: UInt8) async throws {}

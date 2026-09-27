@@ -41,6 +41,9 @@ public final class WatchConnection: Identifiable {
     /// separately, and one of them waiting is no reason to answer the other with
     /// "busy".
     @ObservationIgnored var appFetchTask: Task<Void, Never>?
+    /// Which fetch `appFetchTask` is, for the task itself to check: a task
+    /// cannot compare itself against the handle it was stored under.
+    @ObservationIgnored var appFetchToken: UUID?
 
     @ObservationIgnored var synchronizedNotificationAppRecords: [String: [UInt8]] = [:]
     @ObservationIgnored var synchronizedAppGlances: [UUID: [UInt8]] = [:]
@@ -124,6 +127,7 @@ public final class WatchConnection: Identifiable {
             synchronizedNotificationAppRecords = [:]
             synchronizedAppGlances = [:]
             endTransfer()
+            voiceCoordinator.reset()
         case .disconnected(let error):
             phase = .disconnected(error)
             synchronizedNotificationAppRecords = [:]
@@ -151,6 +155,7 @@ public final class WatchConnection: Identifiable {
     func cancelApplicationFetch() {
         appFetchTask?.cancel()
         appFetchTask = nil
+        appFetchToken = nil
     }
 
     func consumePostReconnectSync() -> Bool {

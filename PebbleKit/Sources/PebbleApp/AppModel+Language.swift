@@ -12,6 +12,7 @@ extension AppModel {
     // Fetched before the watch is asked for anything: finding out afterwards that
     // it went away beats holding a transfer open through a download.
     public func installLanguagePack(_ pack: LanguagePack, watchID: WatchID? = nil) async {
+        guard !language.isInstalling else { return }
         guard let connection = connection(for: watchID), connection.isConnected else {
             language.feedback = .failure("Connect the watch to change its language.")
             return
@@ -30,6 +31,7 @@ extension AppModel {
     }
 
     public func installLanguagePack(from url: URL, watchID: WatchID? = nil) async {
+        guard !language.isInstalling else { return }
         guard let connection = connection(for: watchID), connection.isConnected else {
             language.feedback = .failure("Connect the watch to change its language.")
             return
@@ -72,7 +74,7 @@ extension AppModel {
             language.feedback = .success("\(name) is installed. The watch switches to it now.")
             await confirmLanguageChange(on: connection)
         } catch {
-            language.feedback = .failure("\(name) could not be installed. \(error.localizedDescription)")
+            language.feedback = .failure("\(name) could not be installed. \(failureReason(for: error))")
         }
     }
 }

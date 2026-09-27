@@ -3,18 +3,38 @@ import Foundation
 import SwiftUI
 
 extension AppModel {
-    /// Brings the phone's Reminders app and the watch to the same timeline.reminders.
+    /// The Synchronize button: the reader asking, so the one path here that may
+    /// ask for the Reminders permission.
+    public func synchronizeRemindersApp() async {
+        do {
+            try await remindersAppStore.requestAccess()
+        } catch {
+            timeline.reminderFeedback = .failure("The Reminders app could not be read.")
+            return
+        }
+        await reloadRemindersApp()
+    }
+
+    /// Brings the phone's Reminders app and the watch to the same reminders,
+    /// under whatever permission already stands — EventKit's change notices
+    /// reach this too, and nobody on this side started those.
     ///
     /// What the watch made goes there first, so that the reading which follows
     /// finds it and does not take it for one the reader has finished with.
-    public func synchronizeRemindersApp() async {
-        await loadReminders()
+    func reloadRemindersApp() async {
+        guard await loadReminders() else { return }
         for reminder in timeline.reminders where reminder.isFromWatch && reminder.timestamp > .now {
             await mirrorInRemindersApp(reminder)
         }
         let items: [RemindersAppItem]
         do {
             items = try await remindersAppStore.reminders()
+        } catch RemindersBridgeError.accessDenied {
+            await DiagnosticLog.shared.record(
+                category: "timeline",
+                message: "the Reminders app was not read: access has not been granted"
+            )
+            return
         } catch {
             timeline.reminderFeedback = .failure("The Reminders app could not be read.")
             await DiagnosticLog.shared.record(

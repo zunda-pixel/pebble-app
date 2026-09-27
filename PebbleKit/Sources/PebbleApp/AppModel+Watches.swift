@@ -116,7 +116,10 @@ extension AppModel {
     func close(_ connection: WatchConnection) async {
         connections.removeAll { $0 === connection }
         await connection.close()
+        chargeLevels.removeValue(forKey: connection.watch.id)
+        chargeNotified.remove(connection.watch.id)
         clearBusyOperationState(on: connection)
+        if activeConnections.isEmpty { musicCoordinator.watchDisconnected() }
         needsApplicationSynchronization = true
         lastConnectionError = nil
         refreshConnectionState()
@@ -126,7 +129,7 @@ extension AppModel {
         do {
             diagnostics.reportURL = try await DiagnosticLog.shared.exportReport(
                 watch: connectedWatch,
-                applications: applications.apps + applications.watchfaces
+                applications: applications.all
             )
             // Nothing to say on success: the Share row appearing is the answer,
             // and this clears whatever an earlier attempt left behind.

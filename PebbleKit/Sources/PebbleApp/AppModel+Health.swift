@@ -10,7 +10,6 @@ extension AppModel {
     }
 
     public func requestHealthSync() async {
-        guard !activeConnections.isEmpty else { return }
         for connection in activeConnections {
             await requestHealthSync(on: connection)
         }
@@ -69,7 +68,12 @@ extension AppModel {
     }
 
     public func deleteHealthData() async {
-        try? await healthStore.deleteAll()
+        do {
+            try await healthStore.deleteAll()
+        } catch {
+            health.feedback = .failure("Local Pebble health data could not be deleted.")
+            return
+        }
         health.samples = []
         health.exportURL = nil
         health.feedback = .success("Local Pebble health data deleted.")

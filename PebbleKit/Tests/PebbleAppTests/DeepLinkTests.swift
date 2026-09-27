@@ -98,7 +98,7 @@ struct DeepLinkTests {
 
         #expect(model.deepLinks.pendingPackage == nil)
         #expect(model.deepLinks.requestedSection == .apps)
-        #expect((model.applications.apps + model.applications.watchfaces).contains { $0.id == applicationID })
+        #expect(model.applications.all.contains { $0.id == applicationID })
     }
 
     /// Waved away, the offer leaves nothing behind: no pending state and no
@@ -115,7 +115,7 @@ struct DeepLinkTests {
 
         #expect(model.deepLinks.pendingPackage == nil)
         #expect(!FileManager.default.fileExists(atPath: copy.path()))
-        #expect((model.applications.apps + model.applications.watchfaces).isEmpty)
+        #expect(model.applications.all.isEmpty)
     }
 
     /// A link to a file that is not a watch app is answered with a failure and

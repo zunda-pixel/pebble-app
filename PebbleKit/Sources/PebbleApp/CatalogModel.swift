@@ -14,7 +14,8 @@ public final class CatalogModel {
     /// Where these came from, so that asking the store about one application
     /// goes to the store the rest of them came from.
     public internal(set) var sourceURL: URL?
-    public internal(set) var lastUpdated: Date?
+    /// The store being browsed, by `CatalogSource.id`.
+    public internal(set) var sourceID = CatalogSource.pebble.id
     public internal(set) var isUpdating = false
     public internal(set) var installingApplicationID: UUID?
     public internal(set) var feedback: FeatureFeedback?
@@ -42,6 +43,6 @@ public final class CatalogModel {
     public internal(set) var hasMoreSearchResults = false
     public internal(set) var isSearching = false
     /// The next page to ask the index for.
-    var searchPage = 0
-    var searchKind: WatchApplicationKind?
+    @ObservationIgnored var searchPage = 0
+    @ObservationIgnored var searchKind: WatchApplicationKind?
 }

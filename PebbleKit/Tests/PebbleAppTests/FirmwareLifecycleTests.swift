@@ -84,7 +84,7 @@ struct FirmwareLifecycleTests {
         let package = makeFirmwarePackage()
         try await model.pendingFirmwareUpdateStore.save(package, journal: FirmwareUpdateJournal(
             watchID: watch.id,
-            hardwareRevision: WatchBoard.obelixPVT.rawValue,
+            board: .obelixPVT,
             previousVersion: nil,
             targetVersion: nil,
             packageSHA256: package.sha256
@@ -132,7 +132,7 @@ struct FirmwareLifecycleTests {
         let package = makeFirmwarePackage(versionTag: "v4.36.2")
         try await model.pendingFirmwareUpdateStore.save(package, journal: FirmwareUpdateJournal(
             watchID: watch.id,
-            hardwareRevision: WatchBoard.obelixPVT.rawValue,
+            board: .obelixPVT,
             previousVersion: "v4.9.142",
             targetVersion: "v4.36.2",
             packageSHA256: package.sha256
@@ -179,7 +179,7 @@ struct FirmwareLifecycleTests {
         let package = makeFirmwarePackage(versionTag: "v4.36.2")
         try await model.pendingFirmwareUpdateStore.save(package, journal: FirmwareUpdateJournal(
             watchID: watch.id,
-            hardwareRevision: WatchBoard.obelixPVT.rawValue,
+            board: .obelixPVT,
             previousVersion: nil,
             targetVersion: "v4.36.2",
             packageSHA256: package.sha256
@@ -226,7 +226,7 @@ struct FirmwareLifecycleTests {
         let package = makeFirmwarePackage(versionTag: "v4.36.2")
         try await model.pendingFirmwareUpdateStore.save(package, journal: FirmwareUpdateJournal(
             watchID: watch.id,
-            hardwareRevision: WatchBoard.obelixPVT.rawValue,
+            board: .obelixPVT,
             previousVersion: "v4.9.142",
             targetVersion: "v4.36.2",
             packageSHA256: package.sha256
@@ -245,6 +245,146 @@ struct FirmwareLifecycleTests {
         #expect(model.firmware.feedback == nil)
     }
 
+    @Test
+    func choosingAnotherPackageDuringATransferLeavesTheStagedOneAlone() async throws {
+        let client = MockWatchClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        )
+        let package = makeFirmwarePackage(versionTag: "v4.36.2")
+        try await model.pendingFirmwareUpdateStore.save(package, journal: FirmwareUpdateJournal(
+            watchID: WatchID("watch-1"),
+            board: .obelixPVT,
+            previousVersion: nil,
+            targetVersion: "v4.36.2",
+            packageSHA256: package.sha256
+        ))
+        let running = Task<Void, any Error> { try await Task.sleep(for: .seconds(60)) }
+        model.firmwareUpdateTask = running
+
+        await model.installFirmware(from: try makeFirmwareArchive(in: directory), watchID: WatchID("watch-1"))
+
+        #expect(try await model.pendingFirmwareUpdateStore.journal()?.packageSHA256 == package.sha256)
+        #expect(model.firmware.feedback == .failure("This firmware is already being transferred."))
+
+        running.cancel()
+        model.firmwareUpdateTask = nil
+        await model.discardPendingFirmwareUpdate()
+    }
+
+    @Test
+    func aCancelledTransferFinishingLateLeavesTheNextOneRunning() async throws {
+        let client = SuspendingWatchClient()
+        // The second outlasts the first by far more than the cancel and the
+        // restart take, so it is still running when the first one ends.
+        client.firmwareTransferTimes = [.milliseconds(300), .seconds(1)]
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        )
+        let watch = ConnectedWatch(
+            id: WatchID("watch-1"),
+            name: "My Pebble",
+            model: .pebbleTime2,
+            batteryLevel: nil,
+            version: WatchVersionInformation(
+                firmwareVersion: "v4.9.142",
+                serialNumber: nil,
+                hardwarePlatform: 18
+            )
+        )
+        let connection = WatchConnection(client: client, watch: watch)
+        let package = makeFirmwarePackage(versionTag: "v4.36.2")
+        try await model.pendingFirmwareUpdateStore.save(package, journal: FirmwareUpdateJournal(
+            watchID: watch.id,
+            board: .obelixPVT,
+            previousVersion: nil,
+            targetVersion: "v4.36.2",
+            packageSHA256: package.sha256
+        ))
+
+        let first = Task { try await model.performFirmwareUpdate(package, on: connection) }
+        while model.firmwareUpdateTask == nil { try await Task.sleep(for: .milliseconds(5)) }
+        await model.cancelFirmwareUpdate()
+        let second = Task { try await model.performFirmwareUpdate(package, on: connection) }
+        while model.firmwareUpdateTask == nil { try await Task.sleep(for: .milliseconds(5)) }
+
+        await #expect(throws: CancellationError.self) { try await first.value }
+        #expect(model.firmwareUpdateTask != nil)
+        #expect(connection.transferProgress(for: .firmware) != nil)
+
+        try await second.value
+        #expect(model.firmwareUpdateTask == nil)
+        await model.discardPendingFirmwareUpdate()
+    }
+
+    @Test
+    func anotherBoardsDownloadIsNotInstalledOnThisWatch() async throws {
+        let client = MockWatchClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        )
+        await model.scan()
+        let discovered = try #require(model.discoveredWatches.first)
+        await model.connect(to: discovered)
+        let board = try #require(model.board(for: discovered.id))
+        let otherBoard = try #require(WatchBoard.allCases.first { $0 != board })
+        model.firmware.downloaded = DownloadedFirmware(
+            versionTag: "v4.37.0",
+            board: otherBoard,
+            url: try makeFirmwareArchive(in: directory)
+        )
+
+        await model.installDownloadedFirmware(watchID: discovered.id)
+
+        #expect(model.firmware.journal == nil)
+        #expect(client.installedFirmwarePackages.isEmpty)
+        #expect(model.firmware.feedback?.isFailure == true)
+    }
+
+    @Test
+    func confirmingARecoveryUpdateForAnAbsentWatchSaysSo() async throws {
+        let client = MockWatchClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            client: client,
+            storageDirectory: StorageDirectory(url: directory),
+            applicationLibrary: WatchApplicationLibrary(fileURL: directory.appending(path: "applications.json")),
+            watchStore: SavedWatchStore(fileURL: directory.appending(path: "watches.json"))
+        )
+        let package = makeFirmwarePackage()
+        try await model.pendingFirmwareUpdateStore.save(package, journal: FirmwareUpdateJournal(
+            watchID: WatchID("away"),
+            board: .obelixPVT,
+            previousVersion: nil,
+            targetVersion: nil,
+            packageSHA256: package.sha256
+        ))
+        model.firmware.requiresConfirmation = true
+
+        await model.confirmRecoveryFirmwareUpdate()
+
+        #expect(model.firmware.feedback?.isFailure == true)
+        #expect(model.firmware.requiresConfirmation)
+        #expect(client.installedFirmwarePackages.isEmpty)
+        await model.discardPendingFirmwareUpdate()
+    }
+
     private func makeFirmwarePackage(versionTag: String? = nil) -> PBZFirmwarePackage {
         let firmware = Data([4, 3, 2, 1])
         return PBZFirmwarePackage(
@@ -253,7 +393,7 @@ struct FirmwareLifecycleTests {
                 firmware: PBZFirmwareBlob(
                     name: "firmware.bin",
                     type: "normal",
-                    hardwareRevision: WatchBoard.obelixPVT.rawValue,
+                    boardName: WatchBoard.obelixPVT.rawValue,
                     size: firmware.count,
                     crc: PebbleCRC32.calculate([UInt8](firmware)),
                     versionTag: versionTag,
