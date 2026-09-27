@@ -976,8 +976,8 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         failPulls(error)
         failAppReorder(error)
         finishFirmwareControl(throwing: error)
-        // `AppModel` keeps its own list of undelivered messages and flushes it
-        // on the next connection, so a copy held here would be sent twice.
+        // `AppModel` queues a message whose link went and flushes it on the
+        // next connection, so a copy held here would be sent twice.
         appMessages.failAll(error)
     }
 

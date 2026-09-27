@@ -477,6 +477,7 @@ extension AppModel {
                 )
                 return
             }
+            companionRuntimeWatchID = connection.watch.id
             try await companionRuntime.load(source: source, application: application)
             try await companionRuntime.deliver(message)
             try await connection.client.respondToAppMessage(
@@ -576,15 +577,41 @@ extension AppModel {
         }
     }
 
-    func sendOrQueueAppMessage(applicationID: UUID, tuples: [AppMessageTuple]) async throws {
-        guard let connection = activeConnections.first else {
-            pendingAppMessages.append(StoredAppMessage(applicationID: applicationID, tuples: tuples))
-            if pendingAppMessages.count > 50 { pendingAppMessages.removeFirst(pendingAppMessages.count - 50) }
-            try await pendingAppMessageStore.save(pendingAppMessages)
-            return
-        }
-        try await connection.client.sendAppMessage(applicationID: applicationID, tuples: tuples)
+    /// The connection the companion script's watch is on, else the first.
+    var companionRuntimeConnection: WatchConnection? {
+        activeConnections.first { $0.watch.id == companionRuntimeWatchID } ?? activeConnections.first
     }
+
+    /// Throws whenever the message did not reach the watch, including when it
+    /// was queued for the next connection: the script is told it failed, which
+    /// is what happened. Not retried — a refusal means the app is not running,
+    /// and it is the same refusal a moment later.
+    func sendOrQueueAppMessage(applicationID: UUID, tuples: [AppMessageTuple]) async throws {
+        let destination = companionRuntimeWatchID
+        let message = StoredAppMessage(applicationID: applicationID, tuples: tuples, watchID: destination)
+        guard let connection = activeConnections.first(where: { destination == nil || $0.watch.id == destination }) else {
+            try await queue(message)
+            throw WatchConnectionError.disconnected
+        }
+        do {
+            try await connection.client.sendAppMessage(applicationID: applicationID, tuples: tuples)
+        } catch let error as WatchConnectionError where !error.isWorthAnotherAttempt {
+            // The link went with the message on it: the transport kept no copy,
+            // so this is the only one.
+            try await queue(message)
+            throw error
+        }
+    }
+
+    private func queue(_ message: StoredAppMessage) async throws {
+        pendingAppMessages.append(message)
+        if pendingAppMessages.count > 50 { pendingAppMessages.removeFirst(pendingAppMessages.count - 50) }
+        try await pendingAppMessageStore.save(pendingAppMessages)
+    }
+
+    /// How long a queued message is worth delivering. A settings change made a
+    /// day ago is one the reader has likely made again since.
+    static var appMessageLifetime: TimeInterval { 24 * 60 * 60 }
 
     func flushPendingAppMessages() async {
         // The same wait-then-run as the notification flush, for the same hop —
@@ -600,14 +627,37 @@ extension AppModel {
         await flush.value
     }
 
+    /// A refusal holds back only the messages for that app on that watch: the
+    /// watch refuses anything for an app that is not running
+    /// (`app_message_inbox.c`), and one refused message at the front used to
+    /// keep every other app's waiting behind it for good.
     private func deliverPendingAppMessages() async {
-        while let connection = activeConnections.first, let message = pendingAppMessages.first {
+        let now = Date()
+        pendingAppMessages.removeAll { now.timeIntervalSince($0.createdAt) > Self.appMessageLifetime }
+        var attempted: Set<UUID> = []
+        var refused: Set<String> = []
+        var unreachable: Set<WatchID> = []
+        while let message = pendingAppMessages.first(where: { !attempted.contains($0.id) }) {
+            attempted.insert(message.id)
+            guard let connection = activeConnections.first(where: { connection in
+                !unreachable.contains(connection.watch.id)
+                    && (message.watchID == nil || message.watchID == connection.watch.id)
+            }) else { continue }
+            // Kept in order behind a refused one for the same app.
+            let key = "\(connection.watch.id.rawValue)|\(message.applicationID)"
+            guard !refused.contains(key) else { continue }
             do {
                 try await connection.client.sendAppMessage(
                     applicationID: message.applicationID,
                     tuples: message.tuples
                 )
-            } catch { break }
+            } catch AppMessageClientError.negativeAcknowledgement {
+                refused.insert(key)
+                continue
+            } catch {
+                unreachable.insert(connection.watch.id)
+                continue
+            }
             // Removed by identity: sending suspends, so the message at the front
             // afterwards need not be the one just sent.
             pendingAppMessages.removeAll { $0.id == message.id }

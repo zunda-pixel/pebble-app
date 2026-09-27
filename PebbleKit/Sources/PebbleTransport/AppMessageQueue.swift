@@ -92,8 +92,8 @@ final class AppMessageQueue {
     }
 
     /// The link is gone: what was in flight is over, and so is everything behind
-    /// it. `AppModel` keeps its own list of undelivered messages and flushes that
-    /// on the next connection, so a copy held here would be sent twice.
+    /// it. `AppModel` queues a message whose link went and flushes it on the
+    /// next connection, so a copy held here would be sent twice.
     func failAll(_ error: any Error) {
         deadline?.cancel()
         deadline = nil

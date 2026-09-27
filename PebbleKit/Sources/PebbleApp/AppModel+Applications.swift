@@ -101,12 +101,13 @@ extension AppModel {
     /// this launch the way the PKJS lifecycle promises. The lazy starts on
     /// configuration and on an incoming appmessage remain as the net under a
     /// run-state event that never came.
-    func launchCompanionRuntime(applicationID: UUID) async {
+    func launchCompanionRuntime(applicationID: UUID, on watchID: WatchID) async {
         guard let application = applications.all
             .first(where: { $0.id == applicationID }),
             application.hasCompanionJavaScript,
             let source = ((try? await applicationLibrary.companionJavaScript(applicationID: applicationID)) ?? nil)
         else { return }
+        companionRuntimeWatchID = watchID
         try? await companionRuntime.relaunch(source: source, application: application)
     }
 

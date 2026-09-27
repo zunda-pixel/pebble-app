@@ -255,6 +255,10 @@ public final class AppModel {
     /// not a catalogue that answered "up to date".
     var firmwareCheckedAt: [String: Date] = [:]
     var pendingAppMessages: [StoredAppMessage] = []
+    /// The watch whose app the companion script is running for: the one that
+    /// launched it or last sent it a message. A reply goes back there, not to
+    /// whichever watch happens to be first.
+    @ObservationIgnored var companionRuntimeWatchID: WatchID?
     let calendarBridge = CalendarBridge()
     // Held behind its protocol so a test can answer for the Reminders app,
     // which nothing can write to without a person saying yes to it first.
@@ -317,7 +321,9 @@ public final class AppModel {
                 body: body
             )
         },
-        activeWatchHandler: { [weak self] in self?.connectedWatch },
+        activeWatchHandler: { [weak self] in
+            self?.companionRuntimeConnection?.watch ?? self?.connectedWatch
+        },
         // The same position the weather is fetched for. A script asking for one
         // is asking the phone, because WebKit gives an app no way to grant the
         // web's own `navigator.geolocation`.
@@ -717,7 +723,12 @@ public final class AppModel {
                 // so a launch is what makes `ready` fire — every launch, not
                 // only the first (#130).
                 Task { [weak self] in
-                    await self?.launchCompanionRuntime(applicationID: id)
+                    await self?.launchCompanionRuntime(applicationID: id, on: connection.watch.id)
+                    // What was queued for this app was refused while it was not
+                    // running; now it is.
+                    if self?.pendingAppMessages.contains(where: { $0.applicationID == id }) == true {
+                        await self?.flushPendingAppMessages()
+                    }
                 }
             case .stopped(let id):
                 if applications.activeWatchfaceIDs[connection.watch.id] == id {

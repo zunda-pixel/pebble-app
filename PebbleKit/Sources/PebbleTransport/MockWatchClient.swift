@@ -178,7 +178,13 @@ public final class MockWatchClient: WatchClient {
         appFetchResponses.append(status)
     }
 
+    /// The apps the watch is not running, whose messages it refuses.
+    public var appsRefusingMessages: Set<UUID> = []
+
     public func sendAppMessage(applicationID: UUID, tuples: [AppMessageTuple]) async throws {
+        if appsRefusingMessages.contains(applicationID) {
+            throw AppMessageClientError.negativeAcknowledgement
+        }
         sentAppMessages.append(AppMessageData(
             transactionID: nextTransactionID,
             applicationID: applicationID,
