@@ -203,16 +203,6 @@
         }
       }
     },
-    "%@ ready" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "%@ 準備完了"
-          }
-        }
-      }
-    },
     "%@ still has %@. %@" : {
       "localizations" : {
         "en" : {
@@ -3209,16 +3199,6 @@
         }
       }
     },
-    "Installing…" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "インストール中…"
-          }
-        }
-      }
-    },
     "It installs as soon as this watch connects." : {
       "localizations" : {
         "ja" : {
@@ -4605,16 +4585,6 @@
         }
       }
     },
-    "Recovery firmware" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "リカバリファームウェア"
-          }
-        }
-      }
-    },
     "Recovery firmware is ready. Confirm to continue." : {
       "localizations" : {
         "ja" : {
@@ -5221,6 +5191,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "小"
+          }
+        }
+      }
+    },
+    "Software Update" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ソフトウェアアップデート"
           }
         }
       }
@@ -7067,16 +7047,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "アップデート"
-          }
-        }
-      }
-    },
-    "Update waiting" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アップデート待機中"
           }
         }
       }

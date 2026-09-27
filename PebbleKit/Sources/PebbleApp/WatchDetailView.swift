@@ -129,8 +129,6 @@ struct WatchDetailView: View {
         let watchSettings = currentWatchSettings(board: watch.board)
         WatchDetailContent(
             watch: watch,
-            firmwareJournalPhase: model.firmware[watchID].journal?.phase,
-            downloadedFirmwareVersion: model.downloadedFirmware(for: watchID)?.versionTag,
             languageName: languageName,
             backlightSummary: BacklightSettingsContent.summary(of: watchSettings),
             quietTimeSummary: QuietTimeSettingsContent.summary(of: watchSettings),
@@ -182,8 +180,6 @@ struct WatchDetailContent<
     DiagnosticsDestination: View
 >: View {
     var watch: WatchSummary
-    var firmwareJournalPhase: FirmwareUpdatePhase?
-    var downloadedFirmwareVersion: String?
     var languageName: String?
     var backlightSummary: LocalizedStringKey
     var quietTimeSummary: LocalizedStringKey
@@ -202,25 +198,6 @@ struct WatchDetailContent<
     @ViewBuilder var languageDestination: () -> LanguageDestination
     @ViewBuilder var settingsDestination: (WatchSettingsPage) -> SettingsDestination
     @ViewBuilder var diagnosticsDestination: () -> DiagnosticsDestination
-
-    // A version is a version in any language, so it is not translated.
-    private var firmwareSummary: Text {
-        if let firmwareJournalPhase {
-            return firmwareJournalPhase == .transferring || firmwareJournalPhase == .installing
-                ? Text("Installing…")
-                : Text("Update waiting")
-        }
-        if watch.isRunningRecoveryFirmware {
-            return Text("Recovery firmware")
-        }
-        if let downloadedFirmwareVersion {
-            return Text("\(downloadedFirmwareVersion) ready")
-        }
-        guard let version = watch.firmwareVersion else {
-            return Text("Unknown")
-        }
-        return Text(verbatim: version)
-    }
 
     private var languageSummary: Text {
         guard let languageName else {
@@ -284,18 +261,35 @@ struct WatchDetailContent<
                 NavigationLink {
                     firmwareDestination()
                 } label: {
-                    LabeledContent("Firmware") { firmwareSummary }
+                    Text("Software Update")
                 }
-                NavigationLink {
-                    languageDestination()
-                } label: {
-                    LabeledContent("Language") { languageSummary }
+            }
+
+            Section("Connection") {
+                LabeledContent("Status") {
+                    switch watch.phase {
+                    case .connected:
+                        Text("Connected")
+                    case .reconnecting:
+                        Text("Reconnecting…")
+                    case .disconnected, nil:
+                        Text("Not connected")
+                    }
                 }
-                NavigationLink {
-                    diagnosticsDestination()
-                } label: {
-                    Text("Diagnostics")
+                if watch.phase == nil, watch.isSaved {
+                    Button("Connect", systemImage: "applewatch.radiowaves.left.and.right", action: connect)
+                        .disabled(watch.isConnecting)
                 }
+                if watch.isSaved {
+                    Toggle("Connect Automatically", isOn: Binding(
+                        get: { watch.automaticallyConnects },
+                        set: { setAutomaticallyConnects($0) }
+                    ))
+                }
+                if watch.phase != nil {
+                    Button("Disconnect", role: .destructive, action: disconnect)
+                }
+                FeedbackBanner(feedback: connectionFeedback)
             }
 
             Section {
@@ -313,6 +307,11 @@ struct WatchDetailContent<
                     settingsDestination(.appearance)
                 } label: {
                     Text("Appearance")
+                }
+                NavigationLink {
+                    languageDestination()
+                } label: {
+                    LabeledContent("Language") { languageSummary }
                 }
                 NavigationLink {
                     settingsDestination(.backlight)
@@ -354,31 +353,12 @@ struct WatchDetailContent<
                 Text("Turns the watch's own Reminders app on, which is where the reminders added on the Timeline screen appear.")
             }
 
-            Section("Connection") {
-                LabeledContent("Status") {
-                    switch watch.phase {
-                    case .connected:
-                        Text("Connected")
-                    case .reconnecting:
-                        Text("Reconnecting…")
-                    case .disconnected, nil:
-                        Text("Not connected")
-                    }
+            Section {
+                NavigationLink {
+                    diagnosticsDestination()
+                } label: {
+                    Text("Diagnostics")
                 }
-                if watch.phase == nil, watch.isSaved {
-                    Button("Connect", systemImage: "applewatch.radiowaves.left.and.right", action: connect)
-                        .disabled(watch.isConnecting)
-                }
-                if watch.isSaved {
-                    Toggle("Connect Automatically", isOn: Binding(
-                        get: { watch.automaticallyConnects },
-                        set: { setAutomaticallyConnects($0) }
-                    ))
-                }
-                if watch.phase != nil {
-                    Button("Disconnect", role: .destructive, action: disconnect)
-                }
-                FeedbackBanner(feedback: connectionFeedback)
             }
 
             Section {
@@ -448,8 +428,6 @@ struct WatchDetailContent<
     NavigationStack {
         WatchDetailContent(
             watch: PreviewSamples.connectedSummary,
-            firmwareJournalPhase: nil,
-            downloadedFirmwareVersion: nil,
             languageName: "日本語",
             backlightSummary: BacklightSettingsContent.summary(of: [.backlight: 1]),
             quietTimeSummary: QuietTimeSettingsContent.summary(of: [.quietTimeWeekdayScheduleEnabled: 1]),
@@ -474,8 +452,6 @@ struct WatchDetailContent<
     NavigationStack {
         WatchDetailContent(
             watch: PreviewSamples.savedSummary,
-            firmwareJournalPhase: .validated,
-            downloadedFirmwareVersion: PreviewSamples.firmwareRelease.versionTag,
             languageName: nil,
             backlightSummary: BacklightSettingsContent.summary(of: [:]),
             quietTimeSummary: QuietTimeSettingsContent.summary(of: [:]),
@@ -501,8 +477,6 @@ struct WatchDetailContent<
     NavigationStack {
         WatchDetailContent(
             watch: PreviewSamples.recoverySummary,
-            firmwareJournalPhase: nil,
-            downloadedFirmwareVersion: nil,
             languageName: nil,
             backlightSummary: BacklightSettingsContent.summary(of: [:]),
             quietTimeSummary: QuietTimeSettingsContent.summary(of: [:]),
@@ -527,8 +501,6 @@ struct WatchDetailContent<
     NavigationStack {
         WatchDetailContent(
             watch: PreviewSamples.savedSummary,
-            firmwareJournalPhase: nil,
-            downloadedFirmwareVersion: nil,
             languageName: nil,
             backlightSummary: BacklightSettingsContent.summary(of: [.backlight: 0]),
             quietTimeSummary: QuietTimeSettingsContent.summary(of: [.quietTimeManual: 1]),

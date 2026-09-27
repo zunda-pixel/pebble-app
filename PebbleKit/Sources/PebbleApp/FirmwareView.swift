@@ -143,7 +143,7 @@ struct FirmwareContent: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle(Text("Firmware"))
+        .navigationTitle(Text("Software Update"))
         .fileImporter(isPresented: $isChoosingFile, allowedContentTypes: [.pebbleFirmware]) { result in
             guard case .success(let url) = result else { return }
             installFile(url)
