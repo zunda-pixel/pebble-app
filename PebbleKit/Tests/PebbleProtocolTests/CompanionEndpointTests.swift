@@ -1427,6 +1427,78 @@ struct VoiceTests {
         #expect(sent[0].payload.last == VoiceSessionResult.disabled.rawValue)
     }
 
+    /// A recognizer that never answers still leaves the watch with an answer,
+    /// and before the watch's own fifteen seconds are up.
+    @Test func aResultTheRecognizerNeverGivesIsAnsweredWithATimeoutInTime() async throws {
+        let clock = ManualClock()
+        let collector = FrameCollector()
+        let coordinator = VoiceSessionCoordinator(
+            provider: StallingTranscriptionProvider(stallsTranscribing: true),
+            clock: clock
+        ) { frame in
+            await collector.append(frame)
+        }
+        await coordinator.handleVoiceFrame(PebbleProtocolFrame(
+            endpoint: 11_000,
+            payload: sessionSetupPayload(includeEncoderInfo: true, applicationID: nil)
+        ))
+        await coordinator.handleAudioFrame(PebbleProtocolFrame(
+            endpoint: 10_000,
+            payload: [0x03, 0x34, 0x12]
+        ))
+        for _ in 0..<200 where clock.sleeperCount == 0 {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+
+        clock.advance(by: .seconds(12))
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(await collector.frames.count == 1)
+
+        clock.advance(by: .seconds(1))
+        var sent: [PebbleProtocolFrame] = []
+        for _ in 0..<200 {
+            sent = await collector.frames
+            if sent.count == 2 { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(sent.count == 2)
+        #expect(sent.last?.payload[0] == 0x02)
+        #expect(sent.last?.payload[7] == VoiceSessionResult.timeout.rawValue)
+        // No attributes: a transcription with an empty word in it fails the
+        // watch's `transcription_validate`, so a failure carries none at all.
+        #expect(sent.last?.payload.last == 0)
+    }
+
+    /// A phone slow to say whether it can listen at all is answered for,
+    /// inside the watch's eight seconds, rather than left for the watch to
+    /// give up on.
+    @Test func aSetupThePhoneCannotDecideInTimeIsAnsweredWithATimeout() async throws {
+        let clock = ManualClock()
+        let collector = FrameCollector()
+        let coordinator = VoiceSessionCoordinator(
+            provider: StallingTranscriptionProvider(stallsDecidingToServe: true),
+            clock: clock
+        ) { frame in
+            await collector.append(frame)
+        }
+
+        let setup = Task {
+            await coordinator.handleVoiceFrame(PebbleProtocolFrame(
+                endpoint: 11_000,
+                payload: sessionSetupPayload(includeEncoderInfo: true, applicationID: nil)
+            ))
+        }
+        for _ in 0..<200 where clock.sleeperCount == 0 {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        clock.advance(by: .seconds(6))
+        await setup.value
+
+        let sent = await collector.frames
+        #expect(sent.count == 1)
+        #expect(sent.first?.payload.last == VoiceSessionResult.timeout.rawValue)
+    }
+
     @Test func coordinatorReportsInvalidSetupWithoutEncoderInfo() async {
         let collector = FrameCollector()
         let coordinator = VoiceSessionCoordinator(provider: StaticTranscriptionProvider(words: [])) { frame in
@@ -1447,6 +1519,32 @@ private actor FrameCollector {
 
     func append(_ frame: PebbleProtocolFrame) {
         frames.append(frame)
+    }
+}
+
+/// A recognizer that takes far longer than the watch will wait, and does not
+/// stop when it is told to.
+private actor StallingTranscriptionProvider: VoiceTranscriptionProvider {
+    private let stallsDecidingToServe: Bool
+    private let stallsTranscribing: Bool
+
+    init(stallsDecidingToServe: Bool = false, stallsTranscribing: Bool = false) {
+        self.stallsDecidingToServe = stallsDecidingToServe
+        self.stallsTranscribing = stallsTranscribing
+    }
+
+    private func stall() async {
+        await Task.detached { try? await Task.sleep(for: .seconds(60)) }.value
+    }
+
+    func canServeSession(_ sessionType: VoiceSessionType) async -> Bool {
+        if stallsDecidingToServe { await stall() }
+        return true
+    }
+
+    func transcribe(encoderInfo: SpeexEncoderInfo, audioFrames: [[UInt8]]) async -> VoiceTranscriptionOutcome {
+        if stallsTranscribing { await stall() }
+        return .transcribed([VoiceTranscriptionWord(text: "late", confidence: 1)])
     }
 }
 

@@ -26,16 +26,29 @@ public final class VoiceSessionCoordinator {
         var audioFrames: [[UInt8]] = []
     }
 
+    /// The watch gives up on a session it has asked for after 8 seconds
+    /// (`TIMEOUT_SESSION_SETUP`) and on its result 15 seconds after recording
+    /// stops (`TIMEOUT_SESSION_RESULT`, both in `services/voice/voice.c`).
+    /// These leave two of each for the answer to cross the link. An answer
+    /// that arrives after the watch's own deadline is thrown away and the
+    /// reader is shown the watch's timeout instead, so waiting for the
+    /// recognizer past this gains nothing and holds the next session up.
+    static let setupDeadline = Duration.seconds(6)
+    static let resultDeadline = Duration.seconds(13)
+
     private let send: (PebbleProtocolFrame) async throws -> Void
     private let provider: (any VoiceTranscriptionProvider)?
+    private let clock: any Clock<Duration>
     private var activeSession: ActiveSession?
     private var transcriptionTask: Task<Void, Never>?
 
     public init(
         provider: (any VoiceTranscriptionProvider)?,
+        clock: any Clock<Duration> = ContinuousClock(),
         send: @escaping (PebbleProtocolFrame) async throws -> Void
     ) {
         self.provider = provider
+        self.clock = clock
         self.send = send
     }
 
@@ -64,8 +77,19 @@ public final class VoiceSessionCoordinator {
             await respondToSetup(request, result: .invalidMessage, applicationInitiated: applicationInitiated)
             return
         }
-        guard let provider, await provider.canServeSession(request.sessionType) else {
+        guard let provider else {
             await respondToSetup(request, result: .disabled, applicationInitiated: applicationInitiated)
+            return
+        }
+        let sessionType = request.sessionType
+        switch await answer(within: Self.setupDeadline, { await provider.canServeSession(sessionType) }) {
+        case true?:
+            break
+        case false?:
+            await respondToSetup(request, result: .disabled, applicationInitiated: applicationInitiated)
+            return
+        case nil:
+            await respondToSetup(request, result: .timeout, applicationInitiated: applicationInitiated)
             return
         }
         await respondToSetup(request, result: .success, applicationInitiated: applicationInitiated)
@@ -94,20 +118,63 @@ public final class VoiceSessionCoordinator {
             return
         }
         let request = session.request
+        let audioFrames = session.audioFrames
         transcriptionTask = Task { [send] in
-            let outcome = await provider.transcribe(
-                encoderInfo: encoderInfo,
-                audioFrames: session.audioFrames
-            )
-            guard !Task.isCancelled else { return }
-            let frame = switch request.sessionType {
-            case .naturalLanguage:
-                await Self.reminderFrame(for: outcome, request: request, provider: provider)
-            case .dictation, .command:
-                Self.dictationFrame(for: outcome, request: request)
+            let answered = await answer(within: Self.resultDeadline) {
+                let outcome = await provider.transcribe(
+                    encoderInfo: encoderInfo,
+                    audioFrames: audioFrames
+                )
+                return switch request.sessionType {
+                case .naturalLanguage:
+                    await Self.reminderFrame(for: outcome, request: request, provider: provider)
+                case .dictation, .command:
+                    Self.dictationFrame(for: outcome, request: request)
+                }
             }
             guard !Task.isCancelled else { return }
+            // Said outright rather than left to the watch's own timer, which
+            // ends the same way for the reader but only once it runs out, and
+            // leaves the phone still working on a session nobody is waiting for.
+            let frame = answered ?? Self.failureFrame(.timeout, request: request)
             try? await send(frame)
+        }
+    }
+
+    /// `work`'s answer, or nil if `deadline` passes first.
+    ///
+    /// Not a task group: a group waits for every child before it returns, so a
+    /// recognizer that does not stop when cancelled would hold the answer for
+    /// as long as it liked — which is the one thing the deadline is for. The
+    /// work is cancelled and left to finish on its own.
+    private func answer<Value: Sendable>(
+        within deadline: Duration,
+        _ work: @escaping @MainActor () async -> Value
+    ) async -> Value? {
+        let race = DeadlineRace<Value>()
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                race.begin(continuation, work: work, deadline: deadline, clock: clock)
+            }
+        } onCancel: {
+            Task { @MainActor in race.finish(nil) }
+        }
+    }
+
+    private static func failureFrame(
+        _ result: VoiceSessionResult,
+        request: VoiceSessionSetupRequest
+    ) -> PebbleProtocolFrame {
+        switch request.sessionType {
+        case .naturalLanguage:
+            VoiceControlCodec.nlpResultFrame(
+                sessionID: request.sessionID,
+                result: result,
+                reminder: nil,
+                time: nil
+            )
+        case .dictation, .command:
+            dictationFrame(for: .failed(result), request: request)
         }
     }
 
@@ -170,5 +237,44 @@ public final class VoiceSessionCoordinator {
             result: result,
             applicationInitiated: applicationInitiated
         ))
+    }
+}
+
+/// Whichever comes first of an answer and a deadline, resumed exactly once.
+@MainActor
+private final class DeadlineRace<Value: Sendable> {
+    private var continuation: CheckedContinuation<Value?, Never>?
+    private var isFinished = false
+    private var work: Task<Void, Never>?
+    private var timer: Task<Void, Never>?
+
+    func begin(
+        _ continuation: CheckedContinuation<Value?, Never>,
+        work: @escaping @MainActor () async -> Value,
+        deadline: Duration,
+        clock: any Clock<Duration>
+    ) {
+        guard !isFinished else {
+            continuation.resume(returning: nil)
+            return
+        }
+        self.continuation = continuation
+        self.work = Task {
+            let value = await work()
+            self.finish(value)
+        }
+        timer = Task {
+            guard (try? await clock.sleep(for: deadline)) != nil else { return }
+            self.finish(nil)
+        }
+    }
+
+    func finish(_ value: Value?) {
+        guard !isFinished else { return }
+        isFinished = true
+        work?.cancel()
+        timer?.cancel()
+        continuation?.resume(returning: value)
+        continuation = nil
     }
 }
