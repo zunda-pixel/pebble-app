@@ -730,13 +730,17 @@ struct WeatherTests {
         // The firmware keeps 64 bytes for the name and wants room for a
         // terminator, and a kanji costs three bytes — cutting by character
         // count would overrun it, cutting mid-character would corrupt it.
-        let long = String(repeating: "京", count: 30)
-        let cut = WeatherCodec.truncated(long, toBytes: 63)
+        var long = report
+        long.locationName = String(repeating: "京", count: 30)
+        let value = WeatherCodec.value(for: long)
 
-        #expect(cut.utf8.count <= 63)
-        #expect(cut.count == 21)
-        #expect(String(decoding: Array(cut.utf8), as: UTF8.self) == cut)
-        #expect(WeatherCodec.truncated("Kyoto", toBytes: 63) == "Kyoto")
+        // The strings close the record: the name as a length and its bytes,
+        // then the phrase the same way.
+        let phrase = UInt16(5).littleEndianBytes + Array("Clear".utf8)
+        #expect(Array(value.suffix(phrase.count)) == phrase)
+        let name = Array(value.dropLast(phrase.count).suffix(63))
+        #expect(String(decoding: name, as: UTF8.self) == String(repeating: "京", count: 21))
+        #expect(Array(value.dropLast(phrase.count + 63).suffix(2)) == UInt16(63).littleEndianBytes)
     }
 }
 

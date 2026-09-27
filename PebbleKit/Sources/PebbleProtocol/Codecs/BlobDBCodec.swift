@@ -54,12 +54,7 @@ public struct ApplicationMetadata: Equatable, Sendable {
     }
 
     private var fixedNameBytes: [UInt8] {
-        var bytes: [UInt8] = []
-        for character in name {
-            let characterBytes = Array(String(character).utf8)
-            guard bytes.count + characterBytes.count <= 95 else { break }
-            bytes.append(contentsOf: characterBytes)
-        }
+        var bytes = name.utf8BytesEndingOnACharacter(maximumByteCount: 95)
         bytes.append(0)
         bytes.append(contentsOf: repeatElement(0, count: 96 - bytes.count))
         return bytes

@@ -105,7 +105,7 @@ public enum AppGlanceCodec {
                     .littleEndianBytes
             ),
         ]
-        let subtitle = trimmed(slice.subtitleTemplate)
+        let subtitle = slice.subtitleTemplate.utf8BytesEndingOnACharacter(maximumByteCount: maximumSubtitleLength)
         if !subtitle.isEmpty {
             attributes.append(attribute(id: subtitleTemplateAttribute, content: subtitle))
         }
@@ -138,16 +138,5 @@ public enum AppGlanceCodec {
 
     private static func attribute(id: UInt8, content: [UInt8]) -> [UInt8] {
         [id, UInt8(content.count & 0xFF), UInt8(content.count >> 8)] + content
-    }
-
-    /// The template as bytes, cut on a character rather than inside one.
-    private static func trimmed(_ template: String) -> [UInt8] {
-        var bytes: [UInt8] = []
-        for character in template {
-            let encoded = Array(String(character).utf8)
-            guard bytes.count + encoded.count <= maximumSubtitleLength else { break }
-            bytes.append(contentsOf: encoded)
-        }
-        return bytes
     }
 }

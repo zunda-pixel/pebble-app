@@ -177,7 +177,10 @@ public enum NotificationAppsCodec {
 
     public static func value(for app: NotificationSourceApp) -> [UInt8] {
         var attributes: [[UInt8]] = [
-            attribute(id: appNameAttribute, content: trimmedName(app.displayName)),
+            attribute(
+                id: appNameAttribute,
+                content: app.displayName.utf8BytesEndingOnACharacter(maximumByteCount: maximumNameLength)
+            ),
             attribute(id: muteDayOfWeekAttribute, content: [app.muteState.rawValue]),
             attribute(
                 id: lastUpdatedAttribute,
@@ -315,16 +318,6 @@ public enum NotificationAppsCodec {
             content.append(contentsOf: value.littleEndianBytes)
         }
         return content
-    }
-
-    private static func trimmedName(_ name: String) -> [UInt8] {
-        var bytes: [UInt8] = []
-        for character in name {
-            let characterBytes = Array(String(character).utf8)
-            guard bytes.count + characterBytes.count <= maximumNameLength else { break }
-            bytes.append(contentsOf: characterBytes)
-        }
-        return bytes
     }
 }
 

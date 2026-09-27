@@ -62,8 +62,8 @@ public enum WeatherCodec {
     /// `WeatherDBEntry` is a packed struct: every number little-endian, nothing
     /// aligned.
     public static func value(for report: WeatherReport) -> [UInt8] {
-        let name = truncated(report.locationName, toBytes: maximumLocationNameBytes)
-        let phrase = truncated(report.shortPhrase, toBytes: maximumShortPhraseBytes)
+        let name = report.locationName.utf8BytesEndingOnACharacter(maximumByteCount: maximumLocationNameBytes)
+        let phrase = report.shortPhrase.utf8BytesEndingOnACharacter(maximumByteCount: maximumShortPhraseBytes)
 
         var value: [UInt8] = [recordVersion]
         value.append(contentsOf: report.currentTemperature.littleEndianBytes)
@@ -96,22 +96,7 @@ public enum WeatherCodec {
         BlobDBCodec.uncheckedDeleteFrame(databaseID: databaseID, key: id.bytes, token: token)
     }
 
-    private static func pascalString(_ value: String) -> [UInt8] {
-        let bytes = Array(value.utf8)
-        return UInt16(bytes.count).littleEndianBytes + bytes
-    }
-
-    // Counting in bytes is what matters: a name in kanji costs three a letter.
-    static func truncated(_ value: String, toBytes limit: Int) -> String {
-        guard value.utf8.count > limit else { return value }
-        var result = ""
-        var count = 0
-        for character in value {
-            let size = String(character).utf8.count
-            guard count + size <= limit else { break }
-            result.append(character)
-            count += size
-        }
-        return result
+    private static func pascalString(_ bytes: [UInt8]) -> [UInt8] {
+        UInt16(bytes.count).littleEndianBytes + bytes
     }
 }
