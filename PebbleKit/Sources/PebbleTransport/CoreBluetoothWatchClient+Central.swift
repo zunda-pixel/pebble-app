@@ -160,11 +160,20 @@ extension CoreBluetoothWatchClient: CBCentralManagerDelegate {
         }
 
         let identifier = peripheral.watchID
+        // A link this client has already let go of, reporting late: connecting
+        // to another watch cancels the old one, and its callback arriving in the
+        // new handshake wiped that handshake's state, so the new link's own
+        // didConnect was refused. Its expected-disconnect marker is spent here,
+        // or it would swallow a later drop that was real.
+        guard connectedPeripheral?.identifier == peripheral.identifier || pendingWatch?.id == identifier else {
+            _ = reconnects.wasExpected(identifier)
+            return
+        }
         let wasConnected = connectedWatch != nil
         let wasIntentional = reconnects.wasExpected(identifier)
         let watchToReconnect = reconnects.watch
         let wasAutomatic = reconnects.isAutomatic
-        if pendingWatch?.id == peripheral.watchID, !wasAutomatic {
+        if pendingWatch?.id == identifier, !wasAutomatic {
             failConnection(.disconnected)
         }
         pendingWatch = nil
