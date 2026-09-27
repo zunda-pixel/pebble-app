@@ -91,7 +91,7 @@ struct ReportedStateTests {
     }
 
     @Test
-    func aPlaceWhoseForecastIsRefusedKeepsItsWarning() async throws {
+    func aPlaceWhoseForecastIsRefusedKeepsItsLastReportAndItsWarning() async throws {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = makeModel(directory: directory)
@@ -114,13 +114,12 @@ struct ReportedStateTests {
             position: .fixed(latitude: 0, longitude: 0)
         )
         model.weather.places = [kyoto, refused]
-        model.fetchWeatherReport = { place, _, _ in
-            guard place.id == kyoto.id else { throw WeatherSourceError.placeNotFound }
-            return WeatherReport(
+        func report(for place: WeatherPlace, temperature: Int16) -> WeatherReport {
+            WeatherReport(
                 id: place.id,
                 locationName: place.name,
                 isCurrentLocation: false,
-                currentTemperature: 21,
+                currentTemperature: temperature,
                 currentType: .sun,
                 todayHigh: 26,
                 todayLow: 18,
@@ -131,14 +130,19 @@ struct ReportedStateTests {
                 updated: .now
             )
         }
+        model.fetchWeatherReport = { place, _, _ in report(for: place, temperature: 21) }
+        await model.refreshWeather()
+        let earlier = try #require(model.weather.reports.last)
 
+        model.fetchWeatherReport = { place, _, _ in
+            guard place.id == kyoto.id else { throw WeatherSourceError.placeNotFound }
+            return report(for: place, temperature: 23)
+        }
         await model.refreshWeather()
 
-        // The place that worked is kept, and the one that did not keeps its
-        // warning: it shows with a blank temperature and is left out of the
-        // ordering the watch is given, which is not something to be quiet
-        // about.
-        #expect(model.weather.reports.map(\.locationName) == ["Kyoto"])
+        #expect(model.weather.reports.map(\.locationName) == ["Kyoto", "Nowhere"])
+        #expect(model.weather.reports.map(\.currentTemperature) == [23, 21])
+        #expect(model.weather.reports.last == earlier)
         #expect(model.weather.feedback != nil)
     }
 

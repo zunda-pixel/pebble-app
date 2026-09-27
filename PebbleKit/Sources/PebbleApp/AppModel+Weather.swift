@@ -130,6 +130,10 @@ extension AppModel {
         }
         var reports: [WeatherReport] = []
         var placeFailed = false
+        // A place whose fetch fails keeps the forecast it had. Dropped, it
+        // left the ordering too, and the watch stopped showing it over one
+        // failed fetch.
+        let previousReports = Dictionary(weather.reports.map { ($0.id, $0) }) { first, _ in first }
         for place in weather.places {
             let location: CLLocation
             switch place.position {
@@ -150,6 +154,7 @@ extension AppModel {
                         category: "weather",
                         message: "the phone's position: \(String(reflecting: error))"
                     )
+                    if let previous = previousReports[place.id] { reports.append(previous) }
                     continue
                 }
             }
@@ -167,6 +172,7 @@ extension AppModel {
                     category: "weather",
                     message: "\(place.name): \(String(reflecting: error))"
                 )
+                if let previous = previousReports[place.id] { reports.append(previous) }
             }
         }
         guard !reports.isEmpty else { return }
