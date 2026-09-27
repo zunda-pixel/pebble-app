@@ -19,8 +19,8 @@ struct FirmwareView: View {
             board: summary.board,
             isConnected: summary.isConnected,
             isRunningRecoveryFirmware: summary.isRunningRecoveryFirmware,
-            availableRelease: model.firmware.availableRelease,
-            downloadedFirmware: model.firmware.downloaded,
+            availableRelease: model.firmware.availableRelease.flatMap { $0.board == summary.board ? $0 : nil },
+            downloadedFirmware: model.firmware.downloaded.flatMap { $0.board == summary.board ? $0 : nil },
             journal: journal,
             progress: journal == nil ? nil : model.firmwareTransferProgress(on: watchID),
             feedback: model.firmware.feedback,
@@ -268,7 +268,8 @@ private struct FirmwareStatusRow: View {
     NavigationStack {
         FirmwareContent(
             installedVersion: "v4.36.2",
-            board: .obelixPVT,            isConnected: true,
+            board: .obelixPVT,
+            isConnected: true,
             isRunningRecoveryFirmware: false,
             availableRelease: nil,
             downloadedFirmware: nil,
@@ -292,7 +293,8 @@ private struct FirmwareStatusRow: View {
     NavigationStack {
         FirmwareContent(
             installedVersion: "v4.36.2",
-            board: .obelixPVT,            isConnected: true,
+            board: .obelixPVT,
+            isConnected: true,
             isRunningRecoveryFirmware: false,
             availableRelease: PreviewSamples.firmwareRelease,
             downloadedFirmware: PreviewSamples.downloadedFirmware,
@@ -316,7 +318,8 @@ private struct FirmwareStatusRow: View {
     NavigationStack {
         FirmwareContent(
             installedVersion: "v4.36.2",
-            board: .obelixPVT,            isConnected: false,
+            board: .obelixPVT,
+            isConnected: false,
             isRunningRecoveryFirmware: false,
             availableRelease: PreviewSamples.firmwareRelease,
             downloadedFirmware: PreviewSamples.downloadedFirmware,
@@ -340,7 +343,8 @@ private struct FirmwareStatusRow: View {
     NavigationStack {
         FirmwareContent(
             installedVersion: "v4.36.2",
-            board: .obelixPVT,            isConnected: true,
+            board: .obelixPVT,
+            isConnected: true,
             isRunningRecoveryFirmware: true,
             availableRelease: nil,
             downloadedFirmware: PreviewSamples.downloadedFirmware,

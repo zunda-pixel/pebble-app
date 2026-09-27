@@ -34,22 +34,11 @@ public func makeQEMUWatchClient() -> any WatchClient {
 #endif
 
 public struct ContentView: View {
-    @State private var model: AppModel
+    var model: AppModel
     @Environment(\.scenePhase) private var scenePhase
 
-    public init() {
-        _model = State(initialValue: AppModel(
-            client: CoreBluetoothWatchClient(),
-            clientFactory: makeDefaultWatchClientFactory()
-        ))
-    }
-
-    public init(client: any WatchClient) {
-        _model = State(initialValue: AppModel(client: client))
-    }
-
     public init(model: AppModel) {
-        _model = State(initialValue: model)
+        self.model = model
     }
 
     public var body: some View {
@@ -88,6 +77,13 @@ public enum AppSection: String, CaseIterable, Identifiable, Sendable {
         case .settings:
             "Settings"
         }
+    }
+
+    /// Looked up in this module's catalogue. A `Button(section.title)` in the
+    /// app target resolves the key against the app's own, which has none of
+    /// these.
+    public var titleText: Text {
+        Text(title)
     }
 
     public var keyboardShortcut: KeyEquivalent {
@@ -168,6 +164,9 @@ struct AppRootView: View {
                     model: model,
                     editGlance: nil
                 )
+                .toolbar {
+                    Button(role: .close) { model.dismissDeepLinkStoreApplication() }
+                }
             }
         }
         .alert(
@@ -269,16 +268,17 @@ struct ConnectionStatusBanner: View {
             Label { title } icon: { Image(systemName: systemImage) }
                 .font(.callout)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(Text("Connection status"))
+                .accessibilityValue(title)
             if case .reconnecting = state, let cancelReconnect {
-                Button("Cancel", role: .cancel, action: cancelReconnect)
+                Button("Stop Reconnecting", role: .cancel, action: cancelReconnect)
                     .font(.callout)
             }
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
         .background(reduceTransparency ? AnyShapeStyle(.background) : AnyShapeStyle(.regularMaterial))
-        .accessibilityLabel(Text("Connection status"))
-        .accessibilityValue(title)
     }
 
     // A `Text` rather than a key: the failure reads as two sentences, and one of
@@ -331,6 +331,18 @@ struct SectionContent: View {
 
 #Preview("Connected") {
     ConnectionStatusBanner(state: .connected(PreviewSamples.watch))
+}
+
+#Preview("Failed") {
+    ConnectionStatusBanner(state: .failed(.connectionTimedOut))
+}
+
+#Preview("Not connected") {
+    ConnectionStatusBanner(state: .idle)
+}
+
+#Preview("Scanning") {
+    ConnectionStatusBanner(state: .scanning)
 }
 
 #Preview("Root") {

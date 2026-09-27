@@ -37,21 +37,23 @@ struct NotificationSettingsContent<PhoneAppsDestination: View>: View {
                 ))
                 if notificationPreferences.areQuietHoursEnabled {
                     Stepper(
-                        "Starts at \(notificationPreferences.quietHoursStart):00",
                         value: Binding(
                             get: { notificationPreferences.quietHoursStart },
                             set: { value in setQuietHours(true, value, nil) }
                         ),
                         in: 0...23
-                    )
+                    ) {
+                        Text("Starts at \(hourOfDay(notificationPreferences.quietHoursStart), format: .dateTime.hour())")
+                    }
                     Stepper(
-                        "Ends at \(notificationPreferences.quietHoursEnd):00",
                         value: Binding(
                             get: { notificationPreferences.quietHoursEnd },
                             set: { value in setQuietHours(true, nil, value) }
                         ),
                         in: 0...23
-                    )
+                    ) {
+                        Text("Ends at \(hourOfDay(notificationPreferences.quietHoursEnd), format: .dateTime.hour())")
+                    }
                 }
                 if !applications.isEmpty {
                     // Named for whose apps these are. It used to be "Per-App
@@ -84,6 +86,12 @@ struct NotificationSettingsContent<PhoneAppsDestination: View>: View {
         }
         .formStyle(.grouped)
         .navigationTitle(Text("Notifications"))
+    }
+
+    /// A time rather than `"\(hour):00"`, which read 22:00 in a twelve-hour
+    /// locale as well.
+    private func hourOfDay(_ hour: Int) -> Date {
+        Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: .now) ?? .now
     }
 }
 

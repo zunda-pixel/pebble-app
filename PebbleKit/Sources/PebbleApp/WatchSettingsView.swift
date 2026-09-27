@@ -37,7 +37,7 @@ struct WatchSettingsView: View {
             ),
             board: board,
             quickLaunchAssignments: { model.quickLaunchAssignment(for: $0) },
-            applications: model.applications.apps + model.applications.watchfaces,
+            applications: model.applications.all,
             activitySettings: model.watchSettings.activity,
             heartRateSettings: model.watchSettings.heartRate,
             heartRateZones: model.watchSettings.heartRateZones,
@@ -70,7 +70,6 @@ struct WatchSettingsView: View {
     }
 }
 
-/// The watch's own settings, and what its health tracking is told.
 /// One watch setting: a switch where it is one, a picker where it is a choice.
 ///
 /// Both write the same thing — the number the firmware keeps — so the row is
@@ -240,6 +239,7 @@ extension WatchSetting {
     }
 }
 
+/// The watch's own settings, and what its health tracking is told.
 struct WatchSettingsContent: View {
     var watchSettings: [WatchSetting: Int]
     var board: WatchBoard?
@@ -383,7 +383,7 @@ struct WatchSettingsContent: View {
                     Text("Health")
                 }
             } footer: {
-                // On the last of the four, but it speaks for all of them.
+                // On the last of the five, but it speaks for all of them.
                 Text("These are the watch's own settings. They are written again whenever it connects, so this is the copy that wins.")
             }
 
@@ -427,18 +427,14 @@ struct WatchSettingsContent: View {
     }
 }
 
-#Preview("Heart rate off, watch away") {
+#Preview("Watch away") {
     NavigationStack {
         WatchSettingsContent(
             watchSettings: [:],
             // A watch the app cannot place, which hides the conditional rows.
             board: nil,
             activitySettings: ActivitySettings(),
-            heartRateSettings: HeartRateSettings(
-                isEnabled: false,
-                interval: .everyThirtyMinutes,
-                isEnabledDuringActivity: false
-            ),
+            heartRateSettings: HeartRateSettings(),
             isReminderAppEnabled: false,
             isConnected: false,
             feedback: .failure("Pebble 5209 did not accept the setting."),
@@ -449,31 +445,3 @@ struct WatchSettingsContent: View {
         )
     }
 }
-
-#Preview("Blood oxygen on") {
-    NavigationStack {
-        WatchSettingsContent(
-            watchSettings: [:],
-            board: .obelixPVT,
-            activitySettings: ActivitySettings(),
-            heartRateSettings: HeartRateSettings(),
-            bloodOxygenSettings: BloodOxygenSettings(
-                isEnabled: true,
-                interval: .everyThirtyMinutes,
-                isEnabledDuringActivity: true
-            ),
-            isReminderAppEnabled: true,
-            isConnected: true,
-            feedback: nil,
-            setWatchSetting: { _, _ in },
-            setActivitySettings: { _ in },
-            setHeartRateSettings: { _ in },
-            setBloodOxygenSettings: { _ in },
-            setReminderAppEnabled: { _ in }
-        )
-    }
-}
-
-/// The backlight screen for a Pebble Time 2, which has every row: the enable
-/// switch and the preset above, six individual values below — a duration
-/// picker and the level as a slider among them.

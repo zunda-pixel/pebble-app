@@ -23,10 +23,7 @@ struct SettingsView: View {
     var body: some View {
         SettingsContent(
             weatherPlaceNames: model.weather.places.map(\.name),
-            notificationSourceAppCount: model.notifications.sourceApps.count,
             areCompanionNotificationsEnabled: model.notifications.companionEnabled,
-            notificationPreferences: model.notifications.preferences,
-            applications: model.applications.apps + model.applications.watchfaces,
             diagnosticReportURL: model.diagnostics.reportURL,
             diagnosticsFeedback: model.diagnostics.feedback[.report],
             voiceTranscription: model.voiceTranscriptionReadiness,
@@ -44,20 +41,13 @@ struct SettingsView: View {
             setVoiceSpokenLanguage: { identifier in
                 Task { await model.setVoiceSpokenLanguage(identifier) }
             },
-            setCompanionNotificationsEnabled: { model.setCompanionNotificationsEnabled($0) },
-            setQuietHours: { enabled, start, end in
-                Task { await model.setQuietHours(enabled: enabled, start: start, end: end) }
-            },
-            setNotificationsEnabled: { enabled, applicationID in
-                Task { await model.setNotificationsEnabled(enabled, applicationID: applicationID) }
-            },
             prepareDiagnosticReport: { Task { await model.prepareDiagnosticReport() } },
             weatherDestination: { WeatherView(model: model) },
             notificationSettingsDestination: {
                 NotificationSettingsContent(
                     areCompanionNotificationsEnabled: model.notifications.companionEnabled,
                     notificationPreferences: model.notifications.preferences,
-                    applications: model.applications.apps + model.applications.watchfaces,
+                    applications: model.applications.all,
                     notificationSourceAppCount: model.notifications.sourceApps.count,
                     feedback: model.notifications.settingsFeedback,
                     setCompanionNotificationsEnabled: { model.setCompanionNotificationsEnabled($0) },
@@ -79,10 +69,7 @@ struct SettingsView: View {
 
 struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination: View>: View {
     var weatherPlaceNames: [String]
-    var notificationSourceAppCount: Int
     var areCompanionNotificationsEnabled: Bool
-    var notificationPreferences: NotificationDeliveryPreferences
-    var applications: [WatchApplication]
     var diagnosticReportURL: URL?
     /// The answer to asking for a diagnostic report, which is asked for here.
     var diagnosticsFeedback: FeatureFeedback?
@@ -95,9 +82,6 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
     var setNotifyAboutFirmwareUpdates: (Bool) -> Void = { _ in }
     var setVoiceTranscriptionEnabled: (Bool) -> Void
     var setVoiceSpokenLanguage: (String?) -> Void = { _ in }
-    var setCompanionNotificationsEnabled: (Bool) -> Void
-    var setQuietHours: (_ enabled: Bool, _ start: Int?, _ end: Int?) -> Void
-    var setNotificationsEnabled: (Bool, UUID) -> Void
     var prepareDiagnosticReport: () -> Void
     @ViewBuilder var weatherDestination: () -> WeatherDestination
     @ViewBuilder var notificationSettingsDestination: () -> NotificationSettingsDestination
@@ -245,18 +229,12 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
     NavigationStack {
         SettingsContent(
             weatherPlaceNames: PreviewSamples.weatherPlaces.map(\.name),
-            notificationSourceAppCount: PreviewSamples.notificationApps.count,
             areCompanionNotificationsEnabled: true,
-            notificationPreferences: NotificationDeliveryPreferences(),
-            applications: PreviewSamples.watchApplications + PreviewSamples.watchfaces,
             diagnosticReportURL: nil,
             diagnosticsFeedback: nil,
             voiceTranscription: .ready,
             voiceLanguages: ["en_US", "ja_JP", "de_DE"],
             setVoiceTranscriptionEnabled: { _ in },
-            setCompanionNotificationsEnabled: { _ in },
-            setQuietHours: { _, _, _ in },
-            setNotificationsEnabled: { _, _ in },
             prepareDiagnosticReport: {},
             weatherDestination: { EmptyView() },
             notificationSettingsDestination: { EmptyView() }
@@ -268,19 +246,13 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
     NavigationStack {
         SettingsContent(
             weatherPlaceNames: PreviewSamples.weatherPlaces.map(\.name),
-            notificationSourceAppCount: PreviewSamples.notificationApps.count,
             areCompanionNotificationsEnabled: true,
-            notificationPreferences: NotificationDeliveryPreferences(),
-            applications: PreviewSamples.watchApplications,
             // Nil alongside the failure: an earlier report is not offered for
             // sharing next to a message saying the report could not be made.
             diagnosticReportURL: nil,
             diagnosticsFeedback: .failure("The diagnostic report could not be created."),
             voiceTranscription: .ready,
             setVoiceTranscriptionEnabled: { _ in },
-            setCompanionNotificationsEnabled: { _ in },
-            setQuietHours: { _, _, _ in },
-            setNotificationsEnabled: { _, _ in },
             prepareDiagnosticReport: {},
             weatherDestination: { EmptyView() },
             notificationSettingsDestination: { EmptyView() }
@@ -288,25 +260,33 @@ struct SettingsContent<WeatherDestination: View, NotificationSettingsDestination
     }
 }
 
-#Preview("Quiet hours on, nothing installed") {
+#Preview("Recognizer downloading, notifications off") {
     NavigationStack {
         SettingsContent(
             weatherPlaceNames: [],
-            notificationSourceAppCount: 0,
             areCompanionNotificationsEnabled: false,
-            notificationPreferences: NotificationDeliveryPreferences(
-                areQuietHoursEnabled: true,
-                quietHoursStart: 22,
-                quietHoursEnd: 7
-            ),
-            applications: [],
             diagnosticReportURL: URL(fileURLWithPath: "/tmp/pebble-diagnostics.txt"),
             diagnosticsFeedback: nil,
-            voiceTranscription: .needsInstalling,
+            voiceTranscription: .installing,
+            voiceLanguages: ["en_US", "ja_JP", "de_DE"],
             setVoiceTranscriptionEnabled: { _ in },
-            setCompanionNotificationsEnabled: { _ in },
-            setQuietHours: { _, _, _ in },
-            setNotificationsEnabled: { _, _ in },
+            prepareDiagnosticReport: {},
+            weatherDestination: { EmptyView() },
+            notificationSettingsDestination: { EmptyView() }
+        )
+    }
+}
+
+#Preview("Recognizer unsupported") {
+    NavigationStack {
+        SettingsContent(
+            weatherPlaceNames: [PreviewSamples.weatherPlaces[0].name],
+            areCompanionNotificationsEnabled: true,
+            diagnosticReportURL: nil,
+            diagnosticsFeedback: nil,
+            voiceTranscription: .unsupported,
+            voiceLanguages: ["en_US", "ja_JP"],
+            setVoiceTranscriptionEnabled: { _ in },
             prepareDiagnosticReport: {},
             weatherDestination: { EmptyView() },
             notificationSettingsDestination: { EmptyView() }

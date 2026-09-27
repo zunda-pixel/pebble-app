@@ -94,101 +94,101 @@ struct HealthWatchSettingsContent: View {
             // Pebble Round 2 — gets neither row, the way the backlight rows hide
             // on a board that lacks their hardware.
             if board?.hasHeartRateSensor == true {
-            Section {
-                Toggle("Heart Rate", isOn: Binding(
-                    get: { heartRateSettings.isEnabled },
-                    set: { isOn in
-                        var settings = heartRateSettings
-                        settings.isEnabled = isOn
-                        setHeartRateSettings(settings)
-                    }
-                ))
-                if heartRateSettings.isEnabled {
-                    // Off is left out of the choices: the watch keeps a separate
-                    // flag for that, which is the toggle above, and offering it
-                    // twice would let the two disagree.
-                    Picker("Reading", selection: Binding(
-                        get: { heartRateSettings.interval == .off ? .everyTenMinutes : heartRateSettings.interval },
-                        set: { interval in
-                            var settings = heartRateSettings
-                            settings.interval = interval
-                            setHeartRateSettings(settings)
-                        }
-                    )) {
-                        ForEach(HeartRateInterval.allCases.filter { $0 != .off }, id: \.self) { interval in
-                            Text(interval.title).tag(interval)
-                        }
-                    }
-                    Toggle("Read During Activity", isOn: Binding(
-                        get: { heartRateSettings.isEnabledDuringActivity },
-                        set: { isOn in
-                            var settings = heartRateSettings
-                            settings.isEnabledDuringActivity = isOn
-                            setHeartRateSettings(settings)
-                        }
-                    ))
-                }
-            } header: {
-                Text("Heart Rate")
-            }
-
-            if heartRateSettings.isEnabled {
                 Section {
-                    zoneStepper("Resting", \.restingBPM)
-                    zoneStepper("Elevated", \.elevatedBPM)
-                    zoneStepper("Maximum", \.maximumBPM)
-                    zoneStepper("Zone 1", \.zone1BPM)
-                    zoneStepper("Zone 2", \.zone2BPM)
-                    zoneStepper("Zone 3", \.zone3BPM)
+                    Toggle("Heart Rate", isOn: Binding(
+                        get: { heartRateSettings.isEnabled },
+                        set: { isOn in
+                            var settings = heartRateSettings
+                            settings.isEnabled = isOn
+                            setHeartRateSettings(settings)
+                        }
+                    ))
+                    if heartRateSettings.isEnabled {
+                        // Off is left out of the choices: the watch keeps a separate
+                        // flag for that, which is the toggle above, and offering it
+                        // twice would let the two disagree.
+                        Picker("Reading", selection: Binding(
+                            get: { heartRateSettings.interval == .off ? .everyTenMinutes : heartRateSettings.interval },
+                            set: { interval in
+                                var settings = heartRateSettings
+                                settings.interval = interval
+                                setHeartRateSettings(settings)
+                            }
+                        )) {
+                            ForEach(HeartRateInterval.allCases.filter { $0 != .off }, id: \.self) { interval in
+                                Text(interval.title).tag(interval)
+                            }
+                        }
+                        Toggle("Read During Activity", isOn: Binding(
+                            get: { heartRateSettings.isEnabledDuringActivity },
+                            set: { isOn in
+                                var settings = heartRateSettings
+                                settings.isEnabledDuringActivity = isOn
+                                setHeartRateSettings(settings)
+                            }
+                        ))
+                    }
                 } header: {
-                    Text("Heart Rate Zones")
-                } footer: {
-                    // The same two chains the firmware's own handler enforces;
-                    // a step that would break one simply does not move.
-                    Text("The watch grades a workout against these. Resting stays under elevated, elevated under maximum, and each zone starts above the one before.")
+                    Text("Heart Rate")
                 }
-            }
 
-            Section {
-                Toggle("Blood Oxygen", isOn: Binding(
-                    get: { bloodOxygenSettings.isEnabled },
-                    set: { isOn in
-                        var settings = bloodOxygenSettings
-                        settings.isEnabled = isOn
-                        setBloodOxygenSettings(settings)
+                if heartRateSettings.isEnabled {
+                    Section {
+                        zoneStepper("Resting", \.restingBPM)
+                        zoneStepper("Elevated", \.elevatedBPM)
+                        zoneStepper("Maximum", \.maximumBPM)
+                        zoneStepper("Zone 1", \.zone1BPM)
+                        zoneStepper("Zone 2", \.zone2BPM)
+                        zoneStepper("Zone 3", \.zone3BPM)
+                    } header: {
+                        Text("Heart Rate Zones")
+                    } footer: {
+                        // The same two chains the firmware's own handler enforces;
+                        // a step that would break one simply does not move.
+                        Text("The watch grades a workout against these. Resting stays under elevated, elevated under maximum, and each zone starts above the one before.")
                     }
-                ))
-                if bloodOxygenSettings.isEnabled {
-                    // Off is not a reading here: the watch keeps blood oxygen's
-                    // on/off in its own pref, which is the toggle above, so the
-                    // interval only ever names how often.
-                    Picker("Reading", selection: Binding(
-                        get: { bloodOxygenSettings.interval == .off ? .everyTenMinutes : bloodOxygenSettings.interval },
-                        set: { interval in
-                            var settings = bloodOxygenSettings
-                            settings.interval = interval
-                            setBloodOxygenSettings(settings)
-                        }
-                    )) {
-                        ForEach(HeartRateInterval.allCases.filter { $0 != .off }, id: \.self) { interval in
-                            Text(interval.title).tag(interval)
-                        }
-                    }
-                    Toggle("Read During Activity", isOn: Binding(
-                        get: { bloodOxygenSettings.isEnabledDuringActivity },
+                }
+
+                Section {
+                    Toggle("Blood Oxygen", isOn: Binding(
+                        get: { bloodOxygenSettings.isEnabled },
                         set: { isOn in
                             var settings = bloodOxygenSettings
-                            settings.isEnabledDuringActivity = isOn
+                            settings.isEnabled = isOn
                             setBloodOxygenSettings(settings)
                         }
                     ))
+                    if bloodOxygenSettings.isEnabled {
+                        // Off is not a reading here: the watch keeps blood oxygen's
+                        // on/off in its own pref, which is the toggle above, so the
+                        // interval only ever names how often.
+                        Picker("Reading", selection: Binding(
+                            get: { bloodOxygenSettings.interval == .off ? .everyTenMinutes : bloodOxygenSettings.interval },
+                            set: { interval in
+                                var settings = bloodOxygenSettings
+                                settings.interval = interval
+                                setBloodOxygenSettings(settings)
+                            }
+                        )) {
+                            ForEach(HeartRateInterval.allCases.filter { $0 != .off }, id: \.self) { interval in
+                                Text(interval.title).tag(interval)
+                            }
+                        }
+                        Toggle("Read During Activity", isOn: Binding(
+                            get: { bloodOxygenSettings.isEnabledDuringActivity },
+                            set: { isOn in
+                                var settings = bloodOxygenSettings
+                                settings.isEnabledDuringActivity = isOn
+                                setBloodOxygenSettings(settings)
+                            }
+                        ))
+                    }
+                } header: {
+                    Text("Blood Oxygen")
+                } footer: {
+                    Text("Measures blood oxygen (SpO2) on its own schedule, off until you turn it on.")
                 }
-            } header: {
-                Text("Blood Oxygen")
-            } footer: {
-                Text("Measures blood oxygen (SpO2) on its own schedule, off until you turn it on.")
             }
-            }  // board?.hasHeartRateSensor
         }
         .formStyle(.grouped)
         .navigationTitle(Text("Health"))

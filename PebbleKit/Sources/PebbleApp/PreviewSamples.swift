@@ -73,6 +73,19 @@ enum PreviewSamples {
         lastConnectedAt: .now
     )
 
+    static let reconnectingSummary = WatchSummary(
+        id: watch.id,
+        name: watch.name,
+        model: watch.model,
+        serialNumber: watch.serialNumber,
+        batteryLevel: watch.batteryLevel,
+        firmwareVersion: watch.firmwareVersion,
+        phase: .reconnecting,
+        isSaved: true,
+        automaticallyConnects: true,
+        lastConnectedAt: .now.addingTimeInterval(-120)
+    )
+
     static let savedSummary = WatchSummary(
         id: WatchID("saved-watch"),
         name: "Pebble 2 Duo",
@@ -103,7 +116,7 @@ enum PreviewSamples {
             ),
             TimelinePin(
                 parentApplicationID: UUID(),
-                timestamp: day.addingTimeInterval(26 * 3_600),
+                timestamp: CalendarBridge.anchoredToUTCMidnight(day.addingTimeInterval(24 * 3_600)),
                 title: "Dentist",
                 subtitle: nil,
                 body: nil,
@@ -180,6 +193,9 @@ enum PreviewSamples {
             restingKilocalories: 1_500,
             distanceMetres: 4_800 + day * 311 % 3_000,
             activeMinutes: 28 + day * 7 % 40,
+            heartRate: WatchHeartRateSummary(
+                lowest: 54 + day % 6, average: 72 + day % 9, highest: 128 + day * 3 % 30, measuredMinutes: 48 + day % 12
+            ),
             bloodOxygen: WatchBloodOxygenSummary(
                 lowest: 95, average: 97, highest: 99, measuredMinutes: 6 + day % 5
             ),
@@ -301,7 +317,7 @@ enum PreviewSamples {
     static func firmwareJournal(phase: FirmwareUpdatePhase) -> FirmwareUpdateJournal {
         FirmwareUpdateJournal(
             watchID: watch.id,
-            hardwareRevision: "obelix_pvt",
+            board: .obelixPVT,
             previousVersion: watch.firmwareVersion,
             targetVersion: firmwareRelease.versionTag,
             packageSHA256: String(repeating: "a", count: 64),
@@ -342,9 +358,16 @@ enum PreviewSamples {
 
     static let transferProgress = PutBytesTransferProgress(bytesSent: 240_000, totalBytes: 512_000)
 
-    /// A model on a mock transport, for the navigation shells whose whole job is
-    /// the chrome around a screen. What each screen shows previews from its own
-    /// content view instead: a screen that loads from disk in `.task` would
+    /// A Pebble Time 2's screen, in bands of the watch's own palette.
+    static let screenshot = WatchScreenshot(
+        width: 200,
+        height: 228,
+        pixels: (0..<(200 * 228)).map { index in
+            let bands: [UInt32] = [0xFF00_55AA, 0xFFFF_AA00, 0xFF55_AA55, 0xFFFF_FFFF]
+            return bands[(index / 200) / 57]
+        }
+    )
+
     /// Permission states for the screen that shows them.
     ///
     /// Here rather than written inline in the `#Preview`, because a memberwise
@@ -371,6 +394,9 @@ enum PreviewSamples {
         health: .unknown
     )
 
+    /// A model on a mock transport, for the navigation shells whose whole job is
+    /// the chrome around a screen. What each screen shows previews from its own
+    /// content view instead: a screen that loads from disk in `.task` would
     /// overwrite anything set here.
     @MainActor
     static func appModel() -> AppModel {

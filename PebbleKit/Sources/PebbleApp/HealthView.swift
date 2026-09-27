@@ -59,6 +59,7 @@ struct HealthContent: View {
     @State private var isExporting = false
 
     var body: some View {
+        let newest = newestSample
         List {
             Picker("Period", selection: $period) {
                 ForEach(HealthAnalysisPeriod.allCases) { period in Text(period.title).tag(period) }
@@ -70,28 +71,28 @@ struct HealthContent: View {
             // charts where it would never be seen.
             FeedbackBanner(feedback: feedback)
             Section {
-                LabeledContent("Steps", value: newestSample?.steps ?? 0, format: .number)
+                LabeledContent("Steps", value: newest?.steps ?? 0, format: .number)
                 LabeledContent("Sleep") {
-                    Text("\(newestSample?.sleepMinutes ?? 0) min")
+                    Text("\(newest?.sleepMinutes ?? 0) min")
                 }
-                if let deep = newestSample?.deepSleepMinutes, deep > 0 {
+                if let deep = newest?.deepSleepMinutes, deep > 0 {
                     LabeledContent("Deep Sleep") {
                         Text("\(deep) min")
                     }
                 }
                 // Only Apple Health knows these, so they are shown when it has
                 // been asked and left out when it has not.
-                if let energy = newestSample?.activeKilocalories, energy > 0 {
+                if let energy = newest?.activeKilocalories, energy > 0 {
                     LabeledContent("Active Energy") {
                         Text(Measurement(value: Double(energy), unit: UnitEnergy.kilocalories), format: .measurement(width: .abbreviated))
                     }
                 }
-                if let distance = newestSample?.distanceMetres, distance > 0 {
+                if let distance = newest?.distanceMetres, distance > 0 {
                     LabeledContent("Distance") {
                         Text(Measurement(value: Double(distance), unit: UnitLength.meters), format: .measurement(width: .abbreviated, usage: .road))
                     }
                 }
-                if let active = newestSample?.activeMinutes, active > 0 {
+                if let active = newest?.activeMinutes, active > 0 {
                     LabeledContent("Exercise") {
                         Text("\(active) min")
                     }
@@ -99,7 +100,7 @@ struct HealthContent: View {
                 // The range rather than one number: the watch measures a
                 // scattered handful of minutes, so a lone average would hide
                 // both how high it went and how little it watched.
-                if let heartRate = newestSample?.heartRate {
+                if let heartRate = newest?.heartRate {
                     LabeledContent("Heart Rate") {
                         Text("\(heartRate.lowest)–\(heartRate.highest) bpm")
                     }
@@ -110,7 +111,7 @@ struct HealthContent: View {
                 }
                 // The range, like the heart rate: a scattered handful of measured
                 // minutes, so the low and the high say more than one average.
-                if let bloodOxygen = newestSample?.bloodOxygen {
+                if let bloodOxygen = newest?.bloodOxygen {
                     LabeledContent("Blood Oxygen") {
                         Text("\(bloodOxygen.lowest)–\(bloodOxygen.highest)%")
                     }
@@ -121,7 +122,7 @@ struct HealthContent: View {
                 // A night the watch broke into a sleep and a nap, or into two
                 // halves with a wakeful hour between them, is two rows: one
                 // range would say the reader slept through what they did not.
-                ForEach(Array((newestSample?.sleepSessions ?? []).enumerated()), id: \.offset) { _, session in
+                ForEach(Array((newest?.sleepSessions ?? []).enumerated()), id: \.offset) { _, session in
                     LabeledContent {
                         Text("\(session.asleepMinutes) min")
                     } label: {

@@ -73,6 +73,16 @@ struct ApplicationsView: View {
             removeApplication: { applicationID in
                 Task { await model.removeApplication(id: applicationID) }
             },
+            // One task, each removal awaited before the next: a task apiece
+            // started them all at once, and every one after the first was
+            // refused as another operation already in progress.
+            removeApplications: { applicationIDs in
+                Task {
+                    for applicationID in applicationIDs {
+                        await model.removeApplication(id: applicationID)
+                    }
+                }
+            },
             reorderApplications: { kind, offsets, destination in
                 Task {
                     await model.reorderApplications(
@@ -150,18 +160,16 @@ struct ApplicationsView: View {
                 ConfigurationWebView(url: page.url) { response in
                     Task { await model.closeConfiguration(response: response) }
                 }
-                .navigationTitle(model.applications.configurationApplication?.displayName ?? "App Settings")
+                .navigationTitle(
+                    model.applications.configurationApplication.map { Text(verbatim: $0.displayName) }
+                        ?? Text("App Settings")
+                )
                 .toolbar {
-                    // The leading slot, which is where a modal's way out goes
-                    // on both platforms — named for cancelling, but nothing is
-                    // being cancelled here.
-                    ToolbarItem(placement: .cancellationAction) {
-                        // Closing, not confirming: the page has its own submit,
-                        // and whatever it posted has already been applied by
-                        // the time this is reachable.
-                        Button(role: .close) {
-                            Task { await model.closeConfiguration() }
-                        }
+                    // Closing, not confirming: the page has its own submit,
+                    // and whatever it posted has already been applied by
+                    // the time this is reachable.
+                    Button(role: .close) {
+                        Task { await model.closeConfiguration() }
                     }
                 }
             }
@@ -185,6 +193,7 @@ struct ApplicationsContent<Detail: View>: View {
     var refresh: @MainActor () async -> Void = {}
     var storeImageURL: (WatchApplication) async -> URL? = { _ in nil }
     var removeApplication: (UUID) -> Void
+    var removeApplications: ([UUID]) -> Void
     var reorderApplications: (WatchApplicationKind, IndexSet, Int) -> Void
     var configureApplication: (WatchApplication) -> Void
     var editGlance: (WatchApplication) -> Void
@@ -289,7 +298,7 @@ struct ApplicationsContent<Detail: View>: View {
                     isPresented: $isConfirmingBulkRemoval
                 ) {
                     Button("Remove", role: .destructive) {
-                        for id in selection { removeApplication(id) }
+                        removeApplications(Array(selection))
                         selection.removeAll()
                     }
                     Button(role: .cancel) {}
@@ -621,6 +630,7 @@ struct ApplicationPlaceholderRow: View {
             installingApplicationName: nil,
             installationProgress: nil,
             removeApplication: { _ in },
+            removeApplications: { _ in },
             reorderApplications: { _, _, _ in },
             configureApplication: { _ in },
             editGlance: { _ in },
@@ -644,6 +654,7 @@ struct ApplicationPlaceholderRow: View {
             installingApplicationName: "Timeline Weather",
             installationProgress: PreviewSamples.transferProgress,
             removeApplication: { _ in },
+            removeApplications: { _ in },
             reorderApplications: { _, _, _ in },
             configureApplication: { _ in },
             editGlance: { _ in },
@@ -667,6 +678,55 @@ struct ApplicationPlaceholderRow: View {
             installingApplicationName: nil,
             installationProgress: nil,
             removeApplication: { _ in },
+            removeApplications: { _ in },
+            reorderApplications: { _, _, _ in },
+            configureApplication: { _ in },
+            editGlance: { _ in },
+            activateWatchface: { _ in },
+            detail: { application in Text(verbatim: application.displayName) }
+        )
+    }
+}
+
+#Preview("Loading") {
+    NavigationStack {
+        ApplicationsContent(
+            watchApplications: [],
+            watchfaces: [],
+            activeWatchfaceID: nil,
+            installedApplicationIDs: nil,
+            isLoading: true,
+            libraryFeedback: nil,
+            operationFeedback: nil,
+            isOperationInProgress: false,
+            installingApplicationName: nil,
+            installationProgress: nil,
+            removeApplication: { _ in },
+            removeApplications: { _ in },
+            reorderApplications: { _, _, _ in },
+            configureApplication: { _ in },
+            editGlance: { _ in },
+            activateWatchface: { _ in },
+            detail: { application in Text(verbatim: application.displayName) }
+        )
+    }
+}
+
+#Preview("An operation refused") {
+    NavigationStack {
+        ApplicationsContent(
+            watchApplications: PreviewSamples.watchApplications,
+            watchfaces: PreviewSamples.watchfaces,
+            activeWatchfaceID: PreviewSamples.watchfaces.first?.id,
+            installedApplicationIDs: nil,
+            isLoading: false,
+            libraryFeedback: .failure("Another application operation is already in progress."),
+            operationFeedback: nil,
+            isOperationInProgress: false,
+            installingApplicationName: nil,
+            installationProgress: nil,
+            removeApplication: { _ in },
+            removeApplications: { _ in },
             reorderApplications: { _, _, _ in },
             configureApplication: { _ in },
             editGlance: { _ in },

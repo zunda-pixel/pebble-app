@@ -88,6 +88,9 @@ struct TimelineView: View {
             .sheet(isPresented: $showsCalendarSettings) {
                 NavigationStack {
                     CalendarSettingsView(model: model)
+                        .toolbar {
+                            Button(role: .close) { showsCalendarSettings = false }
+                        }
                 }
             }
             .sheet(item: $composing) { kind in
@@ -146,18 +149,14 @@ struct TimelineItemComposer: View {
             .formStyle(.grouped)
             .navigationTitle(Text(kind.newTitle))
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(role: .cancel) { dismiss() }
+                Button(role: .cancel) { dismiss() }
+                Button("Add", role: .confirm) {
+                    let value = title
+                    let when = date
+                    dismiss()
+                    add(value, when)
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(role: .confirm) {
-                        let value = title
-                        let when = date
-                        dismiss()
-                        add(value, when)
-                    }
-                    .disabled(!isComplete)
-                }
+                .disabled(!isComplete)
             }
         }
     }

@@ -175,7 +175,6 @@ struct WatchDetailContent<
                 }
             }
 
-
             Section("Connection") {
                 LabeledContent("Status") {
                     switch watch.phase {
@@ -271,7 +270,8 @@ struct WatchDetailContent<
             watch: PreviewSamples.connectedSummary,
             firmwareJournalPhase: nil,
             downloadedFirmwareVersion: nil,
-            languageName: "日本語",            resetFeedback: nil,
+            languageName: "日本語",
+            resetFeedback: nil,
             connectionFeedback: nil,
             connect: {},
             setAutomaticallyConnects: { _ in },
@@ -292,7 +292,8 @@ struct WatchDetailContent<
             watch: PreviewSamples.savedSummary,
             firmwareJournalPhase: .validated,
             downloadedFirmwareVersion: PreviewSamples.firmwareRelease.versionTag,
-            languageName: nil,            resetFeedback: nil,
+            languageName: nil,
+            resetFeedback: nil,
             connectionFeedback: .failure("The watch does not expose the expected Pebble connection service."),
             connect: {},
             setAutomaticallyConnects: { _ in },
@@ -313,7 +314,8 @@ struct WatchDetailContent<
             watch: PreviewSamples.recoverySummary,
             firmwareJournalPhase: nil,
             downloadedFirmwareVersion: nil,
-            languageName: nil,            resetFeedback: .progress("The watch is erasing itself. It has forgotten this device, so it cannot reconnect until it is forgotten here too."),
+            languageName: nil,
+            resetFeedback: .progress("The watch is erasing itself. It has forgotten this device, so it cannot reconnect until it is forgotten here too."),
             connectionFeedback: nil,
             connect: {},
             setAutomaticallyConnects: { _ in },

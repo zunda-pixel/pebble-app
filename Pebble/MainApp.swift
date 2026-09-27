@@ -3,59 +3,60 @@ import PebbleApp
 
 @main
 struct MainApp: App {
-  @State private var model: AppModel
+    @State private var model: AppModel
 
-  init() {
+    init() {
 #if os(macOS)
-    let useQEMU = ProcessInfo.processInfo.environment["PEBBLE_QEMU"] == "1"
-      || CommandLine.arguments.contains("--qemu")
-    _model = State(initialValue: AppModel(
-      client: useQEMU ? makeQEMUWatchClient() : makeDefaultPebbleClient(),
-      clientFactory: useQEMU ? nil : makeDefaultWatchClientFactory()
-    ))
+        let useQEMU = ProcessInfo.processInfo.environment["PEBBLE_QEMU"] == "1"
+            || CommandLine.arguments.contains("--qemu")
+        _model = State(initialValue: AppModel(
+            client: useQEMU ? makeQEMUWatchClient() : makeDefaultPebbleClient(),
+            clientFactory: useQEMU ? nil : makeDefaultWatchClientFactory()
+        ))
 #else
-    _model = State(initialValue: AppModel(
-      client: makeDefaultPebbleClient(),
-      clientFactory: makeDefaultWatchClientFactory()
-    ))
+        _model = State(initialValue: AppModel(
+            client: makeDefaultPebbleClient(),
+            clientFactory: makeDefaultWatchClientFactory()
+        ))
 #endif
-  }
+    }
 
-  var body: some Scene {
+    var body: some Scene {
 #if os(macOS)
-    WindowGroup(id: "main") {
-      ContentView(model: model)
-    }
-    .defaultSize(width: 960, height: 680)
-    .windowToolbarStyle(.unified)
-    .commands {
-      CommandMenu("Pebble") {
-        Button("Scan for Watches") {
-          NotificationCenter.default.post(ScanRequest(), subject: model)
+        WindowGroup(id: "main") {
+            ContentView(model: model)
         }
-        .keyboardShortcut("r", modifiers: .command)
-        .disabled(model.isScanningOrConnecting)
+        .defaultSize(width: 960, height: 680)
+        .windowToolbarStyle(.unified)
+        .commands {
+            CommandMenu("Pebble") {
+                Button("Scan for Watches") {
+                    NotificationCenter.default.post(ScanRequest(), subject: model)
+                }
+                .keyboardShortcut("r", modifiers: .command)
+                .disabled(model.isScanningOrConnecting)
 
-        Divider()
+                Divider()
 
-        ForEach(AppSection.windowSections) { section in
-          Button(section.title) {
-            NotificationCenter.default.post(SectionRequest(section: section), subject: model)
-          }
-          .keyboardShortcut(section.keyboardShortcut, modifiers: .command)
+                ForEach(AppSection.windowSections) { section in
+                    Button {
+                        NotificationCenter.default.post(SectionRequest(section: section), subject: model)
+                    } label: {
+                        section.titleText
+                    }
+                    .keyboardShortcut(section.keyboardShortcut, modifiers: .command)
+                }
+            }
         }
 
-      }
-    }
-
-    Settings {
-      SettingsRootView(model: model)
-        .frame(width: 620, height: 680)
-    }
+        Settings {
+            SettingsRootView(model: model)
+                .frame(width: 620, height: 680)
+        }
 #else
-    WindowGroup {
-      ContentView(model: model)
-    }
+        WindowGroup {
+            ContentView(model: model)
+        }
 #endif
-  }
+    }
 }

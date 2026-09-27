@@ -15,7 +15,7 @@ struct CatalogApplicationDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     private var installed: WatchApplication? {
-        (model.applications.apps + model.applications.watchfaces).first { $0.id == application.id }
+        model.applications.all.first { $0.id == application.id }
     }
 
     var body: some View {

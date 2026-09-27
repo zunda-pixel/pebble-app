@@ -101,7 +101,7 @@ struct ApplicationDetailContent: View {
             Section {
                 header
             }
-            
+
             Section {
                 if canInstall {
                     Button(installButtonTitle, systemImage: "arrow.down.app", action: install)
@@ -127,7 +127,7 @@ struct ApplicationDetailContent: View {
                 }
                 FeedbackBanner(feedback: feedback)
             }
-            
+
             if subject.catalogEntry?.releaseNotes != nil || subject.catalogEntry?.changelog.isEmpty == false {
                 Section("Release Notes") {
                     if let releaseNotes = subject.catalogEntry?.releaseNotes {
@@ -155,7 +155,7 @@ struct ApplicationDetailContent: View {
                         .disabled(isActive || isOperationInProgress)
                 }
             }
-            
+
             if let screenshots = subject.catalogEntry?.screenshotURLs, !screenshots.isEmpty {
                 Section("Screenshots") {
                     ScrollView(.horizontal) {
@@ -173,7 +173,7 @@ struct ApplicationDetailContent: View {
                     }
                 }
             }
-            
+
             if let summary = subject.catalogEntry?.summary {
                 Section {
                     Text(summary)
@@ -403,7 +403,7 @@ struct ApplicationDetailView: View {
     /// Read from the library rather than held: a removal elsewhere, or a
     /// reinstall, should show here without going back first.
     private var current: WatchApplication? {
-        (model.applications.apps + model.applications.watchfaces).first { $0.id == application.id }
+        model.applications.all.first { $0.id == application.id }
     }
 
     var body: some View {

@@ -294,7 +294,10 @@ struct CatalogContent<Destination: View, CollectionDestination: View>: View {
         .toolbarVisibility(.hidden, for: .tabBar)
         #endif
         .overlay {
-            if filteredApplications.isEmpty && searchResults == nil && !isSearching {
+            if isUpdating && applications.isEmpty && searchResults == nil && !isSearching {
+                ProgressView()
+                    .accessibilityLabel(Text("Loading the catalog"))
+            } else if filteredApplications.isEmpty && searchResults == nil && !isSearching {
                 // Two causes, and the screen cannot tell them apart: a filter
                 // that excludes everything, or a catalogue that was never
                 // fetched. Saying both beats naming the wrong one — and it
@@ -412,7 +415,7 @@ struct CatalogApplicationRow: View {
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(application.name).font(.headline)
-                Text("\(application.developer) · \(application.version)").foregroundStyle(.secondary)
+                Text(verbatim: "\(application.developer) · \(application.version)").foregroundStyle(.secondary)
                 // Left out where the store did not name one, as the detail
                 // screen already does. It used to draw the model's `"Other"`,
                 // which was this app putting a word in the store's mouth.
@@ -476,13 +479,88 @@ struct CatalogStateLabel: View {
     }
 }
 
+#Preview("First fetch") {
+    NavigationStack {
+        CatalogContent(
+            applications: [],
+            state: { _ in .available },
+            isImportingApplication: false,
+            isImportDisabled: false,
+            isUpdating: true,
+            feedback: nil,
+            importApplication: {},
+            refresh: {},
+            destination: { _ in EmptyView() },
+            collectionDestination: { _ in EmptyView() }
+        )
+    }
+}
+
+#Preview("Search results") {
+    NavigationStack {
+        CatalogContent(
+            applications: [PreviewSamples.catalogApplication],
+            state: { _ in .available },
+            isImportingApplication: false,
+            isImportDisabled: false,
+            isUpdating: false,
+            feedback: nil,
+            searchResults: [PreviewSamples.catalogApplication],
+            searchQuery: "weather",
+            hasMoreSearchResults: true,
+            importApplication: {},
+            refresh: {},
+            destination: { application in Text(verbatim: application.name) },
+            collectionDestination: { _ in EmptyView() }
+        )
+    }
+}
+
+#Preview("Searching") {
+    NavigationStack {
+        CatalogContent(
+            applications: [PreviewSamples.catalogApplication],
+            state: { _ in .available },
+            isImportingApplication: false,
+            isImportDisabled: false,
+            isUpdating: false,
+            feedback: nil,
+            searchQuery: "weather",
+            isSearching: true,
+            importApplication: {},
+            refresh: {},
+            destination: { _ in EmptyView() },
+            collectionDestination: { _ in EmptyView() }
+        )
+    }
+}
+
+#Preview("Nothing found") {
+    NavigationStack {
+        CatalogContent(
+            applications: [PreviewSamples.catalogApplication],
+            state: { _ in .available },
+            isImportingApplication: false,
+            isImportDisabled: false,
+            isUpdating: false,
+            feedback: nil,
+            searchResults: [],
+            searchQuery: "天気",
+            importApplication: {},
+            refresh: {},
+            destination: { _ in EmptyView() },
+            collectionDestination: { _ in EmptyView() }
+        )
+    }
+}
+
 #Preview("Empty catalog") {
     CatalogContent(
         applications: [],
         state: { _ in .available },
         isImportingApplication: true,
         isImportDisabled: true,
-        isUpdating: true,
+        isUpdating: false,
         feedback: .failure("Catalog refresh failed; showing the offline cache."),
         importApplication: {},
         refresh: {},

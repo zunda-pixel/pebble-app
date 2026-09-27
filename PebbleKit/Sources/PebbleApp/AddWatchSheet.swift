@@ -70,7 +70,6 @@ struct AddWatchContent: View {
         NavigationStack {
             List {
                 FeedbackBanner(feedback: connectionFeedback)
-                    .accessibilityLabel(Text("Bluetooth error"))
                 FeedbackBanner(feedback: managementFeedback)
 
                 if !unknownBondedWatches.isEmpty {
@@ -107,9 +106,7 @@ struct AddWatchContent: View {
             }
             .navigationTitle(Text("Add Watch"))
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(role: .close, action: close)
-                }
+                Button(role: .close, action: close)
             }
         }
         #if os(macOS)
@@ -126,6 +123,45 @@ struct AddWatchContent: View {
             UnknownBondedWatch(id: WatchID("bonded-watch"), name: "Pebble 33EE"),
         ],
         discoveredWatches: [PreviewSamples.discovered],
+        isConnecting: false,
+        connectUnknown: { _ in },
+        connectDiscovered: { _ in },
+        close: {}
+    )
+}
+
+#Preview("Connecting") {
+    AddWatchContent(
+        connectionFeedback: nil,
+        managementFeedback: nil,
+        unknownBondedWatches: [],
+        discoveredWatches: [PreviewSamples.discovered],
+        isConnecting: true,
+        connectUnknown: { _ in },
+        connectDiscovered: { _ in },
+        close: {}
+    )
+}
+
+#Preview("Connection failed") {
+    AddWatchContent(
+        connectionFeedback: .failure(WatchConnectionError.connectionTimedOut.message),
+        managementFeedback: nil,
+        unknownBondedWatches: [],
+        discoveredWatches: [PreviewSamples.discovered],
+        isConnecting: false,
+        connectUnknown: { _ in },
+        connectDiscovered: { _ in },
+        close: {}
+    )
+}
+
+#Preview("Nothing nearby") {
+    AddWatchContent(
+        connectionFeedback: nil,
+        managementFeedback: nil,
+        unknownBondedWatches: [],
+        discoveredWatches: [],
         isConnecting: false,
         connectUnknown: { _ in },
         connectDiscovered: { _ in },

@@ -158,3 +158,19 @@ struct LanguageContent: View {
         )
     }
 }
+
+#Preview("Never connected") {
+    NavigationStack {
+        LanguageContent(
+            packs: [],
+            installedLocale: "",
+            installedVersion: 0,
+            isConnected: false,
+            isInstalling: false,
+            progress: nil,
+            feedback: nil,
+            install: { _ in },
+            installFile: { _ in }
+        )
+    }
+}

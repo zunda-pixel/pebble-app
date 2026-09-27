@@ -68,12 +68,41 @@ struct WatchSetupView<FirmwareDestination: View>: View {
 
     // Settled when the flow opens. Rebuilding it as answers arrive would take
     // the step being read out from under the reader.
-    @State private var steps: [WatchSetupStep] = []
-    @State private var stepIndex = 0
+    @State private var steps: [WatchSetupStep]
+    @State private var stepIndex: Int
     @State private var isAsking = false
     /// What the toggles are drawn from, so an answer shows on the screen that
     /// asked for it.
     @State private var granted: PhonePermissions?
+
+    init(
+        watchName: String,
+        isRunningRecoveryFirmware: Bool,
+        permissions: PhonePermissions,
+        request: @escaping (PhonePermissionKind) async -> Void,
+        readPermissions: @escaping () -> PhonePermissions = { PhonePermissions.current() },
+        openSettings: @escaping () -> Void = { openPrivacySettings() },
+        startAt: WatchSetupStep = .welcome,
+        @ViewBuilder firmwareDestination: @escaping () -> FirmwareDestination,
+        finish: @escaping () -> Void
+    ) {
+        self.watchName = watchName
+        self.isRunningRecoveryFirmware = isRunningRecoveryFirmware
+        self.permissions = permissions
+        self.request = request
+        self.readPermissions = readPermissions
+        self.openSettings = openSettings
+        self.startAt = startAt
+        self.firmwareDestination = firmwareDestination
+        self.finish = finish
+        let steps = WatchSetupStep.steps(
+            isRunningRecoveryFirmware: isRunningRecoveryFirmware,
+            permissions: permissions
+        )
+        _steps = State(initialValue: steps)
+        _stepIndex = State(initialValue: steps.firstIndex(of: startAt) ?? 0)
+        _granted = State(initialValue: permissions)
+    }
 
     private var step: WatchSetupStep {
         steps.indices.contains(stepIndex) ? steps[stepIndex] : .welcome
@@ -88,21 +117,12 @@ struct WatchSetupView<FirmwareDestination: View>: View {
             }
             .navigationTitle(Text("Set Up \(watchName)"))
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(role: .close, action: finish)
-                }
+                Button(role: .close, action: finish)
             }
         }
+        #if os(macOS)
         .frame(minWidth: 420, minHeight: 460)
-        .task {
-            guard steps.isEmpty else { return }
-            steps = WatchSetupStep.steps(
-                isRunningRecoveryFirmware: isRunningRecoveryFirmware,
-                permissions: permissions
-            )
-            stepIndex = steps.firstIndex(of: startAt) ?? 0
-            granted = permissions
-        }
+        #endif
     }
 
     @ViewBuilder private var page: some View {

@@ -56,6 +56,10 @@ struct WatchDiagnosticsContent: View {
     var sendTestNotification: () -> Void
     var notificationFeedback: FeatureFeedback?
 
+    /// Drawn once per screenshot rather than on every pass: with app logs on,
+    /// each line that arrives redraws this screen.
+    @State private var screenshotImage: Image?
+
     var body: some View {
         List {
             Section {
@@ -71,9 +75,8 @@ struct WatchDiagnosticsContent: View {
             Section {
                 Button("Take Screenshot", systemImage: "camera", action: takeScreenshot)
                     .disabled(!isConnected || isTakingScreenshot)
-                if let screenshot,
-                   let image = WatchScreenshotImage(screenshot: screenshot).image {
-                    image
+                if let screenshotImage {
+                    screenshotImage
                         .interpolation(.none)
                         .resizable()
                         .scaledToFit()
@@ -93,7 +96,7 @@ struct WatchDiagnosticsContent: View {
                 Button("Gather Watch Logs", systemImage: "doc.text.magnifyingglass", action: gatherWatchLogs)
                     .disabled(!isConnected || isGatheringWatchLogs)
                 if watchLogLineCount > 0 {
-                    LabeledContent("Lines") { Text("\(watchLogLineCount)") }
+                    LabeledContent("Lines") { Text(watchLogLineCount, format: .number) }
                 }
                 if let watchLogsURL {
                     ShareLink(item: watchLogsURL) { Label("Share Logs", systemImage: "square.and.arrow.up") }
@@ -153,12 +156,12 @@ struct WatchDiagnosticsContent: View {
             }
         }
         .navigationTitle(Text("Diagnostics"))
+        .task(id: screenshot) {
+            screenshotImage = screenshot.flatMap { WatchScreenshotImage(screenshot: $0).image }
+        }
     }
 }
 
-/// How the last attempt went, in the section that asked. The screen's buttons
-/// are sections apart and the app logs section can be fifty lines long, so a
-/// result gathered anywhere else is off the screen from whatever caused it.
 /// A picture the watch sent, ready to show.
 struct WatchScreenshotImage {
     var screenshot: WatchScreenshot
@@ -209,6 +212,58 @@ struct WatchScreenshotImage {
             applicationLogLines: [],
             coredumpURL: nil,
             isCollectingCoredump: false,
+            feedback: [:],
+            takeScreenshot: {},
+            gatherWatchLogs: {},
+            setApplicationLogging: { _ in },
+            collectCoredump: {},
+            clearTimeline: {},
+            sendTestNotification: {},
+            notificationFeedback: nil
+        )
+    }
+}
+
+#Preview("Screenshot taken") {
+    NavigationStack {
+        WatchDiagnosticsContent(
+            isConnected: true,
+            screenshot: PreviewSamples.screenshot,
+            screenshotURL: URL(filePath: "/tmp/screenshot.png"),
+            isTakingScreenshot: false,
+            watchLogLineCount: 0,
+            watchLogsURL: nil,
+            isGatheringWatchLogs: false,
+            isApplicationLoggingEnabled: false,
+            applicationLogLines: [],
+            coredumpURL: nil,
+            isCollectingCoredump: false,
+            feedback: [:],
+            takeScreenshot: {},
+            gatherWatchLogs: {},
+            setApplicationLogging: { _ in },
+            collectCoredump: {},
+            clearTimeline: {},
+            sendTestNotification: {},
+            notificationFeedback: nil
+        )
+    }
+}
+
+#Preview("Working") {
+    NavigationStack {
+        WatchDiagnosticsContent(
+            isConnected: true,
+            screenshot: nil,
+            screenshotURL: nil,
+            isTakingScreenshot: true,
+            watchLogLineCount: 0,
+            watchLogsURL: nil,
+            isGatheringWatchLogs: true,
+            isApplicationLoggingEnabled: false,
+            applicationLogLines: [],
+            coredumpURL: nil,
+            isCollectingCoredump: true,
             feedback: [:],
             takeScreenshot: {},
             gatherWatchLogs: {},

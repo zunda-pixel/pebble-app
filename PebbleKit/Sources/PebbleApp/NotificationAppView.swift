@@ -54,14 +54,12 @@ struct NotificationAppContent<RulesDestination: View>: View {
     var supportsVibePatterns: Bool = true
     @ViewBuilder var rulesDestination: () -> RulesDestination
 
-    private var current: NotificationSourceApp { app }
-
     var body: some View {
         Form {
             FeedbackBanner(feedback: feedback)
             Section {
                 Picker("Mute", selection: Binding(
-                    get: { current.muteState },
+                    get: { app.muteState },
                     set: { state in setMute(state) }
                 )) {
                     ForEach(NotificationAppMuteState.allCases, id: \.self) { state in
@@ -72,7 +70,7 @@ struct NotificationAppContent<RulesDestination: View>: View {
                     rulesDestination()
                 } label: {
                     LabeledContent("Rules") {
-                        Text(current.filterRules.count, format: .number)
+                        Text(app.filterRules.count, format: .number)
                     }
                 }
             } header: {
@@ -81,7 +79,7 @@ struct NotificationAppContent<RulesDestination: View>: View {
 
             Section {
                 Picker("Buzz", selection: Binding(
-                    get: { current.vibePattern },
+                    get: { app.vibePattern },
                     set: { pattern in setVibePattern(pattern) }
                 )) {
                     Text("Chosen by the Watch").tag(NotificationVibePattern?.none)
@@ -102,7 +100,7 @@ struct NotificationAppContent<RulesDestination: View>: View {
 
             Section {
                 Picker("Icon", selection: Binding(
-                    get: { current.icon },
+                    get: { app.icon },
                     set: { icon in setIcon(icon) }
                 )) {
                     Text("Chosen by the Watch").tag(TimelineIcon?.none)
@@ -119,15 +117,15 @@ struct NotificationAppContent<RulesDestination: View>: View {
             Section {
                 WatchColorPicker(
                     label: Text("Background"),
-                    selection: current.backgroundColor,
-                    onChoose: { colour in setColours(colour, current.foregroundColor) }
+                    selection: app.backgroundColor,
+                    onChoose: { colour in setColours(colour, app.foregroundColor) }
                 )
                 WatchColorPicker(
                     label: Text("Text"),
-                    selection: current.foregroundColor,
-                    onChoose: { colour in setColours(current.backgroundColor, colour) }
+                    selection: app.foregroundColor,
+                    onChoose: { colour in setColours(app.backgroundColor, colour) }
                 )
-                if current.backgroundColor != nil || current.foregroundColor != nil {
+                if app.backgroundColor != nil || app.foregroundColor != nil {
                     Button("Chosen by the Watch") { setColours(nil, nil) }
                 }
             } header: {
@@ -137,7 +135,7 @@ struct NotificationAppContent<RulesDestination: View>: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle(Text(verbatim: current.displayName))
+        .navigationTitle(Text(verbatim: app.displayName))
     }
 }
 

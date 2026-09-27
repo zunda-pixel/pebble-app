@@ -153,6 +153,28 @@ extension TextField where Label == Text {
             Text(titleKey)
         }
     }
+
+    init(_ titleKey: LocalizedStringKey, text: Binding<String>, axis: Axis) {
+        self.init(text: text, axis: axis) {
+            Text(titleKey)
+        }
+    }
+}
+
+extension NavigationLink where Label == Text {
+    init(_ titleKey: LocalizedStringKey, @ViewBuilder destination: () -> Destination) {
+        self.init(destination: destination) {
+            Text(titleKey)
+        }
+    }
+}
+
+extension ColorPicker where Label == Text {
+    init(_ titleKey: LocalizedStringKey, selection: Binding<Color>, supportsOpacity: Bool = true) {
+        self.init(selection: selection, supportsOpacity: supportsOpacity) {
+            Text(titleKey)
+        }
+    }
 }
 
 extension Stepper where Label == Text {

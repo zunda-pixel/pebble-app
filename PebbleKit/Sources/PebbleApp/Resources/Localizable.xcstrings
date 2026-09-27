@@ -111,17 +111,6 @@
         }
       }
     },
-    "%@ installed." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "“%@”をインストールしました。"
-          }
-        }
-      }
-    },
     "%@ is active." : {
       "localizations" : {
         "ja" : {
@@ -240,45 +229,26 @@
         }
       }
     },
-    "%@ was added." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "“%@”をライブラリに追加しました。"
-          }
-        }
-      }
-    },
-    "%@ · %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ · %2$@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "%1$@ · %2$@"
-          }
-        }
-      }
-    },
-    "%lld" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "%lld"
-          }
-        }
-      }
-    },
     "%lld apps" : {
       "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld app"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld apps"
+                }
+              }
+            }
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "machine_translated",
@@ -328,7 +298,14 @@
       }
     },
     "%lld%%" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%%"
+          }
+        }
+      }
     },
     "%lld–%lld bpm" : {
       "localizations" : {
@@ -351,6 +328,12 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
+            "value" : "%1$lld–%2$lld%%"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "%1$lld–%2$lld%%"
           }
         }
@@ -946,13 +929,12 @@
         }
       }
     },
-    "App catalog updated with %lld apps." : {
-      "extractionState" : "stale",
+    "App Settings" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アプリカタログを更新しました（%lld個のアプリ）。"
+            "state" : "translated",
+            "value" : "アプリの設定"
           }
         }
       }
@@ -963,6 +945,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "画面表示"
+          }
+        }
+      }
+    },
+    "Apple Music" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Music"
           }
         }
       }
@@ -1157,17 +1149,6 @@
         }
       }
     },
-    "Battery" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "バッテリー"
-          }
-        }
-      }
-    },
     "Battery Saver" : {
       "localizations" : {
         "ja" : {
@@ -1234,16 +1215,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "Bluetoothへのアクセスが許可されていません。“システム設定”で有効にしてください。"
-          }
-        }
-      }
-    },
-    "Bluetooth error" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "Bluetoothエラー"
           }
         }
       }
@@ -1338,6 +1309,16 @@
         }
       }
     },
+    "Calendar Event" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "予定"
+          }
+        }
+      }
+    },
     "Calendar access or synchronization failed." : {
       "localizations" : {
         "ja" : {
@@ -1404,16 +1385,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ヘルスケアデータを読み取れます"
-          }
-        }
-      }
-    },
-    "Cancel" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "キャンセル"
           }
         }
       }
@@ -2228,12 +2199,12 @@
         }
       }
     },
-    "Ends at %lld:00" : {
+    "Ends at %@" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "終了: %lld:00"
+            "state" : "translated",
+            "value" : "終了: %@"
           }
         }
       }
@@ -3438,6 +3409,26 @@
         }
       }
     },
+    "Loading the catalog" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カタログを読み込み中"
+          }
+        }
+      }
+    },
+    "Local Pebble health data could not be deleted." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ローカルのPebbleヘルスケアデータを削除できませんでした。"
+          }
+        }
+      }
+    },
     "Local Pebble health data deleted." : {
       "localizations" : {
         "ja" : {
@@ -3664,28 +3655,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ミュージック"
-          }
-        }
-      }
-    },
-    "Music: Progress Bar" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ミュージック: プログレスバー"
-          }
-        }
-      }
-    },
-    "Music: Volume Controls" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ミュージック: 音量コントロール"
           }
         }
       }
@@ -3990,6 +3959,16 @@
         }
       }
     },
+    "Notifications are reaching your watch." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知はウォッチに届いています。"
+          }
+        }
+      }
+    },
     "Notifications are turned off for this app in the system settings." : {
       "localizations" : {
         "ja" : {
@@ -4186,6 +4165,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "Pebble"
+          }
+        }
+      }
+    },
+    "Pebble Test" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pebbleテスト"
           }
         }
       }
@@ -4636,17 +4625,6 @@
         }
       }
     },
-    "Refresh" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "再読み込み"
-          }
-        }
-      }
-    },
     "Refresh After" : {
       "localizations" : {
         "ja" : {
@@ -4897,17 +4875,6 @@
         }
       }
     },
-    "Running Slot" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "実行中のスロット"
-          }
-        }
-      }
-    },
     "Running recovery firmware" : {
       "localizations" : {
         "ja" : {
@@ -5024,17 +4991,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ストアを検索"
-          }
-        }
-      }
-    },
-    "Search the Whole Store" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ストア全体を検索"
           }
         }
       }
@@ -5249,17 +5205,6 @@
         }
       }
     },
-    "Sort" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "並べ替え"
-          }
-        }
-      }
-    },
     "Spoken Language" : {
       "localizations" : {
         "ja" : {
@@ -5310,12 +5255,12 @@
         }
       }
     },
-    "Starts at %lld:00" : {
+    "Starts at %@" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "開始: %lld:00"
+            "state" : "translated",
+            "value" : "開始: %@"
           }
         }
       }
@@ -5366,6 +5311,16 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "停止"
+          }
+        }
+      }
+    },
+    "Stop Reconnecting" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再接続を中止"
           }
         }
       }
@@ -5496,17 +5451,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチの充電が完了したとき、または新しいPebbleOSが公開されたときに、iPhoneに通知します。オンにすると、通知の許可を求められます。"
-          }
-        }
-      }
-    },
-    "Tells this phone when a watch finishes charging. Turning it on asks for notification permission." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチの充電が完了したときに、iPhoneに通知します。オンにすると、通知の許可を求められます。"
           }
         }
       }
@@ -6077,6 +6021,26 @@
         }
       }
     },
+    "The watch app's settings page could not be loaded." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ウォッチアプリの設定ページを読み込めませんでした。"
+          }
+        }
+      }
+    },
+    "The watch app's settings service could not be found." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ウォッチアプリの設定サービスが見つかりませんでした。"
+          }
+        }
+      }
+    },
     "The watch buzzes the way its own settings say unless one is chosen here." : {
       "localizations" : {
         "ja" : {
@@ -6377,17 +6341,6 @@
         }
       }
     },
-    "The watch keeps the numbers it is given, so they are sent in this unit." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ウォッチは渡された数値をそのまま保持するため、この単位で送信します。"
-          }
-        }
-      }
-    },
     "The watch keeps the numbers it is given, so they are sent in this unit. Distance and wind units are the watch's own, on its settings screen." : {
       "localizations" : {
         "ja" : {
@@ -6414,17 +6367,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "ウォッチが録音した音声を、このiPhone上で文字に変換します。音声はどこにも送信されません。オンにすると、選んだ言語に対応した認識モデルをダウンロードします。"
-          }
-        }
-      }
-    },
-    "The watch records what you say and this app turns it into words here on the phone, without sending the sound anywhere. Turning this on downloads the recognizer for the language the phone is set to." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチが録音した音声を、このiPhone上で文字に変換します。音声はどこにも送信されません。オンにすると、iPhoneの言語に対応した認識モデルをダウンロードします。"
           }
         }
       }
@@ -7105,17 +7047,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "アップデート"
-          }
-        }
-      }
-    },
-    "Update All" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "すべてアップデート"
           }
         }
       }

@@ -47,7 +47,7 @@ struct ConfigurationWebView: View {
     /// 9.7 seconds without ever finishing, against 0.83 for one that opened
     /// alone.
     @State private var page: WebPage?
-    @State private var loadErrorMessage: String?
+    @State private var loadErrorMessage: LocalizedStringKey?
     /// Which of these views is loading. A `@State` initial value is taken once
     /// per identity, so this is what said the page was being loaded by two
     /// views rather than by one view starting over.
@@ -59,7 +59,6 @@ struct ConfigurationWebView: View {
         self.url = url
         self.closeHandler = closeHandler
     }
-
 
     var body: some View {
         Group {
@@ -139,7 +138,7 @@ struct ConfigurationWebView: View {
 
 /// What the screen says when a settings page cannot be shown.
 struct ConfigurationUnavailableView: View {
-    var message: String
+    var message: LocalizedStringKey
 
     var body: some View {
         ContentUnavailableView(

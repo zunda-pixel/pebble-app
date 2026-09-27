@@ -43,7 +43,7 @@ struct WatchesContent<Destination: View>: View {
             // Above the watches, not below them. It carries the connection
             // failures — the long one about the watch having forgotten this
             // phone — and at the foot of the list that sat past every watch.
-            // `AddWatchContent` in this file already does it this way.
+            // `AddWatchContent` already does it this way.
             FeedbackBanner(feedback: feedback)
             if watches.isEmpty {
                 ContentUnavailableView {
@@ -187,6 +187,17 @@ struct DiscoveredWatchRow: View {
             feedback: .failure("Bluetooth is off."),
             addWatch: {},
             destination: { _ in EmptyView() }
+        )
+    }
+}
+
+#Preview("Reconnecting") {
+    NavigationStack {
+        WatchesContent(
+            watches: [PreviewSamples.reconnectingSummary, PreviewSamples.savedSummary],
+            feedback: nil,
+            addWatch: {},
+            destination: { watch in Text(verbatim: watch.name) }
         )
     }
 }

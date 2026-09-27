@@ -5,6 +5,9 @@ struct AppGlanceView: View {
     var model: AppModel
     var application: WatchApplication
     @Environment(\.dismiss) private var dismiss
+    /// This sheet's own save, rather than `appGlances.feedback` as it stands:
+    /// that one still holds whatever the last line saved for any app said.
+    @State private var saveFeedback: FeatureFeedback?
 
     var body: some View {
         AppGlanceContent(
@@ -14,10 +17,15 @@ struct AppGlanceView: View {
             isInstalled: model.connections.contains {
                 model.installedApplicationIDs(on: $0.watch.id).contains(application.id)
             },
+            feedback: saveFeedback,
             save: { glance in
                 Task {
                     await model.setAppGlance(glance)
-                    dismiss()
+                    if let feedback = model.appGlances.feedback, feedback.isFailure {
+                        saveFeedback = feedback
+                    } else {
+                        dismiss()
+                    }
                 }
             },
             cancel: { dismiss() }
@@ -34,10 +42,31 @@ struct AppGlanceContent: View {
     var save: (AppGlance) -> Void
     var cancel: () -> Void
 
-    @State private var subtitle = ""
+    @State private var subtitle: String
     @State private var icon: TimelineIcon?
-    @State private var expires = false
-    @State private var expiry = Date()
+    @State private var expires: Bool
+    @State private var expiry: Date
+
+    init(
+        applicationName: String,
+        glance: AppGlance,
+        isInstalled: Bool = true,
+        feedback: FeatureFeedback? = nil,
+        save: @escaping (AppGlance) -> Void,
+        cancel: @escaping () -> Void
+    ) {
+        self.applicationName = applicationName
+        self.glance = glance
+        self.isInstalled = isInstalled
+        self.feedback = feedback
+        self.save = save
+        self.cancel = cancel
+        let slice = glance.slices.first
+        _subtitle = State(initialValue: slice?.subtitleTemplate ?? "")
+        _icon = State(initialValue: slice?.icon)
+        _expires = State(initialValue: slice?.expires != nil)
+        _expiry = State(initialValue: slice?.expires ?? Date())
+    }
 
     private var edited: AppGlance {
         var written = glance
@@ -99,20 +128,9 @@ struct AppGlanceContent: View {
             .formStyle(.grouped)
             .navigationTitle(Text(verbatim: applicationName))
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(role: .cancel) { cancel() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(role: .confirm) { save(edited) }
-                }
+                Button(role: .cancel) { cancel() }
+                Button(role: .confirm) { save(edited) }
             }
-        }
-        .onAppear {
-            guard let slice = glance.slices.first else { return }
-            subtitle = slice.subtitleTemplate
-            icon = slice.icon
-            expires = slice.expires != nil
-            expiry = slice.expires ?? Date()
         }
     }
 }
@@ -137,6 +155,16 @@ struct AppGlanceContent: View {
                 expires: Date(timeIntervalSince1970: 1_788_393_600)
             )]
         ),
+        save: { _ in },
+        cancel: {}
+    )
+}
+
+#Preview("Could not be saved") {
+    AppGlanceContent(
+        applicationName: "Timeline Weather",
+        glance: AppGlance(applicationID: UUID()),
+        feedback: .failure("The launcher line could not be saved."),
         save: { _ in },
         cancel: {}
     )

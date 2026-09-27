@@ -3,15 +3,15 @@ import SwiftUI
 
 /// What a watch is, on a page of its own.
 ///
-/// The three facts here do not change while the app is open: a watch's model,
-/// the serial written at the factory, and the hardware revision beside it. They
-/// sat in the `Watch` section above the battery and the connection state, which
+/// The facts here hardly change while the app is open: a watch's model, the
+/// serial written at the factory, the hardware revision beside it, and the
+/// firmware it runs. They sat in the `Watch` section above the battery and the connection state, which
 /// do change — so a section named for the watch was half identity and half
 /// status, and the two halves are read for different reasons. A reader wants
 /// the battery at a glance and the serial once, when something has gone wrong
 /// and a form is asking for it.
 ///
-/// Takes the three values rather than a closure, unlike every other page pushed
+/// Takes the four values rather than a closure, unlike every other page pushed
 /// from a watch's screen: those need `AppModel` to do something, and this only
 /// needs what the screen pushing it already holds.
 struct WatchInformationContent: View {
