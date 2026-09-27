@@ -20,5 +20,5 @@ public final class TimelineModel {
     public internal(set) var reminderFeedback: FeatureFeedback?
     /// The synchronization pass in flight, if one is. Two at once read the
     /// same queue and send it twice, so a second caller waits for the first.
-    @ObservationIgnored var synchronizationTask: Task<Void, Never>?
+    @ObservationIgnored var synchronizationTask: Task<Set<WatchID>, Never>?
 }

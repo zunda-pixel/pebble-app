@@ -5695,6 +5695,26 @@
         }
       }
     },
+    "The calendar could not be read." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カレンダーを読み込めませんでした。"
+          }
+        }
+      }
+    },
+    "The calendar was read, but the timeline could not be saved." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カレンダーは読み込めましたが、タイムラインを保存できませんでした。"
+          }
+        }
+      }
+    },
     "The catalog package was rejected: %@" : {
       "localizations" : {
         "ja" : {
@@ -6617,6 +6637,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ウォッチのタイムラインを消去し、アプリが持っているピンを書き込み直しました。"
+          }
+        }
+      }
+    },
+    "The watch's timeline was cleared, but not all of it was written again. The rest is sent on the next connection." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ウォッチのタイムラインは消去しましたが、すべてを書き戻せませんでした。残りは次の接続時に送信します。"
           }
         }
       }

@@ -49,16 +49,18 @@ extension AppModel {
             return
         }
         timeline.reminderFeedback = nil
+        let labelled = reminder.labelledForWatch
         for connection in activeConnections {
+            let client = connection.client
             do {
-                try await connection.client.write(.timelineReminder(reminder.labelledForWatch))
+                try await retry(with: .watchWork) { try await client.write(.timelineReminder(labelled)) }
                 // Written down before it can be deleted: a reminder added,
                 // then deleted while the watch is away, is one only this record
                 // can name when the watch comes back.
                 let watchID = connection.watch.id
-                var written = (try? await reminderStore.writtenPinIDs(watchID: watchID)) ?? []
-                written.insert(reminder.id)
-                try? await reminderStore.setWrittenPinIDs(written, watchID: watchID)
+                var written = (try? await reminderStore.writtenPinDigests(watchID: watchID)) ?? [:]
+                written[reminder.id] = labelled.writtenDigest
+                try? await reminderStore.setWrittenPinDigests(written, watchID: watchID)
             } catch {
                 timeline.reminderFeedback = .failure(
                     "\(connection.watch.name) did not accept the reminder. \(Text(refusalReason(for: error)))"
@@ -145,11 +147,17 @@ extension AppModel {
         guard connection.isConnected, await loadReminders() else { return }
         await removeRemindersTheWatchStillHas(on: connection)
         let watchID = connection.watch.id
-        var written = (try? await reminderStore.writtenPinIDs(watchID: watchID)) ?? []
-        for reminder in timeline.reminders where reminder.timestamp > .now && !reminder.isFromWatch {
+        let client = connection.client
+        // By the digest of the labelled bytes, the way the calendar's reminders
+        // are: what the watch already holds costs nothing, and a reader who
+        // changes language has every one written again in it.
+        var written = (try? await reminderStore.writtenPinDigests(watchID: watchID)) ?? [:]
+        for reminder in timeline.reminders.map(\.labelledForWatch)
+        where reminder.timestamp > .now && !reminder.isFromWatch {
+            guard written[reminder.id] != reminder.writtenDigest else { continue }
             do {
-                try await connection.client.write(.timelineReminder(reminder.labelledForWatch))
-                written.insert(reminder.id)
+                try await retry(with: .watchWork) { try await client.write(.timelineReminder(reminder)) }
+                written[reminder.id] = reminder.writtenDigest
             } catch {
                 await DiagnosticLog.shared.record(
                     .error,
@@ -161,7 +169,7 @@ extension AppModel {
         }
         // Whatever got through, so that a reminder deleted before the next
         // connection can still be named.
-        try? await reminderStore.setWrittenPinIDs(written, watchID: watchID)
+        try? await reminderStore.setWrittenPinDigests(written, watchID: watchID)
     }
 }
 

@@ -60,10 +60,12 @@ final class RemindersBridge: RemindersAppStore {
 
     func reminders() async throws -> [RemindersAppItem] {
         try requireAccess()
-        let start = Date()
+        let now = Date()
+        // From the start of today: a reminder with a date and no time is due
+        // at midnight to EventKit, and would otherwise be missed on its own day.
         let predicate = store.predicateForIncompleteReminders(
-            withDueDateStarting: start,
-            ending: start.addingTimeInterval(Self.window),
+            withDueDateStarting: Calendar.current.startOfDay(for: now),
+            ending: now.addingTimeInterval(Self.window),
             calendars: nil
         )
         return await withCheckedContinuation { continuation in
@@ -116,8 +118,15 @@ final class RemindersBridge: RemindersAppStore {
     /// Read off the main actor, inside EventKit's own callback, so nothing of
     /// this class is touched: a reminder is turned into the value that leaves.
     private nonisolated static func item(for reminder: EKReminder) -> RemindersAppItem? {
-        guard let components = reminder.dueDateComponents,
-              let due = Calendar.current.date(from: components) else { return nil }
+        guard var components = reminder.dueDateComponents else { return nil }
+        // A reminder with a date and no time is one for that day, and the
+        // Reminders app tells of it in the morning. Read as it stands it was
+        // midnight, and the watch buzzed the reader awake for it.
+        if components.hour == nil {
+            components.hour = allDayReminderHour
+            components.minute = 0
+        }
+        guard let due = Calendar.current.date(from: components) else { return nil }
         let identifier = reminder.calendarItemIdentifier
         return RemindersAppItem(
             identifier: identifier,
@@ -132,6 +141,11 @@ final class RemindersBridge: RemindersAppStore {
             )
         )
     }
+
+    /// When a reminder with no time of its own is given to the watch: the
+    /// Reminders app's own default for all-day reminders. The reader's setting
+    /// for it is not something EventKit hands over.
+    nonisolated static let allDayReminderHour = 9
 
     /// What the watch is told made these reminders.
     nonisolated static let applicationID = UUID(uuid: (

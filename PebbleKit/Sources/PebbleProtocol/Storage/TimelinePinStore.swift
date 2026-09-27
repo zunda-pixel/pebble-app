@@ -52,10 +52,10 @@ public actor TimelinePinStore {
 
     /// Names the pins without saying what they were written as.
     ///
-    /// The reminders are sent from a queue rather than derived from what the app
-    /// holds, so they have nothing to compare a digest against and keep only
-    /// this record. A pin that arrives with no digest keeps the one it already
-    /// had, so noting one more held item does not re-send all the others.
+    /// For a removal, and for the items a watch made, which it holds already
+    /// and so were never written as anything. A pin that arrives with no
+    /// digest keeps the one it already had, so noting one more held item does
+    /// not re-send all the others.
     public func setWrittenPinIDs(_ pinIDs: Set<UUID>, watchID: WatchID) throws {
         var states = try writtenStates()
         let existing = Dictionary(

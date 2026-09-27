@@ -120,38 +120,47 @@ extension AppModel {
     public func removeTimelinePins(_ removed: [TimelinePin]) async {
         guard !removed.isEmpty else { return }
         let identifiers = Set(removed.map(\.id))
-        timeline.pins.removeAll { identifiers.contains($0.id) }
-        let saved = (try? await timelineStore.save(timeline.pins)) != nil
+        let kept = timeline.pins.filter { !identifiers.contains($0.id) }
+        // Taken off the watch only once the phone has let go of them too: the
+        // next synchronization reads the pins from disk, and would write back
+        // to the watch what it had just been told to delete.
+        do {
+            try await timelineStore.save(kept)
+        } catch {
+            timeline.feedback = .failure("The change could not be saved.")
+            return
+        }
+        timeline.pins = kept
         for pin in removed { try? await queueTimelineOperation(.delete(pin.id)) }
         if connectedWatch != nil { await synchronizeTimeline() }
-        if !saved {
-            timeline.feedback = .failure("The change could not be saved.")
-        }
     }
 
-    public func synchronizeTimeline() async {
+    /// Answers the watches that took everything this pass had for them.
+    @discardableResult
+    public func synchronizeTimeline() async -> Set<WatchID> {
         // Joining a pass already in flight is not enough: work queued after
         // its read would sit until the next trigger. Wait it out, then run a
         // pass of our own — which finds nothing left to do when the earlier
         // one covered us, and costs one queue read to find that out.
         while let running = timeline.synchronizationTask {
-            await running.value
+            _ = await running.value
         }
         // The task clears its own handle before finishing: awaiting a finished
         // task need not suspend, so a waiter waking to a handle the claimant
         // had not cleared yet would spin on the main actor without ever
         // letting the claimant back on to clear it.
         let task = Task {
-            await self.runTimelineSynchronization()
+            let completed = await self.runTimelineSynchronization()
             self.timeline.synchronizationTask = nil
+            return completed
         }
         timeline.synchronizationTask = task
-        await task.value
+        return await task.value
     }
 
-    private func runTimelineSynchronization() async {
+    private func runTimelineSynchronization() async -> Set<WatchID> {
         await loadTimeline()
-        guard !activeConnections.isEmpty else { return }
+        guard !activeConnections.isEmpty else { return [] }
         let queued = (try? await pendingTimelineOperationStore.operations()) ?? []
         let queuedUpserts = Set(queued.compactMap { operation -> UUID? in
             if case .upsert(let pin) = operation { return pin.id }
@@ -161,22 +170,27 @@ extension AppModel {
         // connection, and so does every other watch: whatever the least
         // finished one did not get is what is kept.
         var firstUnfinished = queued.count
+        var completedWatches: Set<WatchID> = []
         for connection in activeConnections {
             // What the reconciliation took off this watch, so the queue does not
             // ask for it a second time: deleting a pin used to cost two removes,
             // one from each.
-            let alreadyGone = await removePinsTheAppHasForgotten(on: connection)
+            let (alreadyGone, removedAll) = await removePinsTheAppHasForgotten(on: connection)
             // Derived per watch, because what each already holds is its own: the
             // queue is the durable work and goes first, so an index into it
             // keeps its meaning however many pins this watch still needs.
             let derived = await upsertsStillNeeded(besides: queuedUpserts, on: connection)
+            let operations = queued + derived
             let stopped = await send(
-                queued + derived,
+                operations,
                 to: connection,
                 queuedCount: queued.count,
                 alreadyGone: alreadyGone
             )
             firstUnfinished = min(firstUnfinished, min(stopped, queued.count))
+            if removedAll, stopped == operations.count {
+                completedWatches.insert(connection.watch.id)
+            }
         }
         // Taken off the live queue by identity, not written over with this
         // pass's leftovers: a delete queued while the sends above were in
@@ -191,6 +205,7 @@ extension AppModel {
             }
         }
         try? await pendingTimelineOperationStore.save(remaining)
+        return completedWatches
     }
 
     /// The pins this watch does not already hold, as upserts.
@@ -288,7 +303,7 @@ extension AppModel {
     }
 
     /// Deletes the pins this watch was given and the app no longer has, and
-    /// answers which ones went.
+    /// answers which ones went and whether that was all of them.
     ///
     /// BlobDB has no listing, so a pin can only be named from the app's own
     /// record of what it wrote. Without this, a pin whose delete was never
@@ -297,11 +312,13 @@ extension AppModel {
     ///
     /// The answer matters because the queue usually holds a delete for the same
     /// pin: letting go of one from the phone puts it in both places at once.
-    private func removePinsTheAppHasForgotten(on connection: WatchConnection) async -> Set<UUID> {
+    private func removePinsTheAppHasForgotten(
+        on connection: WatchConnection
+    ) async -> (removed: Set<UUID>, all: Bool) {
         let watchID = connection.watch.id
         let written = (try? await timelineStore.writtenPinDigests(watchID: watchID)) ?? [:]
         let forgotten = Set(written.keys).subtracting(timeline.pins.map(\.id))
-        guard !forgotten.isEmpty else { return [] }
+        guard !forgotten.isEmpty else { return ([], true) }
         var removed: Set<UUID> = []
         let client = connection.client
         for id in forgotten {
@@ -323,7 +340,7 @@ extension AppModel {
             message: "\(connection.watch.name): removed \(removed.count)"
                 + " of \(forgotten.count) pin(s) the app no longer has"
         )
-        return removed
+        return (removed, removed.count == forgotten.count)
     }
 
     /// Empties the watch's own pin database and writes back what the app holds.
@@ -352,7 +369,12 @@ extension AppModel {
             message: "\(connection.watch.name): cleared the pin database"
         )
         diagnostics[watchID].feedback[.timeline] = .progress("The watch's timeline was cleared. Sending what the app has…")
-        await synchronizeTimeline()
+        guard await synchronizeTimeline().contains(watchID) else {
+            diagnostics[watchID].feedback[.timeline] = .failure(
+                "The watch's timeline was cleared, but not all of it was written again. The rest is sent on the next connection."
+            )
+            return
+        }
         diagnostics[watchID].feedback[.timeline] = .success("The watch's timeline was cleared and written again from the app.")
     }
 
@@ -488,11 +510,11 @@ extension AppModel {
     ///   "synchronized" on a screen where nobody had asked for anything, so
     ///   that one says it in the log.
     func reloadCalendar(reportsToReader: Bool) async {
+        let calendarPins: [TimelinePin]
+        let calendarReminders: [TimelinePin]
         do {
             // The master switch empties the fetch rather than skipping the
             // sync: absence is what queues the deletions, on the watch too.
-            let calendarPins: [TimelinePin]
-            let calendarReminders: [TimelinePin]
             if Defaults[.calendarPinsEnabled] {
                 // The list is read here and not only on the settings screen,
                 // because the disabled set has to be derived from what EventKit
@@ -516,28 +538,6 @@ extension AppModel {
                 calendarPins = []
                 calendarReminders = []
             }
-            try await calendarReminderStore.save(calendarReminders)
-            let oldCalendarPins = timeline.pins.filter { $0.parentApplicationID == CalendarBridge.calendarApplicationID }
-
-            timeline.pins.removeAll { $0.parentApplicationID == CalendarBridge.calendarApplicationID }
-            timeline.pins.append(contentsOf: calendarPins)
-            try await timelineStore.save(timeline.pins)
-            let newIDs = Set(calendarPins.map(\.id))
-            for pin in oldCalendarPins where !newIDs.contains(pin.id) {
-                try await queueTimelineOperation(.delete(pin.id))
-            }
-            for pin in Self.calendarPinsWorthQueueing(calendarPins, replacing: oldCalendarPins) {
-                try await queueTimelineOperation(.upsert(pin))
-            }
-            if connectedWatch != nil { await synchronizeTimeline() }
-            // After the pins: a reminder's parent is its pin, which the watch
-            // reads back for the snooze arithmetic.
-            for connection in activeConnections {
-                await synchronizeCalendarReminders(on: connection)
-            }
-            if reportsToReader {
-                timeline.feedback = .success("Calendar synchronized with Timeline.")
-            }
         } catch CalendarBridgeError.accessDenied {
             // Not a banner: whoever asked for calendar access was answered at
             // the time, and this read was not the reader's doing.
@@ -545,15 +545,64 @@ extension AppModel {
                 category: "timeline",
                 message: "the calendar was not read: access has not been granted"
             )
+            return
         } catch {
             if reportsToReader {
-                timeline.feedback = .failure("Calendar access or synchronization failed.")
+                timeline.feedback = .failure("The calendar could not be read.")
             }
             await DiagnosticLog.shared.record(
                 .error,
                 category: "timeline",
-                message: "the calendar could not be synchronized: \(String(reflecting: error))"
+                message: "the calendar could not be read: \(String(reflecting: error))"
             )
+            return
+        }
+        let oldCalendarPins = timeline.pins.filter { $0.parentApplicationID == CalendarBridge.calendarApplicationID }
+        let pins = timeline.pins.filter { $0.parentApplicationID != CalendarBridge.calendarApplicationID }
+            + calendarPins
+        // Kept here only once both are on disk: the screen would otherwise show
+        // a calendar the next launch has never heard of.
+        do {
+            try await calendarReminderStore.save(calendarReminders)
+            try await timelineStore.save(pins)
+        } catch {
+            if reportsToReader {
+                timeline.feedback = .failure("The calendar was read, but the timeline could not be saved.")
+            }
+            await DiagnosticLog.shared.record(
+                .error,
+                category: "timeline",
+                message: "the calendar's pins could not be saved: \(String(reflecting: error))"
+            )
+            return
+        }
+        timeline.pins = pins
+        // A queue that will not take them loses nothing the synchronization
+        // cannot find again: an upsert is derived from the digests, and a pin
+        // that is gone here is removed by the reconciliation.
+        do {
+            let newIDs = Set(calendarPins.map(\.id))
+            for pin in oldCalendarPins where !newIDs.contains(pin.id) {
+                try await queueTimelineOperation(.delete(pin.id))
+            }
+            for pin in Self.calendarPinsWorthQueueing(calendarPins, replacing: oldCalendarPins) {
+                try await queueTimelineOperation(.upsert(pin))
+            }
+        } catch {
+            await DiagnosticLog.shared.record(
+                .error,
+                category: "timeline",
+                message: "the calendar's changes could not be queued: \(String(reflecting: error))"
+            )
+        }
+        if connectedWatch != nil { await synchronizeTimeline() }
+        // After the pins: a reminder's parent is its pin, which the watch
+        // reads back for the snooze arithmetic.
+        for connection in activeConnections {
+            await synchronizeCalendarReminders(on: connection)
+        }
+        if reportsToReader {
+            timeline.feedback = .success("Calendar synchronized with Timeline.")
         }
     }
 

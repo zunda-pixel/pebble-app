@@ -56,13 +56,28 @@ extension AppModel {
             mirrored: mirrored,
             now: .now
         )
-        timeline.reminders = outcome.reminders
         // Named for both directions: what came from the Reminders app is named
         // here too, so letting go of it in this app can reach it there.
         for item in items { mirrored[item.reminder.id] = item.identifier }
         for reminder in outcome.finished { mirrored[reminder.id] = nil }
-        try? await reminderStore.save(timeline.reminders)
-        try? await reminderStore.setMirroredIdentifiers(mirrored)
+        // Kept, and synchronized, only once both are on disk: the watches'
+        // synchronization reads the reminders back from there, and would undo
+        // a merge that was never saved.
+        do {
+            try await reminderStore.save(outcome.reminders)
+            try await reminderStore.setMirroredIdentifiers(mirrored)
+        } catch {
+            if reportsToReader {
+                timeline.reminderFeedback = .failure("The change could not be saved.")
+            }
+            await DiagnosticLog.shared.record(
+                .error,
+                category: "timeline",
+                message: "the Reminders app's reminders could not be saved: \(String(reflecting: error))"
+            )
+            return
+        }
+        timeline.reminders = outcome.reminders
         if reportsToReader { timeline.reminderFeedback = nil }
         for connection in activeConnections {
             await synchronizeReminders(on: connection)

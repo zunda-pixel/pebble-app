@@ -15,7 +15,7 @@ extension AppModel {
             timeline.reminders.removeAll { $0.id == item.id }
             timeline.reminders.append(item)
             timeline.reminders.sort { $0.timestamp < $1.timestamp }
-            try? await reminderStore.save(timeline.reminders)
+            await keepItemMadeOnWatch { try await self.reminderStore.save(self.timeline.reminders) }
             await noteHeld(item.id, by: connection, in: reminderStore)
             // Written where the reader will look for it: a reminder spoken to
             // the watch belongs in the app they keep their timeline.reminders in, and it
@@ -25,13 +25,27 @@ extension AppModel {
         case .pin, .notification:
             timeline.pins.removeAll { $0.id == item.id }
             timeline.pins.append(item)
-            try? await timelineStore.save(timeline.pins)
+            await keepItemMadeOnWatch { try await self.timelineStore.save(self.timeline.pins) }
             await noteHeld(item.id, by: connection, in: timelineStore)
         }
         await DiagnosticLog.shared.record(
             category: "timeline",
             message: "kept a \(item.kind) the watch made, for \(item.timestamp)"
         )
+    }
+
+    /// Nobody on this side asked for the item, so there is no screen to tell;
+    /// the log is where a reminder that did not survive a relaunch is explained.
+    private func keepItemMadeOnWatch(_ save: () async throws -> Void) async {
+        do {
+            try await save()
+        } catch {
+            await DiagnosticLog.shared.record(
+                .error,
+                category: "timeline",
+                message: "an item the watch made could not be saved: \(String(reflecting: error))"
+            )
+        }
     }
 
     /// Writes down that this watch has this item.
