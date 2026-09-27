@@ -58,6 +58,8 @@ public final class WatchConnection: Identifiable {
     @ObservationIgnored let voiceCoordinator: VoiceSessionCoordinator
     @ObservationIgnored private var eventsTask: Task<Void, Never>?
     @ObservationIgnored private var framesTask: Task<Void, Never>?
+    @ObservationIgnored private var appMessagesTask: Task<Void, Never>?
+    @ObservationIgnored private var appMessages: AsyncStream<AppMessageData>.Continuation?
 
     public nonisolated var id: WatchID {
         watchID
@@ -92,10 +94,25 @@ public final class WatchConnection: Identifiable {
         }
     }
 
+    /// `onAppMessage` is given one message at a time, in the order the watch
+    /// sent them: a task per message let a later one reach the app's script
+    /// first whenever the earlier one waited longer to load it.
     func startObserving(
         onEvent: @escaping @MainActor (WatchConnection, WatchClientEvent) -> Void,
-        onFrame: @escaping @MainActor (WatchConnection, PebbleProtocolFrame) async -> Void
+        onFrame: @escaping @MainActor (WatchConnection, PebbleProtocolFrame) async -> Void,
+        onAppMessage: @escaping @MainActor (WatchConnection, AppMessageData) async -> Void
     ) {
+        stopDeliveringAppMessages()
+        let (messages, continuation) = AsyncStream.makeStream(of: AppMessageData.self)
+        appMessages = continuation
+        appMessagesTask = Task { [weak self] in
+            for await message in messages {
+                guard !Task.isCancelled, let self else {
+                    return
+                }
+                await onAppMessage(self, message)
+            }
+        }
         eventsTask?.cancel()
         eventsTask = Task { [weak self, client] in
             for await event in client.events() {
@@ -103,6 +120,11 @@ public final class WatchConnection: Identifiable {
                     return
                 }
                 self.apply(event)
+                // Queued rather than awaited: a script slow to answer must not
+                // hold up the events behind it, a disconnect among them.
+                if case .appMessageReceived(let message) = event {
+                    self.appMessages?.yield(message)
+                }
                 onEvent(self, event)
             }
         }
@@ -137,10 +159,18 @@ public final class WatchConnection: Identifiable {
             synchronizedAppGlances = [:]
             endTransfer()
             cancelApplicationFetch()
+            stopDeliveringAppMessages()
             voiceCoordinator.reset()
         default:
             break
         }
+    }
+
+    private func stopDeliveringAppMessages() {
+        appMessages?.finish()
+        appMessages = nil
+        appMessagesTask?.cancel()
+        appMessagesTask = nil
     }
 
     // So a bar appears at once and the count left by the last transfer is not
@@ -172,6 +202,7 @@ public final class WatchConnection: Identifiable {
         framesTask?.cancel()
         framesTask = nil
         cancelApplicationFetch()
+        stopDeliveringAppMessages()
         endTransfer()
         voiceCoordinator.reset()
         await client.disconnect(from: watch)

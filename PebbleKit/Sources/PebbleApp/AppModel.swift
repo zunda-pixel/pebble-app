@@ -617,6 +617,9 @@ public final class AppModel {
                 },
                 onFrame: { [weak self] connection, frame in
                     await self?.handleCompanionFrame(frame, from: connection)
+                },
+                onAppMessage: { [weak self] connection, message in
+                    await self?.handleAppMessage(message, from: connection)
                 }
             )
             discoveredWatches.removeAll { $0.id == watch.id }
@@ -670,8 +673,9 @@ public final class AppModel {
             }
         case .appFetchRequested(let request):
             beginHandlingAppFetchRequest(request, from: connection)
-        case .appMessageReceived(let message):
-            Task { [weak self] in await self?.handleAppMessage(message, from: connection) }
+        case .appMessageReceived:
+            // `WatchConnection` hands these to `handleAppMessage` one at a time.
+            break
         case .transferProgress:
             break
         case .reconnecting:
