@@ -823,7 +823,7 @@ struct AppModelTests {
         await model.resetWatch(.restart, watchID: WatchID("missing-watch"))
 
         #expect(client.sentFrames.isEmpty)
-        #expect(model.watches.feedback != nil)
+        #expect(model.watches.resetFeedback[WatchID("missing-watch")]?.isFailure == true)
     }
 
     @Test

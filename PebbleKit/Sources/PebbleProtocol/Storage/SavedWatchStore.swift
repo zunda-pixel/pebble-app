@@ -54,18 +54,19 @@ public actor SavedWatchStore {
         try loadIfNeeded()
         var updated = watches ?? []
         let previous = updated.first { $0.id == watch.id }
+        // Each kept from the last connection that knew it: a connection that
+        // does not say — the battery not read yet, a model it could not
+        // resolve — should not erase what is known.
         let watch = SavedWatch(
             id: watch.id,
             name: watch.name,
-            model: watch.model,
-            firmwareVersion: watch.firmwareVersion,
-            serialNumber: watch.serialNumber,
-            lastBatteryLevel: watch.batteryLevel,
+            model: watch.model ?? previous?.model,
+            firmwareVersion: watch.firmwareVersion ?? previous?.firmwareVersion,
+            serialNumber: watch.serialNumber ?? previous?.serialNumber,
+            lastBatteryLevel: watch.batteryLevel ?? previous?.lastBatteryLevel,
             lastConnectedAt: Date(),
             automaticallyConnects: previous?.automaticallyConnects ?? true,
             board: watch.board ?? previous?.board,
-            // Kept from the last connection that knew it, the way the board is:
-            // a connection that does not say should not erase what is known.
             hardwareRevision: watch.hardwareRevision ?? previous?.hardwareRevision
         )
         updated.removeAll { $0.id == watch.id }

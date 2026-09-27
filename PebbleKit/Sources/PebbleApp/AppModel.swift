@@ -58,6 +58,12 @@ public final class AppModel {
     public internal(set) var discoveredWatches: [DiscoveredWatch] = []
     /// Which of the watches being connected have got past the link coming up.
     var negotiatingWatchIDs: Set<WatchID> = []
+    /// Which connect each watch's link is coming up for. A forget or a
+    /// disconnect while it is withdraws the attempt, and the link that arrives
+    /// afterwards is closed rather than kept.
+    @ObservationIgnored var connectionAttempts: [WatchID: UUID] = [:]
+    @ObservationIgnored var watchHistoryCouldNotBeSaved = false
+    @ObservationIgnored var startup: Task<Void, Never>?
     /// Why the last scan could not look — the radio off or refused. Nothing to
     /// do with any one watch, which is what lets the Add Watch sheet show it
     /// beside a watch's own failure without showing another watch's.
@@ -110,13 +116,10 @@ public final class AppModel {
     public let weather = WeatherModel()
     public let deepLinks = DeepLinksModel()
 
+    /// Not read off `connectionState`, which answers `.negotiating` for a
+    /// link that is up and `.connected` while a second watch is looked for.
     public var isScanningOrConnecting: Bool {
-        switch connectionState {
-        case .scanning, .connecting:
-            true
-        default:
-            false
-        }
+        isScanning || !connectingWatchIDs.isEmpty
     }
 
     public var connectedWatches: [ConnectedWatch] {
@@ -429,9 +432,7 @@ public final class AppModel {
         catalog.source = Defaults[.catalogSource]
     }
 
-    public func start() async {
-        guard !hasStarted else { return }
-        hasStarted = true
+    private func loadWhatWasKept() async {
         await loadSavedWatches()
         await restorePendingNotifications()
         notifications.preferences = (try? await notificationPreferenceStore.preferences()) ?? NotificationDeliveryPreferences()
@@ -445,6 +446,22 @@ public final class AppModel {
         notifications.sourceApps = (try? await notificationSourceAppStore.apps()) ?? []
         notifications.sent = (try? await sentNotificationStore.notifications()) ?? []
         await loadAppGlances()
+    }
+
+    /// Every caller waits for what is on disk to be read — the scene coming
+    /// forward and the first view's task arrive together, and the second used
+    /// to go on to flush and refresh against a model that had loaded nothing.
+    /// Not for the scan after it, which waits for every watch it connects to.
+    public func start() async {
+        if let startup {
+            await startup.value
+            return
+        }
+        guard !hasStarted else { return }
+        hasStarted = true
+        let startup = Task { await self.loadWhatWasKept() }
+        self.startup = startup
+        await startup.value
         observeWatchesReconnectingThemselves()
         // A watch that has been set up reconnects on its own, so the radio has
         // to be open before it does — but only where there is a watch to expect.
@@ -453,9 +470,6 @@ public final class AppModel {
         // asked for anything.
         if !watches.saved.isEmpty {
             scannerClient.startBluetooth()
-        }
-        if watches.saved.contains(where: \.automaticallyConnects) {
-            await scan()
         }
         observeEventKitChanges()
         // The weather's clock, for as long as the app is running. Five minutes
@@ -468,6 +482,11 @@ public final class AppModel {
                 guard let self else { return }
                 await self.refreshWeatherIfStale()
             }
+        }
+        // Last: it waits for every watch it connects to, and nothing above
+        // needs a watch.
+        if watches.saved.contains(where: \.automaticallyConnects) {
+            await scan()
         }
     }
 
@@ -495,8 +514,7 @@ public final class AppModel {
     public func scan() async {
         guard !isScanning else { return }
         isScanning = true
-        defer { isScanning = false }
-
+        var automaticTargets: [DiscoveredWatch] = []
         do {
             await loadSavedWatches()
             // Asking for a watch is the moment the radio is worth its dialog.
@@ -514,11 +532,8 @@ public final class AppModel {
             }
             discoveredWatches = scanned.filter { !connectedIDs.contains($0.id) }
             scanFailure = nil
-            let automaticTargets = discoveredWatches.filter { discovered in
+            automaticTargets = discoveredWatches.filter { discovered in
                 watches.saved.contains { $0.id == discovered.id && $0.automaticallyConnects }
-            }
-            for watch in automaticTargets {
-                await connect(to: watch)
             }
         } catch let error as WatchConnectionError {
             // Another scan already looking is not the radio failing to.
@@ -532,6 +547,15 @@ public final class AppModel {
                 lastConnectionError = .bluetoothUnavailable
             }
         }
+        // The scan is over once the watches are found. Held through the
+        // connects, it was held through each watch's whole synchronization —
+        // a network round trip among it — and the second watch waited for the
+        // first's.
+        isScanning = false
+        let connects = automaticTargets.map { watch in
+            Task { await self.connect(to: watch) }
+        }
+        for connect in connects { await connect.value }
     }
 
     public func connect(to watch: SavedWatch) async {
@@ -549,6 +573,8 @@ public final class AppModel {
         }
         connectingWatchIDs.insert(watch.id)
         connectionFailures[watch.id] = nil
+        let attempt = UUID()
+        connectionAttempts[watch.id] = attempt
         Task { [id = watch.id] in
             await DiagnosticLog.shared.record(
                 category: "connection",
@@ -558,6 +584,7 @@ public final class AppModel {
         defer {
             connectingWatchIDs.remove(watch.id)
             negotiatingWatchIDs.remove(watch.id)
+            if connectionAttempts[watch.id] == attempt { connectionAttempts[watch.id] = nil }
         }
 
         let connectionClient = clientFactory(watch.id)
@@ -570,6 +597,12 @@ public final class AppModel {
                 // the log needs to tell those apart.
                 guard let self else { return }
                 self.negotiatingWatchIDs.insert(watch.id)
+            }
+            // Forgotten or disconnected while the link was coming up: saving it
+            // now would bring back the watch the reader just let go of.
+            guard connectionAttempts[watch.id] == attempt else {
+                await connectionClient.disconnect(from: connectedWatch)
+                return
             }
             lastConnectionError = nil
             connectionFailures[watch.id] = nil
@@ -596,6 +629,7 @@ public final class AppModel {
             await DiagnosticLog.shared.record(category: "connection", message: "Watch connected")
             await synchronizeEverything(on: connection)
         } catch let error as WatchConnectionError {
+            guard connectionAttempts[watch.id] == attempt else { return }
             lastConnectionError = error
             connectionFailures[watch.id] = error
             if !connections.isEmpty {
@@ -603,6 +637,7 @@ public final class AppModel {
             }
             await DiagnosticLog.shared.record(.error, category: "connection", message: error.logDescription)
         } catch {
+            guard connectionAttempts[watch.id] == attempt else { return }
             lastConnectionError = .protocolNegotiationFailed
             connectionFailures[watch.id] = .protocolNegotiationFailed
         }

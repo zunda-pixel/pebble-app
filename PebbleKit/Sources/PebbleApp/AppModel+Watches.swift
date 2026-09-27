@@ -89,25 +89,61 @@ extension AppModel {
     @discardableResult
     public func forgetWatch(id: WatchID) async -> Bool {
         // A successful reconnect would otherwise re-save the forgotten entry.
+        connectionAttempts[id] = nil
         if let connection = connections.first(where: { $0.watch.id == id }) {
             await close(connection)
         }
         do {
             watches.saved = try await watchStore.remove(watchID: id)
-            applications.installedIDsByWatch[id] = nil
-            connectionFailures[id] = nil
-            watches.resetFeedback[id] = nil
-            diagnostics.watches[id] = nil
-            language.feedback[id] = nil
-            watches.feedback = nil
-            return true
         } catch {
             watches.feedback = .failure("The watch could not be forgotten.")
             return false
         }
+        await forgetEverythingKept(for: id)
+        watches.feedback = nil
+        return true
+    }
+
+    /// Everything the app keeps about one watch, on disk and here. Left behind,
+    /// the same watch added again inherits it — a firmware update staged for it
+    /// before would install itself unasked.
+    private func forgetEverythingKept(for id: WatchID) async {
+        applications.installedIDsByWatch[id] = nil
+        applications.activeWatchfaceIDs[id] = nil
+        Defaults[.notifiedFirmwareVersions][id] = nil
+        watchesAwaitingApplicationSynchronization.remove(id)
+        connectionFailures[id] = nil
+        chargeLevels[id] = nil
+        chargeNotified.remove(id)
+        firmwareCheckedAt = firmwareCheckedAt.filter { !$0.key.hasPrefix("\(id.rawValue)|") }
+        firmware.watches[id] = nil
+        watches.resetFeedback[id] = nil
+        diagnostics.watches[id] = nil
+        language.feedback[id] = nil
+        let library = applicationLibrary
+        let stores = [timelineStore, reminderStore, calendarReminderStore]
+        let firmwareUpdates = pendingFirmwareUpdateStore
+        let writtenRecords = writtenRecordStore
+        do {
+            try await firmwareUpdates.clear(watchID: id)
+            try await writtenRecords.forget(watchID: id)
+            try await library.forgetSynchronizedApplicationIDs(watchID: id)
+            for store in stores {
+                try await store.forgetWrittenPinIDs(watchID: id)
+            }
+        } catch {
+            // The watch is forgotten either way; what is left is the same
+            // records a watch added again would have been given afresh.
+            await DiagnosticLog.shared.record(
+                .error,
+                category: "connection",
+                message: "Some records of a forgotten watch could not be removed: \(error)"
+            )
+        }
     }
 
     public func disconnect(watchID: WatchID) async {
+        connectionAttempts[watchID] = nil
         guard let connection = connections.first(where: { $0.watch.id == watchID }) else {
             return
         }
@@ -115,6 +151,7 @@ extension AppModel {
     }
 
     public func disconnect() async {
+        connectionAttempts.removeAll()
         for connection in connections {
             await close(connection)
         }
@@ -154,9 +191,11 @@ extension AppModel {
     }
 
     // The watch reboots without answering, so the connection is closed locally.
-    public func resetWatch(_ kind: ResetKind, watchID: WatchID? = nil) async {
+    /// The watch is named, never defaulted: "whichever is first" is no answer
+    /// for a factory reset.
+    public func resetWatch(_ kind: ResetKind, watchID: WatchID) async {
         guard let connection = connection(for: watchID), connection.isConnected else {
-            watches.feedback = .failure("Connect the watch before resetting it.")
+            watches.resetFeedback[watchID] = .failure("Connect the watch before resetting it.")
             return
         }
         let watch = connection.watch
@@ -171,7 +210,6 @@ extension AppModel {
                 category: "reset",
                 message: "Sent reset command \(kind) to the watch"
             )
-            watches.feedback = nil
             await close(connection)
             let message: LocalizedStringKey = switch kind {
             case .restart: "The watch is restarting."
@@ -183,8 +221,7 @@ extension AppModel {
             // only news afterwards is the link returning.
             watches.resetFeedback[watch.id] = .progress(message)
         } catch {
-            watches.resetFeedback[watch.id] = nil
-            watches.feedback = .failure("The reset command could not be sent.")
+            watches.resetFeedback[watch.id] = .failure("The reset command could not be sent.")
         }
     }
 
@@ -195,8 +232,14 @@ extension AppModel {
         noteFirmwareUpdateFinished(on: watch)
         do {
             watches.saved = try await watchStore.record(watch)
-            watches.feedback = nil
+            // Only this call's own failure is its to clear: it runs on every
+            // battery reading, and the list's message may be another watch's.
+            if watchHistoryCouldNotBeSaved {
+                watchHistoryCouldNotBeSaved = false
+                watches.feedback = nil
+            }
         } catch {
+            watchHistoryCouldNotBeSaved = true
             watches.feedback = .failure("The watch connection history could not be saved.")
         }
     }

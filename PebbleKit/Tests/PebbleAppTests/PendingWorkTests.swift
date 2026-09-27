@@ -894,4 +894,110 @@ struct PendingWorkTests {
 
         #expect(client.sentNotifications.isEmpty)
     }
+
+    @Test
+    func aWatchDroppingLeavesAnotherWatchsOperationRunning() async throws {
+        let client = MockWatchClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = makeModel(client: client, directory: directory)
+        let dropped = WatchConnection(
+            client: client,
+            watch: ConnectedWatch(
+                id: WatchID("dropped"),
+                name: "Pebble Time 2",
+                model: .pebbleTime2,
+                batteryLevel: 50,
+                version: WatchVersionInformation(
+                    firmwareVersion: "v5.0.0-test",
+                    serialNumber: "TEST00000002",
+                    hardwarePlatform: 18
+                )
+            )
+        )
+        model.applications.managementOperation = .reordering
+
+        model.clearBusyOperationState(on: dropped)
+
+        #expect(model.applications.managementOperation == .reordering)
+    }
+
+    @Test
+    func aMessageTheWatchRefusesDoesNotHoldBackAnotherAppsMessages() async throws {
+        let client = MockWatchClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = makeModel(client: client, directory: directory)
+        await model.scan()
+        let discovered = try #require(model.discoveredWatches.first)
+        await model.connect(to: discovered)
+        let notRunning = StoredAppMessage(applicationID: UUID(), tuples: [])
+        let running = StoredAppMessage(applicationID: UUID(), tuples: [])
+        client.appsRefusingMessages = [notRunning.applicationID]
+        model.pendingAppMessages = [notRunning, running]
+
+        await model.flushPendingAppMessages()
+
+        #expect(client.sentAppMessages.map(\.applicationID) == [running.applicationID])
+        #expect(model.pendingAppMessages == [notRunning])
+    }
+
+    @Test
+    func aScriptsMessageWithNoWatchToTakeItIsQueuedAndReportedAsNotSent() async throws {
+        let client = MockWatchClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = makeModel(client: client, directory: directory)
+
+        await #expect(throws: WatchConnectionError.disconnected) {
+            try await model.sendOrQueueAppMessage(applicationID: UUID(), tuples: [])
+        }
+
+        #expect(model.pendingAppMessages.count == 1)
+    }
+
+    @Test
+    func aMessageOlderThanADayIsDroppedRatherThanDelivered() async throws {
+        let client = MockWatchClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = makeModel(client: client, directory: directory)
+        await model.scan()
+        let discovered = try #require(model.discoveredWatches.first)
+        await model.connect(to: discovered)
+        model.pendingAppMessages = [
+            StoredAppMessage(applicationID: UUID(), tuples: [], createdAt: Date(timeIntervalSinceNow: -2 * 24 * 60 * 60)),
+        ]
+
+        await model.flushPendingAppMessages()
+
+        #expect(client.sentAppMessages.isEmpty)
+        #expect(model.pendingAppMessages.isEmpty)
+    }
+
+    @Test
+    func forgettingAWatchDropsTheFirmwareUpdateStagedForIt() async throws {
+        let client = MockWatchClient()
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = makeModel(client: client, directory: directory)
+        await model.scan()
+        let discovered = try #require(model.discoveredWatches.first)
+        await model.connect(to: discovered)
+        let journal = FirmwareUpdateJournal(
+            watchID: discovered.id,
+            board: .obelixPVT,
+            previousVersion: nil,
+            targetVersion: nil,
+            packageFileName: "staged.pbz",
+            packageSHA256: "0000"
+        )
+        try await model.pendingFirmwareUpdateStore.save(journal)
+        model.firmware[discovered.id].journal = journal
+
+        #expect(await model.forgetWatch(id: discovered.id))
+
+        #expect(try await model.pendingFirmwareUpdateStore.journal(for: discovered.id) == nil)
+        #expect(model.firmware[discovered.id].journal == nil)
+    }
 }

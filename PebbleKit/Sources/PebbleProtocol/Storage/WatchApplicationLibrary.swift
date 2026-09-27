@@ -176,6 +176,12 @@ public actor WatchApplicationLibrary {
         try PersistentJSON.save(states, to: synchronizationStateURL)
     }
 
+    public func forgetSynchronizedApplicationIDs(watchID: WatchID) throws {
+        var states = try synchronizationStates()
+        guard states.removeValue(forKey: watchID) != nil else { return }
+        try PersistentJSON.save(states, to: synchronizationStateURL)
+    }
+
     private func persist(_ applications: [WatchApplication]) throws {
         try PersistentJSON.save(applications, to: fileURL)
         cachedApplications = applications
