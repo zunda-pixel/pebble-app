@@ -131,8 +131,12 @@ struct AppGlanceContent: View {
             .formStyle(.grouped)
             .navigationTitle(Text(verbatim: applicationName))
             .toolbar {
-                Button(role: .cancel) { cancel() }
-                Button(role: .confirm) { save(edited) }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(role: .cancel) { cancel() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(role: .confirm) { save(edited) }
+                }
             }
         }
     }

@@ -35,8 +35,12 @@ struct DeepLinkPackageSheet: View {
             .formStyle(.grouped)
             .navigationTitle(Text("Install from link?"))
             .toolbar {
-                Button(role: .cancel, action: cancel)
-                Button("Install", role: .confirm, action: install)
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(role: .cancel, action: cancel)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Install", role: .confirm, action: install)
+                }
             }
         }
     }

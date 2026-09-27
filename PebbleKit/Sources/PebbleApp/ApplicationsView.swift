@@ -174,8 +174,10 @@ struct ApplicationsView: View {
                     // Closing, not confirming: the page has its own submit,
                     // and whatever it posted has already been applied by
                     // the time this is reachable.
-                    Button(role: .close) {
-                        Task { await model.closeConfiguration() }
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(role: .close) {
+                            Task { await model.closeConfiguration() }
+                        }
                     }
                 }
             }

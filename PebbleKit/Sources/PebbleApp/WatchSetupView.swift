@@ -117,7 +117,9 @@ struct WatchSetupView<FirmwareDestination: View>: View {
             }
             .navigationTitle(Text("Set Up \(watchName)"))
             .toolbar {
-                Button(role: .close, action: finish)
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(role: .close, action: finish)
+                }
             }
         }
         #if os(macOS)

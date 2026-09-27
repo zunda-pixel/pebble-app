@@ -196,7 +196,9 @@ struct AppRootView: View {
                     editGlance: nil
                 )
                 .toolbar {
-                    Button(role: .close) { model.dismissDeepLinkStoreApplication() }
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(role: .close) { model.dismissDeepLinkStoreApplication() }
+                    }
                 }
             }
         }

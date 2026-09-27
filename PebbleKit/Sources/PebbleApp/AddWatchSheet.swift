@@ -125,7 +125,9 @@ struct AddWatchContent: View {
             }
             .navigationTitle(Text("Add Watch"))
             .toolbar {
-                Button(role: .close, action: close)
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(role: .close, action: close)
+                }
             }
         }
         #if os(macOS)

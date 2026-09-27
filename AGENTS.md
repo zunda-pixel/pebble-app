@@ -166,12 +166,14 @@ Never "device".
 - Avoid force unwrapping outside tests.
 - A button that dismisses, abandons or accepts carries the role and no title of
   its own: `Button(role: .close)`, `Button(role: .cancel)`,
-  `Button(role: .confirm)`. The system supplies the label, the glyph and the
-  placement, so a role button goes straight into `.toolbar { }` rather than into
-  a `ToolbarItem(placement: .cancellationAction)`. Keep a title only where it
-  says more than the role does — "Add" on the confirm button of a composer. A
-  toolbar cannot mix bare views with `ToolbarItem`/`ToolbarItemGroup`; make the
-  whole closure views.
+  `Button(role: .confirm)`. The system supplies the label and the glyph; the
+  sheet says where each one goes. Its close or cancel button sits in
+  `ToolbarItem(placement: .cancellationAction)` and its confirming one — Add,
+  Install, Save — in `ToolbarItem(placement: .confirmationAction)`, the role kept
+  on both. Keep a title only where it says more than the role does — "Add" on
+  the confirm button of a composer. A toolbar cannot mix bare views with
+  `ToolbarItem`/`ToolbarItemGroup`, so once one entry is a `ToolbarItem`, make
+  every entry one.
 
 ## Views and previews
 

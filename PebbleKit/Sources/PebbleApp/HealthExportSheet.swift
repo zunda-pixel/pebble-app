@@ -76,7 +76,9 @@ struct HealthExportSheet: View {
             .formStyle(.grouped)
             .navigationTitle(Text("Export"))
             .toolbar {
-                Button(role: .close) { dismiss() }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(role: .close) { dismiss() }
+                }
             }
         }
     }
