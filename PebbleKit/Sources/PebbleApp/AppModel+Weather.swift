@@ -1,5 +1,6 @@
 import PebbleProtocol
 import CoreLocation
+import Retry
 import Defaults
 import MapKit
 public import Foundation
@@ -74,8 +75,10 @@ extension AppModel {
         // nothing said about it anywhere: gone from the phone, still on the
         // wrist, and no way to tell why.
         for connection in activeConnections where connection.watch.supportsWeatherApp {
+            let client = connection.client
             do {
-                try await connection.client.remove(.weather(id))
+                try await removeRecord(.weather(id), from: client)
+                await noteRemoved(id.uuidString, .weather, on: connection.watch.id)
             } catch {
                 weather.feedback = .failure(
                     "\(connection.watch.name) still has \(name). \(Text(refusalReason(for: error)))"
@@ -83,13 +86,17 @@ extension AppModel {
                 continue
             }
             do {
-                try await connection.client.write(.weatherOrder(weather.reports.map(\.id)))
+                let order = weather.reports.map(\.id)
+                try await retry(with: .watchWork) { try await client.write(.weatherOrder(order)) }
             } catch {
                 weather.feedback = .failure(
                     "\(connection.watch.name) did not accept the list of places. \(Text(refusalReason(for: error)))"
                 )
             }
         }
+        // The first place's forecast is the one on the timeline, and with no
+        // place left there is no forecast to show.
+        await updateWeatherTimelinePins()
     }
 
     public func setWeatherUsesFahrenheit(_ usesFahrenheit: Bool) async {
@@ -121,6 +128,8 @@ extension AppModel {
     private func runWeatherRefresh() async {
         guard !weather.places.isEmpty else {
             weather.feedback = nil
+            weather.reports = []
+            await updateWeatherTimelinePins()
             return
         }
         weather.isRefreshing = true
@@ -194,16 +203,37 @@ extension AppModel {
         // The reader said the watch's weather app is not this app's to feed.
         // The timeline pins have their own switch and their own path.
         guard Defaults[.weatherWritesToWatch] else { return }
-        guard connection.isConnected, !weather.reports.isEmpty else { return }
+        guard connection.isConnected else { return }
         // A watch without the weather app refuses the write, and one in recovery
         // firmware refuses everything.
         guard connection.watch.supportsWeatherApp, !connection.watch.isRunningRecoveryFirmware else {
             return
         }
+        let watchID = connection.watch.id
+        let client = connection.client
+        // A place removed while this watch was away. Its order leaving it out
+        // hides it, but the forecast would stay in the watch's database.
+        let current = Set(weather.places.map(\.id.uuidString))
+        for key in await writtenKeys(.weather, on: watchID) where !current.contains(key) {
+            guard let id = UUID(uuidString: key) else { continue }
+            do {
+                try await removeRecord(.weather(id), from: client)
+                await noteRemoved(key, .weather, on: watchID)
+            } catch {
+                await DiagnosticLog.shared.record(
+                    .error,
+                    category: "weather",
+                    message: "\(connection.watch.name) kept a place removed here: \(String(reflecting: error))"
+                )
+                break
+            }
+        }
+        guard !weather.reports.isEmpty else { return }
         // Before the forecasts: the watch skips a forecast whose key it has no
         // ordering for, and this is the only place that ordering comes from.
         do {
-            try await connection.client.write(.weatherOrder(weather.reports.map(\.id)))
+            let order = weather.reports.map(\.id)
+            try await retry(with: .watchWork) { try await client.write(.weatherOrder(order)) }
         } catch {
             weather.feedback = .failure(
                 "\(connection.watch.name) did not accept the list of places. \(Text(refusalReason(for: error)))"
@@ -219,7 +249,8 @@ extension AppModel {
             do {
                 // A refusal — no weather app, a database that is full — is the difference
                 // between "sent" and "shown".
-                try await connection.client.write(.weather(report))
+                try await retry(with: .watchWork) { try await client.write(.weather(report)) }
+                await noteWritten(report.id.uuidString, .weather, on: watchID)
             } catch {
                 weather.feedback = .failure(
                     "\(connection.watch.name) did not accept the forecast. \(Text(refusalReason(for: error)))"
@@ -362,8 +393,19 @@ extension AppModel {
         }
         let changed = others + weatherPins
         guard changed != timeline.pins else { return }
+        // Not synchronized unless saved: the synchronization reads the pins
+        // back from disk, and would put the old forecast back on the watch.
+        do {
+            try await timelineStore.save(changed)
+        } catch {
+            await DiagnosticLog.shared.record(
+                .error,
+                category: "weather",
+                message: "the forecast's timeline pins could not be saved: \(String(reflecting: error))"
+            )
+            return
+        }
         timeline.pins = changed
-        try? await timelineStore.save(timeline.pins)
         await synchronizeTimeline()
     }
 

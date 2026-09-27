@@ -269,6 +269,7 @@ public final class AppModel {
     #endif
     let notificationSourceAppStore: NotificationSourceAppStore
     let appGlanceStore: AppGlanceStore
+    let writtenRecordStore: WrittenRecordStore
     let speechBridge = SpeechBridge()
     var voiceTranscriptionReadiness = VoiceTranscriptionReadiness.turnedOff
     /// Every language the phone's recognizer can be asked for, for the
@@ -422,6 +423,7 @@ public final class AppModel {
         pendingFirmwareUpdateStore = PendingFirmwareUpdateStore(directory: storageDirectory)
         firmwarePackageStore = FirmwarePackageStore(directory: storageDirectory)
         notificationSourceAppStore = NotificationSourceAppStore(directory: storageDirectory)
+        writtenRecordStore = WrittenRecordStore(directory: storageDirectory)
         notifications.companionEnabled = Defaults[.companionNotificationsEnabled]
         applications.activeWatchfaceIDs = Defaults[.activeWatchfaceIDs]
         catalog.source = Defaults[.catalogSource]

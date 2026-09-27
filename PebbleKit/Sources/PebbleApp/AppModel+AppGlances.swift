@@ -1,5 +1,6 @@
 public import PebbleProtocol
 public import Foundation
+import Retry
 // `FeatureFeedback` holds a `LocalizedStringKey`, whose literal initializer
 // needs the module that declares it.
 import SwiftUI
@@ -57,6 +58,8 @@ extension AppModel {
     }
 
     func synchronizeAppGlances(on connection: WatchConnection) async {
+        let watchID = connection.watch.id
+        let client = connection.client
         var taken = 0
         var dropped = 0
         for glance in appGlances.glances {
@@ -69,8 +72,9 @@ extension AppModel {
             let value = AppGlanceCodec.value(for: glance)
             guard connection.synchronizedAppGlances[glance.applicationID] != value else { continue }
             do {
-                try await connection.client.write(.appGlance(glance))
+                try await retry(with: .watchWork) { try await client.write(.appGlance(glance)) }
                 connection.synchronizedAppGlances[glance.applicationID] = value
+                await noteWritten(glance.applicationID.uuidString, .appGlance, on: watchID)
                 taken += 1
             } catch {
                 await DiagnosticLog.shared.record(
@@ -81,12 +85,15 @@ extension AppModel {
                 return
             }
         }
-        // A glance the reader deleted is one the watch is still showing.
-        for applicationID in connection.synchronizedAppGlances.keys
+        // A glance the reader deleted is one the watch is still showing — including
+        // one deleted while this watch was away, which only the store remembers.
+        let written = await writtenKeys(.appGlance, on: watchID).compactMap(UUID.init(uuidString:))
+        for applicationID in Set(written).union(connection.synchronizedAppGlances.keys)
         where !appGlances.glances.contains(where: { $0.applicationID == applicationID }) {
             do {
-                try await connection.client.remove(.appGlance(applicationID: applicationID))
+                try await removeRecord(.appGlance(applicationID: applicationID), from: client)
                 connection.synchronizedAppGlances[applicationID] = nil
+                await noteRemoved(applicationID.uuidString, .appGlance, on: watchID)
                 dropped += 1
             } catch {
                 await DiagnosticLog.shared.record(
@@ -104,5 +111,30 @@ extension AppModel {
             category: "glance",
             message: "\(connection.watch.name) took \(taken) glance(s) and dropped \(dropped)"
         )
+    }
+}
+
+extension AppModel {
+    /// A removal the watch answers with "no such key" has done what it was for:
+    /// the record is gone, which is all the caller wanted.
+    func removeRecord(_ key: BlobDBKey, from client: any WatchClient) async throws {
+        do {
+            try await retry(with: .watchWork) { try await client.remove(key) }
+        } catch BlobDBClientError.rejected(.keyDoesNotExist) {}
+    }
+
+    func writtenKeys(_ kind: WrittenRecordKind, on watchID: WatchID) async -> Set<String> {
+        (try? await writtenRecordStore.keys(kind, watchID: watchID)) ?? []
+    }
+
+    // Unrecorded, a write costs only a removal that is never sent for it: the
+    // record stays where the reader cannot see it, which is how it was before
+    // anything was remembered.
+    func noteWritten(_ key: String, _ kind: WrittenRecordKind, on watchID: WatchID) async {
+        try? await writtenRecordStore.insert(key, kind, watchID: watchID)
+    }
+
+    func noteRemoved(_ key: String, _ kind: WrittenRecordKind, on watchID: WatchID) async {
+        try? await writtenRecordStore.remove(key, kind, watchID: watchID)
     }
 }

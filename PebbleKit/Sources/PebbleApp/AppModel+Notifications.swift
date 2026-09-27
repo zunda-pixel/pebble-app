@@ -347,6 +347,23 @@ extension AppModel {
     }
 
     func synchronizeNotificationSourceApps(on connection: WatchConnection) async {
+        let watchID = connection.watch.id
+        let client = connection.client
+        // Forgotten here while this watch was away: nothing else will name them.
+        let kept = Set(notifications.sourceApps.map(\.bundleID))
+        for bundleID in await writtenKeys(.notificationSourceApp, on: watchID) where !kept.contains(bundleID) {
+            do {
+                try await removeRecord(.notificationSourceApp(bundleID: bundleID), from: client)
+                await noteRemoved(bundleID, .notificationSourceApp, on: watchID)
+            } catch {
+                await DiagnosticLog.shared.record(
+                    .error,
+                    category: "notification",
+                    message: "\(connection.watch.name) kept an app forgotten here: " + String(reflecting: error)
+                )
+                break
+            }
+        }
         for app in notifications.sourceApps {
             // Cut down here rather than in the client, so that what is written
             // down as sent is the record that was sent.
@@ -358,8 +375,9 @@ extension AppModel {
             do {
                 // Recorded as synchronized only once the watch says it took it, so a
                 // refusal is retried on the next pass.
-                try await connection.client.write(.notificationSourceApp(record))
+                try await retry(with: .watchWork) { try await client.write(.notificationSourceApp(record)) }
                 connection.synchronizedNotificationAppRecords[app.bundleID] = value
+                await noteWritten(app.bundleID, .notificationSourceApp, on: watchID)
             } catch {
                 await DiagnosticLog.shared.record(
                     .error,
@@ -448,7 +466,8 @@ extension AppModel {
             for connection in activeConnections {
                 connection.synchronizedNotificationAppRecords[app.bundleID] = nil
                 do {
-                    try await connection.client.remove(.notificationSourceApp(bundleID: app.bundleID))
+                    try await removeRecord(.notificationSourceApp(bundleID: app.bundleID), from: connection.client)
+                    await noteRemoved(app.bundleID, .notificationSourceApp, on: connection.watch.id)
                 } catch {
                     await DiagnosticLog.shared.record(
                         .error,
