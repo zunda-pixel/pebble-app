@@ -8,7 +8,8 @@ struct AccessoryNotificationCodecTests {
         title: String? = "Mia",
         body: String? = "Lunch?",
         sourceIdentifier: String? = "com.apple.MobileSMS",
-        actions: [ForwardedNotification.Action] = []
+        actions: [ForwardedNotification.Action] = [],
+        replies: [String] = []
     ) -> ForwardedNotification {
         ForwardedNotification(
             identifier: "n1",
@@ -18,8 +19,60 @@ struct AccessoryNotificationCodecTests {
             sourceName: "Messages",
             sourceIdentifier: sourceIdentifier,
             shouldAlert: true,
-            actions: actions
+            actions: actions,
+            replies: replies
         )
+    }
+
+    private let reply = ForwardedNotification.Action(identifier: "r", title: "Reply", collectsText: true)
+
+    @Test
+    func repliesFollowTheActionsAsLengthPrefixedEntries() {
+        let bytes = AccessoryNotificationCodec.encode(.present(notification(
+            actions: [reply],
+            replies: ["OK", "", "はい"]
+        )))
+
+        // Tag 0x09 in `prv_present`, accessory_notifications.c.
+        #expect(Array(bytes.suffix(12)) == [0x09, 10, 2] + Array("OK".utf8) + [6] + Array("はい".utf8))
+        #expect(tlvs(bytes).map { $0.tag } ==[0x01, 0x03, 0x04, 0x08, 0x05, 0x06, 0x07, 0x09])
+    }
+
+    @Test
+    func repliesAreLeftOutWhereNothingCouldSendThem() {
+        let plainOnly = AccessoryNotificationCodec.encode(.present(notification(
+            actions: [.init(identifier: "ok", title: "Mark as Read", collectsText: false)],
+            replies: ["OK"]
+        )))
+        let noReplies = AccessoryNotificationCodec.encode(.present(notification(actions: [reply], replies: ["", ""])))
+
+        #expect(!tlvs(plainOnly).contains { $0.tag == 0x09 })
+        #expect(!tlvs(noReplies).contains { $0.tag == 0x09 })
+    }
+
+    @Test
+    func aReplyThatDoesNotFitIsLeftOutWhole() throws {
+        let long = String(repeating: "x", count: 100)
+        let bytes = AccessoryNotificationCodec.encode(.present(notification(
+            actions: [reply],
+            replies: [long, long, long, "Yes"]
+        )))
+
+        // The TLV's length byte, which is inside `MAX_LENGTH_CANNED_RESPONSES`
+        // (attribute.c).
+        let value = try #require(tlvs(bytes).first { $0.tag == 0x09 }?.value)
+        #expect(value == [100] + Array(long.utf8) + [100] + Array(long.utf8) + [3] + Array("Yes".utf8))
+    }
+
+    @Test
+    func aReplyLongerThanTheTagIsCutBetweenCharacters() throws {
+        let bytes = AccessoryNotificationCodec.encode(.present(notification(
+            actions: [reply],
+            replies: [String(repeating: "あ", count: 100)]
+        )))
+
+        let value = try #require(tlvs(bytes).first { $0.tag == 0x09 }?.value)
+        #expect(value == [252] + Array(String(repeating: "あ", count: 84).utf8))
     }
 
     @Test

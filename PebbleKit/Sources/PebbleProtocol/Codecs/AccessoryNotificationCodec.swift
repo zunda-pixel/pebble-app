@@ -23,6 +23,9 @@ package struct ForwardedNotification: Equatable, Sendable {
     package var sourceIdentifier: String?
     package var shouldAlert: Bool
     package var actions: [Action]
+    /// What the watch offers to send from each of its text-input actions, in
+    /// place of its own replies.
+    package var replies: [String]
 
     package init(
         identifier: String,
@@ -32,7 +35,8 @@ package struct ForwardedNotification: Equatable, Sendable {
         sourceName: String?,
         sourceIdentifier: String?,
         shouldAlert: Bool,
-        actions: [Action]
+        actions: [Action],
+        replies: [String] = []
     ) {
         self.identifier = identifier
         self.title = title
@@ -42,6 +46,7 @@ package struct ForwardedNotification: Equatable, Sendable {
         self.sourceIdentifier = sourceIdentifier
         self.shouldAlert = shouldAlert
         self.actions = actions
+        self.replies = replies
     }
 }
 
@@ -82,6 +87,7 @@ package enum AccessoryNotificationCodec {
     static let alertTag: UInt8 = 0x06
     static let actionTag: UInt8 = 0x07
     static let sourceIdentifierTag: UInt8 = 0x08
+    static let repliesTag: UInt8 = 0x09
 
     static let textInputFlag: UInt8 = 0x01
 
@@ -146,10 +152,31 @@ package enum AccessoryNotificationCodec {
             notificationIdentifier: notification.identifier
         ))
         append(alertTag, [notification.shouldAlert ? 1 : 0])
-        for action in notification.actions.compactMap(actionEntry).prefix(maximumActionCount) {
-            append(actionTag, action)
+        let actions = notification.actions
+            .compactMap { action in actionEntry(action).map { (collectsText: action.collectsText, entry: $0) } }
+            .prefix(maximumActionCount)
+        for action in actions {
+            append(actionTag, action.entry)
+        }
+        if actions.contains(where: { $0.collectsText }) {
+            append(repliesTag, repliesValue(notification.replies))
         }
         return bytes
+    }
+
+    /// `u8 len | reply` for each, no terminators, as many as fit in one TLV. The
+    /// watch keeps up to `MAX_LENGTH_CANNED_RESPONSES` of a list, more than the
+    /// length byte holds, so the length byte is the limit. A reply that does not
+    /// fit beside the ones before it is left out whole rather than cut to the
+    /// room left, which would send the other person a fragment of it.
+    private static func repliesValue(_ replies: [String]) -> [UInt8] {
+        var value: [UInt8] = []
+        for reply in replies {
+            let bytes = reply.utf8BytesEndingOnACharacter(maximumByteCount: 254)
+            guard !bytes.isEmpty, value.count + 1 + bytes.count <= 255 else { continue }
+            value += [UInt8(bytes.count)] + bytes
+        }
+        return value
     }
 
     /// Nil for an action the watch could not show or could not answer: a row with
