@@ -33,11 +33,13 @@ final class WatchAccessoryLink: NSObject {
         case timedOut
     }
 
-    /// Every notification the watch sends on the service, the public key first.
+    /// Every notification the watch sends on the service, and the public key it
+    /// answers a read with.
     var onNotification: ((_ frame: [UInt8]) -> Void)?
     /// What the watch last said its public key is. It keeps the key across
-    /// reboots and sends it once per subscription, so a session that starts on a
-    /// link already subscribed would otherwise never hear it.
+    /// reboots and notifies it only when a subscription starts, so a session
+    /// that starts on a link another process already subscribed would otherwise
+    /// never hear it; the read in `didDiscoverCharacteristicsFor` asks for it.
     private(set) var publicKey: [UInt8]?
 
     private struct PendingWrite {
@@ -52,12 +54,20 @@ final class WatchAccessoryLink: NSObject {
     private let accessories = ASAccessorySession()
     private var isAccessorySessionActive = false
     private var peripheral: CBPeripheral?
+    /// Every paired watch asked for at once, until one answers. Waiting on the
+    /// first of two paired watches waited for ever when that one was away.
+    private var candidates: [CBPeripheral] = []
     private var writeCharacteristic: CBCharacteristic?
     private var writes: Deque<PendingWrite> = []
     /// The write whose frame is on the air. Kept past a deadline that gave up on
     /// it, so the acknowledgement that still arrives is not taken for the next.
     private var inFlight: UUID?
+    /// Connects that failed since the link last worked. Past a handful the
+    /// link stops trying by itself and waits for the next write to ask again.
+    private var failures = 0
+    private var retry: Task<Void, Never>?
 
+    private static let maximumFailures = 5
     private static let service = CBUUID(string: AccessoryTransportFrame.serviceUUID)
     private static let notifyCharacteristic = CBUUID(string: AccessoryTransportFrame.notifyCharacteristicUUID)
     private static let writeCharacteristicUUID = CBUUID(string: AccessoryTransportFrame.writeCharacteristicUUID)
@@ -94,30 +104,36 @@ final class WatchAccessoryLink: NSObject {
                 self?.finish(id, with: .failure(LinkError.timedOut))
             }
             writes.append(write)
+            connectIfPossible()
             writeNext()
         }
     }
 
     private func connectIfPossible() {
-        guard let central, central.state == .poweredOn, isAccessorySessionActive, peripheral == nil else {
+        guard let central, central.state == .poweredOn, isAccessorySessionActive,
+              peripheral == nil, candidates.isEmpty else {
             return
         }
+        retry?.cancel()
+        retry = nil
         let paired = central.retrievePeripherals(
             withIdentifiers: accessories.accessories.compactMap(\.bluetoothIdentifier)
         )
-        let candidate = paired.first { $0.state == .connected }
-            ?? paired.first
-            ?? central.retrieveConnectedPeripherals(withServices: [Self.pairingService]).first
-        guard let candidate else {
+        let chosen = paired.first { $0.state == .connected }.map { [$0] }
+            ?? (paired.isEmpty ? central.retrieveConnectedPeripherals(withServices: [Self.pairingService]) : paired)
+        guard !chosen.isEmpty else {
             forwardingLog.log("no paired watch yet; scanning")
             central.scanForPeripherals(withServices: [Self.pairingService])
             return
         }
-        connect(candidate)
+        for candidate in chosen {
+            attempt(candidate)
+        }
     }
 
-    private func connect(_ candidate: CBPeripheral) {
-        peripheral = candidate
+    private func attempt(_ candidate: CBPeripheral) {
+        guard !candidates.contains(candidate) else { return }
+        candidates.append(candidate)
         candidate.delegate = self
         central?.connect(candidate)
     }
@@ -167,6 +183,23 @@ final class WatchAccessoryLink: NSObject {
             writes[index].frames = nil
         }
     }
+
+    /// Tries again after a pause, a bounded number of times: a watch that is
+    /// away fails every connect at once, and retrying without a pause or an
+    /// end would spin.
+    private func retryAfterFailure() {
+        failures += 1
+        guard failures < Self.maximumFailures else {
+            forwardingLog.error("the watch could not be reached \(self.failures) times; waiting for the next write")
+            return
+        }
+        retry?.cancel()
+        retry = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            self?.connectIfPossible()
+        }
+    }
 }
 
 extension WatchAccessoryLink: CBCentralManagerDelegate {
@@ -174,6 +207,9 @@ extension WatchAccessoryLink: CBCentralManagerDelegate {
         guard central.state == .poweredOn else {
             dropLink()
             peripheral = nil
+            candidates = []
+            retry?.cancel()
+            retry = nil
             return
         }
         connectIfPossible()
@@ -186,10 +222,21 @@ extension WatchAccessoryLink: CBCentralManagerDelegate {
         rssi RSSI: NSNumber
     ) {
         central.stopScan()
-        connect(peripheral)
+        attempt(peripheral)
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+        if self.peripheral == nil, candidates.contains(peripheral) {
+            self.peripheral = peripheral
+            for other in candidates where other != peripheral {
+                central.cancelPeripheralConnection(other)
+            }
+            candidates = []
+        }
+        guard peripheral == self.peripheral else {
+            central.cancelPeripheralConnection(peripheral)
+            return
+        }
         peripheral.discoverServices([Self.service])
     }
 
@@ -199,7 +246,13 @@ extension WatchAccessoryLink: CBCentralManagerDelegate {
         error: (any Error)?
     ) {
         forwardingLog.error("could not reach the watch: \(String(describing: error), privacy: .public)")
-        self.peripheral = nil
+        candidates.removeAll { $0 == peripheral }
+        if peripheral == self.peripheral {
+            dropLink()
+            self.peripheral = nil
+        }
+        guard self.peripheral == nil, candidates.isEmpty else { return }
+        retryAfterFailure()
     }
 
     func centralManager(
@@ -207,6 +260,7 @@ extension WatchAccessoryLink: CBCentralManagerDelegate {
         didDisconnectPeripheral peripheral: CBPeripheral,
         error: (any Error)?
     ) {
+        guard peripheral == self.peripheral else { return }
         forwardingLog.log("the watch went away; waiting for it to come back")
         dropLink()
         central.connect(peripheral)
@@ -216,10 +270,21 @@ extension WatchAccessoryLink: CBCentralManagerDelegate {
 extension WatchAccessoryLink: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: (any Error)?) {
         guard let service = peripheral.services?.first(where: { $0.uuid == Self.service }) else {
+            // `didModifyServices` looks again if the watch publishes it later.
             forwardingLog.error("the watch has no forwarding service; its firmware predates it")
             return
         }
         peripheral.discoverCharacteristics([Self.notifyCharacteristic, Self.writeCharacteristicUUID], for: service)
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didModifyServices invalidatedServices: [CBService]) {
+        guard peripheral == self.peripheral,
+              writeCharacteristic == nil || invalidatedServices.contains(where: { $0.uuid == Self.service }) else {
+            return
+        }
+        forwardingLog.log("the watch changed its services; looking for the forwarding service again")
+        dropLink()
+        peripheral.discoverServices([Self.service])
     }
 
     func peripheral(
@@ -230,8 +295,17 @@ extension WatchAccessoryLink: CBPeripheralDelegate {
         let characteristics = service.characteristics ?? []
         if let notify = characteristics.first(where: { $0.uuid == Self.notifyCharacteristic }) {
             peripheral.setNotifyValue(true, for: notify)
+            // Another process subscribed first has already had the key, and the
+            // watch notifies it only on a subscription that starts. Older
+            // firmware refuses the read, which `didUpdateValueFor` ignores.
+            if publicKey == nil {
+                peripheral.readValue(for: notify)
+            }
         }
         writeCharacteristic = characteristics.first { $0.uuid == Self.writeCharacteristicUUID }
+        if writeCharacteristic != nil {
+            failures = 0
+        }
         writeNext()
     }
 
