@@ -17,10 +17,7 @@ public enum WatchImageRenderer {
     }
 
     public static func pngData(_ screenshot: WatchScreenshot) -> Data? {
-        guard screenshot.width > 0, screenshot.height > 0,
-              screenshot.pixels.count >= screenshot.width * screenshot.height,
-              let image = makeImage(screenshot)
-        else { return nil }
+        guard let image = makeImage(screenshot) else { return nil }
         let data = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(
             data, UTType.png.identifier as CFString, 1, nil
@@ -30,7 +27,13 @@ public enum WatchImageRenderer {
         return data as Data
     }
 
+    /// Checks the buffer itself: the context reads `bytesPerRow * height`
+    /// bytes from it whoever the caller is, and a screenshot is a public value
+    /// anyone can build.
     static func makeImage(_ screenshot: WatchScreenshot) -> CGImage? {
+        guard screenshot.width > 0, screenshot.height > 0,
+              screenshot.pixels.count >= screenshot.width * screenshot.height
+        else { return nil }
         var pixels = screenshot.pixels
         let bytesPerRow = screenshot.width * 4
         return pixels.withUnsafeMutableBytes { buffer -> CGImage? in

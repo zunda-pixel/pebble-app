@@ -198,6 +198,9 @@ final class ScriptedMusicSource: SystemMusicSource {
                 message: "Music is answering again"
             )
         }
+        // Stopped while the script ran, which does not stop for being asked
+        // to: the answer is for a watch that has gone.
+        guard watching != nil else { return }
         guard let answer, let fresh = MusicScript.snapshot(from: answer) else { return }
         guard fresh != snapshot else { return }
         snapshot = fresh

@@ -156,7 +156,11 @@ final class MusicCoordinator {
                 try await send(MusicControlCodec.nowPlayingFrame(snapshot.nowPlaying))
             }
         } catch {
-            lastSnapshot = previous
+            // Forgotten rather than rolled back to `previous`: a watch that
+            // connected while this was sending has already had the snapshot
+            // forgotten for it, and putting the old one back would send that
+            // watch a diff. Sending everything again costs a few frames.
+            lastSnapshot = nil
         }
     }
 }
