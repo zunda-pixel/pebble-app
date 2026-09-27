@@ -271,6 +271,18 @@ struct CatalogContent<Destination: View, CollectionDestination: View>: View {
             // words only sift the feed until they are submitted again.
             if changed.trimmingCharacters(in: .whitespaces).isEmpty { clearSearch() }
         }
+        // The results outlive this screen in the model, and the box does not:
+        // opened again, the screen showed results for a box that was empty,
+        // with no way back to the feed but typing and deleting. Not cleared on
+        // disappearing instead — pushing a result's own screen is that too.
+        .onAppear {
+            if searchResults != nil, query.isEmpty { query = searchQuery }
+        }
+        // Another store's feed has its own categories, and a choice it does
+        // not have filtered every row out.
+        .onChange(of: categories) { _, available in
+            if let category, !available.contains(category) { self.category = nil }
+        }
         .navigationTitle(Text("Catalog"))
         // A second pull while one is running is the model's to ignore, which
         // it does — `updateCatalog` returns early when it is already updating.

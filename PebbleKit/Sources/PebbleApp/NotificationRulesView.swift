@@ -13,7 +13,9 @@ struct NotificationRulesView: View {
         NotificationRulesContent(
             appName: current.displayName,
             rules: current.filterRules,
-            isSupported: model.connections.contains { $0.watch.supportsNotificationFiltering },
+            // Said to be unsupported only by a watch that is here to say so.
+            isSupported: model.activeConnections.isEmpty
+                || model.activeConnections.contains { $0.watch.supportsNotificationFiltering },
             feedback: model.notifications.sourceAppFeedback,
             setRules: { rules in
                 Task {

@@ -140,6 +140,13 @@ struct WatchSettingRow: View {
                 setRawValue(colorDraft)
                 self.colorDraft = nil
             }
+            // The quiet moment never comes for a colour picked just before the
+            // screen goes, and the slider's reason holds here too.
+            .onDisappear {
+                guard let colorDraft else { return }
+                setRawValue(colorDraft)
+                self.colorDraft = nil
+            }
         }
     }
 }

@@ -45,9 +45,10 @@ struct CatalogCollectionView: View {
         guard !isLoading else { return }
         isLoading = true
         defer { isLoading = false }
+        // `hasMore` is left as it was: a page that failed is still a page the
+        // shelf has, and dropping it ended the list as though it were whole.
         guard let page = await model.fetchCollectionPage(collection, offset: receivedCount) else {
             failedToLoad = true
-            hasMore = false
             return
         }
         failedToLoad = false
@@ -82,6 +83,10 @@ struct CatalogCollectionContent<Destination: View>: View {
             if isLoading {
                 ProgressView()
                     .frame(maxWidth: .infinity)
+            } else if failedToLoad, !applications.isEmpty {
+                Label("The next page could not be fetched.", systemImage: "wifi.exclamationmark")
+                    .foregroundStyle(.secondary)
+                Button("Try Again", systemImage: "arrow.clockwise", action: loadMore)
             } else if hasMore {
                 Button("Load More", action: loadMore)
             }
@@ -115,6 +120,21 @@ struct CatalogCollectionContent<Destination: View>: View {
             hasMore: true,
             isLoading: false,
             failedToLoad: false,
+            loadMore: {},
+            destination: { application in Text(verbatim: application.name) }
+        )
+    }
+}
+
+#Preview("Next page could not be fetched") {
+    NavigationStack {
+        CatalogCollectionContent(
+            collectionName: PreviewSamples.catalogCollections[0].name,
+            applications: [PreviewSamples.catalogApplication],
+            state: { _ in .available },
+            hasMore: true,
+            isLoading: false,
+            failedToLoad: true,
             loadMore: {},
             destination: { application in Text(verbatim: application.name) }
         )

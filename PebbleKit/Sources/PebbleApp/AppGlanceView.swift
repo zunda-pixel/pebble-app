@@ -14,8 +14,11 @@ struct AppGlanceView: View {
             applicationName: application.displayName,
             glance: model.glance(for: application.id)
                 ?? AppGlance(applicationID: application.id),
-            isInstalled: model.connections.contains {
-                model.installedApplicationIDs(on: $0.watch.id).contains(application.id)
+            // Refused only by a watch that is here and has said what it holds:
+            // with none connected, or one yet to answer, there is nothing to
+            // warn about, and the line is sent when the watch arrives.
+            isInstalled: model.activeConnections.isEmpty || model.activeConnections.contains {
+                model.applications.installedIDsByWatch[$0.watch.id]?.contains(application.id) != false
             },
             feedback: saveFeedback,
             save: { glance in

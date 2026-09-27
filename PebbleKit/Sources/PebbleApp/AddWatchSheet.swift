@@ -43,7 +43,9 @@ struct AddWatchSheet: View {
             managementFeedback: model.watches.feedback,
             unknownBondedWatches: model.watches.unknownBonded,
             discoveredWatches: model.discoveredWatches,
-            isConnecting: !model.connectingWatchIDs.isEmpty,
+            // The watch the reader tapped, not any watch: one of theirs
+            // reconnecting in the background left every row here unpressable.
+            isConnecting: watchBeingAdded.map(model.connectingWatchIDs.contains) ?? false,
             connectUnknown: { watch in
                 watchBeingAdded = watch.id
                 Task { await model.connect(to: watch) }

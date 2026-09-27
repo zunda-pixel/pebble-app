@@ -36,7 +36,9 @@ struct NotificationAppView: View {
                     )
                 }
             },
-            supportsVibePatterns: model.connections.contains { $0.watch.supportsCustomVibePatterns },
+            // Said to be unsupported only by a watch that is here to say so.
+            supportsVibePatterns: model.activeConnections.isEmpty
+                || model.activeConnections.contains { $0.watch.supportsCustomVibePatterns },
             rulesDestination: { NotificationRulesView(model: model, app: app) }
         )
     }
