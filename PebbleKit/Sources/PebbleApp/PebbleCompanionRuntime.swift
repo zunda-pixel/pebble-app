@@ -91,6 +91,14 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
     /// application. Left behind, it would come back as the old settings of a
     /// watch app installed again under the same identifier.
     static func forget(applicationID: UUID) async {
+        // Removing a store before anything else in the process has touched
+        // WebKit crashes inside it: `removeDataStoreWithIdentifierImpl`
+        // finishes on the main RunLoop, which WebKit has not set up yet
+        // (SIGSEGV on the WebsiteDataStoreIO queue, iOS 27.2). A reader who
+        // removes an app without having opened a settings page or run its
+        // JavaScript in this launch is exactly that case. The default store is
+        // touched rather than this app's own, which would put it in use.
+        _ = WKWebsiteDataStore.default()
         try? await WKWebsiteDataStore.remove(forIdentifier: applicationID)
     }
 
