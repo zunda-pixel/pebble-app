@@ -320,6 +320,6 @@ extension AppModel {
                 return
             }
         }
-        applications.managementFeedback = .success("Installed \(updates.count) catalog update(s).")
+        applications.managementFeedback = .success("Installed \(updates.count) catalog updates.")
     }
 }

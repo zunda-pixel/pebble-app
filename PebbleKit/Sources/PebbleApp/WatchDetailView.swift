@@ -257,7 +257,7 @@ struct WatchDetailContent<
                             firmwareVersion: watch.firmwareVersion
                         )
                     } label: {
-                        LabeledContent("General Information") {
+                        LabeledContent("About") {
                             if let model = watch.model {
                                 Text(model.displayName)
                             }

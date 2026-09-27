@@ -173,7 +173,7 @@ struct FirmwareContent: View {
     // An install under way beats one that stopped, which beats a watch that
     // cannot run the newest firmware.
     /// Nil until the catalogue has answered for a watch whose version is
-    /// known: that version is on the General Information screen already.
+    /// known: that version is on the General screen already.
     private var status: FirmwareStatus? {
         if let journal, journal.phase == .transferring || journal.phase == .installing {
             return FirmwareStatus(

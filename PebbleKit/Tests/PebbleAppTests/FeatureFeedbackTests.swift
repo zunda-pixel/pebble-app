@@ -216,7 +216,7 @@ struct FeatureFeedbackTests {
     /// When it was said travels with it.
     ///
     /// Nothing here is taken away on a timer, so a message outlives the moment
-    /// it was true: "3 health update(s) received from the watch." is still on
+    /// it was true: "Received 3 health updates from the watch." is still on
     /// the screen tomorrow, reading exactly as it did when it arrived. The
     /// banner draws this so a reader can tell the two apart.
     @Test func anAnswerSaysWhenItWasGiven() {
@@ -333,7 +333,7 @@ struct FeatureFeedbackTests {
         model.openConfigurationURL(try #require(URL(string: "file:///etc/passwd")))
 
         #expect(model.applications.configurationURL == nil)
-        #expect(model.applications.libraryFeedback == .failure("The application requested an unsafe settings URL."))
+        #expect(model.applications.libraryFeedback == .failure("The app requested an unsafe settings URL."))
         #expect(model.catalog.feedback == nil)
 
         // And a plain page is opened rather than refused.

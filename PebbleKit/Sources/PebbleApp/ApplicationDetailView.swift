@@ -204,7 +204,7 @@ struct ApplicationDetailContent: View {
                 Text("About")
             } footer: {
                 if let isInstalled, !isInstalled, subject.installed != nil {
-                    Text("The watch is told about this application the next time it connects.")
+                    Text("The watch is told about this app the next time it connects.")
                 }
             }
 
@@ -219,7 +219,7 @@ struct ApplicationDetailContent: View {
                     // Said plainly, because a list like this reads as a
                     // permission sheet: these are the application's own words
                     // about itself, and nothing here has been granted to it.
-                    Text("What the application says it uses. Nothing here is a permission you have given; the phone asks for its own when a feature needs one.")
+                    Text("What the app says it uses. Nothing here is a permission you have given; the phone asks for its own when a feature needs one.")
                 }
             }
         }
@@ -247,10 +247,10 @@ struct ApplicationDetailContent: View {
             Text("Remove \(subject.name)?"),
             isPresented: $isConfirmingRemoval
         ) {
-            Button("Remove Application", role: .destructive, action: removeApplication)
+            Button("Remove App", role: .destructive, action: removeApplication)
             Button(role: .cancel) {}
         } message: {
-            Text("The application and its settings will be removed. A Pebble that is not connected is told the next time it is.")
+            Text("The app and its settings will be removed. A Pebble that is not connected is told the next time it is.")
         }
     }
 
@@ -451,7 +451,7 @@ struct ApplicationDetailView: View {
                 ContentUnavailableView(
                     "Removed",
                     systemImage: "trash",
-                    description: Text("This application is no longer in the library.")
+                    description: Text("This app is no longer in the library.")
                 )
             }
         }
@@ -650,7 +650,7 @@ struct ApplicationDetailView: View {
             isInstalling: false,
             isAnyInstallRunning: false,
             isOperationInProgress: false,
-            feedback: .failure("Another application operation is already in progress."),
+            feedback: .failure("Another app operation is already in progress."),
             install: {},
             configureApplication: {},
             editGlance: {},

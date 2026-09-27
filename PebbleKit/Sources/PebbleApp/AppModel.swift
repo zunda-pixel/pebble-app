@@ -679,7 +679,7 @@ public final class AppModel {
                     return
                 }
                 await self.reportHealth(
-                    .success("Received \(samples.count) health update(s) from the watch."),
+                    .success("Received \(samples.count) health updates from the watch."),
                     logging: "saved \(samples.count) day(s) from the watch"
                 )
                 #if os(iOS)

@@ -24,7 +24,7 @@ struct ModuleLocalizationTests {
                 .flatMap(Bundle.init(url:))
         )
 
-        #expect(japanese.localizedString(forKey: "Devices", value: nil, table: nil) == "デバイス")
+        #expect(japanese.localizedString(forKey: "Watches", value: nil, table: nil) == "ウォッチ")
         #expect(japanese.localizedString(forKey: "Connected", value: nil, table: nil) == "接続済み")
         #expect(
             japanese.localizedString(forKey: "Firmware Required", value: nil, table: nil)
@@ -37,6 +37,6 @@ struct ModuleLocalizationTests {
     /// which is exactly how a Japanese iPhone showed every screen.
     @Test
     func theAppBundleDoesNotCarryTheScreensStrings() {
-        #expect(Bundle.main.localizedString(forKey: "Devices", value: nil, table: nil) == "Devices")
+        #expect(Bundle.main.localizedString(forKey: "Watches", value: nil, table: nil) == "Watches")
     }
 }

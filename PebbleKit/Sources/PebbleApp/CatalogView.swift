@@ -251,7 +251,7 @@ struct CatalogContent<Destination: View, CollectionDestination: View>: View {
                         }
                     }
                 }
-                Section("Applications") {
+                Section("Apps") {
                     ForEach(filteredApplications) { application in
                         NavigationLink {
                             destination(application)
@@ -282,7 +282,7 @@ struct CatalogContent<Destination: View, CollectionDestination: View>: View {
                 if let importApplication {
                     if isImportingApplication {
                         ProgressView()
-                            .accessibilityLabel(Text("Importing Pebble application"))
+                            .accessibilityLabel(Text("Importing Pebble app"))
                     } else {
                         Button("Import", systemImage: "square.and.arrow.down", action: importApplication)
                             .accessibilityHint(Text("Choose a PBW package from Files"))

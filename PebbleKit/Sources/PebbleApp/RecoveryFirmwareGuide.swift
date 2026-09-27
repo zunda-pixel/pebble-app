@@ -32,7 +32,7 @@ struct RecoveryFirmwareGuide<FirmwareDestination: View>: View {
             // Not "Steps": that key is the health screen's step count.
             Section("What to Do") {
                 GuideStep(number: 1, text: "Put the watch on its charger and keep it next to this device.")
-                GuideStep(number: 2, text: "Open Firmware below and check for updates.")
+                GuideStep(number: 2, text: "Open Install Firmware below and check for updates.")
                 GuideStep(number: 3, text: "Download the published PebbleOS, then install it.")
                 GuideStep(number: 4, text: "Leave both alone until the watch restarts by itself.")
             }

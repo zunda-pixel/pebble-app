@@ -47,7 +47,7 @@ struct WatchesContent<Destination: View>: View {
             FeedbackBanner(feedback: feedback)
             if watches.isEmpty {
                 ContentUnavailableView {
-                    Label("No Devices", systemImage: "applewatch")
+                    Label("No Watches", systemImage: "applewatch")
                 } description: {
                     Text("Add a Pebble 2 Duo, Pebble Time 2, or Pebble Round 2.")
                 } actions: {
@@ -65,7 +65,7 @@ struct WatchesContent<Destination: View>: View {
                 }
             }
         }
-        .navigationTitle(Text("Devices"))
+        .navigationTitle(Text("Watches"))
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("Add Watch", systemImage: "plus", action: addWatch)

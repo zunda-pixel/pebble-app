@@ -37,7 +37,7 @@ extension AppModel {
 
     func openConfigurationURL(_ url: URL) {
         guard Self.mayOpenConfigurationURL(url) else {
-            applications.libraryFeedback = .failure("The application requested an unsafe settings URL.")
+            applications.libraryFeedback = .failure("The app requested an unsafe settings URL.")
             Task { [
                 scheme = url.scheme ?? "none",
                 host = url.host ?? "none",
@@ -93,7 +93,7 @@ extension AppModel {
             hasLoadedApplications = true
             applications.libraryFeedback = nil
         } catch {
-            applications.libraryFeedback = .failure("The application library could not be read: \(failureReason(for: error))")
+            applications.libraryFeedback = .failure("The app library could not be read: \(failureReason(for: error))")
         }
     }
 
@@ -125,7 +125,7 @@ extension AppModel {
                 message: "Requested configuration for \(application.displayName)"
             )
         } catch {
-            applications.libraryFeedback = .failure("The application settings could not be opened.")
+            applications.libraryFeedback = .failure("The app's settings could not be opened.")
         }
     }
 
@@ -316,7 +316,7 @@ extension AppModel {
 
     func beginApplicationOperation(_ operation: ApplicationManagementOperation) -> Bool {
         guard applications.managementOperation == nil, !isHandlingAppFetch else {
-            applications.libraryFeedback = .failure("Another application operation is already in progress.")
+            applications.libraryFeedback = .failure("Another app operation is already in progress.")
             return false
         }
         applications.managementOperation = operation
@@ -467,15 +467,15 @@ extension AppModel {
     func statusMessage(for operation: ApplicationManagementOperation) -> LocalizedStringKey {
         switch operation {
         case .importing:
-            "Preparing application…"
+            "Preparing app…"
         case .installing:
-            "Installing application…"
+            "Installing app…"
         case .removing:
-            "Removing application…"
+            "Removing app…"
         case .reordering:
-            "Updating application order…"
+            "Updating app order…"
         case .synchronizing:
-            "Synchronizing applications…"
+            "Synchronizing apps…"
         }
     }
 
@@ -484,37 +484,37 @@ extension AppModel {
         case let error as WatchConnectionError:
             error.message
         case BlobDBClientError.operationAlreadyInProgress:
-            "The watch is already processing another application change. Please try again."
+            "The watch is already processing another app change. Please try again."
         case BlobDBClientError.rejected(.databaseFull):
-            "The watch does not have enough space for this application."
+            "The watch does not have enough space for this app."
         case BlobDBClientError.rejected(.locked), BlobDBClientError.rejected(.tryLater):
             "The watch is busy. Please wait and try again."
         case is BlobDBClientError:
-            "The watch rejected the application change."
+            "The watch rejected the app change."
         case AppReorderClientError.operationAlreadyInProgress:
-            "The watch is already updating the application order."
+            "The watch is already updating the app order."
         case AppReorderClientError.rejected(.retry):
-            "The watch is busy. Please try changing the application order again."
+            "The watch is busy. Please try changing the app order again."
         case is AppReorderClientError:
-            "The watch rejected the application order. The previous order was restored."
+            "The watch rejected the app order. The previous order was restored."
         case PutBytesTransferError.negativeAcknowledgement:
-            "The watch rejected the application data. The application library was left as it was."
+            "The watch rejected the app data. The library was left as it was."
         case is PutBytesTransferError, is PutBytesCodecError:
-            "The application transfer was interrupted. The application library was left as it was."
+            "The app transfer was interrupted. The app library was left as it was."
         case PBWManifestError.noCompatibleVariant:
-            "This application does not support the connected Pebble model."
+            "This app does not support the connected Pebble model."
         case PBWPackageImportError.applicationIDMismatch:
-            "The PBW package contains mismatched application identifiers."
+            "The PBW package contains mismatched app identifiers."
         case PBWPackageImportError.missingExecutable:
-            "The PBW package does not contain an application executable."
+            "The PBW package does not contain an app executable."
         case is PBWPackageImportError, is PBWManifestError, is PBWBinaryHeaderError, is PBWApplicationError:
             "The selected PBW package is invalid or incomplete."
         case ApplicationManagementError.missingStoredPackage(let name):
             "The stored package for \(name) is missing. Import it again."
         case ApplicationManagementError.applicationIDMismatch:
-            "The watch requested an application that does not match the stored PBW package."
+            "The watch requested an app that does not match the stored PBW package."
         default:
-            "The application operation could not be completed. \(failureReason(for: error))"
+            "The app operation could not be completed. \(failureReason(for: error))"
         }
     }
 

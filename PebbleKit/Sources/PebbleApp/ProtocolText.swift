@@ -12,7 +12,7 @@ public extension WatchConnectionError {
         case .bluetoothUnsupported:
             "Bluetooth Low Energy is not supported on this device."
         case .permissionDenied:
-            "Bluetooth access is not allowed. Enable it in System Settings."
+            Self.permissionDeniedMessage
         case .scanAlreadyInProgress:
             "A watch scan is already in progress."
         case .watchNotFound:
@@ -32,6 +32,14 @@ public extension WatchConnectionError {
         case .pairingRemovedByWatch:
             "The connection failed: the watch has thrown away its pairing with this device. A Pebble keeps one, so pairing it with another phone or computer does this. Forget the watch in the system Bluetooth settings, then pair it again here."
         }
+    }
+
+    private static var permissionDeniedMessage: LocalizedStringKey {
+        #if os(macOS)
+        return "Bluetooth access is not allowed. Allow it in System Settings."
+        #else
+        return "Bluetooth access is not allowed. Allow it in Settings."
+        #endif
     }
 }
 
@@ -155,7 +163,7 @@ public extension WatchSetting {
     /// Empty for a switch, which has a title and no options.
     var optionTitles: [LocalizedStringKey] {
         switch self {
-        case .unitsDistance: ["Kilometres", "Miles"]
+        case .unitsDistance: ["Kilometers", "Miles"]
         // The first follows whatever distance is set to, which is what
         // `UnitsWind_FromDistance` means and what the watch does with it.
         case .unitsWind: ["Match Distance", "km/h", "mph"]

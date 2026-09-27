@@ -6,7 +6,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "いま“%@”をダウンロードできませんでした。"
+            "value" : "現在“%@”をダウンロードできません。"
           }
         }
       }
@@ -38,7 +38,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“%@”が予報を受け付けませんでした。%@"
+            "value" : "%@が予報を受け付けませんでした。%@"
           }
         }
       }
@@ -48,7 +48,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“%@”が地点リストを受け付けませんでした。%@"
+            "value" : "%@が地点リストを受け付けませんでした。%@"
           }
         }
       }
@@ -63,8 +63,8 @@
         },
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "“%@”がリマインダーを受け付けませんでした。%@"
+            "state" : "translated",
+            "value" : "%@がリマインダーを受け付けませんでした。%@"
           }
         }
       }
@@ -79,8 +79,8 @@
         },
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "“%@”が設定を受け付けませんでした。%@"
+            "state" : "translated",
+            "value" : "%@が設定を受け付けませんでした。%@"
           }
         }
       }
@@ -95,8 +95,8 @@
         },
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "%1$@ はタイムラインを消去しませんでした。%2$@"
+            "state" : "translated",
+            "value" : "%1$@がタイムラインを消去しませんでした。%2$@"
           }
         }
       }
@@ -106,7 +106,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“%@”には天気アプリがないため、何も送信しません。"
+            "value" : "%@には天気アプリがないため、何も送信されません。"
           }
         }
       }
@@ -115,8 +115,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "“%@”を使用中です。"
+            "state" : "translated",
+            "value" : "“%@”を適用しました。"
           }
         }
       }
@@ -125,7 +125,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "%@が接続されました"
           }
         }
@@ -135,7 +135,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "%@の充電が完了しました。"
           }
         }
@@ -146,7 +146,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“%@”をインストールしました。ウォッチはこれから切り替わります。"
+            "value" : "“%@”をインストールしました。ウォッチの言語がまもなく切り替わります。"
           }
         }
       }
@@ -155,7 +155,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "“%@”はこのウォッチに対応していません。"
           }
         }
@@ -165,7 +165,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "%@にはファームウェアが必要です"
           }
         }
@@ -181,8 +181,8 @@
         },
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "%@/%@ MB 送信済み"
+            "state" : "translated",
+            "value" : "%1$@/%2$@ MBを送信済み"
           }
         }
       }
@@ -197,7 +197,7 @@
         },
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "%2$@バイト中%1$@バイト"
           }
         }
@@ -213,8 +213,8 @@
         },
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "“%@”には“%@”がまだ残っています。%@"
+            "state" : "translated",
+            "value" : "%1$@には“%2$@”がまだ残っています。%3$@"
           }
         }
       }
@@ -241,7 +241,7 @@
         },
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "%lld個のアプリ"
           }
         }
@@ -251,7 +251,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "%lld bpm"
           }
         }
@@ -261,7 +261,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "%lld dBm"
           }
         }
@@ -271,7 +271,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "%lld分"
           }
         }
@@ -307,7 +307,7 @@
         },
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "%1$lld–%2$lld bpm"
           }
         }
@@ -333,7 +333,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "1時間"
           }
         }
@@ -343,7 +343,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "24時間表示"
           }
         }
@@ -353,7 +353,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "3時間"
           }
         }
@@ -363,7 +363,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "3秒"
           }
         }
@@ -373,7 +373,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "30分"
           }
         }
@@ -383,7 +383,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "5秒"
           }
         }
@@ -393,7 +393,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "6時間"
           }
         }
@@ -403,7 +403,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "8秒"
           }
         }
@@ -414,7 +414,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このウォッチのボード向けにビルドされたPBLパック。別のボード向けのパックもインストールはできますが、字形が崩れます。"
+            "value" : "このウォッチのボード向けにビルドされたPBLパックです。別のボード向けのパックもインストールはできますが、文字が正しく表示されません。"
           }
         }
       }
@@ -423,7 +423,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "このウォッチのボード向けにビルドされたPBZパッケージです。"
           }
         }
@@ -433,7 +433,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "予定、リマインダー、天気をウォッチに表示するには、いくつかの許可が必要です。次の画面にまとめてあり、どれもあとにできます。"
           }
         }
@@ -443,8 +443,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "これより古くなった予報は、次に機会があったとき（アプリを開いたときや、ウォッチが接続されているあいだ）に更新されます。タイムラインピンは、今日・明日・明後日の予報をウォッチのタイムラインに追加します。"
+            "state" : "translated",
+            "value" : "これより古くなった予報は、次に更新できるとき（アプリを開いたときや、ウォッチの接続中）に更新されます。“タイムラインピン”をオンにすると、今日、明日、明後日の予報がウォッチのタイムラインに追加されます。"
           }
         }
       }
@@ -453,7 +453,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "一行にはカウントダウンを埋め込めます。ウォッチが自動的に更新します。時刻は1970年からの秒数で指定してください。"
           }
         }
@@ -463,7 +463,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "期限を過ぎた一行は表示されなくなり、アプリ名だけの表示に戻ります。"
           }
         }
@@ -473,7 +473,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "これらのいずれかが見つかった通知は、ウォッチに表示されずに破棄されます。"
           }
         }
@@ -483,8 +483,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アプリが持たなくなったピンは、次回の同期で削除されます。これは記録が残っていないピン（再インストール後や、キューが失われた場合）のための操作です。"
+            "state" : "translated",
+            "value" : "アプリ側でなくなったピンは、次回の同期でウォッチからも削除されます。この操作は、アプリに記録が残っていないピン（再インストール後や、キューが失われた場合）を消すためのものです。"
           }
         }
       }
@@ -493,7 +493,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ピンは、その時刻までウォッチのタイムラインで待機し、時刻が過ぎたあともそのまま残ります。"
           }
         }
@@ -503,7 +503,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "リマインダーは、タイムラインで待つのではなく、時間になるとウォッチが振動して知らせます。ウォッチは今日に近いものだけを保持し、残りは破棄します。"
           }
         }
@@ -513,7 +513,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "時間が過ぎたリマインダーは、ウォッチに送信されません。"
           }
         }
@@ -523,8 +523,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "リカバリファームウェアのウォッチは頻繁に切断されます。インストールは次の接続で再開されるので、途中で切断されてもアップデートは失われません。"
+            "state" : "translated",
+            "value" : "リカバリファームウェアで動作中のウォッチは頻繁に切断されます。インストールは次の接続時に再開されるため、途中で切断されてもアップデートは失われません。"
           }
         }
       }
@@ -533,7 +533,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチのスキャンはすでに実行中です。"
           }
         }
@@ -543,8 +543,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "工場出荷時の状態にリセットしたウォッチは、このMacを認識しなくなります。古いペアリングが残っていると追加し直せないので、ここで登録を解除してから、「システム設定」＞「Bluetooth」でも登録を解除してください。"
+            "state" : "translated",
+            "value" : "工場出荷時の状態にリセットしたウォッチは、このMacを認識しなくなります。古いペアリングが残っていると追加し直せないので、ここで登録を解除してから、“システム設定”＞“Bluetooth”でも登録を解除してください。"
           }
         }
       }
@@ -553,17 +553,17 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "工場出荷時の状態にリセットしたウォッチは、このiPhoneを認識しなくなります。古いペアリングが残っていると追加し直せないので、ここで登録を解除してから、「設定」＞「Bluetooth」でウォッチの横のⓘをタップし、「このデバイスの登録を解除」を選んでください。"
+            "state" : "translated",
+            "value" : "工場出荷時の状態にリセットしたウォッチは、このiPhoneを認識しなくなります。古いペアリングが残っていると追加し直せないので、ここで登録を解除してから、“設定”＞“Bluetooth”でウォッチの横のⓘをタップし、“このデバイスの登録を解除”を選んでください。"
           }
         }
       }
     },
-    "A watch that is paired with this phone but has not been added here. It cannot be found by scanning; it appears when it reaches the app by itself." : {
+    "A watch that is already paired but has not been added here. It cannot be found by scanning; it appears when it reaches the app by itself." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "この端末とペアリング済みですが、まだ追加されていないウォッチです。スキャンでは見つからないため、ウォッチ側から接続してきたときに表示されます。"
           }
         }
@@ -573,7 +573,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "情報"
           }
         }
@@ -583,7 +583,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "身体情報"
           }
         }
@@ -593,7 +593,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "アカウントのリンクにはまだ対応していません。"
           }
         }
@@ -603,7 +603,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "適用"
           }
         }
@@ -613,7 +613,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "適用中"
           }
         }
@@ -623,7 +623,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "アクティブエネルギー"
           }
         }
@@ -633,7 +633,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "アクティビティ"
           }
         }
@@ -643,7 +643,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "アクティビティのインサイト"
           }
         }
@@ -663,7 +663,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "アプリを追加"
           }
         }
@@ -673,7 +673,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ルールを追加"
           }
         }
@@ -683,7 +683,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチを追加"
           }
         }
@@ -693,7 +693,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "Pebble 2 Duo、Pebble Time 2、またはPebble Round 2を追加してください。"
           }
         }
@@ -713,7 +713,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "追加すると、時間になったときにウォッチが振動して知らせます。"
           }
         }
@@ -723,7 +723,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "+ボタンで追加するか、カレンダーを同期してください。"
           }
         }
@@ -734,7 +734,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "現在地か、気にしている場所を追加してください。"
+            "value" : "現在地か、天気を確認したい場所を追加してください。"
           }
         }
       }
@@ -743,7 +743,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "リンクによるストアフィードの追加にはまだ対応していません。"
           }
         }
@@ -753,7 +753,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "年齢: %@歳"
           }
         }
@@ -763,7 +763,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "アラーム"
           }
         }
@@ -773,7 +773,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "アルバムアート"
           }
         }
@@ -783,7 +783,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "すべて"
           }
         }
@@ -793,7 +793,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "すべてのカテゴリ"
           }
         }
@@ -813,7 +813,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "すべてのウォッチアプリ"
           }
         }
@@ -823,8 +823,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "すべてのウォッチフェイス"
+            "state" : "translated",
+            "value" : "すべての文字盤"
           }
         }
       }
@@ -843,8 +843,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "許可"
+            "state" : "translated",
+            "value" : "許可済み"
           }
         }
       }
@@ -853,7 +853,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ペアリング済み"
           }
         }
@@ -863,7 +863,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "常に"
           }
         }
@@ -873,18 +873,18 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アップデートが待機中"
+            "state" : "translated",
+            "value" : "保留中のアップデートがあります"
           }
         }
       }
     },
-    "Another application operation is already in progress." : {
+    "Another app operation is already in progress." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "別のアプリケーション操作がすでに実行中です。"
+            "state" : "translated",
+            "value" : "別のアプリの操作がすでに実行中です。"
           }
         }
       }
@@ -893,7 +893,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "別のウォッチへの接続がすでに進行中です。"
           }
         }
@@ -903,8 +903,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "答えなかった項目は、あとから“設定”で許可できます。“設定”には、このアプリが読み取りを許可されている項目も表示されます。"
+            "state" : "translated",
+            "value" : "許可しなかった項目は、あとから“設定”で許可できます。“設定”では、このアプリに読み取りを許可した項目も確認できます。"
           }
         }
       }
@@ -913,8 +913,18 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "アプリのログ"
+          }
+        }
+      }
+    },
+    "App Name" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリ名"
           }
         }
       }
@@ -933,7 +943,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "画面表示"
           }
         }
@@ -949,31 +959,11 @@
         }
       }
     },
-    "Application Name" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アプリケーション名"
-          }
-        }
-      }
-    },
-    "Applications" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アプリケーション"
-          }
-        }
-      }
-    },
     "Apps" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "アプリ"
           }
         }
@@ -983,7 +973,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチが通知の送信を検出したアプリの一覧と、それぞれに対するウォッチの動作です。"
           }
         }
@@ -993,7 +983,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチが通知の送信を検出したアプリの一覧です。ミュートすると、そのアプリの通知はウォッチでフィルタリングされます。"
           }
         }
@@ -1003,8 +993,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "期限"
+            "state" : "translated",
+            "value" : "日時"
           }
         }
       }
@@ -1013,8 +1003,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "通知を自動で消す"
+            "state" : "translated",
+            "value" : "通知を自動的に閉じる"
           }
         }
       }
@@ -1023,7 +1013,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "このPebbleの自動再接続情報が削除されます。"
           }
         }
@@ -1033,7 +1023,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "血中酸素の平均"
           }
         }
@@ -1043,7 +1033,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "心拍数の平均"
           }
         }
@@ -1053,7 +1043,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "背景"
           }
         }
@@ -1063,7 +1053,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "バックライト"
           }
         }
@@ -1073,7 +1063,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "バックライトの明るさ"
           }
         }
@@ -1083,7 +1073,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "バックライトの色"
           }
         }
@@ -1093,7 +1083,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "バックライトの点灯時間"
           }
         }
@@ -1103,7 +1093,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "バックライトの輝度"
           }
         }
@@ -1113,7 +1103,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "暗い場所でのみバックライト点灯"
           }
         }
@@ -1123,7 +1113,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "タッチでバックライト点灯"
           }
         }
@@ -1133,8 +1123,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "手首を返してバックライト点灯"
+            "state" : "translated",
+            "value" : "手首を振ってバックライト点灯"
           }
         }
       }
@@ -1143,7 +1133,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "省電力"
           }
         }
@@ -1153,7 +1143,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "1日の最高記録"
           }
         }
@@ -1163,7 +1153,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "血中酸素"
           }
         }
@@ -1173,7 +1163,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ブルーム"
           }
         }
@@ -1183,7 +1173,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "Bluetooth"
           }
         }
@@ -1193,18 +1183,28 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "このデバイスはBluetooth Low Energyに対応していません。"
+            "state" : "translated",
+            "value" : "この端末はBluetooth Low Energyに対応していません。"
           }
         }
       }
     },
-    "Bluetooth access is not allowed. Enable it in System Settings." : {
+    "Bluetooth access is not allowed. Allow it in Settings." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "Bluetoothへのアクセスが許可されていません。“システム設定”で有効にしてください。"
+            "state" : "translated",
+            "value" : "Bluetoothへのアクセスが許可されていません。“設定”で許可してください。"
+          }
+        }
+      }
+    },
+    "Bluetooth access is not allowed. Allow it in System Settings." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bluetoothへのアクセスが許可されていません。“システム設定”で許可してください。"
           }
         }
       }
@@ -1213,7 +1213,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "Bluetoothがオフか、一時的に利用できません。"
           }
         }
@@ -1223,7 +1223,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "本文"
           }
         }
@@ -1233,7 +1233,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "明るい"
           }
         }
@@ -1243,7 +1243,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "最も明るい"
           }
         }
@@ -1253,7 +1253,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ブラウズ"
           }
         }
@@ -1263,7 +1263,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "対応機種"
           }
         }
@@ -1273,7 +1273,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "振動パターン"
           }
         }
@@ -1283,7 +1283,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "カレンダー"
           }
         }
@@ -1303,7 +1303,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "カレンダーへのアクセスまたは同期に失敗しました。"
           }
         }
@@ -1313,8 +1313,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "タイムラインのカレンダー"
+            "state" : "translated",
+            "value" : "タイムラインにカレンダーを表示"
           }
         }
       }
@@ -1323,7 +1323,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "カレンダーをタイムラインと同期しました。"
           }
         }
@@ -1333,7 +1333,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "カレンダー"
           }
         }
@@ -1343,7 +1343,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "タイムラインにピンを追加できます"
           }
         }
@@ -1353,8 +1353,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "現在地を問い合わせられます"
+            "state" : "translated",
+            "value" : "現在地を取得できます"
           }
         }
       }
@@ -1363,8 +1363,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ヘルスケアデータを読み取れます"
+            "state" : "translated",
+            "value" : "健康データを読み取れます"
           }
         }
       }
@@ -1373,7 +1373,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "キャンセル済み"
           }
         }
@@ -1383,7 +1383,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "カタログ"
           }
         }
@@ -1393,7 +1393,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "カタログを更新できなかったため、オフラインのキャッシュを表示しています。"
           }
         }
@@ -1403,7 +1403,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "カテゴリ"
           }
         }
@@ -1423,7 +1423,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "変更内容は保存され、ウォッチが接続したときに書き込まれます。"
           }
         }
@@ -1433,7 +1433,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "いずれかを変更すると、ウォッチ本体と同じように“バックライトの明るさ”が“カスタム”に切り替わります。"
           }
         }
@@ -1443,7 +1443,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "アップデートを確認"
           }
         }
@@ -1453,7 +1453,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "アップデートを確認中…"
           }
         }
@@ -1463,7 +1463,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "“ファイル”からPBWパッケージを選択します"
           }
         }
@@ -1473,8 +1473,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチが選択"
+            "state" : "translated",
+            "value" : "ウォッチに任せる"
           }
         }
       }
@@ -1483,7 +1483,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "履歴を消去"
           }
         }
@@ -1493,7 +1493,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "タイムラインを消去"
           }
         }
@@ -1503,8 +1503,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "このウォッチのピンをすべて消去しますか？"
+            "state" : "translated",
+            "value" : "このウォッチのピンをすべて消去しますか?"
           }
         }
       }
@@ -1513,7 +1513,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチのタイムラインを消去"
           }
         }
@@ -1523,7 +1523,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "クラッシュレポートを取得"
           }
         }
@@ -1533,17 +1533,17 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "コレクション"
           }
         }
       }
     },
-    "Colours" : {
+    "Colors" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "色"
           }
         }
@@ -1553,8 +1553,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "これから"
+            "state" : "translated",
+            "value" : "今後"
           }
         }
       }
@@ -1563,8 +1563,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "構成"
+            "state" : "translated",
+            "value" : "設定"
           }
         }
       }
@@ -1573,7 +1573,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "接続"
           }
         }
@@ -1583,7 +1583,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "自動的に接続"
           }
         }
@@ -1593,7 +1593,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "テスト通知を送信する前にPebbleを接続してください。"
           }
         }
@@ -1604,7 +1604,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ウォッチフェイスを変更するには、Pebbleを接続してください。"
+            "value" : "文字盤を変更するには、Pebbleを接続してください。"
           }
         }
       }
@@ -1613,8 +1613,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "対象のPebbleを一度接続してボードを確認してから、ファームウェアを確認してください。"
+            "state" : "translated",
+            "value" : "ボードを識別できるように対象のPebbleを一度接続してから、ファームウェアを確認してください。"
           }
         }
       }
@@ -1623,8 +1623,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "対象のPebbleを一度接続してボードを確認してから、ファームウェアを選択してください。"
+            "state" : "translated",
+            "value" : "ボードを識別できるように対象のPebbleを一度接続してから、ファームウェアを選択してください。"
           }
         }
       }
@@ -1633,7 +1633,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "タイムラインを消去する前にウォッチを接続してください。"
           }
         }
@@ -1643,7 +1643,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "クラッシュレポートを取得する前にウォッチを接続してください。"
           }
         }
@@ -1653,7 +1653,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ログを取得する前にウォッチを接続してください。"
           }
         }
@@ -1663,7 +1663,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "リセットする前にウォッチを接続してください。"
           }
         }
@@ -1673,7 +1673,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "スクリーンショットを撮る前にウォッチを接続してください。"
           }
         }
@@ -1713,7 +1713,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "インストールするには、ウォッチを接続してください。"
           }
         }
@@ -1723,8 +1723,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "実行中のバージョンを読み取るには、ウォッチを接続してください。"
+            "state" : "translated",
+            "value" : "実行中のバージョンを確認するには、ウォッチを接続してください。"
           }
         }
       }
@@ -1733,7 +1733,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ファームウェアのアップデートを再開するには、ウォッチを接続してください。"
           }
         }
@@ -1743,7 +1743,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "接続済み"
           }
         }
@@ -1753,8 +1753,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "“%@”に接続しました"
+            "state" : "translated",
+            "value" : "%@に接続済み"
           }
         }
       }
@@ -1763,7 +1763,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "接続中…"
           }
         }
@@ -1773,7 +1773,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "接続"
           }
         }
@@ -1793,7 +1793,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "接続が切断されました。再接続中…"
           }
         }
@@ -1803,7 +1803,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "接続状況"
           }
         }
@@ -1813,7 +1813,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "このウォッチに接続します"
           }
         }
@@ -1823,7 +1823,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "続ける"
           }
         }
@@ -1833,7 +1833,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "カウントダウン"
           }
         }
@@ -1843,7 +1843,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "クラッシュレポート"
           }
         }
@@ -1863,7 +1863,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "カスタム"
           }
         }
@@ -1873,7 +1873,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "日常"
           }
         }
@@ -1883,7 +1883,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "1日の平均"
           }
         }
@@ -1893,7 +1893,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "日付"
           }
         }
@@ -1903,7 +1903,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "深い睡眠"
           }
         }
@@ -1913,7 +1913,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "深い睡眠の平均"
           }
         }
@@ -1923,8 +1923,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ヘルスケアデータを削除"
+            "state" : "translated",
+            "value" : "健康データを削除"
           }
         }
       }
@@ -1933,8 +1933,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ローカルのヘルスケアデータを削除"
+            "state" : "translated",
+            "value" : "ローカルの健康データを削除"
           }
         }
       }
@@ -1943,8 +1943,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ローカルのヘルスケアデータをすべて削除しますか?"
+            "state" : "translated",
+            "value" : "ローカルの健康データをすべて削除しますか?"
           }
         }
       }
@@ -1953,7 +1953,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "詳細"
           }
         }
@@ -1963,18 +1963,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "デベロッパ"
-          }
-        }
-      }
-    },
-    "Devices" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "デバイス"
           }
         }
       }
@@ -1983,7 +1973,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "診断"
           }
         }
@@ -1993,7 +1983,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチからの音声入力"
           }
         }
@@ -2003,7 +1993,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "暗い"
           }
         }
@@ -2013,7 +2003,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "接続解除"
           }
         }
@@ -2033,7 +2023,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "距離"
           }
         }
@@ -2043,7 +2033,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "2回"
           }
         }
@@ -2053,7 +2043,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ダブルタップ"
           }
         }
@@ -2063,7 +2053,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "PebbleOS %@をダウンロード"
           }
         }
@@ -2073,7 +2063,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ダウンロードしてからインストールします。"
           }
         }
@@ -2083,7 +2073,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "先にファームウェアをダウンロードしてください。"
           }
         }
@@ -2093,7 +2083,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "公開されているPebbleOSをダウンロードして、インストールします。"
           }
         }
@@ -2103,7 +2093,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ダウンロード済み"
           }
         }
@@ -2113,7 +2103,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "“%@”をダウンロード中…"
           }
         }
@@ -2123,7 +2113,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "PebbleOS %@をダウンロード中…"
           }
         }
@@ -2133,7 +2123,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ダウンロードはネットワークだけで済むので、ウォッチが手元になくても実行できます。インストールにはウォッチが必要で、接続され次第始まります。"
           }
         }
@@ -2143,7 +2133,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ダウンロード中…"
           }
         }
@@ -2153,8 +2143,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "カレンダーの予定中"
+            "state" : "translated",
+            "value" : "カレンダーの予定がある間"
           }
         }
       }
@@ -2163,7 +2153,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "バックライトの自動調光"
           }
         }
@@ -2173,7 +2163,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "上昇時"
           }
         }
@@ -2183,7 +2173,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "終了"
           }
         }
@@ -2223,8 +2213,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "“%@”を消去しますか?"
+            "state" : "translated",
+            "value" : "%@を消去しますか?"
           }
         }
       }
@@ -2233,7 +2223,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチを消去"
           }
         }
@@ -2243,7 +2233,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "イベント"
           }
         }
@@ -2253,7 +2243,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "予定のリマインダー"
           }
         }
@@ -2263,7 +2253,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "カレンダーの予定がウォッチのタイムラインピンになり、この先の予定を手元で確認できます。"
           }
         }
@@ -2273,7 +2263,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "以下のカレンダーの今後30日間の予定が、ウォッチのタイムラインに表示されます。カレンダーをオフにすると、そのカレンダーの予定はウォッチからも削除されます。"
           }
         }
@@ -2283,7 +2273,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "10分ごと"
           }
         }
@@ -2313,8 +2303,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチに保存されているすべてのアプリ、ウォッチフェイス、および設定が消去されます。この操作は取り消せません。"
+            "state" : "translated",
+            "value" : "ウォッチに保存されているすべてのアプリ、文字盤、および設定が消去されます。この操作は取り消せません。"
           }
         }
       }
@@ -2323,8 +2313,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチが記録した日のデータをすべて1つのJSONファイルに書き出します。ここから共有するまで、ファイルがこのiPhoneの外に出ることはありません。"
+            "state" : "translated",
+            "value" : "ウォッチが記録した日のデータをすべて1つのJSONファイルに書き出します。ここから共有するまで、ファイルがこの端末の外に出ることはありません。"
           }
         }
       }
@@ -2333,7 +2323,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "このアプリの通知はすべてウォッチに届きます。"
           }
         }
@@ -2343,7 +2333,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "このアプリが送っていないものも含めて、ウォッチ上のピンをすべて削除し、そのあとアプリが持っているピンを書き戻します。"
           }
         }
@@ -2353,8 +2343,18 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "エクササイズ"
+          }
+        }
+      }
+    },
+    "Expires" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有効期限を設ける"
           }
         }
       }
@@ -2363,7 +2363,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "書き出し"
           }
         }
@@ -2373,7 +2373,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "もう一度書き出す"
           }
         }
@@ -2383,8 +2383,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ヘルスケアデータを書き出す"
+            "state" : "translated",
+            "value" : "健康データを書き出す"
           }
         }
       }
@@ -2393,7 +2393,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "書き出し中…"
           }
         }
@@ -2403,7 +2403,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "特大"
           }
         }
@@ -2413,8 +2413,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチフェイス"
+            "state" : "translated",
+            "value" : "文字盤"
           }
         }
       }
@@ -2423,7 +2423,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "工場出荷時の状態にリセット"
           }
         }
@@ -2443,7 +2443,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "女性"
           }
         }
@@ -2453,7 +2453,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ファイル"
           }
         }
@@ -2463,7 +2463,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ファームウェア"
           }
         }
@@ -2473,7 +2473,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ファームウェアが必要"
           }
         }
@@ -2483,18 +2483,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ファームウェアアップデート"
-          }
-        }
-      }
-    },
-    "Firmware Version" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ファームウェアバージョン"
           }
         }
       }
@@ -2503,7 +2493,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "現在ファームウェアをダウンロードできません。"
           }
         }
@@ -2513,7 +2503,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ファームウェアをインストールしました。ウォッチの再起動を待っています。"
           }
         }
@@ -2523,7 +2513,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ファームウェアの準備ができました。ウォッチが接続され次第インストールされます。"
           }
         }
@@ -2533,7 +2523,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ファームウェア不明"
           }
         }
@@ -2543,7 +2533,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ファームウェアのアップデートをキャンセルしました。リカバリデータは保持されています。"
           }
         }
@@ -2553,7 +2543,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ファームウェアのアップデートを安全に停止しました: %@"
           }
         }
@@ -2563,7 +2553,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ファイブ"
           }
         }
@@ -2573,7 +2563,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "フラグ"
           }
         }
@@ -2594,7 +2584,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "集中モードはウォッチを消音する機能です。iPhoneが何を転送するかは、“通知”画面のサイレント時間帯で決まります。"
+            "value" : "集中モードはウォッチを消音する機能です。ウォッチに何を転送するかは、“通知”画面の“サイレント時間帯”で決まります。"
           }
         }
       }
@@ -2613,7 +2603,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "破棄"
           }
         }
@@ -2623,8 +2613,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "“%@”の登録を解除しますか?"
+            "state" : "translated",
+            "value" : "%@の登録を解除しますか?"
           }
         }
       }
@@ -2633,7 +2623,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "このアップデートを破棄"
           }
         }
@@ -2643,7 +2633,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチの登録を解除"
           }
         }
@@ -2653,18 +2643,48 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "このアップデートを破棄しますか?"
           }
         }
       }
     },
-    "Forgot %lld app(s)." : {
+    "Forgot %lld apps." : {
       "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "Forgot %lld app."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "Forgot %lld apps."
+                }
+              }
+            }
+          }
+        },
         "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "%lld個のアプリを忘れました。"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld個のアプリを一覧から削除しました。"
+                }
+              },
+              "zero" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld個のアプリを一覧から削除しました。"
+                }
+              }
+            }
           }
         }
       }
@@ -2673,7 +2693,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "充電完了"
           }
         }
@@ -2683,7 +2703,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ゲーム"
           }
         }
@@ -2693,7 +2713,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチのログを取得"
           }
         }
@@ -2703,18 +2723,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "性別"
-          }
-        }
-      }
-    },
-    "General Information" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "一般情報"
           }
         }
       }
@@ -2723,8 +2733,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "自動生成ウォッチフェイス"
+            "state" : "translated",
+            "value" : "自動生成の文字盤"
           }
         }
       }
@@ -2733,8 +2743,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ハードウェアバージョン"
+            "state" : "translated",
+            "value" : "ハードウェアリビジョン"
           }
         }
       }
@@ -2743,7 +2753,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "コンパニオンJavaScriptあり"
           }
         }
@@ -2753,7 +2763,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ヘルスケア"
           }
         }
@@ -2763,7 +2773,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ヘルスケア/フィットネス"
           }
         }
@@ -2773,8 +2783,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ヘルスケアのアーカイブを読み込んで統合しました。"
+            "state" : "translated",
+            "value" : "健康データのアーカイブを読み込んで統合しました。"
           }
         }
       }
@@ -2783,8 +2793,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ヘルスケアデータを書き出せませんでした。"
+            "state" : "translated",
+            "value" : "健康データを書き出せませんでした。"
           }
         }
       }
@@ -2793,8 +2803,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ヘルスケアデータを読み込めませんでした。"
+            "state" : "translated",
+            "value" : "健康データを読み込めませんでした。"
           }
         }
       }
@@ -2803,8 +2813,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ヘルスケアデータを“ヘルスケア”と同期しました。"
+            "state" : "translated",
+            "value" : "健康データを“ヘルスケア”と同期しました。"
           }
         }
       }
@@ -2813,8 +2823,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ヘルスケアデータの同期が完了しました。"
+            "state" : "translated",
+            "value" : "健康データの同期が完了しました。"
           }
         }
       }
@@ -2823,8 +2833,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ヘルスケアデータの同期を要求しました。"
+            "state" : "translated",
+            "value" : "健康データの同期を要求しました。"
           }
         }
       }
@@ -2833,8 +2843,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ヘルスケアデータの同期は再接続後に再試行されます。"
+            "state" : "translated",
+            "value" : "健康データの同期は再接続後に再試行されます。"
           }
         }
       }
@@ -2843,7 +2853,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "“ヘルスケア”へのアクセスまたは同期に失敗しました。"
           }
         }
@@ -2853,7 +2863,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "“ヘルスケア”のデータを読み取れませんでした。"
           }
         }
@@ -2863,7 +2873,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "“ヘルスケア”のデータを読み込んで重複を除去しました。"
           }
         }
@@ -2873,7 +2883,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "心拍数"
           }
         }
@@ -2883,7 +2893,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "心拍ゾーン"
           }
         }
@@ -2893,7 +2903,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "身長: %@"
           }
         }
@@ -2903,7 +2913,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "戻るボタン長押し"
           }
         }
@@ -2913,7 +2923,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "下ボタン長押し"
           }
         }
@@ -2923,7 +2933,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "選択ボタン長押し"
           }
         }
@@ -2933,7 +2943,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "上ボタン長押し"
           }
         }
@@ -2943,8 +2953,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチフェイスの表示中にボタンを長押しすると、そのボタンに割り当てたアプリが開きます。"
+            "state" : "translated",
+            "value" : "文字盤の表示中にボタンを長押しすると、そのボタンに割り当てたアプリが開きます。"
           }
         }
       }
@@ -2953,7 +2963,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "アイコン"
           }
         }
@@ -2963,7 +2973,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "読み込む"
           }
         }
@@ -2973,8 +2983,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ヘルスケアアーカイブを読み込む"
+            "state" : "translated",
+            "value" : "健康データのアーカイブを読み込む"
           }
         }
       }
@@ -2983,7 +2993,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "“ヘルスケア”から読み込む"
           }
         }
@@ -2993,18 +3003,18 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "読み込んだウォッチアプリとウォッチフェイスがここに表示されます。"
+            "state" : "translated",
+            "value" : "読み込んだウォッチアプリと文字盤がここに表示されます。"
           }
         }
       }
     },
-    "Importing Pebble application" : {
+    "Importing Pebble app" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "Pebbleアプリケーションを読み込み中"
+            "state" : "translated",
+            "value" : "Pebbleアプリを読み込み中"
           }
         }
       }
@@ -3013,7 +3023,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "辞退した予定を含める"
           }
         }
@@ -3023,7 +3033,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "非対応"
           }
         }
@@ -3033,7 +3043,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "インストール"
           }
         }
@@ -3043,7 +3053,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ファームウェアをインストール"
           }
         }
@@ -3053,7 +3063,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "PebbleOS %@をインストール"
           }
         }
@@ -3063,8 +3073,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "使用中のウォッチフェイスを削除する前に、別のウォッチフェイスをインストールして使用してください。"
+            "state" : "translated",
+            "value" : "適用中の文字盤を削除する前に、別の文字盤をインストールして適用してください。"
           }
         }
       }
@@ -3073,7 +3083,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ファイルからインストール…"
           }
         }
@@ -3083,7 +3093,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "リンクからインストールしますか?"
           }
         }
@@ -3093,7 +3103,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "好きなタイミングでインストールできます。"
           }
         }
@@ -3103,7 +3113,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "リカバリファームウェアをインストールしますか?"
           }
         }
@@ -3113,18 +3123,48 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "インストール済み"
           }
         }
       }
     },
-    "Installed %lld catalog update(s)." : {
+    "Installed %lld catalog updates." : {
       "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "Installed %lld catalog update."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "Installed %lld catalog updates."
+                }
+              }
+            }
+          }
+        },
         "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "カタログのアップデート%lld件をインストールしました。"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "カタログのアップデート%lld件をインストールしました。"
+                }
+              },
+              "zero" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "カタログのアップデート%lld件をインストールしました。"
+                }
+              }
+            }
           }
         }
       }
@@ -3133,7 +3173,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "インストール済みのアプリは最新です。"
           }
         }
@@ -3143,7 +3183,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "インストール中"
           }
         }
@@ -3153,7 +3193,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "PebbleOS %@をインストール中"
           }
         }
@@ -3169,12 +3209,12 @@
         }
       }
     },
-    "Installing application…" : {
+    "Installing app…" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アプリケーションをインストール中…"
+            "state" : "translated",
+            "value" : "アプリをインストール中…"
           }
         }
       }
@@ -3183,7 +3223,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ファームウェアをインストール中"
           }
         }
@@ -3193,7 +3233,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "このウォッチ用に選択されたファームウェアをインストール中…"
           }
         }
@@ -3203,7 +3243,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "このウォッチが接続され次第インストールされます。"
           }
         }
@@ -3213,8 +3253,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "リカバリファームウェアで起動しており、この状態でできるのはPebbleOSを新しく受け取ることだけです。インストールすれば、アプリ、ウォッチフェイス、通知はまた使えるようになります。"
+            "state" : "translated",
+            "value" : "リカバリファームウェアで起動しており、この状態でできるのはPebbleOSを新しく受け取ることだけです。インストールすれば、アプリ、文字盤、通知はまた使えるようになります。"
           }
         }
       }
@@ -3223,8 +3263,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "リカバリファームウェアで起動しています。この状態でできることは、PebbleOSの新しいコピーを受け取ることだけです。インストールが終われば、ほかの機能も元に戻ります。"
+            "state" : "translated",
+            "value" : "リカバリファームウェアで起動しており、この状態でできるのはPebbleOSを新しく受け取ることだけです。インストールすれば、ほかの機能もすべて元に戻ります。"
           }
         }
       }
@@ -3233,17 +3273,17 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "完了するまでウォッチを近くに置いてください。"
           }
         }
       }
     },
-    "Kilometres" : {
+    "Kilometers" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "キロメートル"
           }
         }
@@ -3253,7 +3293,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "種類"
           }
         }
@@ -3273,7 +3313,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "言語パック"
           }
         }
@@ -3293,7 +3333,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "大"
           }
         }
@@ -3313,7 +3353,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "あとで"
           }
         }
@@ -3323,7 +3363,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ランチャーの一行"
           }
         }
@@ -3333,7 +3373,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ランチャーの一行を保存しました。接続していないPebbleには、接続したときに伝えます。"
           }
         }
@@ -3343,8 +3383,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチが自動的に再起動するまで、どちらも操作せずに待ちます。"
+            "state" : "translated",
+            "value" : "ウォッチが自動的に再起動するまで、ウォッチも充電器もそのままにしておきます。"
           }
         }
       }
@@ -3353,7 +3393,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ライセンス"
           }
         }
@@ -3363,7 +3403,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "表示する一行"
           }
         }
@@ -3373,7 +3413,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "行数"
           }
         }
@@ -3383,7 +3423,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "リスト"
           }
         }
@@ -3393,18 +3433,18 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "さらに読み込む"
           }
         }
       }
     },
-    "Loading applications" : {
+    "Loading apps" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アプリケーションを読み込み中"
+            "state" : "translated",
+            "value" : "アプリを読み込み中"
           }
         }
       }
@@ -3424,7 +3464,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ローカルのPebbleヘルスケアデータを削除できませんでした。"
+            "value" : "Pebbleのローカルの健康データを削除できませんでした。"
           }
         }
       }
@@ -3433,8 +3473,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ローカルのPebbleヘルスケアデータを削除しました。"
+            "state" : "translated",
+            "value" : "Pebbleのローカルの健康データを削除しました。"
           }
         }
       }
@@ -3453,8 +3493,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "探す場所"
+            "state" : "translated",
+            "value" : "検索対象"
           }
         }
       }
@@ -3463,7 +3503,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "公開されているファームウェアを検索中…"
           }
         }
@@ -3473,7 +3513,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "メール"
           }
         }
@@ -3483,7 +3523,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "男性"
           }
         }
@@ -3493,8 +3533,18 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "手動"
+          }
+        }
+      }
+    },
+    "Match Case" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "大文字と小文字を区別"
           }
         }
       }
@@ -3503,18 +3553,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "距離の単位に合わせる"
-          }
-        }
-      }
-    },
-    "Match Upper and Lower Case" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "大文字と小文字を区別"
           }
         }
       }
@@ -3523,7 +3563,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "最大"
           }
         }
@@ -3533,8 +3573,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "血中酸素(SpO2)を独自の間隔で測定します。オンにするまでは無効です。"
+            "state" : "translated",
+            "value" : "血中酸素（SpO2）を独自の間隔で測定します。オンにするまでは無効です。"
           }
         }
       }
@@ -3543,7 +3583,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "中"
           }
         }
@@ -3553,7 +3593,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "メニューのループスクロール"
           }
         }
@@ -3563,7 +3603,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "メッセージ"
           }
         }
@@ -3573,7 +3613,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "マイル"
           }
         }
@@ -3583,7 +3623,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "分"
           }
         }
@@ -3593,7 +3633,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "測定分数"
           }
         }
@@ -3603,7 +3643,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "不在着信"
           }
         }
@@ -3613,7 +3653,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "モデル"
           }
         }
@@ -3623,7 +3663,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "月"
           }
         }
@@ -3633,7 +3673,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "その他"
           }
         }
@@ -3643,7 +3683,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "人気"
           }
         }
@@ -3653,7 +3693,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ミュージック"
           }
         }
@@ -3663,7 +3703,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ミュート"
           }
         }
@@ -3673,7 +3713,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "マイウォッチ"
           }
         }
@@ -3683,7 +3723,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "名前"
           }
         }
@@ -3693,7 +3733,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "近くのウォッチ"
           }
         }
@@ -3703,7 +3743,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "しない"
           }
         }
@@ -3713,7 +3753,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "新規ピン"
           }
         }
@@ -3723,7 +3763,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "新規リマインダー"
           }
         }
@@ -3733,8 +3773,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "新しいルール"
+            "state" : "translated",
+            "value" : "新規ルール"
           }
         }
       }
@@ -3743,7 +3783,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ニュース"
           }
         }
@@ -3753,7 +3793,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "アプリなし"
           }
         }
@@ -3763,8 +3803,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アプリなし"
+            "state" : "translated",
+            "value" : "まだアプリはありません"
           }
         }
       }
@@ -3773,7 +3813,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "振動なし"
           }
         }
@@ -3783,18 +3823,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "カタログアプリなし"
-          }
-        }
-      }
-    },
-    "No Devices" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "デバイスなし"
           }
         }
       }
@@ -3803,8 +3833,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ピンなし"
+            "state" : "translated",
+            "value" : "ピンがありません"
           }
         }
       }
@@ -3823,8 +3853,18 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "リマインダーなし"
+            "state" : "translated",
+            "value" : "リマインダーがありません"
+          }
+        }
+      }
+    },
+    "No Watches" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ウォッチなし"
           }
         }
       }
@@ -3843,8 +3883,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "許可しない"
+            "state" : "translated",
+            "value" : "未許可"
           }
         }
       }
@@ -3853,7 +3893,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "未確認"
           }
         }
@@ -3863,7 +3903,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "この言語では利用できません"
           }
         }
@@ -3873,7 +3913,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "未ダウンロード"
           }
         }
@@ -3883,7 +3923,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "未接続"
           }
         }
@@ -3893,8 +3933,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "このウォッチには未インストール"
+            "state" : "translated",
+            "value" : "このウォッチにはインストールされていません"
           }
         }
       }
@@ -3903,7 +3943,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "まだ何も送信していません"
           }
         }
@@ -3913,7 +3953,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "条件に一致するアプリがないか、カタログを取得できませんでした。"
           }
         }
@@ -3923,8 +3963,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "失われたものはありません。やり直すには、ウォッチを接続してください。"
+            "state" : "translated",
+            "value" : "何も失われていません。ウォッチを接続してやり直してみてください。"
           }
         }
       }
@@ -3933,8 +3973,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "失われたものはありません。準備ができたらやり直してみてください。"
+            "state" : "translated",
+            "value" : "何も失われていません。準備ができたらやり直してみてください。"
           }
         }
       }
@@ -3943,7 +3983,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "通知"
           }
         }
@@ -3953,7 +3993,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "通知"
           }
         }
@@ -3973,8 +4013,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "“システム設定”でこのアプリの通知がオフになっています。"
+            "state" : "translated",
+            "value" : "システムの設定で、このアプリの通知がオフになっています。"
           }
         }
       }
@@ -3983,7 +4023,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "このアプリの通知を有効にしました。"
           }
         }
@@ -3993,7 +4033,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "このアプリの通知をミュートしました。"
           }
         }
@@ -4003,7 +4043,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ファームウェアアップデートを通知"
           }
         }
@@ -4013,7 +4053,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "充電完了時に通知"
           }
         }
@@ -4033,7 +4073,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "オー、オー"
           }
         }
@@ -4043,7 +4083,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "オーレ"
           }
         }
@@ -4053,7 +4093,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "オン"
           }
         }
@@ -4063,7 +4103,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチ上"
           }
         }
@@ -4073,18 +4113,18 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "このアプリが送信したものだけです。ほかのアプリの通知はiOSからウォッチへ直接届くため、iPhone上のどのアプリもその内容を見ることはできません。"
           }
         }
       }
     },
-    "Open Firmware below and check for updates." : {
+    "Open Install Firmware below and check for updates." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "下の「ファームウェア」を開いて、アップデートを確認します。"
+            "state" : "translated",
+            "value" : "下の“ファームウェアをインストール”を開いて、アップデートを確認します。"
           }
         }
       }
@@ -4093,7 +4133,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "プライバシー設定を開く"
           }
         }
@@ -4103,7 +4143,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "リポジトリを開く"
           }
         }
@@ -4113,7 +4153,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "その他"
           }
         }
@@ -4133,7 +4173,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "一部許可"
           }
         }
@@ -4143,8 +4183,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "過去"
+            "state" : "translated",
+            "value" : "時刻を過ぎたもの"
           }
         }
       }
@@ -4153,7 +4193,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "支払い"
           }
         }
@@ -4163,7 +4203,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "Pebble"
           }
         }
@@ -4183,7 +4223,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "PebbleOS"
           }
         }
@@ -4199,8 +4239,8 @@
         },
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "%2$@にPebbleOS %1$@が利用できます。"
+            "state" : "translated",
+            "value" : "%2$@用のPebbleOS %1$@を利用できます。"
           }
         }
       }
@@ -4209,8 +4249,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "PebbleOS %@をダウンロード済み"
+            "state" : "translated",
+            "value" : "PebbleOS %@はダウンロード済みです"
           }
         }
       }
@@ -4219,7 +4259,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "PebbleOS %@が公開されています"
           }
         }
@@ -4229,7 +4269,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "PebbleOS %@をインストールできます。"
           }
         }
@@ -4239,7 +4279,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "PebbleOS %@が待機中"
           }
         }
@@ -4259,7 +4299,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "保留中のファームウェアアップデートを削除しました。"
           }
         }
@@ -4269,7 +4309,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチアプリ別"
           }
         }
@@ -4279,7 +4319,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "期間"
           }
         }
@@ -4289,7 +4329,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "期間合計"
           }
         }
@@ -4299,7 +4339,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "アクセス許可"
           }
         }
@@ -4309,8 +4349,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "スマートフォンアプリの通知"
+            "state" : "translated",
+            "value" : "iPhoneアプリの通知"
           }
         }
       }
@@ -4319,7 +4359,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "通話"
           }
         }
@@ -4329,8 +4369,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "iPhoneへの通知"
+            "state" : "translated",
+            "value" : "この端末への通知"
           }
         }
       }
@@ -4339,7 +4379,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ピン"
           }
         }
@@ -4349,7 +4389,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "時報"
           }
         }
@@ -4369,18 +4409,18 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "診断レポートを作成"
           }
         }
       }
     },
-    "Preparing application…" : {
+    "Preparing app…" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アプリケーションを準備中…"
+            "state" : "translated",
+            "value" : "アプリを準備中…"
           }
         }
       }
@@ -4389,7 +4429,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "インストールを準備中"
           }
         }
@@ -4399,7 +4439,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "プログレスバー"
           }
         }
@@ -4409,7 +4449,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "公開バージョン"
           }
         }
@@ -4419,7 +4459,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "現在、公開されているファームウェアを確認できません。"
           }
         }
@@ -4429,7 +4469,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "パルス"
           }
         }
@@ -4439,8 +4479,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチを充電器に載せ、この端末のそばに置きます。"
+            "state" : "translated",
+            "value" : "ウォッチを充電器にセットし、この端末のそばに置いておきます。"
           }
         }
       }
@@ -4449,7 +4489,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "四半期"
           }
         }
@@ -4459,7 +4499,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "質問"
           }
         }
@@ -4469,7 +4509,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "クイック起動"
           }
         }
@@ -4479,7 +4519,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "サイレント時間帯"
           }
         }
@@ -4489,7 +4529,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "サイレント時間帯を更新しました。"
           }
         }
@@ -4499,7 +4539,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "アクティビティ中の測定"
           }
         }
@@ -4509,7 +4549,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "測定頻度"
           }
         }
@@ -4519,18 +4559,48 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "利用可能"
           }
         }
       }
     },
-    "Received %lld health update(s) from the watch." : {
+    "Received %lld health updates from the watch." : {
       "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "Received %lld health update from the watch."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "Received %lld health updates from the watch."
+                }
+              }
+            }
+          }
+        },
         "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチからヘルスケアの更新%lld件を受信しました。"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "ウォッチから健康データの更新を%lld件受信しました。"
+                }
+              },
+              "zero" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "ウォッチから健康データの更新を%lld件受信しました。"
+                }
+              }
+            }
           }
         }
       }
@@ -4539,7 +4609,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "認識モデル"
           }
         }
@@ -4549,7 +4619,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "再接続中…"
           }
         }
@@ -4559,8 +4629,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "リカバリファームウェアの準備ができました。続けるには確認してください。"
+            "state" : "translated",
+            "value" : "リカバリファームウェアの準備ができました。確認して続けてください。"
           }
         }
       }
@@ -4569,8 +4639,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "リカバリファームウェアを検証しました。続けるには確認してください。"
+            "state" : "translated",
+            "value" : "リカバリファームウェアを検証しました。確認して続けてください。"
           }
         }
       }
@@ -4579,7 +4649,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "リカバリアップデートを安全に停止しました: %@"
           }
         }
@@ -4589,7 +4659,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "更新の目安"
           }
         }
@@ -4599,7 +4669,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "自動的に更新"
           }
         }
@@ -4610,7 +4680,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "いま更新"
+            "value" : "今すぐ更新"
           }
         }
       }
@@ -4619,7 +4689,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "リリースノート"
           }
         }
@@ -4629,7 +4699,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "リマインダー"
           }
         }
@@ -4639,7 +4709,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "リマインダー"
           }
         }
@@ -4649,7 +4719,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "リマインダーアプリ"
           }
         }
@@ -4659,7 +4729,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "リマインダーはウォッチのリマインダーアプリに送信され、時間になると振動でお知らせします。"
           }
         }
@@ -4669,7 +4739,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "リモコン"
           }
         }
@@ -4679,7 +4749,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "削除"
           }
         }
@@ -4689,7 +4759,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "“%@”を削除しますか?"
           }
         }
@@ -4699,18 +4769,18 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "選択した%lld件を削除しますか?"
           }
         }
       }
     },
-    "Remove Application" : {
+    "Remove App" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アプリケーションを削除"
+            "state" : "translated",
+            "value" : "アプリを削除"
           }
         }
       }
@@ -4719,8 +4789,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "選択したアプリケーションを削除"
+            "state" : "translated",
+            "value" : "選択したアプリを削除"
           }
         }
       }
@@ -4729,18 +4799,18 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "削除されました"
           }
         }
       }
     },
-    "Removing application…" : {
+    "Removing app…" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アプリケーションを削除中…"
+            "state" : "translated",
+            "value" : "アプリを削除中…"
           }
         }
       }
@@ -4749,7 +4819,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "置き換え前"
           }
         }
@@ -4759,7 +4829,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "リセット"
           }
         }
@@ -4769,8 +4839,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "“%@”をリカバリファームウェアで再起動しますか?"
+            "state" : "translated",
+            "value" : "%@をリカバリファームウェアで再起動しますか?"
           }
         }
       }
@@ -4779,8 +4849,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "“%@”を再起動しますか?"
+            "state" : "translated",
+            "value" : "%@を再起動しますか?"
           }
         }
       }
@@ -4789,7 +4859,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチを再起動"
           }
         }
@@ -4799,7 +4869,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "リカバリファームウェアで再起動"
           }
         }
@@ -4809,7 +4879,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "安静時"
           }
         }
@@ -4819,7 +4889,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "制限あり"
           }
         }
@@ -4829,7 +4899,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ルール"
           }
         }
@@ -4839,7 +4909,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "リカバリファームウェアで動作中"
           }
         }
@@ -4849,7 +4919,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "SOS"
           }
         }
@@ -4859,8 +4929,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "OSの設定と同じ"
+            "state" : "translated",
+            "value" : "この端末と同じ"
           }
         }
       }
@@ -4869,7 +4939,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "保存されたウォッチを読み込めませんでした。"
           }
         }
@@ -4879,8 +4949,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "保存しました。接続していないPebbleには、接続したときに伝えます。"
+            "state" : "translated",
+            "value" : "保存しました。接続していないPebbleには、次回の接続時に反映されます。"
           }
         }
       }
@@ -4889,7 +4959,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチを検索中…"
           }
         }
@@ -4899,7 +4969,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "スケジュール"
           }
         }
@@ -4909,8 +4979,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "スケジュール"
+            "state" : "translated",
+            "value" : "スケジュールを使用"
           }
         }
       }
@@ -4919,7 +4989,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "画面"
           }
         }
@@ -4929,8 +4999,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "%@のスクリーンショット"
+            "state" : "translated",
+            "value" : "“%@”のスクリーンショット"
           }
         }
       }
@@ -4939,7 +5009,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "スクリーンショット"
           }
         }
@@ -4949,7 +5019,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ストアを検索"
           }
         }
@@ -4959,7 +5029,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "テスト通知を送信"
           }
         }
@@ -4969,7 +5039,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチに送信"
           }
         }
@@ -4989,8 +5059,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "接続が通知を運べるか確認するため、サンプル通知をウォッチに送ります。"
+            "state" : "translated",
+            "value" : "サンプルの通知をウォッチに送信して、通知が届くかどうかを確認します。"
           }
         }
       }
@@ -4999,7 +5069,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "送信した通知"
           }
         }
@@ -5009,7 +5079,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "シリアル番号"
           }
         }
@@ -5019,7 +5089,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "%@を設定"
           }
         }
@@ -5029,7 +5099,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "接続を設定中…"
           }
         }
@@ -5039,7 +5109,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "設定"
           }
         }
@@ -5049,7 +5119,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "設定を利用できません"
           }
         }
@@ -5059,7 +5129,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "設定が完了しました"
           }
         }
@@ -5069,7 +5139,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "クラッシュレポートを共有"
           }
         }
@@ -5079,7 +5149,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "診断レポートを共有"
           }
         }
@@ -5089,7 +5159,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "書き出したデータを共有"
           }
         }
@@ -5099,7 +5169,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ログを共有"
           }
         }
@@ -5109,18 +5179,18 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "スクリーンショットを共有"
           }
         }
       }
     },
-    "Shown in the launcher beside the app, so that its state can be read without opening it." : {
+    "Shown in the launcher under the app's name, so that its state can be read without opening it." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ランチャーでアプリ名の隣に表示されます。アプリを開かなくても状態が分かります。"
+            "state" : "translated",
+            "value" : "ランチャーでアプリ名の下に表示されるため、アプリを開かなくても状態を確認できます。"
           }
         }
       }
@@ -5129,7 +5199,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "サイズ"
           }
         }
@@ -5139,7 +5209,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "睡眠"
           }
         }
@@ -5149,7 +5219,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "睡眠のインサイト"
           }
         }
@@ -5159,8 +5229,18 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "小"
+          }
+        }
+      }
+    },
+    "Software" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ソフトウェア"
           }
         }
       }
@@ -5179,7 +5259,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "話す言語"
           }
         }
@@ -5189,7 +5269,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "標準"
           }
         }
@@ -5199,7 +5279,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "スタンバイモード"
           }
         }
@@ -5209,7 +5289,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "開始"
           }
         }
@@ -5219,7 +5299,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "リカバリファームウェアのインストールを開始"
           }
         }
@@ -5239,7 +5319,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "状態"
           }
         }
@@ -5249,7 +5329,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "状態"
           }
         }
@@ -5259,7 +5339,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "歩数"
           }
         }
@@ -5269,7 +5349,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチが記録した歩数と睡眠を“ヘルスケア”に書き込み、iPhoneが記録したデータと並べて表示します。"
           }
         }
@@ -5279,7 +5359,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "停止"
           }
         }
@@ -5299,18 +5379,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "停止"
-          }
-        }
-      }
-    },
-    "Stops Being True" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "有効期限を設ける"
+            "state" : "translated",
+            "value" : "停止済み"
           }
         }
       }
@@ -5319,7 +5389,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ストア"
           }
         }
@@ -5329,7 +5399,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ストア検索"
           }
         }
@@ -5339,7 +5409,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "カレンダーを同期"
           }
         }
@@ -5349,8 +5419,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ヘルスケアデータを同期"
+            "state" : "translated",
+            "value" : "健康データを同期"
           }
         }
       }
@@ -5359,7 +5429,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "リマインダーを同期"
           }
         }
@@ -5369,18 +5439,18 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "“ヘルスケア”と同期"
           }
         }
       }
     },
-    "Synchronizing applications…" : {
+    "Synchronizing apps…" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アプリケーションを同期中…"
+            "state" : "translated",
+            "value" : "アプリを同期中…"
           }
         }
       }
@@ -5389,7 +5459,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "システム通知は、Apple Notification Center Serviceを使用してペアリング済みのPebbleに直接配信されます。このスイッチでは、インストール済みのウォッチアプリが作成する通知を制御できます。テスト通知は各ウォッチの詳細ページから送信できます。"
           }
         }
@@ -5399,7 +5469,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "スクリーンショットを撮る"
           }
         }
@@ -5409,7 +5479,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "タップ"
           }
         }
@@ -5419,8 +5489,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチの充電が完了したとき、または新しいPebbleOSが公開されたときに、iPhoneに通知します。オンにすると、通知の許可を求められます。"
+            "state" : "translated",
+            "value" : "ウォッチの充電が完了したとき、または新しいPebbleOSが公開されたときに、この端末に通知します。オンにすると、通知の許可を求められます。"
           }
         }
       }
@@ -5439,7 +5509,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "テスト通知を送信しました。"
           }
         }
@@ -5449,7 +5519,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "文字"
           }
         }
@@ -5459,7 +5529,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "文字サイズ"
           }
         }
@@ -5470,7 +5540,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "その言語パックを読み込めませんでした。"
+            "value" : "この言語パックを読み込めませんでした。"
           }
         }
       }
@@ -5479,7 +5549,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "その時刻は過ぎているため、リマインダーはここに保存し、ウォッチには送りません。"
           }
         }
@@ -5489,28 +5559,28 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "アプリのアイコン"
           }
         }
       }
     },
-    "The PBW package contains mismatched application identifiers." : {
+    "The PBW package contains mismatched app identifiers." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "PBWパッケージ内のアプリケーション識別子が一致していません。"
+            "state" : "translated",
+            "value" : "PBWパッケージ内のアプリ識別子が一致していません。"
           }
         }
       }
     },
-    "The PBW package does not contain an application executable." : {
+    "The PBW package does not contain an app executable." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "PBWパッケージにアプリケーションの実行ファイルが含まれていません。"
+            "state" : "translated",
+            "value" : "PBWパッケージにアプリの実行ファイルが含まれていません。"
           }
         }
       }
@@ -5519,8 +5589,18 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "リマインダーアプリを読み込めませんでした。"
+            "state" : "translated",
+            "value" : "“リマインダー”のデータを読み込めませんでした。"
+          }
+        }
+      }
+    },
+    "The app and its settings will be removed. A Pebble that is not connected is told the next time it is." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリとその設定を削除します。接続していないPebbleには、次回の接続時に反映されます。"
           }
         }
       }
@@ -5529,7 +5609,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "アプリカタログのキャッシュを読み込めませんでした。"
           }
         }
@@ -5539,78 +5619,68 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "アプリカタログを更新できませんでした。"
           }
         }
       }
     },
-    "The application and its settings will be removed. A Pebble that is not connected is told the next time it is." : {
+    "The app library could not be read: %@" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "アプリケーションとその設定を削除します。接続していないPebbleには、次に接続したときに伝えます。"
+            "value" : "アプリライブラリを読み込めませんでした: %@"
           }
         }
       }
     },
-    "The application library could not be read: %@" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アプリケーションライブラリを読み込めませんでした: %@"
-          }
-        }
-      }
-    },
-    "The application operation could not be completed. %@" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アプリケーションの操作を完了できませんでした。%@"
-          }
-        }
-      }
-    },
-    "The application requested an unsafe settings URL." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アプリケーションが安全でない設定URLを要求しました。"
-          }
-        }
-      }
-    },
-    "The application settings could not be opened." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アプリケーションの設定を開けませんでした。"
-          }
-        }
-      }
-    },
-    "The application transfer was interrupted. The application library was left as it was." : {
+    "The app operation could not be completed. %@" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "アプリケーションの転送が中断されました。アプリケーションライブラリは元のままです。"
+            "value" : "アプリの操作を完了できませんでした。%@"
           }
         }
       }
     },
-    "The applications and their settings will be removed. A Pebble that is not connected is told the next time it is." : {
+    "The app requested an unsafe settings URL." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アプリケーションとその設定を削除します。接続していないPebbleには、次に接続したときに伝えます。"
+            "state" : "translated",
+            "value" : "アプリが安全でない設定URLを要求しました。"
+          }
+        }
+      }
+    },
+    "The app transfer was interrupted. The app library was left as it was." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリの転送が中断されました。アプリライブラリは元のままです。"
+          }
+        }
+      }
+    },
+    "The app's settings could not be opened." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリの設定を開けませんでした。"
+          }
+        }
+      }
+    },
+    "The apps and their settings will be removed. A Pebble that is not connected is told the next time it is." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択したアプリとその設定を削除します。接続していないPebbleには、次回の接続時に反映されます。"
           }
         }
       }
@@ -5619,7 +5689,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "自動接続の設定を保存できませんでした。"
           }
         }
@@ -5629,7 +5699,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "カタログのパッケージが拒否されました: %@"
           }
         }
@@ -5639,7 +5709,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "カタログが安全でないダウンロードURLを返しました。"
           }
         }
@@ -5649,7 +5719,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "変更内容を保存できませんでした。"
           }
         }
@@ -5659,7 +5729,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "コレクションを取得できませんでした。"
           }
         }
@@ -5669,8 +5739,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "接続に失敗しました。ウォッチがこのデバイスとのペアリング情報を破棄しています。Pebbleはペアリングを1つしか保持しないため、ほかのiPhoneやコンピュータとペアリングするとこうなります。“設定”のBluetoothでこのウォッチの登録を解除してから、もう一度ペアリングしてください。"
+            "state" : "translated",
+            "value" : "接続に失敗しました。ウォッチがこの端末とのペアリング情報を破棄しました。Pebbleが保持できるペアリングは1つだけなので、ほかのiPhoneやコンピュータとペアリングするとこうなります。システムのBluetooth設定でこのウォッチの登録を解除してから、ここでもう一度ペアリングしてください。"
           }
         }
       }
@@ -5679,7 +5749,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "クラッシュレポートを読み取れませんでした。"
           }
         }
@@ -5689,7 +5759,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "診断レポートを作成できませんでした。"
           }
         }
@@ -5699,7 +5769,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ダウンロードにはネットワークだけが必要です。このウォッチが接続され次第、インストールが始まります。"
           }
         }
@@ -5709,7 +5779,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチが前回予期せず再起動したときに保存したダンプです。一度取得すると既読として記録されるため、もう一度取得しても何も見つかりません。"
           }
         }
@@ -5719,7 +5789,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ファームウェアのアップデートは途中で停止しました。準備ができたら再開してください。"
           }
         }
@@ -5746,7 +5816,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“%@”の予報を取得できませんでした。ネットワークから応答がありません。"
+            "value" : "“%@”の予報を取得できませんでした。ネットワークから応答がありませんでした。"
           }
         }
       }
@@ -5756,7 +5826,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“%@”の予報がWeatherKitに拒否されました。このアプリのIdentifierでWeatherKitが有効になっているか確認してください（反映まで最大30分かかります）。"
+            "value" : "“%@”の予報がWeatherKitに拒否されました。このアプリのApp IDでWeatherKit機能が有効になっているか確認してください。有効になるまで最大30分かかることがあります。"
           }
         }
       }
@@ -5765,7 +5835,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "履歴を消去できませんでした。"
           }
         }
@@ -5775,8 +5845,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "インストールが停止しました"
+            "state" : "translated",
+            "value" : "インストールが中断されました"
           }
         }
       }
@@ -5785,7 +5855,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ランチャーの一行を保存できませんでした。"
           }
         }
@@ -5795,7 +5865,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "リンクを開けませんでした。"
           }
         }
@@ -5805,7 +5875,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "リンク先のパッケージを読み込めませんでした。"
           }
         }
@@ -5815,8 +5885,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "パッケージが削除され、このアップデートは再開できなくなります。ウォッチは現在のファームウェアのまま動作します。"
+            "state" : "translated",
+            "value" : "パッケージを削除するため、このアップデートは再開できなくなります。ウォッチは現在のファームウェアのまま動作します。"
           }
         }
       }
@@ -5825,7 +5895,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "パッケージのリンクがhttpsではないため、届く内容がリンク先のものと異なる可能性があります。"
           }
         }
@@ -5845,7 +5915,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "リセットコマンドを送信できませんでした。"
           }
         }
@@ -5855,7 +5925,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "選択したPBWパッケージは無効か、不完全です。"
           }
         }
@@ -5865,8 +5935,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "選択したヘルスケアのアーカイブは無効か、対応していません。"
+            "state" : "translated",
+            "value" : "選択した健康データのアーカイブは無効か、対応していません。"
           }
         }
       }
@@ -5875,7 +5945,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "選択したウォッチは利用できなくなりました。もう一度スキャンしてください。"
           }
         }
@@ -5885,7 +5955,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ストアに接続できませんでした。"
           }
         }
@@ -5895,18 +5965,18 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ストアを検索できませんでした。"
           }
         }
       }
     },
-    "The store does not list this application." : {
+    "The store does not list this app." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "このアプリケーションはストアに掲載されていません。"
+            "state" : "translated",
+            "value" : "このアプリはストアに掲載されていません。"
           }
         }
       }
@@ -5915,8 +5985,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ストアに「%@」に一致するものはありませんでした。"
+            "state" : "translated",
+            "value" : "ストアで“%@”に一致するものは見つかりませんでした。"
           }
         }
       }
@@ -5925,7 +5995,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "“%@”の保存済みパッケージが見つかりません。もう一度読み込んでください。"
           }
         }
@@ -5935,7 +6005,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "テスト通知を送信できませんでした。"
           }
         }
@@ -5951,12 +6021,42 @@
         }
       }
     },
-    "The timeline queue is full. %lld removed event(s) are still waiting for the watch." : {
+    "The timeline queue is full. %lld removed events are still waiting for the watch." : {
       "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "The timeline queue is full. %lld removed event is still waiting for the watch."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "machine_translated",
+                  "value" : "The timeline queue is full. %lld removed events are still waiting for the watch."
+                }
+              }
+            }
+          }
+        },
         "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "タイムラインの送信待ちがいっぱいです。削除されたイベント%lld件が、まだウォッチへの反映を待っています。"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "タイムラインの送信待ちがいっぱいです。削除されたイベント%lld件が、まだウォッチへの反映を待っています。"
+                }
+              },
+              "zero" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "タイムラインの送信待ちがいっぱいです。削除されたイベント%lld件が、まだウォッチへの反映を待っています。"
+                }
+              }
+            }
           }
         }
       }
@@ -5965,7 +6065,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチが受け付けました。"
           }
         }
@@ -5975,7 +6075,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチがそのアプリからの通知を初めて検出したときに、アプリがここに追加されます。"
           }
         }
@@ -5985,8 +6085,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチにはすでに新しい内容があります。"
+            "state" : "translated",
+            "value" : "ウォッチにはすでにより新しいデータがあります。"
           }
         }
       }
@@ -6015,8 +6115,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ここで選ばないかぎり、ウォッチは自分の設定どおりに振動します。"
+            "state" : "translated",
+            "value" : "ここで選ばない場合、ウォッチは本体の設定どおりに振動します。"
           }
         }
       }
@@ -6025,7 +6125,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "完了するまでウォッチは使用できません。接続したまま近くに置いてください。"
           }
         }
@@ -6035,7 +6135,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチへの接続に失敗しました。ウォッチを近づけて、やり直してみてください。"
           }
         }
@@ -6045,7 +6145,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチの接続履歴を保存できませんでした。"
           }
         }
@@ -6055,7 +6155,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチの登録を解除できませんでした。"
           }
         }
@@ -6065,7 +6165,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "送った内容をウォッチが読み取れませんでした。"
           }
         }
@@ -6075,7 +6175,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチに保存できませんでした。"
           }
         }
@@ -6085,7 +6185,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチが受け付けませんでした。"
           }
         }
@@ -6095,7 +6195,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチが時間内に応答しませんでした。"
           }
         }
@@ -6105,7 +6205,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチの接続が解除されました。"
           }
         }
@@ -6115,7 +6215,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "再起動中は、ウォッチの接続が解除されます。"
           }
         }
@@ -6125,7 +6225,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "その変更はウォッチでは許可されていません。"
           }
         }
@@ -6135,18 +6235,18 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチが想定されるPebbleの接続サービスを提供していません。"
+            "state" : "translated",
+            "value" : "ウォッチに、必要なPebble接続サービスがありません。"
           }
         }
       }
     },
-    "The watch does not have enough space for this application." : {
+    "The watch does not have enough space for this app." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチにこのアプリケーション用の空き容量がありません。"
+            "state" : "translated",
+            "value" : "ウォッチの空き容量が足りないため、このアプリをインストールできません。"
           }
         }
       }
@@ -6155,7 +6255,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチはこれらの値を基準にワークアウトを評価します。安静時は上昇時より低く、上昇時は最大より低く、各ゾーンは前のゾーンより高い値から始まります。"
           }
         }
@@ -6165,8 +6265,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチは、知っているアプリには独自のロゴを表示します。ここでアイコンを選ぶのは、ウォッチが知らないアプリのためです。"
+            "state" : "translated",
+            "value" : "ウォッチが認識しているアプリには、ウォッチ独自のロゴが表示されます。ここで選ぶアイコンは、それ以外のアプリに使われます。"
           }
         }
       }
@@ -6175,7 +6275,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチに未読のクラッシュレポートはありません。"
           }
         }
@@ -6185,38 +6285,38 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチにクラッシュレポートはありません。"
           }
         }
       }
     },
-    "The watch is already processing another application change. Please try again." : {
+    "The watch is already processing another app change. Please try again." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチは別のアプリケーションの変更を処理中です。やり直してみてください。"
+            "state" : "translated",
+            "value" : "ウォッチは別のアプリの変更を処理中です。やり直してみてください。"
           }
         }
       }
     },
-    "The watch is already updating the application order." : {
+    "The watch is already updating the app order." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチはすでにアプリケーションの並び順を更新しています。"
+            "state" : "translated",
+            "value" : "ウォッチはすでにアプリの並び順を更新中です。"
           }
         }
       }
     },
-    "The watch is busy. Please try changing the application order again." : {
+    "The watch is busy. Please try changing the app order again." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチがビジー状態です。アプリケーションの並び順の変更をやり直してみてください。"
+            "state" : "translated",
+            "value" : "ウォッチが処理中です。アプリの並び順の変更をやり直してみてください。"
           }
         }
       }
@@ -6225,8 +6325,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチがビジー状態です。しばらく待ってからやり直してみてください。"
+            "state" : "translated",
+            "value" : "ウォッチが処理中です。しばらく待ってからやり直してみてください。"
           }
         }
       }
@@ -6235,8 +6335,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチが処理中です。少し待ってからもう一度お試しください。"
+            "state" : "translated",
+            "value" : "ウォッチが処理中です。少し待ってからやり直してみてください。"
           }
         }
       }
@@ -6245,8 +6345,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチを消去しています。ウォッチはこの端末を忘れたため、こちらでも登録を解除するまで再接続できません。"
+            "state" : "translated",
+            "value" : "ウォッチを消去しています。ウォッチ側でこの端末とのペアリング情報が消えたため、こちらでも登録を解除するまで再接続できません。"
           }
         }
       }
@@ -6255,7 +6355,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチをリカバリファームウェアで再起動しています。"
           }
         }
@@ -6265,7 +6365,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチを再起動しています。"
           }
         }
@@ -6275,18 +6375,18 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチが前の変更をまだ処理しています。"
           }
         }
       }
     },
-    "The watch is told about this application the next time it connects." : {
+    "The watch is told about this app the next time it connects." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "このアプリケーションは、次にウォッチが接続したときに伝えられます。"
+            "state" : "translated",
+            "value" : "次にウォッチが接続したときに、このアプリのことがウォッチに伝えられます。"
           }
         }
       }
@@ -6295,8 +6395,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチが今それを使用中です。"
+            "state" : "translated",
+            "value" : "ウォッチで使用中です。"
           }
         }
       }
@@ -6305,7 +6405,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチは起動ごとのログをフラッシュメモリに保存しています。取得すると、ウォッチがこれ以上ないと応答するまで読み出します。"
           }
         }
@@ -6315,8 +6415,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチは渡された数値をそのまま保持するため、この単位で送信します。距離と風速の単位はウォッチ本体の設定で、“ウォッチ設定”画面にあります。"
+            "state" : "translated",
+            "value" : "ウォッチは渡された数値をそのまま保持するため、この単位で送信します。距離と風速の単位はウォッチ本体の設定で、ウォッチの“設定”画面にあります。"
           }
         }
       }
@@ -6325,7 +6425,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチにはもうありません。"
           }
         }
@@ -6335,8 +6435,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチが録音した音声を、このiPhone上で文字に変換します。音声はどこにも送信されません。オンにすると、選んだ言語に対応した認識モデルをダウンロードします。"
+            "state" : "translated",
+            "value" : "ウォッチが録音した音声を、この端末上で文字に変換します。音声はどこにも送信されません。オンにすると、選んだ言語に対応した認識モデルをダウンロードします。"
           }
         }
       }
@@ -6345,48 +6445,48 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチがヘルスケアデータの同期を拒否しました。"
+            "state" : "translated",
+            "value" : "ウォッチが健康データの同期を拒否しました。"
           }
         }
       }
     },
-    "The watch rejected the application change." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチがアプリケーションの変更を拒否しました。"
-          }
-        }
-      }
-    },
-    "The watch rejected the application data. The application library was left as it was." : {
+    "The watch rejected the app change." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ウォッチがアプリケーションのデータを拒否しました。アプリケーションライブラリは元のままです。"
+            "value" : "ウォッチがアプリの変更を拒否しました。"
           }
         }
       }
     },
-    "The watch rejected the application order. The previous order was restored." : {
+    "The watch rejected the app data. The library was left as it was." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチがアプリケーションの並び順を拒否しました。以前の並び順に戻しました。"
+            "state" : "translated",
+            "value" : "ウォッチがアプリのデータを拒否しました。ライブラリは元のままです。"
           }
         }
       }
     },
-    "The watch requested an application that does not match the stored PBW package." : {
+    "The watch rejected the app order. The previous order was restored." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチが、保存されているPBWパッケージと一致しないアプリケーションを要求しました。"
+            "state" : "translated",
+            "value" : "ウォッチがアプリの並び順を拒否しました。以前の並び順に戻しました。"
+          }
+        }
+      }
+    },
+    "The watch requested an app that does not match the stored PBW package." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ウォッチが、保存されているPBWパッケージと一致しないアプリを要求しました。"
           }
         }
       }
@@ -6395,7 +6495,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチがリカバリファームウェアで再起動します。この状態では、ファームウェアのアップデートのみ利用できます。"
           }
         }
@@ -6405,7 +6505,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチは応答を返さずに再起動するため、接続はすぐに解除されます。工場出荷時の状態にリセットすると、ウォッチに保存されているすべてのデータが消去されます。"
           }
         }
@@ -6415,7 +6515,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチのログの取得が途中で停止しました。"
           }
         }
@@ -6425,7 +6525,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ファームウェアをインストールすると、ウォッチは再び使えるようになります。"
           }
         }
@@ -6435,7 +6535,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチはこれらの値からカロリーと距離を算出します。1つのレコードとして送信されるため、すべてまとめて書き込まれます。"
           }
         }
@@ -6445,7 +6545,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチがスクリーンショットを送信しませんでした。"
           }
         }
@@ -6456,7 +6556,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ウォッチのヘルスケアデータを保存しましたが、“ヘルスケア”には追加できませんでした。"
+            "value" : "ウォッチの健康データを保存しましたが、“ヘルスケア”には追加できませんでした。"
           }
         }
       }
@@ -6465,18 +6565,18 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチの画面"
           }
         }
       }
     },
-    "The watch's screen has four levels of each colour, so a colour picked here becomes the nearest one it can show. Until one is picked, the watch uses the colours it already has for this app." : {
+    "The watch's screen has four levels of each color, so a color picked here becomes the nearest one it can show. Until one is picked, the watch uses the colors it already has for this app." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチの画面は各色に4段階しかないため、ここで選んだ色は表示できるいちばん近い色になります。選ぶまでは、このアプリにウォッチがすでに使っている色のままです。"
+            "state" : "translated",
+            "value" : "ウォッチの画面は各色を4段階で表示するため、ここで選んだ色は表示できるいちばん近い色になります。選ぶまでは、ウォッチがこのアプリにすでに使っている色で表示されます。"
           }
         }
       }
@@ -6485,7 +6585,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチのタイムラインを消去し、アプリが持っているピンを書き込み直しました。"
           }
         }
@@ -6495,7 +6595,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチのタイムラインを消去しました。アプリが持っているピンを送信しています…"
           }
         }
@@ -6505,8 +6605,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチフェイスを使用できませんでした。"
+            "state" : "translated",
+            "value" : "文字盤を適用できませんでした。"
           }
         }
       }
@@ -6515,8 +6615,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "語句はテキストのどこにあっても一致します。ウォッチは1文字ずつ比較し、大文字と小文字の同一視は英字にのみ行います。"
+            "state" : "translated",
+            "value" : "語句はテキスト内のどこにあっても一致します。ウォッチは1文字ずつ比較し、大文字と小文字を区別しないのは英字だけです。"
           }
         }
       }
@@ -6525,7 +6625,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチに空き容量がありません。"
           }
         }
@@ -6535,7 +6635,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "これらはウォッチ本体の設定です。接続するたびに書き込まれるため、こちらの内容が優先されます。"
           }
         }
@@ -6545,28 +6645,28 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "このアップデート"
           }
         }
       }
     },
-    "This application does not support the connected Pebble model." : {
+    "This app does not support the connected Pebble model." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "このアプリケーションは接続中のPebbleのモデルに対応していません。"
+            "state" : "translated",
+            "value" : "このアプリは接続中のPebbleのモデルに対応していません。"
           }
         }
       }
     },
-    "This application is no longer in the library." : {
+    "This app is no longer in the library." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "このアプリケーションはライブラリにありません。"
+            "state" : "translated",
+            "value" : "このアプリはライブラリにありません。"
           }
         }
       }
@@ -6575,7 +6675,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "これはリンクから届いたものです。ここで選ばないかぎりインストールされません。"
           }
         }
@@ -6585,7 +6685,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "この変更内容を保存できませんでした。いまは有効ですが、次回の起動時には失われます。"
           }
         }
@@ -6595,7 +6695,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "このコレクションは空です。"
           }
         }
@@ -6605,7 +6705,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "このファームウェアでは対応していません。"
           }
         }
@@ -6615,7 +6715,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "このファームウェアには保存先がありません。"
           }
         }
@@ -6635,7 +6735,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "このリンクは設定ページのもので、そこでしか意味を持ちません。"
           }
         }
@@ -6645,8 +6745,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "このアプリが知らないリンクです。"
+            "state" : "translated",
+            "value" : "このアプリでは扱えないリンクです。"
           }
         }
       }
@@ -6655,7 +6755,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ローカルに保存されている歩数と睡眠の履歴が削除されます。この操作は取り消せません。"
           }
         }
@@ -6675,7 +6775,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "このウォッチは接続はできますが応答しません。ウォッチを再起動するか、ここで登録を解除して追加し直してください。"
           }
         }
@@ -6685,7 +6785,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "このウォッチにはアプリがインストールされていないため、一行を受け付けません。先にアプリをインストールしてください。"
           }
         }
@@ -6695,7 +6795,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "このウォッチはリカバリファームウェアで起動しています。PebbleOSをインストールすると、また使えるようになります。"
           }
         }
@@ -6705,7 +6805,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "このウォッチのファームウェアは通知をフィルタできないため、対応したウォッチが接続するまでルールはここに保存されます。"
           }
         }
@@ -6715,8 +6815,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "このウォッチのファームウェアは自分の設定で選んだ振動を鳴らすため、ほかのパターンを指定できません。"
+            "state" : "translated",
+            "value" : "このウォッチのファームウェアは本体の設定で選んだ振動パターンを使うため、ここでは指定できません。"
           }
         }
       }
@@ -6725,7 +6825,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "時刻"
           }
         }
@@ -6735,7 +6835,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "タイムライン"
           }
         }
@@ -6745,7 +6845,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "タイムラインピン"
           }
         }
@@ -6755,7 +6855,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "タイムラインクイックビュー"
           }
         }
@@ -6765,7 +6865,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "タイムラインの操作が完了しました。"
           }
         }
@@ -6775,7 +6875,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "タイムラインを読み込めませんでした。"
           }
         }
@@ -6785,7 +6885,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "タイムラインのピンは次回の接続時に送信されます。"
           }
         }
@@ -6795,7 +6895,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "タイムラインのピンを保存しました。"
           }
         }
@@ -6805,7 +6905,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "タイトル"
           }
         }
@@ -6815,7 +6915,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "タイトルまたは本文"
           }
         }
@@ -6825,7 +6925,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "今日"
           }
         }
@@ -6835,8 +6935,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ツール＆ユーティリティ"
+            "state" : "translated",
+            "value" : "ツールとユーティリティ"
           }
         }
       }
@@ -6845,7 +6945,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "おすすめ（毎日更新）"
           }
         }
@@ -6865,7 +6965,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "アクティビティの記録"
           }
         }
@@ -6875,7 +6975,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "記録日数"
           }
         }
@@ -6885,7 +6985,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "転送中"
           }
         }
@@ -6895,7 +6995,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "検証済みのファームウェアを転送中…"
           }
         }
@@ -6905,7 +7005,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "3回"
           }
         }
@@ -6915,7 +7015,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "やり直す"
           }
         }
@@ -6925,7 +7025,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "オンにすると、システムに許可を求めます。オフのままにしたものは、あとから“設定”でオンにできます。"
           }
         }
@@ -6935,7 +7035,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチ本体のリマインダーアプリを有効にします。“タイムライン”画面で追加したリマインダーは、このアプリに表示されます。"
           }
         }
@@ -6945,7 +7045,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ツー"
           }
         }
@@ -6955,7 +7055,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "種類"
           }
         }
@@ -6965,7 +7065,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "利用不可"
           }
         }
@@ -6975,7 +7075,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "アプリ名の下"
           }
         }
@@ -6985,7 +7085,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "単位"
           }
         }
@@ -6995,7 +7095,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "不明"
           }
         }
@@ -7005,7 +7105,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "名称不明のアプリ"
           }
         }
@@ -7015,7 +7115,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "アップデート"
           }
         }
@@ -7035,28 +7135,18 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "更新"
           }
         }
       }
     },
-    "Updating application order…" : {
+    "Updating app order…" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アプリケーションの並び順を更新中…"
-          }
-        }
-      }
-    },
-    "Upper and lower case must match" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "大文字と小文字を区別します"
+            "state" : "translated",
+            "value" : "アプリの並び順を更新中…"
           }
         }
       }
@@ -7075,8 +7165,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "使うもの"
+            "state" : "translated",
+            "value" : "使用する機能"
           }
         }
       }
@@ -7085,7 +7175,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "検証済み"
           }
         }
@@ -7095,7 +7185,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ファームウェアを検証中…"
           }
         }
@@ -7105,7 +7195,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "バージョン"
           }
         }
@@ -7115,7 +7205,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "バージョン履歴"
           }
         }
@@ -7125,8 +7215,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "バイブレーション"
+            "state" : "translated",
+            "value" : "振動"
           }
         }
       }
@@ -7135,7 +7225,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ストアで表示"
           }
         }
@@ -7145,7 +7235,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "音声"
           }
         }
@@ -7155,7 +7245,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "音量コントロール"
           }
         }
@@ -7165,7 +7255,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "再起動を待機中"
           }
         }
@@ -7175,7 +7265,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "警告"
           }
         }
@@ -7185,7 +7275,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチ"
           }
         }
@@ -7195,7 +7285,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチアプリ"
           }
         }
@@ -7205,7 +7295,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチアプリの通知"
           }
         }
@@ -7215,7 +7305,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチアプリ"
           }
         }
@@ -7225,7 +7315,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチのログ"
           }
         }
@@ -7235,7 +7325,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチアプリ"
           }
         }
@@ -7245,7 +7335,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチアプリの通知とテスト通知は、送信されるとここに表示されます。"
           }
         }
@@ -7255,7 +7345,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチアプリの通知は無効です。"
           }
         }
@@ -7265,7 +7355,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチアプリの通知は有効です。"
           }
         }
@@ -7275,8 +7365,18 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチのヘルスケアデータを保存できませんでした。"
+            "state" : "translated",
+            "value" : "ウォッチの健康データを保存できませんでした。"
+          }
+        }
+      }
+    },
+    "Watches" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ウォッチ"
           }
         }
       }
@@ -7285,8 +7385,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチフェイス"
+            "state" : "translated",
+            "value" : "文字盤"
           }
         }
       }
@@ -7295,8 +7395,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ウォッチフェイス"
+            "state" : "translated",
+            "value" : "文字盤"
           }
         }
       }
@@ -7325,8 +7425,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "手入力した地点ではなく、iPhoneがある場所の天気を表示します。"
+            "state" : "translated",
+            "value" : "手入力した地点ではなく、現在地の天気を表示します。"
           }
         }
       }
@@ -7335,7 +7435,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "週"
           }
         }
@@ -7345,7 +7445,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "平日"
           }
         }
@@ -7355,7 +7455,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "週末"
           }
         }
@@ -7365,18 +7465,18 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "体重: %@"
           }
         }
       }
     },
-    "What the application says it uses. Nothing here is a permission you have given; the phone asks for its own when a feature needs one." : {
+    "What the app says it uses. Nothing here is a permission you have given; the phone asks for its own when a feature needs one." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "アプリが使うと自ら述べている内容です。ここに挙がっているものは、どれも許可を与えたものではありません。iPhone側の許可は、その機能が必要になったときに改めて求められます。"
+            "state" : "translated",
+            "value" : "アプリ自身が使用すると申告している機能です。ここにあるものは、どれも許可を与えたものではありません。許可は、機能が必要になったときに改めて求められます。"
           }
         }
       }
@@ -7385,7 +7485,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "オンのあいだにウォッチ上のアプリが書き出した内容です。ウォッチは次回の接続時にこの設定を忘れるため、接続のたびに設定し直します。"
           }
         }
@@ -7395,8 +7495,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "iPhoneのリマインダーアプリにあるものもここに表示されます。ここで削除すると、リマインダーアプリからも削除されます。"
+            "state" : "translated",
+            "value" : "“リマインダー”にあるものもここに表示されます。ここで削除すると、“リマインダー”からも削除されます。"
           }
         }
       }
@@ -7405,7 +7505,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ウォッチが使えるもの"
           }
         }
@@ -7415,7 +7515,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "再生中にウォッチのミュージックアプリが表示する項目です。"
           }
         }
@@ -7425,8 +7525,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "このアプリが読み取りを許可されている項目です。“ヘルスケア”は、ヘルスケアデータへの書き込みが許可されているかどうかを示します。iOSには、読み取りが許可されたかどうかを確認する手段がないためです。"
+            "state" : "translated",
+            "value" : "このアプリが読み取りを許可されている項目です。“ヘルスケア”については書き込みが許可されているかどうかを表示します。iOSには、読み取りが許可されたかどうかを確認する方法がないためです。"
           }
         }
       }
@@ -7435,7 +7535,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "手順"
           }
         }
@@ -7455,7 +7555,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "風速"
           }
         }
@@ -7465,8 +7565,8 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "“予定のリマインダー”をオンにすると、予定に設定された各通知の時刻に、iPhoneと同じようにウォッチも振動でお知らせします。"
+            "state" : "translated",
+            "value" : "“予定のリマインダー”をオンにすると、この端末と同じように、予定に設定された各通知の時刻にウォッチも振動でお知らせします。"
           }
         }
       }
@@ -7475,7 +7575,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "探す語句"
           }
         }
@@ -7485,7 +7585,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ゾーン1"
           }
         }
@@ -7495,7 +7595,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ゾーン2"
           }
         }
@@ -7505,7 +7605,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "ゾーン3"
           }
         }
@@ -7515,7 +7615,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "km/h"
           }
         }
@@ -7525,7 +7625,7 @@
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "machine_translated",
+            "state" : "translated",
             "value" : "mph"
           }
         }

@@ -67,7 +67,7 @@ public enum AppSection: String, CaseIterable, Identifiable, Sendable {
     public var title: LocalizedStringKey {
         switch self {
         case .watches:
-            "Devices"
+            "Watches"
         case .apps:
             "Apps"
         case .timeline:

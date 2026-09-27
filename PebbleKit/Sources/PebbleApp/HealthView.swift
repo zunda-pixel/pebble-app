@@ -66,7 +66,7 @@ struct HealthContent: View {
             }
             .pickerStyle(.segmented)
             // At the top, because it says things that arrive on their own —
-            // "Received 3 health update(s) from the watch" turns up when the
+            // "Received 3 health updates from the watch" turns up when the
             // watch pushes them, and at the foot of the list it sat below two
             // charts where it would never be seen.
             FeedbackBanner(feedback: feedback)
@@ -252,7 +252,7 @@ struct HealthContent: View {
         HealthContent(
             samples: PreviewSamples.healthSamples,
             exportURL: nil,
-            feedback: .success("Received 3 health update(s) from the watch."),
+            feedback: .success("Received \(3) health updates from the watch."),
             isWatchConnected: true,
             requestWatchSync: {},
             synchronizeWithHealthKit: {},

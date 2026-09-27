@@ -102,7 +102,7 @@ struct AddWatchContent: View {
                     } header: {
                         Text("Already Paired")
                     } footer: {
-                        Text("A watch that is paired with this phone but has not been added here. It cannot be found by scanning; it appears when it reaches the app by itself.")
+                        Text("A watch that is already paired but has not been added here. It cannot be found by scanning; it appears when it reaches the app by itself.")
                     }
                 }
 

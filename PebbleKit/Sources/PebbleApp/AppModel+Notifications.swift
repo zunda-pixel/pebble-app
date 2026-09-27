@@ -461,7 +461,7 @@ extension AppModel {
         }
         // Said by count rather than by name: this takes a swipe on one row and
         // an edit-mode sweep over several, and the list is what is left.
-        notifications.sourceAppFeedback = .success("Forgot \(removed.count) app(s).")
+        notifications.sourceAppFeedback = .success("Forgot \(removed.count) apps.")
     }
 
     func handleAppMessage(_ message: AppMessageData, from connection: WatchConnection) async {

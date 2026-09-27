@@ -388,7 +388,7 @@ extension AppModel {
         }
         if operations.count > cap {
             timeline.feedback = .failure(
-                "The timeline queue is full. \(operations.count - cap) removed event(s) are still waiting for the watch."
+                "The timeline queue is full. \(operations.count - cap) removed events are still waiting for the watch."
             )
         }
     }

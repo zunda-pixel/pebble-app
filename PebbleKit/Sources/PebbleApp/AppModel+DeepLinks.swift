@@ -47,7 +47,7 @@ extension AppModel {
                 ids: [id],
                 source: selectedCatalogSource
             ).first else {
-                deepLinks.feedback = .failure("The store does not list this application.")
+                deepLinks.feedback = .failure("The store does not list this app.")
                 return
             }
             deepLinks.storeApplication = row

@@ -20,10 +20,9 @@ struct WatchInformationContent: View {
     /// Nil on a watch that never had one written, which is every watch that has
     /// not been through the factory step that writes it.
     var hardwareRevision: String?
-    /// The PebbleOS version the watch is running, shown here as well as on the
-    /// Firmware row — the Firmware row is where it is changed, this is where it
-    /// is read alongside the rest of what the watch is. Nil until a connection
-    /// reports it.
+    /// The PebbleOS version the watch is running. Software Update is where it
+    /// is changed; this is where it is read alongside the rest of what the
+    /// watch is. Nil until a connection reports it.
     var firmwareVersion: String?
 
     /// Whether there is anything here worth pushing a page for.
@@ -55,15 +54,17 @@ struct WatchInformationContent: View {
                 if let hardwareRevision {
                     LabeledContent("Hardware Revision", value: hardwareRevision)
                 }
-                // A version is a version in any language, so it is not
-                // translated.
-                if let firmwareVersion {
-                    LabeledContent("Firmware Version") { Text(verbatim: firmwareVersion) }
+            }
+            if let firmwareVersion {
+                Section("Software") {
+                    // A version is a version in any language, so it is not
+                    // translated.
+                    LabeledContent("Version") { Text(verbatim: firmwareVersion) }
                 }
             }
         }
         .formStyle(.grouped)
-        .navigationTitle(Text("General Information"))
+        .navigationTitle(Text("About"))
     }
 }
 

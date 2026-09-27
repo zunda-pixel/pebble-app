@@ -89,7 +89,7 @@ struct AppGlanceContent: View {
                     Text("Under the App's Name")
                 } footer: {
                     if isInstalled {
-                        Text("Shown in the launcher beside the app, so that its state can be read without opening it.")
+                        Text("Shown in the launcher under the app's name, so that its state can be read without opening it.")
                     } else {
                         Text("This watch does not have the app installed and will refuse a line for it. Install the app first.")
                     }
@@ -105,7 +105,7 @@ struct AppGlanceContent: View {
                 }
 
                 Section {
-                    Toggle("Stops Being True", isOn: $expires)
+                    Toggle("Expires", isOn: $expires)
                     if expires {
                         DatePicker("At", selection: $expiry)
                     }

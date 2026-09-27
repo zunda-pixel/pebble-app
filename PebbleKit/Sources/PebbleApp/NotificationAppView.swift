@@ -129,9 +129,9 @@ struct NotificationAppContent<RulesDestination: View>: View {
                     Button("Chosen by the Watch") { setColours(nil, nil) }
                 }
             } header: {
-                Text("Colours")
+                Text("Colors")
             } footer: {
-                Text("The watch's screen has four levels of each colour, so a colour picked here becomes the nearest one it can show. Until one is picked, the watch uses the colours it already has for this app.")
+                Text("The watch's screen has four levels of each color, so a color picked here becomes the nearest one it can show. Until one is picked, the watch uses the colors it already has for this app.")
             }
         }
         .formStyle(.grouped)
@@ -200,7 +200,7 @@ struct WatchColorPicker: View {
     }
 }
 
-#Preview("Colours") {
+#Preview("Colors") {
     Form {
         WatchColorPicker(
             label: Text("Background"),

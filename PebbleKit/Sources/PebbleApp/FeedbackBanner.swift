@@ -87,7 +87,7 @@ private struct FeedbackAge: View {
 #Preview("Said a while ago") {
     List {
         FeedbackBanner(feedback: .success(
-            "3 health update(s) received from the watch.",
+            "Received \(3) health updates from the watch.",
             at: Date(timeIntervalSinceNow: -3 * 60 * 60)
         ))
     }

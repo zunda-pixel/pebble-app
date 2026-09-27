@@ -57,7 +57,7 @@ struct NotificationRulesContent: View {
                     } label: {
                         Text(verbatim: rule.pattern)
                         if rule.isCaseSensitive {
-                            Text("Upper and lower case must match")
+                            Text("Match Case")
                         }
                     }
                 }
@@ -84,7 +84,7 @@ struct NotificationRulesContent: View {
                         Text(field.title).tag(field)
                     }
                 }
-                Toggle("Match Upper and Lower Case", isOn: $isCaseSensitive)
+                Toggle("Match Case", isOn: $isCaseSensitive)
                 Button("Add Rule") {
                     setRules(rules + [NotificationFilterRule(
                         pattern: trimmedPattern,

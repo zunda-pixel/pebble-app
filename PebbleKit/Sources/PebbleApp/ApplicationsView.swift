@@ -225,7 +225,7 @@ struct ApplicationsContent<Detail: View>: View {
                 ApplicationPlaceholderRow()
             }
             .redacted(reason: .placeholder)
-            .accessibilityLabel(Text("Loading applications"))
+            .accessibilityLabel(Text("Loading apps"))
         } else if watchApplications.isEmpty && watchfaces.isEmpty {
             ContentUnavailableView(
                 "No Apps",
@@ -293,12 +293,12 @@ struct ApplicationsContent<Detail: View>: View {
                     ),
                     presenting: applicationToRemove
                 ) { application in
-                    Button("Remove Application", role: .destructive) {
+                    Button("Remove App", role: .destructive) {
                         removeApplication(application.id)
                     }
                     Button(role: .cancel) {}
                 } message: { _ in
-                    Text("The application and its settings will be removed. A Pebble that is not connected is told the next time it is.")
+                    Text("The app and its settings will be removed. A Pebble that is not connected is told the next time it is.")
                 }
                 // A second alert, for the several ticked in edit mode at once.
                 .alert(
@@ -312,7 +312,7 @@ struct ApplicationsContent<Detail: View>: View {
                     }
                     Button(role: .cancel) {}
                 } message: {
-                    Text("The applications and their settings will be removed. A Pebble that is not connected is told the next time it is.")
+                    Text("The apps and their settings will be removed. A Pebble that is not connected is told the next time it is.")
                 }
                 .toolbar {
                     // The watch's launcher order is what reorder edits, so editing
@@ -607,7 +607,7 @@ struct ApplicationPlaceholderRow: View {
         HStack(spacing: 16) {
             Image(systemName: "square.grid.2x2")
             VStack(alignment: .leading, spacing: 4) {
-                Text("Application Name")
+                Text("App Name")
                     .font(.headline)
                 Text("Developer")
                     .font(.subheadline)
@@ -721,7 +721,7 @@ struct ApplicationPlaceholderRow: View {
             activeWatchfaceID: PreviewSamples.watchfaces.first?.id,
             installedApplicationIDs: nil,
             isLoading: false,
-            libraryFeedback: .failure("Another application operation is already in progress."),
+            libraryFeedback: .failure("Another app operation is already in progress."),
             operationFeedback: nil,
             isOperationInProgress: false,
             installingApplicationName: nil,
