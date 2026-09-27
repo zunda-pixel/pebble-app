@@ -88,7 +88,9 @@ extension AppModel {
             firmware[watchID].feedback = .progress("Looking for published firmware…")
             let release = try await firmwareCatalog.latestRelease(for: board)
             firmware[watchID].availableRelease = release
-            firmware[watchID].feedback = .success("PebbleOS \(release.versionTag) is available.")
+            // Nothing to say on success: the screen asks every time it opens,
+            // and a newer release already shows as the screen's status.
+            firmware[watchID].feedback = nil
         } catch {
             firmware[watchID].availableRelease = nil
             firmware[watchID].feedback = .failure("Published firmware could not be checked right now.")

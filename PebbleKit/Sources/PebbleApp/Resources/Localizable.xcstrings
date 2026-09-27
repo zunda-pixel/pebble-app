@@ -1219,16 +1219,6 @@
         }
       }
     },
-    "Board" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "ボード"
-          }
-        }
-      }
-    },
     "Body" : {
       "localizations" : {
         "ja" : {
@@ -1455,16 +1445,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "アップデートを確認"
-          }
-        }
-      }
-    },
-    "Check for updates to see what is published." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "公開されているバージョンを見るには、アップデートを確認してください。"
           }
         }
       }
@@ -4189,16 +4169,6 @@
         }
       }
     },
-    "PebbleOS %@" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "PebbleOS %@"
-          }
-        }
-      }
-    },
     "PebbleOS %@ is available for %@." : {
       "localizations" : {
         "en" : {
@@ -4211,16 +4181,6 @@
           "stringUnit" : {
             "state" : "machine_translated",
             "value" : "%2$@にPebbleOS %1$@が利用できます。"
-          }
-        }
-      }
-    },
-    "PebbleOS %@ is available." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "machine_translated",
-            "value" : "PebbleOS %@が利用できます。"
           }
         }
       }

@@ -10,7 +10,6 @@ struct FirmwareView: View {
         let state = model.firmware[watchID]
         FirmwareContent(
             installedVersion: summary.firmwareVersion,
-            board: summary.board,
             isConnected: summary.isConnected,
             isRunningRecoveryFirmware: summary.isRunningRecoveryFirmware,
             availableRelease: state.availableRelease.flatMap { $0.board == summary.board ? $0 : nil },
@@ -19,7 +18,7 @@ struct FirmwareView: View {
             progress: state.journal == nil ? nil : model.firmwareTransferProgress(on: watchID),
             feedback: state.feedback,
             requiresConfirmation: state.requiresConfirmation,
-            checkForUpdates: { Task { await model.checkForFirmwareUpdate(watchID: watchID) } },
+            checkForUpdates: { await model.checkForFirmwareUpdate(watchID: watchID) },
             download: { Task { await model.downloadAvailableFirmware(watchID: watchID) } },
             installDownloaded: { Task { await model.installDownloadedFirmware(watchID: watchID) } },
             installFile: { url in Task { await model.installFirmware(from: url, watchID: watchID) } },
@@ -28,12 +27,12 @@ struct FirmwareView: View {
             cancel: { Task { await model.cancelFirmwareUpdate(watchID: watchID) } },
             discard: { Task { await model.discardPendingFirmwareUpdate(watchID: watchID) } }
         )
+        .task { await model.checkForFirmwareUpdate(watchID: watchID) }
     }
 }
 
 struct FirmwareContent: View {
     var installedVersion: String?
-    var board: WatchBoard?
     var isConnected: Bool
     var isRunningRecoveryFirmware: Bool
     var availableRelease: PebbleOSFirmwareRelease?
@@ -42,7 +41,7 @@ struct FirmwareContent: View {
     var progress: PutBytesTransferProgress?
     var feedback: FeatureFeedback?
     var requiresConfirmation: Bool
-    var checkForUpdates: () -> Void
+    var checkForUpdates: () async -> Void
     var download: () -> Void
     var installDownloaded: () -> Void
     var installFile: (URL) -> Void
@@ -56,7 +55,9 @@ struct FirmwareContent: View {
     var body: some View {
         Form {
             Section {
-                FirmwareStatusRow(status: status)
+                if let status {
+                    FirmwareStatusRow(status: status)
+                }
                 if let progress, progress.totalBytes > 0 {
                     ProgressView(
                         value: Double(progress.bytesSent),
@@ -71,15 +72,7 @@ struct FirmwareContent: View {
                 FeedbackBanner(feedback: feedback)
             }
 
-            Section("On the Watch") {
-                LabeledContent("Version", value: installedVersion ?? "—")
-                if let board {
-                    LabeledContent("Board", value: board.rawValue)
-                }
-            }
-
             Section {
-                Button("Check for Updates", systemImage: "arrow.clockwise", action: checkForUpdates)
                 if let availableRelease {
                     LabeledContent("Published", value: availableRelease.versionTag)
                     if downloadedFirmware?.versionTag != availableRelease.versionTag {
@@ -144,6 +137,19 @@ struct FirmwareContent: View {
         }
         .formStyle(.grouped)
         .navigationTitle(Text("Software Update"))
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        // Awaited, so the indicator stays up until the catalogue has answered.
+        .refreshable { await checkForUpdates() }
+        #if os(macOS)
+        // A Mac list is not pulled down, so it keeps a button to ask with.
+        .toolbar {
+            Button("Check for Updates", systemImage: "arrow.clockwise") {
+                Task { await checkForUpdates() }
+            }
+        }
+        #endif
         .fileImporter(isPresented: $isChoosingFile, allowedContentTypes: [.pebbleFirmware]) { result in
             guard case .success(let url) = result else { return }
             installFile(url)
@@ -159,7 +165,9 @@ struct FirmwareContent: View {
 
     // An install under way beats one that stopped, which beats a watch that
     // cannot run the newest firmware.
-    private var status: FirmwareStatus {
+    /// Nil for a watch already on what is published: its version is on the
+    /// General Information screen, and a row saying so said nothing more.
+    private var status: FirmwareStatus? {
         if let journal, journal.phase == .transferring || journal.phase == .installing {
             return FirmwareStatus(
                 title: journal.targetVersion.map { "Installing PebbleOS \($0)" } ?? "Installing firmware",
@@ -212,13 +220,8 @@ struct FirmwareContent: View {
                 tint: .accentColor
             )
         }
-        if let installedVersion {
-            return FirmwareStatus(
-                title: "PebbleOS \(installedVersion)",
-                detail: "Check for updates to see what is published.",
-                systemImage: "checkmark.circle.fill",
-                tint: .green
-            )
+        if installedVersion != nil {
+            return nil
         }
         return FirmwareStatus(
             title: "Firmware unknown",
@@ -262,7 +265,6 @@ private struct FirmwareStatusRow: View {
     NavigationStack {
         FirmwareContent(
             installedVersion: "v4.36.2",
-            board: .obelixPVT,
             isConnected: true,
             isRunningRecoveryFirmware: false,
             availableRelease: nil,
@@ -287,7 +289,6 @@ private struct FirmwareStatusRow: View {
     NavigationStack {
         FirmwareContent(
             installedVersion: "v4.36.2",
-            board: .obelixPVT,
             isConnected: true,
             isRunningRecoveryFirmware: false,
             availableRelease: PreviewSamples.firmwareRelease,
@@ -312,7 +313,6 @@ private struct FirmwareStatusRow: View {
     NavigationStack {
         FirmwareContent(
             installedVersion: "v4.36.2",
-            board: .obelixPVT,
             isConnected: false,
             isRunningRecoveryFirmware: false,
             availableRelease: PreviewSamples.firmwareRelease,
@@ -337,7 +337,6 @@ private struct FirmwareStatusRow: View {
     NavigationStack {
         FirmwareContent(
             installedVersion: "v4.36.2",
-            board: .obelixPVT,
             isConnected: true,
             isRunningRecoveryFirmware: true,
             availableRelease: nil,
