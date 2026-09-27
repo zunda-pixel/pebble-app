@@ -60,7 +60,6 @@ public struct WatchHealthSample: Codable, Equatable, Identifiable, Sendable {
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         date = try container.decode(Date.self, forKey: .date)
         steps = try container.decode(Int.self, forKey: .steps)
         stepReadings = try container.decodeIfPresent([StepReading].self, forKey: .stepReadings) ?? []
@@ -80,6 +79,29 @@ public struct WatchHealthSample: Codable, Equatable, Identifiable, Sendable {
             ?? TimeZone.current.identifier
         source = try container.decodeIfPresent(WatchHealthDataSource.self, forKey: .source) ?? .watch
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? date
+        id = try container.decodeIfPresent(UUID.self, forKey: .id)
+            ?? Self.identifier(forDayAt: date, in: timeZoneIdentifier)
+    }
+
+    /// The identity of a day written before days had one of their own, made
+    /// from the day itself so that every read of the file gives the same one.
+    /// A random one per read was a new HealthKit sync identifier each time,
+    /// and the same minutes were written to Apple Health twice.
+    ///
+    /// FNV-1a rather than a cryptographic digest: this module stays on
+    /// Foundation, and the value only has to be stable, not secret.
+    static func identifier(forDayAt date: Date, in timeZoneIdentifier: String) -> UUID {
+        func fnv1a(_ bytes: some Sequence<UInt8>, seed: UInt64) -> UInt64 {
+            bytes.reduce(seed) { hash, byte in (hash ^ UInt64(byte)) &* 0x0000_0100_0000_01B3 }
+        }
+        let name = "\(Int64(date.timeIntervalSince1970.rounded()))|\(timeZoneIdentifier)"
+        let high = fnv1a(name.utf8, seed: 0xCBF2_9CE4_8422_2325)
+        let low = fnv1a(name.utf8.reversed(), seed: 0x84222325_CBF29CE4)
+        let bytes = high.bigEndianBytes + low.bigEndianBytes
+        return UUID(uuid: (
+            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
+        ))
     }
 }
 
@@ -165,6 +187,10 @@ public struct WatchHealthArchive: Codable, Equatable, Sendable {
     public var schemaVersion: Int = 1
     public var exportedAt: Date = Date()
     public var samples: [WatchHealthSample]
+}
+
+private struct WatchHealthArchiveVersion: Decodable {
+    var schemaVersion: Int
 }
 
 public actor WatchHealthStore {
@@ -313,7 +339,11 @@ public actor WatchHealthStore {
         }
     }
 
-    public func deleteAll() throws { try? FileManager.default.removeItem(at: fileURL) }
+    public func deleteAll() throws {
+        do {
+            try FileManager.default.removeItem(at: fileURL)
+        } catch CocoaError.fileNoSuchFile {}
+    }
     public func export() throws -> URL {
         let output = FileManager.default.temporaryDirectory.appending(path: "pebble-health.json")
         let archive = WatchHealthArchive(samples: try samples())
@@ -328,8 +358,12 @@ public actor WatchHealthStore {
         let data = try Data(contentsOf: url)
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        if let archive = try? decoder.decode(WatchHealthArchive.self, from: data) {
-            guard archive.schemaVersion == 1 else { throw WatchHealthArchiveError.unsupportedVersion }
+        // The version first, on its own: a later version's samples need not
+        // decode as these, and reading the whole archive first reported that
+        // as a malformed file of the oldest kind.
+        if let version = try? decoder.decode(WatchHealthArchiveVersion.self, from: data) {
+            guard version.schemaVersion == 1 else { throw WatchHealthArchiveError.unsupportedVersion }
+            let archive = try decoder.decode(WatchHealthArchive.self, from: data)
             return try merge(archive.samples.map { sample in
                 var value = sample
                 value.source = .imported
