@@ -19,7 +19,9 @@ struct RemindersAppItem: Equatable, Sendable {
 /// written to on a machine nobody has said yes on.
 @MainActor
 protocol RemindersAppStore {
-    func reminders() async throws -> [RemindersAppItem]
+    /// `allDayAt` is when a reminder with a date and no time is due: the hour
+    /// and minute the reader chose to match the Reminders app's own setting.
+    func reminders(allDayAt time: DateComponents) async throws -> [RemindersAppItem]
     func add(_ reminder: TimelinePin) async throws -> String
     func update(_ reminder: TimelinePin, identifier: String) async throws
     func remove(identifier: String) async throws
@@ -62,14 +64,15 @@ final class RemindersBridge: RemindersAppStore {
         }
     }
 
-    func reminders() async throws -> [RemindersAppItem] {
+    func reminders(allDayAt time: DateComponents) async throws -> [RemindersAppItem] {
         try requireAccess()
         let now = Date()
         // From the start of today: a reminder with a date and no time is due
         // at midnight to EventKit, and would otherwise be missed on its own day.
         return await eventKit.incompleteReminders(
             from: Calendar.current.startOfDay(for: now),
-            to: now.addingTimeInterval(Self.window)
+            to: now.addingTimeInterval(Self.window),
+            allDayAt: time
         )
     }
 
@@ -99,16 +102,9 @@ final class RemindersBridge: RemindersAppStore {
         // alarm here would have the phone buzz for it as well.
     }
 
-    nonisolated static func item(for reminder: EKReminder) -> RemindersAppItem? {
-        guard var components = reminder.dueDateComponents else { return nil }
-        // A reminder with a date and no time is one for that day, and the
-        // Reminders app tells of it in the morning. Read as it stands it was
-        // midnight, and the watch buzzed the reader awake for it.
-        if components.hour == nil {
-            components.hour = allDayReminderHour
-            components.minute = 0
-        }
-        guard let due = Calendar.current.date(from: components) else { return nil }
+    nonisolated static func item(for reminder: EKReminder, allDayAt time: DateComponents) -> RemindersAppItem? {
+        guard let components = reminder.dueDateComponents,
+              let due = dueDate(of: components, allDayAt: time) else { return nil }
         let identifier = reminder.calendarItemIdentifier
         return RemindersAppItem(
             identifier: identifier,
@@ -124,10 +120,23 @@ final class RemindersBridge: RemindersAppStore {
         )
     }
 
-    /// When a reminder with no time of its own is given to the watch: the
-    /// Reminders app's own default for all-day reminders. The reader's setting
-    /// for it is not something EventKit hands over.
-    nonisolated static let allDayReminderHour = 9
+    /// When the watch is to buzz for a reminder due on these components.
+    ///
+    /// A reminder with a date and no time is one for that day, and the
+    /// Reminders app tells of it at its Today Notification time. Read as it
+    /// stands it was midnight, and the watch buzzed the reader awake for it.
+    nonisolated static func dueDate(
+        of components: DateComponents,
+        allDayAt time: DateComponents,
+        in calendar: Calendar = .current
+    ) -> Date? {
+        var components = components
+        if components.hour == nil {
+            components.hour = time.hour ?? 9
+            components.minute = time.minute ?? 0
+        }
+        return calendar.date(from: components)
+    }
 
     /// What the watch is told made these reminders.
     nonisolated static let applicationID = UUID(uuid: (

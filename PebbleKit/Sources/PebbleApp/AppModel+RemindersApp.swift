@@ -1,4 +1,5 @@
 import PebbleProtocol
+import Defaults
 import Foundation
 import SwiftUI
 
@@ -13,6 +14,20 @@ extension AppModel {
             return
         }
         await reloadRemindersApp(reportsToReader: true)
+    }
+
+    /// When a reminder with a date and no time buzzes. Changed, the Reminders
+    /// app is read again, so the reminders already on the watch move with it.
+    public func setAllDayReminderTime(minutes: Int) async {
+        let minutes = min(max(minutes, 0), 24 * 60 - 1)
+        guard minutes != timeline.allDayReminderMinutes else { return }
+        timeline.allDayReminderMinutes = minutes
+        Defaults[.allDayReminderMinutes] = minutes
+        await reloadRemindersApp(reportsToReader: false)
+    }
+
+    var allDayReminderTime: DateComponents {
+        DateComponents(hour: timeline.allDayReminderMinutes / 60, minute: timeline.allDayReminderMinutes % 60)
     }
 
     /// Brings the phone's Reminders app and the watch to the same reminders,
@@ -31,7 +46,7 @@ extension AppModel {
         }
         let items: [RemindersAppItem]
         do {
-            items = try await remindersAppStore.reminders()
+            items = try await remindersAppStore.reminders(allDayAt: allDayReminderTime)
         } catch RemindersBridgeError.accessDenied {
             await DiagnosticLog.shared.record(
                 category: "timeline",

@@ -259,7 +259,7 @@ struct PerWatchStateTests {
 struct BackgroundFeedbackTests {
     private final class UnreadableRemindersApp: RemindersAppStore {
         struct Refusal: Error {}
-        func reminders() async throws -> [RemindersAppItem] { throw Refusal() }
+        func reminders(allDayAt time: DateComponents) async throws -> [RemindersAppItem] { throw Refusal() }
         func add(_ reminder: TimelinePin) async throws -> String { throw Refusal() }
         func update(_ reminder: TimelinePin, identifier: String) async throws { throw Refusal() }
         func remove(identifier: String) async throws { throw Refusal() }

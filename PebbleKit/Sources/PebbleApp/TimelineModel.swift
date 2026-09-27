@@ -16,6 +16,9 @@ public final class TimelineModel {
     /// Whether the watch shows its Reminders app at all. The firmware hides it
     /// unless the phone claims the capability and says the app is enabled.
     public internal(set) var isReminderAppEnabled = true
+    /// When a reminder from the Reminders app with a date and no time buzzes,
+    /// in minutes after midnight.
+    public internal(set) var allDayReminderMinutes = 9 * 60
     public internal(set) var feedback: FeatureFeedback?
     public internal(set) var reminderFeedback: FeatureFeedback?
     /// The synchronization pass in flight, if one is. Two at once read the

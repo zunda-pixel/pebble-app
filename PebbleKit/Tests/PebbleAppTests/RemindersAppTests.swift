@@ -1,3 +1,4 @@
+import Defaults
 import Foundation
 import PebbleProtocol
 import PebbleTransport
@@ -23,7 +24,13 @@ final class FakeRemindersApp: RemindersAppStore {
         accessRequests += 1
     }
 
-    func reminders() async throws -> [RemindersAppItem] { items }
+    /// The time the last read was asked to give reminders with no time.
+    var allDayTime: DateComponents?
+
+    func reminders(allDayAt time: DateComponents) async throws -> [RemindersAppItem] {
+        allDayTime = time
+        return items
+    }
 
     func add(_ reminder: TimelinePin) async throws -> String {
         written += 1
@@ -104,6 +111,52 @@ struct RemindersAppTests {
             storageDirectory: StorageDirectory(url: directory),
             reminderStore: TimelinePinStore(fileURL: storeURL)
         )
+    }
+
+    @Test
+    func aReminderWithNoTimeIsDueAtTheChosenTimeOfItsDay() throws {
+        var tokyo = Calendar(identifier: .gregorian)
+        tokyo.timeZone = try #require(TimeZone(identifier: "Asia/Tokyo"))
+        let day = DateComponents(year: 2026, month: 10, day: 3)
+
+        let due = try #require(RemindersBridge.dueDate(
+            of: day,
+            allDayAt: DateComponents(hour: 7, minute: 15),
+            in: tokyo
+        ))
+
+        #expect(tokyo.dateComponents([.year, .month, .day, .hour, .minute], from: due)
+            == DateComponents(year: 2026, month: 10, day: 3, hour: 7, minute: 15))
+    }
+
+    @Test
+    func aReminderWithATimeKeepsIt() throws {
+        var tokyo = Calendar(identifier: .gregorian)
+        tokyo.timeZone = try #require(TimeZone(identifier: "Asia/Tokyo"))
+        let timed = DateComponents(year: 2026, month: 10, day: 3, hour: 18, minute: 30)
+
+        let due = try #require(RemindersBridge.dueDate(
+            of: timed,
+            allDayAt: DateComponents(hour: 7, minute: 15),
+            in: tokyo
+        ))
+
+        #expect(tokyo.dateComponents([.hour, .minute], from: due) == DateComponents(hour: 18, minute: 30))
+    }
+
+    @Test
+    func aNewAllDayTimeReadsTheRemindersAppAgainWithIt() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let previous = Defaults[.allDayReminderMinutes]
+        defer { Defaults[.allDayReminderMinutes] = previous }
+        let remindersApp = FakeRemindersApp()
+        let model = try await connectedModel(in: directory, client: MockWatchClient(), remindersApp: remindersApp)
+
+        await model.setAllDayReminderTime(minutes: 7 * 60 + 15)
+
+        #expect(model.timeline.allDayReminderMinutes == 7 * 60 + 15)
+        #expect(remindersApp.allDayTime == DateComponents(hour: 7, minute: 15))
     }
 
     @Test

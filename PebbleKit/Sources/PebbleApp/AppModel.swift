@@ -427,6 +427,7 @@ public final class AppModel {
         notificationSourceAppStore = NotificationSourceAppStore(directory: storageDirectory)
         writtenRecordStore = WrittenRecordStore(directory: storageDirectory)
         notifications.companionEnabled = Defaults[.companionNotificationsEnabled]
+        timeline.allDayReminderMinutes = Defaults[.allDayReminderMinutes]
         catalog.source = Defaults[.catalogSource]
     }
 

@@ -71,6 +71,11 @@ extension Defaults.Keys {
         default: BloodOxygenSettings()
     )
     static let reminderAppEnabled = Key<Bool>("reminderAppEnabled", default: true)
+    /// When a reminder with a date and no time buzzes, in minutes after
+    /// midnight. 9:00 is the Reminders app's own default for its Today
+    /// Notification, which is the reader's to change there and not something
+    /// EventKit hands over (#151).
+    static let allDayReminderMinutes = Key<Int>("allDayReminderMinutes", default: 9 * 60)
 
     /// One row per calendar the reader has touched a switch for; a calendar
     /// with no row is enabled. Carried by name and owner as well as by

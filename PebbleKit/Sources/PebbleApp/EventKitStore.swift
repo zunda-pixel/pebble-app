@@ -51,7 +51,11 @@ actor EventKitStore {
 
     // MARK: The Reminders app
 
-    func incompleteReminders(from start: Date, to end: Date) async -> [RemindersAppItem] {
+    func incompleteReminders(
+        from start: Date,
+        to end: Date,
+        allDayAt time: DateComponents
+    ) async -> [RemindersAppItem] {
         let predicate = store.predicateForIncompleteReminders(
             withDueDateStarting: start,
             ending: end,
@@ -61,7 +65,9 @@ actor EventKitStore {
             // Read inside EventKit's own callback, so nothing of EventKit's
             // leaves it: a reminder is turned into the value that does.
             store.fetchReminders(matching: predicate) { reminders in
-                continuation.resume(returning: (reminders ?? []).compactMap(RemindersBridge.item(for:)))
+                continuation.resume(returning: (reminders ?? []).compactMap {
+                    RemindersBridge.item(for: $0, allDayAt: time)
+                })
             }
         }
     }

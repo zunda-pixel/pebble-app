@@ -36,6 +36,7 @@ struct TimelineView: View {
     @State private var kind = TimelineListKind.pins
     @State private var composing: TimelineListKind?
     @State private var showsCalendarSettings = false
+    @State private var showsRemindersSettings = false
 
     var body: some View {
         content
@@ -82,6 +83,11 @@ struct TimelineView: View {
                             Task { await model.synchronizeRemindersApp() }
                         }
                     }
+                    ToolbarItem(placement: .secondaryAction) {
+                        Button("Reminder Settings", systemImage: "gearshape") {
+                            showsRemindersSettings = true
+                        }
+                    }
                 }
             }
             .navigationTitle(Text("Timeline"))
@@ -90,6 +96,14 @@ struct TimelineView: View {
                     CalendarSettingsView(model: model)
                         .toolbar {
                             Button(role: .close) { showsCalendarSettings = false }
+                        }
+                }
+            }
+            .sheet(isPresented: $showsRemindersSettings) {
+                NavigationStack {
+                    RemindersSettingsView(model: model)
+                        .toolbar {
+                            Button(role: .close) { showsRemindersSettings = false }
                         }
                 }
             }

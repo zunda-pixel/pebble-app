@@ -519,6 +519,16 @@
         }
       }
     },
+    "A reminder with a date and no time buzzes on the watch at this time. The Reminders app tells of one at the time chosen for Today Notification in Settings, which this app cannot read, so choose the same time here." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日付だけで時刻のないリマインダーは、この時刻にウォッチを振動させます。リマインダーアプリは「設定」の「今日の通知」で選んだ時刻に知らせますが、このアプリからはその時刻を読めないため、同じ時刻を選んでください。"
+          }
+        }
+      }
+    },
     "A watch in recovery firmware disconnects often. The install picks itself up again on the next connection, so a drop part-way through is not a lost update." : {
       "localizations" : {
         "ja" : {
@@ -825,6 +835,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "すべての文字盤"
+          }
+        }
+      }
+    },
+    "All-Day Reminders" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "終日のリマインダー"
           }
         }
       }
@@ -4701,6 +4721,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "リマインダー"
+          }
+        }
+      }
+    },
+    "Reminder Settings" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リマインダーの設定"
           }
         }
       }
