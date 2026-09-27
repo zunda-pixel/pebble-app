@@ -228,25 +228,3 @@ public enum WatchVersionCodecError: Error, Equatable, Sendable {
     case unexpectedMessage
     case truncatedResponse
 }
-
-public extension WatchModel {
-    /// Which watch a platform byte belongs to.
-    ///
-    /// Grouped rather than one-to-one: several boards make up one model, which
-    /// is what `WatchBoard`'s own doc comment says. The emulator's three
-    /// platforms are named for the models this app already has — the raw values
-    /// here are `FLINT`, `EMERY` and `GABBRO`, and PebbleOS builds
-    /// `qemu_flint`, `qemu_emery` and `qemu_gabbro` — so each goes to its own.
-    init?(hardwarePlatform: UInt8) {
-        switch hardwarePlatform {
-        case 15, 246:
-            self = .pebble2Duo
-        case 13, 16, 17, 18, 243, 244, 245, 247, 249:
-            self = .pebbleTime2
-        case 19, 20, 21, 242:
-            self = .pebbleRound2
-        default:
-            return nil
-        }
-    }
-}

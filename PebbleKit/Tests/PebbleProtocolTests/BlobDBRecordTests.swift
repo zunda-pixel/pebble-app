@@ -164,7 +164,7 @@ struct BlobDBRecordTests {
     @Test func aNotificationSourceAppIsWrittenByItsBundleID() throws {
         try expect(
             .notificationSourceApp(sourceApp),
-            [NotificationAppsCodec.insertFrame(app: sourceApp, token: token)],
+            [try NotificationAppsCodec.insertFrame(app: sourceApp, token: token)],
             accepting: owned
         )
     }
@@ -172,7 +172,7 @@ struct BlobDBRecordTests {
     @Test func aGlanceIsWrittenToTheGlanceDatabase() throws {
         try expect(
             .appGlance(glance),
-            [AppGlanceCodec.insertFrame(glance, token: token)],
+            [try AppGlanceCodec.insertFrame(glance, token: token)],
             accepting: owned
         )
     }
@@ -185,7 +185,7 @@ struct BlobDBRecordTests {
         )
         try expect(
             .weatherOrder([itemID, applicationID]),
-            [WeatherCodec.preferencesFrame(orderedIDs: [itemID, applicationID], token: token)],
+            [WatchAppPreferencesCodec.weatherOrderFrame(orderedIDs: [itemID, applicationID], token: token)],
             accepting: owned
         )
     }
@@ -267,7 +267,7 @@ struct BlobDBRecordTests {
     @Test func theReminderAppSwitchGoesIntoThePreferencesDatabase() throws {
         try expect(
             .reminderAppState(.enabled),
-            [WeatherCodec.reminderAppFrame(state: .enabled, token: token)],
+            [WatchAppPreferencesCodec.remindersAppFrame(state: .enabled, token: token)],
             accepting: owned
         )
     }
@@ -290,7 +290,7 @@ struct BlobDBRecordTests {
         )
         try expect(
             .notificationSourceApp(bundleID: sourceApp.bundleID),
-            NotificationAppsCodec.deleteFrame(bundleID: sourceApp.bundleID, token: token),
+            try NotificationAppsCodec.deleteFrame(bundleID: sourceApp.bundleID, token: token),
             accepting: gone
         )
         try expect(

@@ -652,7 +652,7 @@ struct ProtocolCodecTests {
         let id = try #require(UUID(uuidString: "00112233-4455-6677-8899-AABBCCDDEEFF"))
         let invocation = try TimelineActionCodec.decode(PebbleProtocolFrame(
             endpoint: TimelineActionCodec.endpoint,
-            payload: [0x02] + BlobDBCodec.uuidBytes(id) + [7, 0]
+            payload: [0x02] + id.bytes + [7, 0]
         ))
         #expect(invocation == TimelineActionInvocation(itemID: id, actionID: 7))
         #expect(TimelineActionCodec.responseFrame(itemID: id, succeeded: true).payload.last == 0)
@@ -675,5 +675,55 @@ struct ProtocolCodecTests {
         #expect(length == 63)
         #expect(String(bytes: attribute.dropFirst(3), encoding: .utf8)
             == String(repeating: "済", count: 21))
+    }
+}
+
+@Suite
+struct WireEdgeCaseTests {
+    @Test func aFrameBehindAZeroLengthPrefixComesOutOfTheSameDelivery() throws {
+        let behind = PebbleProtocolFrame(endpoint: 45, payload: [0x01, 0x02])
+        var decoder = PebbleProtocolFrameDecoder()
+
+        let encoded = try behind.encoded()
+        let batch = decoder.append([0x00, 0x00, 0x00, 0x0B] + encoded)
+
+        #expect(batch.frames == [behind])
+        #expect(batch.failure == .emptyPayload)
+    }
+
+    @Test func theWatchAskingForTheTimeIsATimeRequest() {
+        #expect(TimeSynchronizationCodec.isTimeRequest(PebbleProtocolFrame(endpoint: 11, payload: [0x04])))
+        #expect(!TimeSynchronizationCodec.isTimeRequest(PebbleProtocolFrame(endpoint: 11, payload: [0x03])))
+        #expect(!TimeSynchronizationCodec.isTimeRequest(PebbleProtocolFrame(endpoint: 17, payload: [0x04])))
+    }
+
+    @Test func aBlobDBKeyOrValueTooLongForItsLengthFieldIsRefused() {
+        #expect(throws: BlobDBCodecError.keyTooLong) {
+            try BlobDBCodec.insertFrame(
+                databaseID: 6, key: [UInt8](repeating: 0x61, count: 256), value: [0], token: 1
+            )
+        }
+        #expect(throws: BlobDBCodecError.valueTooLarge) {
+            try BlobDBCodec.insertFrame(
+                databaseID: 6, key: [0x61], value: [UInt8](repeating: 0, count: 65_536), token: 1
+            )
+        }
+        #expect(throws: BlobDBCodecError.keyTooLong) {
+            try NotificationAppsCodec.deleteFrame(bundleID: String(repeating: "a", count: 300), token: 1)
+        }
+    }
+
+    @Test func aReminderIsLaidOutAsAReminderAndAPinAsGeneric() throws {
+        var pin = TimelinePin(
+            parentApplicationID: UUID(),
+            timestamp: Date(timeIntervalSince1970: 100),
+            title: "Tea",
+            subtitle: nil,
+            body: nil
+        )
+        #expect(try pin.encoded()[41] == 0x01)
+
+        pin.kind = .reminder
+        #expect(try pin.encoded()[41] == 0x03)
     }
 }

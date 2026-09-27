@@ -51,7 +51,7 @@ public enum TimelineActionCodec {
             attributes.append([0x02] + UInt16(content.count).littleEndianBytes + content)
         }
         var payload: [UInt8] = [0x11]
-        payload += BlobDBCodec.uuidBytes(itemID)
+        payload += itemID.bytes
         payload.append(succeeded ? 0 : 1)
         payload.append(UInt8(attributes.count))
         payload += attributes.flatMap { $0 }

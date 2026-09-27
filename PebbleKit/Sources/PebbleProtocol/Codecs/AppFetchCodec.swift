@@ -41,14 +41,7 @@ public enum AppFetchCodec {
             throw AppFetchCodecError.invalidPayload
         }
 
-        let uuidBytes = frame.payload[1..<17]
-        let hexadecimalDigits = Array("0123456789ABCDEF")
-        let hex = uuidBytes.flatMap { byte in
-            [hexadecimalDigits[Int(byte >> 4)], hexadecimalDigits[Int(byte & 0x0F)]]
-        }
-        let hexString = String(hex)
-        let uuidString = "\(hexString.prefix(8))-\(hexString.dropFirst(8).prefix(4))-\(hexString.dropFirst(12).prefix(4))-\(hexString.dropFirst(16).prefix(4))-\(hexString.dropFirst(20))"
-        guard let applicationID = UUID(uuidString: uuidString) else {
+        guard let applicationID = UUID(bytes: frame.payload[1..<17]) else {
             throw AppFetchCodecError.invalidApplicationID
         }
         let appBankID = UInt32(frame.payload[17])

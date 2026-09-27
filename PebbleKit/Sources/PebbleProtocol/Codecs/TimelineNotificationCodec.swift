@@ -12,10 +12,10 @@ public struct TimelineNotification: Codable, Equatable, Sendable {
 
     public func encoded() throws -> [UInt8] {
         var attributes: [[UInt8]] = []
-        attributes.append(Self.textAttribute(id: 0x01, value: title, maximumByteCount: 64))
-        attributes.append(Self.textAttribute(id: 0x03, value: body, maximumByteCount: 512))
+        attributes.append(TimelineItemHeader.textAttribute(id: 0x01, value: title, maximumByteCount: 64))
+        attributes.append(TimelineItemHeader.textAttribute(id: 0x03, value: body, maximumByteCount: 512))
         if let appName, !appName.isEmpty {
-            attributes.append(Self.textAttribute(id: 0x1E, value: appName, maximumByteCount: 40))
+            attributes.append(TimelineItemHeader.textAttribute(id: 0x1E, value: appName, maximumByteCount: 40))
         }
         let attributeBytes = attributes.flatMap { $0 }
         guard let dataLength = UInt16(exactly: attributeBytes.count) else {
@@ -26,27 +26,20 @@ public struct TimelineNotification: Codable, Equatable, Sendable {
             throw TimelineNotificationCodecError.invalidTimestamp
         }
 
-        var bytes = BlobDBCodec.uuidBytes(id)
-        bytes.append(contentsOf: BlobDBCodec.uuidBytes(parentApplicationID))
-        bytes.append(contentsOf: UInt32(seconds).littleEndianBytes)
-        bytes.append(contentsOf: UInt16(0).littleEndianBytes)
-        bytes.append(0x01) // Timeline item type: notification.
-        bytes.append(contentsOf: UInt16(0).littleEndianBytes)
-        bytes.append(0x04) // Layout: genericNotification.
-        bytes.append(contentsOf: dataLength.littleEndianBytes)
-        bytes.append(UInt8(attributes.count))
-        bytes.append(0) // No actions; iOS handles ANCS actions outside the companion app.
-        bytes.append(contentsOf: attributeBytes)
-        return bytes
-    }
-
-    private static func textAttribute(
-        id: UInt8,
-        value: String,
-        maximumByteCount: Int
-    ) -> [UInt8] {
-        let content = value.utf8BytesEndingOnACharacter(maximumByteCount: maximumByteCount)
-        return [id] + UInt16(content.count).littleEndianBytes + content
+        let header = TimelineItemHeader(
+            id: id,
+            parentApplicationID: parentApplicationID,
+            timestamp: UInt32(seconds),
+            durationMinutes: 0,
+            kind: .notification,
+            flags: 0,
+            layout: 0x04, // genericNotification
+            payloadLength: dataLength,
+            attributeCount: UInt8(attributes.count),
+            // No actions; iOS handles ANCS actions outside the companion app.
+            actionCount: 0
+        )
+        return header.encoded + attributeBytes
     }
 }
 
@@ -57,9 +50,9 @@ public enum TimelineNotificationCodec {
         _ notification: TimelineNotification,
         token: UInt16
     ) throws -> PebbleProtocolFrame {
-        BlobDBCodec.insertFrame(
+        try BlobDBCodec.insertFrame(
             databaseID: databaseID,
-            key: BlobDBCodec.uuidBytes(notification.id),
+            key: notification.id.bytes,
             value: try notification.encoded(),
             token: token
         )

@@ -45,9 +45,13 @@ public struct TimelinePin: Codable, Equatable, Identifiable, Sendable {
     public func encoded() throws -> [UInt8] {
         // `MAX_ATTRIBUTE_LENGTHS`. The firmware cuts anything longer itself, and cuts
         // it mid-character.
-        var attributes = [textAttribute(id: 0x01, value: title, limit: 64)]
-        if let subtitle { attributes.append(textAttribute(id: 0x02, value: subtitle, limit: 64)) }
-        if let body { attributes.append(textAttribute(id: 0x03, value: body, limit: 512)) }
+        var attributes = [TimelineItemHeader.textAttribute(id: 0x01, value: title, maximumByteCount: 64)]
+        if let subtitle {
+            attributes.append(TimelineItemHeader.textAttribute(id: 0x02, value: subtitle, maximumByteCount: 64))
+        }
+        if let body {
+            attributes.append(TimelineItemHeader.textAttribute(id: 0x03, value: body, maximumByteCount: 512))
+        }
         let attributeBytes = attributes.flatMap { $0 }
         // A reminder with no action of its own has no menu on the watch at
         // all: `notification_window.c` hides the popup's action button unless
@@ -56,7 +60,7 @@ public struct TimelinePin: Codable, Equatable, Identifiable, Sendable {
         // carries a Dismiss (`SerializedActionHeader`: id, type 0x04, one
         // attribute for the label).
         let actionBytes: [UInt8] = kind == .reminder
-            ? [0x01, 0x04, 0x01] + textAttribute(id: 0x01, value: "Dismiss", limit: 64)
+            ? [0x01, 0x04, 0x01] + TimelineItemHeader.textAttribute(id: 0x01, value: "Dismiss", maximumByteCount: 64)
             : []
         let actionCount: UInt8 = kind == .reminder ? 1 : 0
         guard let length = UInt16(exactly: attributeBytes.count + actionBytes.count) else {
@@ -64,24 +68,23 @@ public struct TimelinePin: Codable, Equatable, Identifiable, Sendable {
         }
         let seconds = timestamp.timeIntervalSince1970.rounded()
         guard seconds >= 0, seconds <= Double(UInt32.max) else { throw TimelinePinError.invalidTimestamp }
-        var bytes = BlobDBCodec.uuidBytes(id)
-        bytes += BlobDBCodec.uuidBytes(parentApplicationID)
-        bytes += UInt32(seconds).littleEndianBytes
-        bytes += durationMinutes.littleEndianBytes
-        bytes.append(kind.rawValue)
-        bytes += UInt16(isAllDay ? 1 << 2 : 0).littleEndianBytes
-        bytes.append(0x01)
-        bytes += length.littleEndianBytes
-        bytes.append(UInt8(attributes.count))
-        bytes.append(actionCount)
-        bytes += attributeBytes
-        bytes += actionBytes
-        return bytes
-    }
-
-    private func textAttribute(id: UInt8, value: String, limit: Int) -> [UInt8] {
-        let content = value.utf8BytesEndingOnACharacter(maximumByteCount: limit)
-        return [id] + UInt16(content.count).littleEndianBytes + content
+        let header = TimelineItemHeader(
+            id: id,
+            parentApplicationID: parentApplicationID,
+            timestamp: UInt32(seconds),
+            durationMinutes: durationMinutes,
+            kind: kind,
+            flags: isAllDay ? 1 << 2 : 0,
+            // A reminder is `LayoutIdReminder`, as the firmware's own
+            // (`reminder.c`) are, not the `LayoutIdGeneric` a pin gets. The
+            // popup picks its own layout today (`notification_window.c`), so
+            // Generic went unseen there.
+            layout: kind == .reminder ? 0x03 : 0x01,
+            payloadLength: length,
+            attributeCount: UInt8(attributes.count),
+            actionCount: actionCount
+        )
+        return header.encoded + attributeBytes + actionBytes
     }
 
     /// Reads an item the watch serialized (`SerializedTimelineItemHeader` in
@@ -92,14 +95,18 @@ public struct TimelinePin: Codable, Equatable, Identifiable, Sendable {
     /// records that there is more to the item than what was kept, so that
     /// nothing here writes it back.
     public init(decoding bytes: [UInt8]) throws {
-        guard bytes.count >= Self.headerLength else {
+        guard bytes.count >= TimelineItemHeader.length else {
             throw TimelinePinError.malformedItem
         }
         guard let kind = TimelineItemKind(rawValue: bytes[38]) else {
             throw TimelinePinError.malformedItem
         }
-        id = try Self.uuid(bytes[0..<16])
-        parentApplicationID = try Self.uuid(bytes[16..<32])
+        guard let id = UUID(bytes: bytes[0..<16]),
+              let parentApplicationID = UUID(bytes: bytes[16..<32]) else {
+            throw TimelinePinError.malformedItem
+        }
+        self.id = id
+        self.parentApplicationID = parentApplicationID
         let seconds = UInt32(bytes[32])
             | UInt32(bytes[33]) << 8
             | UInt32(bytes[34]) << 16
@@ -112,7 +119,7 @@ public struct TimelinePin: Codable, Equatable, Identifiable, Sendable {
         isFromWatch = flags & (1 << 3) != 0
 
         var spokenTitle: String?
-        var offset = Self.headerLength
+        var offset = TimelineItemHeader.length
         for _ in 0..<Int(bytes[44]) {
             guard bytes.count >= offset + 3 else {
                 throw TimelinePinError.malformedItem
@@ -139,38 +146,41 @@ public struct TimelinePin: Codable, Equatable, Identifiable, Sendable {
         }
         title = spokenTitle
     }
+}
 
-    /// `CommonTimelineItemHeader` plus the payload length and the two counts.
-    private static var headerLength: Int { 46 }
-
-    private static func uuid(_ bytes: ArraySlice<UInt8>) throws -> UUID {
-        let dashed = [8, 4, 4, 4, 12].reduce(into: (rest: Substring(bytes.hexadecimalString), parts: [Substring]())) {
-            state, count in
-            state.parts.append(state.rest.prefix(count))
-            state.rest = state.rest.dropFirst(count)
-        }.parts.joined(separator: "-")
-        guard let uuid = UUID(uuidString: dashed) else {
-            throw TimelinePinError.malformedItem
-        }
-        return uuid
+public extension TimelinePin {
+    // Not the synthesized decoder: that reads a field with a default through
+    // `decode`, so a file written before the field existed fails to decode and
+    // `PersistentJSON.loadRecovering` sets the whole file aside.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        parentApplicationID = try container.decode(UUID.self, forKey: .parentApplicationID)
+        timestamp = try container.decode(Date.self, forKey: .timestamp)
+        durationMinutes = try container.decodeIfPresent(UInt16.self, forKey: .durationMinutes) ?? 0
+        title = try container.decode(String.self, forKey: .title)
+        subtitle = try container.decodeIfPresent(String.self, forKey: .subtitle)
+        body = try container.decodeIfPresent(String.self, forKey: .body)
+        isAllDay = try container.decodeIfPresent(Bool.self, forKey: .isAllDay) ?? false
+        kind = try container.decodeIfPresent(TimelineItemKind.self, forKey: .kind) ?? .pin
+        isFromWatch = try container.decodeIfPresent(Bool.self, forKey: .isFromWatch) ?? false
     }
 }
 
 public enum TimelinePinCodec {
-    /// The reminder database stores a pin but shows it as something else.
     public static var databaseID: UInt8 { 0x01 }
 
     public static func insertFrame(_ pin: TimelinePin, token: UInt16) throws -> PebbleProtocolFrame {
-        BlobDBCodec.insertFrame(
+        try BlobDBCodec.insertFrame(
             databaseID: databaseID,
-            key: BlobDBCodec.uuidBytes(pin.id),
+            key: pin.id.bytes,
             value: try pin.encoded(),
             token: token
         )
     }
 
     public static func deleteFrame(id: UUID, token: UInt16) -> PebbleProtocolFrame {
-        BlobDBCodec.deleteFrame(databaseID: databaseID, key: BlobDBCodec.uuidBytes(id), token: token)
+        BlobDBCodec.uncheckedDeleteFrame(databaseID: databaseID, key: id.bytes, token: token)
     }
 
     public static func clearFrame(token: UInt16) -> PebbleProtocolFrame {
@@ -183,20 +193,4 @@ public enum TimelinePinError: Error, Equatable, Sendable {
     case payloadTooLarge
     /// An item the watch sent that this app could not read as one.
     case malformedItem
-}
-
-extension String {
-    /// A cut inside a multi-byte character leaves the watch a byte it cannot read
-    /// as the start of one: `utf8_get_bounds` fails and the text layout draws
-    /// nothing at all, so a Japanese title one character too long would vanish
-    /// rather than lose its tail.
-    func utf8BytesEndingOnACharacter(maximumByteCount limit: Int) -> [UInt8] {
-        var content: [UInt8] = []
-        for character in self {
-            let bytes = Array(String(character).utf8)
-            guard content.count + bytes.count <= limit else { break }
-            content.append(contentsOf: bytes)
-        }
-        return content
-    }
 }

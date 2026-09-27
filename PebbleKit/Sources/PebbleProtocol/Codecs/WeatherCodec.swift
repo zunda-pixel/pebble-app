@@ -45,15 +45,18 @@ public struct WeatherReport: Equatable, Identifiable, Sendable {
 public enum WeatherCodec {
     public static var databaseID: UInt8 { 5 }
 
-    /// The firmware refuses any other version outright, so this is not a floor
-    /// but an exact match.
+    /// Version 3 is what `weather_db.h` calls `WEATHER_DB_LEGACY_VERSION`: the
+    /// firmware parses it beside the current 4 "during rollout", and refuses
+    /// every other major (`weather_db_version_is_supported`). So this is an
+    /// exact match rather than a floor, and one a later firmware may stop
+    /// accepting.
     static let recordVersion: UInt8 = 3
 
     static let maximumLocationNameBytes = 63
     static let maximumShortPhraseBytes = 31
 
     public static func key(for report: WeatherReport) -> [UInt8] {
-        BlobDBCodec.uuidBytes(report.id)
+        report.id.bytes
     }
 
     /// `WeatherDBEntry` is a packed struct: every number little-endian, nothing
@@ -81,7 +84,7 @@ public enum WeatherCodec {
     }
 
     public static func insertFrame(report: WeatherReport, token: UInt16) -> PebbleProtocolFrame {
-        BlobDBCodec.insertFrame(
+        BlobDBCodec.uncheckedInsertFrame(
             databaseID: databaseID,
             key: key(for: report),
             value: value(for: report),
@@ -90,30 +93,7 @@ public enum WeatherCodec {
     }
 
     public static func deleteFrame(id: UUID, token: UInt16) -> PebbleProtocolFrame {
-        BlobDBCodec.deleteFrame(databaseID: databaseID, key: BlobDBCodec.uuidBytes(id), token: token)
-    }
-
-    public static var preferencesDatabaseID: UInt8 { 9 }
-
-    /// The firmware compares this to the literal it holds, so it is not a UUID
-    /// like the forecasts themselves.
-    public static var preferencesKey: String { "weatherApp" }
-
-    /// Writing a forecast is not enough on its own: the app walks this list and
-    /// skips any forecast whose key is not in it.
-    public static func preferencesValue(orderedIDs: [UUID]) -> [UInt8] {
-        // `num_locations` is one byte and the firmware checks the length against it.
-        let ids = orderedIDs.prefix(Int(UInt8.max))
-        return [UInt8(ids.count)] + ids.flatMap { BlobDBCodec.uuidBytes($0) }
-    }
-
-    public static func preferencesFrame(orderedIDs: [UUID], token: UInt16) -> PebbleProtocolFrame {
-        BlobDBCodec.insertFrame(
-            databaseID: preferencesDatabaseID,
-            key: Array(preferencesKey.utf8),
-            value: preferencesValue(orderedIDs: orderedIDs),
-            token: token
-        )
+        BlobDBCodec.uncheckedDeleteFrame(databaseID: databaseID, key: id.bytes, token: token)
     }
 
     private static func pascalString(_ value: String) -> [UInt8] {

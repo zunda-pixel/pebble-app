@@ -38,6 +38,31 @@ public struct AppGlance: Codable, Equatable, Sendable, Identifiable {
     public var id: UUID { applicationID }
 }
 
+public extension AppGlanceSlice {
+    // Not the synthesized decoder: that reads a field with a default through
+    // `decode`, so a file written before the field existed fails to decode and
+    // `PersistentJSON.loadRecovering` sets the whole file aside.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        subtitleTemplate = try container.decodeIfPresent(String.self, forKey: .subtitleTemplate) ?? ""
+        icon = try container.decodeIfPresent(TimelineIcon.self, forKey: .icon)
+        expires = try container.decodeIfPresent(Date.self, forKey: .expires)
+    }
+}
+
+public extension AppGlance {
+    // Not the synthesized decoder: that reads a field with a default through
+    // `decode`, so a file written before the field existed fails to decode and
+    // `PersistentJSON.loadRecovering` sets the whole file aside.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        applicationID = try container.decode(UUID.self, forKey: .applicationID)
+        slices = try container.decodeIfPresent([AppGlanceSlice].self, forKey: .slices) ?? []
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
+    }
+}
+
 public enum AppGlanceCodec {
     public static var databaseID: UInt8 { 11 }
 
@@ -56,7 +81,7 @@ public enum AppGlanceCodec {
     static let maximumSubtitleLength = 150
 
     public static func key(for applicationID: UUID) -> [UInt8] {
-        BlobDBCodec.uuidBytes(applicationID)
+        applicationID.bytes
     }
 
     public static func value(for glance: AppGlance) -> [UInt8] {
@@ -94,8 +119,8 @@ public enum AppGlanceCodec {
             + body
     }
 
-    public static func insertFrame(_ glance: AppGlance, token: UInt16) -> PebbleProtocolFrame {
-        BlobDBCodec.insertFrame(
+    public static func insertFrame(_ glance: AppGlance, token: UInt16) throws -> PebbleProtocolFrame {
+        try BlobDBCodec.insertFrame(
             databaseID: databaseID,
             key: key(for: glance.applicationID),
             value: value(for: glance),
@@ -104,7 +129,7 @@ public enum AppGlanceCodec {
     }
 
     public static func deleteFrame(applicationID: UUID, token: UInt16) -> PebbleProtocolFrame {
-        BlobDBCodec.deleteFrame(
+        BlobDBCodec.uncheckedDeleteFrame(
             databaseID: databaseID,
             key: key(for: applicationID),
             token: token

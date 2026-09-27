@@ -17,7 +17,7 @@ public enum AppReorderCodec {
 
         var payload: [UInt8] = [0x01, UInt8(applicationIDs.count)]
         for applicationID in applicationIDs {
-            payload.append(contentsOf: bytes(of: applicationID))
+            payload.append(contentsOf: applicationID.bytes)
         }
         return PebbleProtocolFrame(endpoint: endpoint, payload: payload)
     }
@@ -34,13 +34,6 @@ public enum AppReorderCodec {
         }
         return result
     }
-
-    private static func bytes(of uuid: UUID) -> [UInt8] {
-        uuid.uuidString
-            .filter { $0 != "-" }
-            .chunks(ofCount: 2)
-            .compactMap { UInt8($0, radix: 16) }
-    }
 }
 
 public enum AppReorderCodecError: Error, Equatable, Sendable {
@@ -48,17 +41,4 @@ public enum AppReorderCodecError: Error, Equatable, Sendable {
     case unexpectedEndpoint
     case invalidPayload
     case unknownResult
-}
-
-private extension String {
-    func chunks(ofCount count: Int) -> [Substring] {
-        var chunks: [Substring] = []
-        var start = startIndex
-        while start < endIndex {
-            let end = index(start, offsetBy: count, limitedBy: endIndex) ?? endIndex
-            chunks.append(self[start..<end])
-            start = end
-        }
-        return chunks
-    }
 }

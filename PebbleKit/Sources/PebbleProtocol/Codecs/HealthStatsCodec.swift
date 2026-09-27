@@ -68,7 +68,7 @@ public enum HealthStatsCodec {
     }
 
     public static func movementFrame(for day: WatchHealthDay, token: UInt16) -> PebbleProtocolFrame {
-        BlobDBCodec.insertFrame(
+        BlobDBCodec.uncheckedInsertFrame(
             databaseID: databaseID,
             key: Array(movementKey(weekday: day.weekday).utf8),
             value: movementValue(for: day),
@@ -77,7 +77,7 @@ public enum HealthStatsCodec {
     }
 
     public static func sleepFrame(for day: WatchHealthDay, token: UInt16) -> PebbleProtocolFrame {
-        BlobDBCodec.insertFrame(
+        BlobDBCodec.uncheckedInsertFrame(
             databaseID: databaseID,
             key: Array(sleepKey(weekday: day.weekday).utf8),
             value: sleepValue(for: day),
@@ -89,7 +89,7 @@ public enum HealthStatsCodec {
     /// each, under the keys `health_db.c` builds — `"average" + "_dailySteps"`
     /// and `"average" + "_sleepDuration"`.
     public static func averageStepsFrame(steps: UInt32, token: UInt16) -> PebbleProtocolFrame {
-        BlobDBCodec.insertFrame(
+        BlobDBCodec.uncheckedInsertFrame(
             databaseID: databaseID,
             key: Array("average_dailySteps".utf8),
             value: steps.littleEndianBytes,
@@ -98,7 +98,7 @@ public enum HealthStatsCodec {
     }
 
     public static func averageSleepFrame(seconds: UInt32, token: UInt16) -> PebbleProtocolFrame {
-        BlobDBCodec.insertFrame(
+        BlobDBCodec.uncheckedInsertFrame(
             databaseID: databaseID,
             key: Array("average_sleepDuration".utf8),
             value: seconds.littleEndianBytes,

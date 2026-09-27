@@ -1,13 +1,13 @@
+// No request for a file by name: `get_bytes.c` serves one only outside
+// `CONFIG_RELEASE`, so a shipping watch refuses it.
 public enum GetBytesRequest: Equatable, Sendable {
     case coredump
     /// The watch marks a crash as read once it has handed it over.
     case unreadCoredump
-    case file(name: String)
 
     var command: UInt8 {
         switch self {
         case .coredump: 0x00
-        case .file: 0x03
         case .unreadCoredump: 0x05
         }
     }
@@ -26,13 +26,7 @@ public enum GetBytesCodec {
     static let maximumObjectByteCount = 32 * 1_024 * 1_024
 
     public static func requestFrame(_ request: GetBytesRequest, transactionID: UInt8) -> PebbleProtocolFrame {
-        var payload: [UInt8] = [request.command, transactionID]
-        if case .file(let name) = request {
-            let bytes = Array(name.utf8.prefix(Int(UInt8.max)))
-            payload.append(UInt8(bytes.count))
-            payload += bytes
-        }
-        return PebbleProtocolFrame(endpoint: endpoint, payload: payload)
+        PebbleProtocolFrame(endpoint: endpoint, payload: [request.command, transactionID])
     }
 }
 

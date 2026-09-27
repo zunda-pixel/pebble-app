@@ -19,17 +19,17 @@ public enum ScreenshotCodec {
 /// There is no marker on the last packet, so the pixels are counted against
 /// the size in the header.
 public struct ScreenshotCollector: WatchPullCollector {
-    /// One bit a pixel on a black and white screen, one byte on a colour one.
+    /// One bit a pixel on a black and white screen, one byte on a color one.
     enum Depth: UInt32 {
         case blackAndWhite = 1
-        case colour = 2
+        case color = 2
 
         var bitsPerPixel: Int { self == .blackAndWhite ? 1 : 8 }
     }
 
     private var width = 0
     private var height = 0
-    private var depth = Depth.colour
+    private var depth = Depth.color
     private var expectedByteCount = 0
     private var bytes: [UInt8] = []
     private var hasHeader = false
@@ -80,16 +80,16 @@ public struct ScreenshotCollector: WatchPullCollector {
                     pixels[y * width + x] = isLit ? 0xFFFF_FFFF : 0xFF00_0000
                 }
             }
-        case .colour:
+        case .color:
             for index in 0..<min(pixels.count, bytes.count) {
-                pixels[index] = Self.colour(bytes[index])
+                pixels[index] = Self.color(bytes[index])
             }
         }
         return WatchScreenshot(width: width, height: height, pixels: pixels)
     }
 
     // Two bits a channel, spread over the whole range.
-    static func colour(_ value: UInt8) -> UInt32 {
+    static func color(_ value: UInt8) -> UInt32 {
         let red = UInt32((value >> 4) & 0x3) * 85
         let green = UInt32((value >> 2) & 0x3) * 85
         let blue = UInt32(value & 0x3) * 85

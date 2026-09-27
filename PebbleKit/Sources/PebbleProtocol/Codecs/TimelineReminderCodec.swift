@@ -11,15 +11,15 @@ public enum TimelineReminderCodec {
     ) throws -> PebbleProtocolFrame {
         var reminder = reminder
         reminder.kind = .reminder
-        return BlobDBCodec.insertFrame(
+        return try BlobDBCodec.insertFrame(
             databaseID: databaseID,
-            key: BlobDBCodec.uuidBytes(reminder.id),
+            key: reminder.id.bytes,
             value: try reminder.encoded(),
             token: token
         )
     }
 
     public static func deleteFrame(id: UUID, token: UInt16) -> PebbleProtocolFrame {
-        BlobDBCodec.deleteFrame(databaseID: databaseID, key: BlobDBCodec.uuidBytes(id), token: token)
+        BlobDBCodec.uncheckedDeleteFrame(databaseID: databaseID, key: id.bytes, token: token)
     }
 }

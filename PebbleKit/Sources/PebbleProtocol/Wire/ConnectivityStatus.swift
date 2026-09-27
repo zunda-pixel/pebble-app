@@ -9,7 +9,12 @@ package struct ConnectivityStatus: Equatable, Sendable {
     package var isEncrypted: Bool
     package var hasBondedGateway: Bool
     package var supportsPinningWithoutSlaveSecurity: Bool
-    package var hasRemoteAttemptedToUseStalePairing: Bool
+    // The reference app calls bit 5 "remote attempted to use stale pairing";
+    // the firmware's is `is_reversed_ppogatt_enabled`
+    // (`pbl_bt_pps_connectivity_status`, `bluetooth/pebble_pairing_service.h`),
+    // and `pebble_pairing_service.c` never sets it, so it cannot signal a
+    // forgotten bond.
+    package var isReversedPPoGATTEnabled: Bool
     package var pairingError: UInt8
 
     // A healthy watch always reports four bytes: flags, two reserved bytes and a
@@ -25,7 +30,7 @@ package struct ConnectivityStatus: Equatable, Sendable {
             isEncrypted: flags & 0b100 != 0,
             hasBondedGateway: flags & 0b1000 != 0,
             supportsPinningWithoutSlaveSecurity: flags & 0b1_0000 != 0,
-            hasRemoteAttemptedToUseStalePairing: flags & 0b10_0000 != 0,
+            isReversedPPoGATTEnabled: flags & 0b10_0000 != 0,
             pairingError: bytes[3]
         )
     }
@@ -41,7 +46,6 @@ package enum PairingTrigger {
     package static func value(
         pinAddress: Bool = false,
         noSecurityRequest: Bool = false,
-        autoAcceptFuturePairing: Bool = false,
         watchAsGattServer: Bool = false
     ) -> [UInt8] {
         var flags: UInt8 = 0
@@ -49,7 +53,6 @@ package enum PairingTrigger {
         if noSecurityRequest { flags |= 1 << 1 }
         // The watch only sends a security request when told to.
         if !noSecurityRequest { flags |= 1 << 2 }
-        if autoAcceptFuturePairing { flags |= 1 << 3 }
         if watchAsGattServer { flags |= 1 << 4 }
         return [flags]
     }

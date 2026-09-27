@@ -102,6 +102,38 @@ struct WorkoutRecordTests {
         #expect(workout.distanceMetres == 0)
     }
 
+    @Test func aRecordWhoseEndIsPastTheWatchClockIsSkippedAndTheRestKept() throws {
+        let read = try decoded(itemSize: 18, items: [
+            sessionItem(type: 6, start: UInt32.max - 10, duration: 1_200),
+            sessionItem(type: 5, start: 1_788_340_000, duration: 600),
+        ])
+
+        #expect(read.flatMap(\.workouts).map(\.kind) == [.walk])
+    }
+
+    @Test func anACKTimeoutLeavesTheSessionOpenAndIsNotAnswered() throws {
+        var processor = HealthDataLoggingProcessor()
+        var open = [UInt8](repeating: 0, count: 29)
+        open[0] = 0x01
+        open[1] = 3
+        open[22] = 83
+        open[27] = 18
+        _ = try processor.process(PebbleProtocolFrame(endpoint: HealthDataLoggingCodec.endpoint, payload: open))
+
+        let timeout = try processor.process(
+            PebbleProtocolFrame(endpoint: HealthDataLoggingCodec.endpoint, payload: [0x07, 3])
+        )
+        #expect(timeout == HealthDataLoggingResult())
+
+        let resend: [UInt8] = [0x02, 3] + [UInt8](repeating: 0, count: 8)
+            + sessionItem(type: 6, start: 1_788_340_000, duration: 1_200)
+        let answer = try processor.process(
+            PebbleProtocolFrame(endpoint: HealthDataLoggingCodec.endpoint, payload: resend)
+        )
+        #expect(answer.response == HealthDataLoggingCodec.ackFrame(sessionID: 3))
+        #expect(answer.samples.flatMap(\.workouts).map(\.kind) == [.run])
+    }
+
     /// The morning walk arrives in the morning sync and the run in the
     /// evening one: the day is the union, not whichever record came last.
     @Test func theMorningWalkSurvivesTheEveningRun() async throws {

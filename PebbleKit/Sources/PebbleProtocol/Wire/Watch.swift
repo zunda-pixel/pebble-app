@@ -129,10 +129,34 @@ public extension WatchBoard {
     }
 }
 
+public extension WatchBoard {
+    /// Several boards make up one model. The emulator's three are named for
+    /// the models they stand in for: PebbleOS builds `qemu_flint`,
+    /// `qemu_emery` and `qemu_gabbro`, and those are the raw values below.
+    var model: WatchModel {
+        switch self {
+        case .asterix, .qemuFlint:
+            .pebble2Duo
+        case .robertEVT, .robertBigboard, .robertBigboard2,
+             .obelixEVT, .obelixDVT, .obelixPVT, .obelixBigboard, .obelixBigboard2,
+             .qemuEmery:
+            .pebbleTime2
+        case .getafixEVT, .getafixDVT, .getafixDVT2, .qemuGabbro:
+            .pebbleRound2
+        }
+    }
+}
+
 public enum WatchModel: String, CaseIterable, Codable, Sendable {
     case pebble2Duo = "FLINT"
     case pebbleTime2 = "EMERY"
     case pebbleRound2 = "GABBRO"
+
+    /// Which watch a platform byte belongs to, by way of its board.
+    public init?(hardwarePlatform: UInt8) {
+        guard let board = WatchBoard(hardwarePlatform: hardwarePlatform) else { return nil }
+        self = board.model
+    }
 
     public var displayName: String {
         switch self {
@@ -244,13 +268,8 @@ public struct ConnectedWatch: Identifiable, Hashable, Sendable {
     public var languageVersion: UInt16 { version.languageVersion }
     public var capabilities: UInt64 { version.capabilities }
 
-    public var supportsLanguagePacks: Bool {
-        WatchCapability.languagePack.isSet(in: capabilities)
-    }
-
-    public var supportsWeatherApp: Bool {
-        WatchCapability.weatherApp.isSet(in: capabilities)
-    }
+    public var supportsLanguagePacks: Bool { version.supportsLanguagePacks }
+    public var supportsWeatherApp: Bool { version.supportsWeatherApp }
 
     public var supportsCustomVibePatterns: Bool {
         WatchCapability.customVibePattern.isSet(in: capabilities)

@@ -1,5 +1,4 @@
 import Foundation
-import MemberwiseInit
 
 public enum AudioStreamMessage: Equatable, Sendable {
     /// The encoded frames a message carried, each one already cut to the length

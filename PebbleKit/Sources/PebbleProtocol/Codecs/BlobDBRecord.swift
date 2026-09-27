@@ -70,16 +70,16 @@ public enum BlobDBRecord: Equatable, Sendable {
             }]
 
         case .notificationSourceApp(let app):
-            [Self.owned { NotificationAppsCodec.insertFrame(app: app, token: $0) }]
+            [Self.owned { try NotificationAppsCodec.insertFrame(app: app, token: $0) }]
 
         case .appGlance(let glance):
-            [Self.owned { AppGlanceCodec.insertFrame(glance, token: $0) }]
+            [Self.owned { try AppGlanceCodec.insertFrame(glance, token: $0) }]
 
         case .weather(let report):
             [Self.owned { WeatherCodec.insertFrame(report: report, token: $0) }]
 
         case .weatherOrder(let orderedIDs):
-            [Self.owned { WeatherCodec.preferencesFrame(orderedIDs: orderedIDs, token: $0) }]
+            [Self.owned { WatchAppPreferencesCodec.weatherOrderFrame(orderedIDs: orderedIDs, token: $0) }]
 
         case .watchSetting(let setting, let rawValue):
             [Self.owned { WatchSettingsCodec.insertFrame(setting, rawValue: rawValue, token: $0) }]
@@ -123,7 +123,7 @@ public enum BlobDBRecord: Equatable, Sendable {
             ]
 
         case .reminderAppState(let state):
-            [Self.owned { WeatherCodec.reminderAppFrame(state: state, token: $0) }]
+            [Self.owned { WatchAppPreferencesCodec.remindersAppFrame(state: state, token: $0) }]
         }
     }
 
@@ -159,7 +159,7 @@ public enum BlobDBKey: Equatable, Sendable {
         case .timelineReminder(let id):
             [Self.gone { TimelineReminderCodec.deleteFrame(id: id, token: $0) }]
         case .notificationSourceApp(let bundleID):
-            [Self.gone { NotificationAppsCodec.deleteFrame(bundleID: bundleID, token: $0) }]
+            [Self.gone { try NotificationAppsCodec.deleteFrame(bundleID: bundleID, token: $0) }]
         case .appGlance(let applicationID):
             [Self.gone { AppGlanceCodec.deleteFrame(applicationID: applicationID, token: $0) }]
         case .weather(let id):

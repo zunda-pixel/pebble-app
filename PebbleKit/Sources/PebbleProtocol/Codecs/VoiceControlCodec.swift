@@ -94,7 +94,7 @@ public enum VoiceControlCodec {
             case speexEncoderInfoAttribute:
                 encoderInfo = try decodeSpeexEncoderInfo(content)
             case applicationIDAttribute where length == 16:
-                applicationID = uuid(from: content)
+                applicationID = UUID(bytes: content)
             default:
                 continue
             }
@@ -146,7 +146,7 @@ public enum VoiceControlCodec {
             attributes.append(attribute(id: transcriptionAttribute, content: transcription(sentence)))
         }
         if let applicationID {
-            attributes.append(attribute(id: applicationIDAttribute, content: BlobDBCodec.uuidBytes(applicationID)))
+            attributes.append(attribute(id: applicationIDAttribute, content: applicationID.bytes))
         }
         // A success with no words is one the watch throws out for being
         // malformed, and it then tells the reader the recognizer misbehaved.
@@ -282,15 +282,6 @@ public enum VoiceControlCodec {
             bitstreamVersion: content[26],
             frameSize: frameSize
         )
-    }
-
-    private static func uuid(from bytes: [UInt8]) -> UUID {
-        UUID(uuid: (
-            bytes[0], bytes[1], bytes[2], bytes[3],
-            bytes[4], bytes[5], bytes[6], bytes[7],
-            bytes[8], bytes[9], bytes[10], bytes[11],
-            bytes[12], bytes[13], bytes[14], bytes[15]
-        ))
     }
 }
 

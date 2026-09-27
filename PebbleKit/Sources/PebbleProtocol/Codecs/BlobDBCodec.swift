@@ -33,7 +33,7 @@ public struct ApplicationMetadata: Equatable, Sendable {
     public var name: String
 
     public func encoded() -> [UInt8] {
-        var bytes = BlobDBCodec.uuidBytes(applicationID)
+        var bytes = applicationID.bytes
         bytes.append(contentsOf: flags.littleEndianBytes)
         bytes.append(contentsOf: iconResourceID.littleEndianBytes)
         bytes.append(appVersionMajor)
@@ -67,15 +67,43 @@ public enum BlobDBCodec {
         metadata: ApplicationMetadata,
         token: UInt16
     ) -> PebbleProtocolFrame {
-        insertFrame(
+        uncheckedInsertFrame(
             databaseID: applicationDatabaseID,
-            key: uuidBytes(metadata.applicationID),
+            key: metadata.applicationID.bytes,
             value: metadata.encoded(),
             token: token
         )
     }
 
     public static func insertFrame(
+        databaseID: UInt8,
+        key: [UInt8],
+        value: [UInt8],
+        token: UInt16
+    ) throws -> PebbleProtocolFrame {
+        guard key.count <= Int(UInt8.max) else { throw BlobDBCodecError.keyTooLong }
+        guard value.count <= Int(UInt16.max) else { throw BlobDBCodecError.valueTooLarge }
+        return uncheckedInsertFrame(databaseID: databaseID, key: key, value: value, token: token)
+    }
+
+    public static func deleteApplicationFrame(
+        applicationID: UUID,
+        token: UInt16
+    ) -> PebbleProtocolFrame {
+        uncheckedDeleteFrame(databaseID: applicationDatabaseID, key: applicationID.bytes, token: token)
+    }
+
+    public static func deleteFrame(databaseID: UInt8, key: [UInt8], token: UInt16) throws -> PebbleProtocolFrame {
+        guard key.count <= Int(UInt8.max) else { throw BlobDBCodecError.keyTooLong }
+        return uncheckedDeleteFrame(databaseID: databaseID, key: key, token: token)
+    }
+
+    // For a record whose key and value this module lays out at a size that
+    // cannot vary — a UUID key, a settings name, a packed struct. Going through
+    // the throwing builders there would put a `try` on every settings write for
+    // a length check that can never fail; a length that does vary with what the
+    // reader has (a bundle ID, a pin's text) goes through them instead.
+    static func uncheckedInsertFrame(
         databaseID: UInt8,
         key: [UInt8],
         value: [UInt8],
@@ -89,22 +117,7 @@ public enum BlobDBCodec {
         return PebbleProtocolFrame(endpoint: endpoint, payload: payload)
     }
 
-    public static func deleteApplicationFrame(
-        applicationID: UUID,
-        token: UInt16
-    ) -> PebbleProtocolFrame {
-        let key = uuidBytes(applicationID)
-        var payload = commonHeader(
-            command: 0x04,
-            token: token,
-            databaseID: applicationDatabaseID
-        )
-        payload.append(UInt8(key.count))
-        payload.append(contentsOf: key)
-        return PebbleProtocolFrame(endpoint: endpoint, payload: payload)
-    }
-
-    public static func deleteFrame(databaseID: UInt8, key: [UInt8], token: UInt16) -> PebbleProtocolFrame {
+    static func uncheckedDeleteFrame(databaseID: UInt8, key: [UInt8], token: UInt16) -> PebbleProtocolFrame {
         var payload = commonHeader(command: 0x04, token: token, databaseID: databaseID)
         payload.append(UInt8(key.count))
         payload.append(contentsOf: key)
@@ -135,13 +148,6 @@ public enum BlobDBCodec {
         return BlobDBResponse(token: token, status: status)
     }
 
-    static func uuidBytes(_ uuid: UUID) -> [UInt8] {
-        uuid.uuidString
-            .filter { $0 != "-" }
-            .strideChunks(ofCount: 2)
-            .compactMap { UInt8($0, radix: 16) }
-    }
-
     private static func commonHeader(
         command: UInt8,
         token: UInt16,
@@ -155,17 +161,8 @@ public enum BlobDBCodecError: Error, Equatable, Sendable {
     case unexpectedEndpoint
     case invalidPayload
     case unknownStatus
-}
-
-private extension String {
-    func strideChunks(ofCount count: Int) -> [Substring] {
-        var chunks: [Substring] = []
-        var start = startIndex
-        while start < endIndex {
-            let end = index(start, offsetBy: count, limitedBy: endIndex) ?? endIndex
-            chunks.append(self[start..<end])
-            start = end
-        }
-        return chunks
-    }
+    /// Longer than the key's one length byte can say.
+    case keyTooLong
+    /// Longer than the value's two length bytes can say.
+    case valueTooLarge
 }

@@ -9,11 +9,11 @@ public enum AppRunStateCodec {
     public static var endpoint: UInt16 { 52 }
 
     public static func startFrame(applicationID: UUID) -> PebbleProtocolFrame {
-        PebbleProtocolFrame(endpoint: endpoint, payload: [0x01] + BlobDBCodec.uuidBytes(applicationID))
+        PebbleProtocolFrame(endpoint: endpoint, payload: [0x01] + applicationID.bytes)
     }
 
     public static func stopFrame(applicationID: UUID) -> PebbleProtocolFrame {
-        PebbleProtocolFrame(endpoint: endpoint, payload: [0x02] + BlobDBCodec.uuidBytes(applicationID))
+        PebbleProtocolFrame(endpoint: endpoint, payload: [0x02] + applicationID.bytes)
     }
 
     public static func requestFrame() -> PebbleProtocolFrame {
@@ -24,20 +24,14 @@ public enum AppRunStateCodec {
         guard frame.endpoint == endpoint, frame.payload.count >= 17 else {
             throw AppRunStateCodecError.invalidPayload
         }
-        let id = try uuid(Array(frame.payload[1..<17]))
+        guard let id = UUID(bytes: frame.payload[1..<17]) else {
+            throw AppRunStateCodecError.invalidPayload
+        }
         switch frame.payload[0] {
         case 0x01: return .started(id)
         case 0x02: return .stopped(id)
         default: throw AppRunStateCodecError.invalidPayload
         }
-    }
-
-    private static func uuid(_ bytes: [UInt8]) throws -> UUID {
-        guard bytes.count == 16 else { throw AppRunStateCodecError.invalidPayload }
-        let hex = bytes.hexadecimalString
-        let value = "\(hex.prefix(8))-\(hex.dropFirst(8).prefix(4))-\(hex.dropFirst(12).prefix(4))-\(hex.dropFirst(16).prefix(4))-\(hex.dropFirst(20))"
-        guard let id = UUID(uuidString: value) else { throw AppRunStateCodecError.invalidPayload }
-        return id
     }
 }
 

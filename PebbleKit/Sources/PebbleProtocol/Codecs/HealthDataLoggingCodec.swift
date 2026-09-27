@@ -35,11 +35,18 @@ public struct HealthDataLoggingProcessor: Sendable {
                 response: HealthDataLoggingCodec.ackFrame(sessionID: sessionID),
                 samples: try samples(from: payload, session: session)
             )
-        case 0x03, 0x07:
+        case 0x03:
             guard frame.payload.count >= 2 else { throw HealthDataLoggingError.invalidPayload }
             let sessionID = frame.payload[1]
             sessions.removeValue(forKey: sessionID)
             return HealthDataLoggingResult(response: HealthDataLoggingCodec.ackFrame(sessionID: sessionID))
+        case 0x07:
+            // `DataLoggingEndpointCmdTimeout` says the watch gave up waiting for
+            // an ACK, not that the session closed: `check_ack_timeout_for_session`
+            // (`services/data_logging/dls_endpoint.c`) only returns it to idle and
+            // sends the data again. Forgetting the session here NACKs that resend,
+            // and an ACK now reaches an idle session as "Unexpected ACK".
+            return HealthDataLoggingResult()
         default:
             return HealthDataLoggingResult()
         }
@@ -186,10 +193,11 @@ public struct HealthDataLoggingProcessor: Sendable {
             let rawOffset = Int32(bitPattern: try uint32(bytes, at: itemStart + SessionRecord.utcOffset))
             let start = try uint32(bytes, at: itemStart + SessionRecord.start)
             let duration = try uint32(bytes, at: itemStart + SessionRecord.duration)
+            guard !start.addingReportingOverflow(duration).overflow else { continue }
             let timeZone = TimeZone(secondsFromGMT: Int(rawOffset)) ?? .current
             var calendar = Calendar(identifier: .gregorian)
             calendar.timeZone = timeZone
-            let endDate = Date(timeIntervalSince1970: TimeInterval(start + duration))
+            let endDate = Date(timeIntervalSince1970: TimeInterval(start) + TimeInterval(duration))
             let day = calendar.startOfDay(for: endDate)
             var value = daily[day, default: ([], [], timeZone.identifier)]
             switch type {

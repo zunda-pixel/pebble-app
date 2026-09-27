@@ -55,14 +55,18 @@ public struct PebbleProtocolFrameDecoder: Sendable {
     public mutating func append(_ bytes: [UInt8]) -> PebbleProtocolFrameBatch {
         buffer.append(contentsOf: bytes)
         var frames: [PebbleProtocolFrame] = []
+        var failure: PebbleProtocolFrameError?
 
         while buffer.count >= 4 {
             let payloadLength = Int(UInt16(buffer[0]) << 8 | UInt16(buffer[1]))
             guard payloadLength > 0 else {
                 // A zero length says the stream is no longer on a frame boundary. Drop the
-                // prefix so the next chunk can resynchronise.
+                // prefix and keep reading: returning here would leave any frame behind it
+                // in the buffer until the watch next sent something, and a reply a caller
+                // waits for could be one of them.
                 buffer.removeFirst(4)
-                return PebbleProtocolFrameBatch(frames: frames, failure: .emptyPayload)
+                failure = .emptyPayload
+                continue
             }
 
             let frameLength = payloadLength + 4
@@ -76,7 +80,7 @@ public struct PebbleProtocolFrameDecoder: Sendable {
             buffer.removeFirst(frameLength)
         }
 
-        return PebbleProtocolFrameBatch(frames: frames)
+        return PebbleProtocolFrameBatch(frames: frames, failure: failure)
     }
 }
 

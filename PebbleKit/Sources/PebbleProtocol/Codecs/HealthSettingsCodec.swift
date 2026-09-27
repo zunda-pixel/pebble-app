@@ -128,7 +128,7 @@ public enum HealthSettingsCodec {
         _ isEnabled: Bool,
         token: UInt16
     ) -> PebbleProtocolFrame {
-        BlobDBCodec.insertFrame(
+        BlobDBCodec.uncheckedInsertFrame(
             databaseID: databaseID,
             key: Array(bloodOxygenKey.utf8),
             value: [isEnabled ? 1 : 0],
@@ -142,7 +142,7 @@ public enum HealthSettingsCodec {
         _ interval: HeartRateInterval,
         token: UInt16
     ) -> PebbleProtocolFrame {
-        BlobDBCodec.insertFrame(
+        BlobDBCodec.uncheckedInsertFrame(
             databaseID: databaseID,
             key: Array(spo2IntervalKey.utf8),
             value: [interval.rawValue],
@@ -155,7 +155,7 @@ public enum HealthSettingsCodec {
         _ isEnabled: Bool,
         token: UInt16
     ) -> PebbleProtocolFrame {
-        BlobDBCodec.insertFrame(
+        BlobDBCodec.uncheckedInsertFrame(
             databaseID: databaseID,
             key: Array(bloodOxygenActivityKey.utf8),
             value: [isEnabled ? 1 : 0],
@@ -167,7 +167,7 @@ public enum HealthSettingsCodec {
         _ preferences: HeartRateZonePreferences,
         token: UInt16
     ) -> PebbleProtocolFrame {
-        BlobDBCodec.insertFrame(
+        BlobDBCodec.uncheckedInsertFrame(
             databaseID: databaseID,
             key: Array(heartRateZonesKey.utf8),
             value: preferences.encoded(),
@@ -179,7 +179,7 @@ public enum HealthSettingsCodec {
         _ settings: ActivitySettings,
         token: UInt16
     ) -> PebbleProtocolFrame {
-        BlobDBCodec.insertFrame(
+        BlobDBCodec.uncheckedInsertFrame(
             databaseID: databaseID,
             key: Array(activityKey.utf8),
             value: settings.encoded(),
@@ -191,7 +191,7 @@ public enum HealthSettingsCodec {
         _ settings: HeartRateSettings,
         token: UInt16
     ) -> PebbleProtocolFrame {
-        BlobDBCodec.insertFrame(
+        BlobDBCodec.uncheckedInsertFrame(
             databaseID: databaseID,
             key: Array(heartRateKey.utf8),
             value: settings.encoded(),

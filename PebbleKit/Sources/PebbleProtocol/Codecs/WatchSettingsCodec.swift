@@ -410,23 +410,16 @@ public struct QuickLaunchAssignment: Codable, Equatable, Sendable {
     }
 
     public func encoded() -> [UInt8] {
-        let bytes = applicationID.uuid
-        return [isEnabled ? 1 : 0] + [
-            bytes.0, bytes.1, bytes.2, bytes.3, bytes.4, bytes.5, bytes.6, bytes.7,
-            bytes.8, bytes.9, bytes.10, bytes.11, bytes.12, bytes.13, bytes.14, bytes.15,
-        ]
+        [isEnabled ? 1 : 0] + applicationID.bytes
     }
 
     /// Nil for anything that is not exactly seventeen bytes: the firmware
     /// reads the record back into a struct of that size, and a record of any
     /// other length never reaches its handler.
     public init?(decoding value: [UInt8]) {
-        guard value.count == 17 else { return nil }
+        guard value.count == 17, let applicationID = UUID(bytes: value[1...]) else { return nil }
         isEnabled = value[0] != 0
-        applicationID = UUID(uuid: (
-            value[1], value[2], value[3], value[4], value[5], value[6], value[7], value[8],
-            value[9], value[10], value[11], value[12], value[13], value[14], value[15], value[16]
-        ))
+        self.applicationID = applicationID
     }
 }
 
@@ -462,7 +455,7 @@ public enum WatchSettingsCodec {
         rawValue: Int,
         token: UInt16
     ) -> PebbleProtocolFrame {
-        BlobDBCodec.insertFrame(
+        BlobDBCodec.uncheckedInsertFrame(
             databaseID: databaseID,
             key: key(for: setting),
             // As many bytes as the firmware's own variable, little-endian the
@@ -480,7 +473,7 @@ public enum WatchSettingsCodec {
         assignment: QuickLaunchAssignment,
         token: UInt16
     ) -> PebbleProtocolFrame {
-        BlobDBCodec.insertFrame(
+        BlobDBCodec.uncheckedInsertFrame(
             databaseID: databaseID,
             key: Array(button.rawValue.utf8) + [0],
             value: assignment.encoded(),
@@ -502,17 +495,14 @@ public enum WatchSettingsCodec {
 
     /// One record the watch pushed back, where this app has a switch for it.
     ///
-    /// Nil for a key this app does not model, which is most of them: the
-    /// firmware's `s_syncable_settings` and `s_syncable_notif_prefs` in
-    /// `src/fw/services/blob_db/settings_blob_db.c` list some seventy keys
-    /// between them, and all nine of this app's are in the first list. The rest
-    /// are settings only the watch offers — `lightTimeoutMs`, `language`, the
-    /// quick-launch buttons, the do-not-disturb schedules — and several are not
-    /// booleans at all, so there is nowhere on this side to put them.
+    /// Nil for a key this app does not model: the firmware's
+    /// `s_syncable_settings` and `s_syncable_notif_prefs`
+    /// (`services/blob_db/settings_blob_db.c`) list some seventy keys, and
+    /// many are settings only the watch offers.
     ///
-    /// Nil too for a value that is not one byte, rather than reading the first
-    /// byte of something that was never one — `lightTimeoutMs` is four, and its
-    /// first byte is not a small number that means anything.
+    /// Nil too for a value whose width is not the setting's, rather than
+    /// reading part of something wider — the first byte of a four-byte
+    /// duration is not a small number that means anything.
     public static func decodeRecord(key: [UInt8], value: [UInt8]) -> (WatchSetting, Int)? {
         // The watch may send the name with its terminator or without it, the
         // same way the firmware accepts both from the phone.
@@ -532,5 +522,3 @@ public enum WatchSettingsCodec {
     }
 }
 
-/// The firmware keeps this as one packed record and takes it whole: sent
-/// with a height of zero, the watch has a wearer with no height.

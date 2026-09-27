@@ -127,10 +127,6 @@ public enum ImagingCodec {
         flagsFrame(token: token, kindValue: kindValue, flags: unsupportedFlag)
     }
 
-    public static func noImageFrame(token: UInt8, kindValue: UInt8) -> PebbleProtocolFrame {
-        flagsFrame(token: token, kindValue: kindValue, flags: noImageFlag)
-    }
-
     static func flagsFrame(token: UInt8, kindValue: UInt8, flags: UInt8) -> PebbleProtocolFrame {
         PebbleProtocolFrame(
             endpoint: endpoint,

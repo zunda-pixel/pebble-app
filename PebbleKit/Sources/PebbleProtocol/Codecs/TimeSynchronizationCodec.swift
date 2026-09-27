@@ -3,6 +3,13 @@ public import Foundation
 public enum TimeSynchronizationCodec {
     public static var endpoint: UInt16 { 11 }
 
+    /// The watch asks for the phone's time with a bare `0x04`
+    /// (`clock_request_time_from_phone`, `services/clock/service.c`) and waits
+    /// for ``frame(date:timeZone:)`` in answer.
+    public static func isTimeRequest(_ frame: PebbleProtocolFrame) -> Bool {
+        frame.endpoint == endpoint && frame.payload.first == 0x04
+    }
+
     public static func frame(
         date: Date = Date(),
         timeZone: TimeZone = .current

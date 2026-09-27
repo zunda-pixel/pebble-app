@@ -112,11 +112,43 @@ public struct NotificationSourceApp: Codable, Equatable, Sendable, Identifiable 
     ///
     /// A watch that reports no capabilities at all has not been asked yet;
     /// nothing extra goes to it either.
-    public func asUnderstoodBy(_ device: ConnectedWatch) -> NotificationSourceApp {
+    public func asUnderstoodBy(_ watch: ConnectedWatch) -> NotificationSourceApp {
         var record = self
-        if !device.supportsCustomVibePatterns { record.vibePattern = nil }
-        if !device.supportsNotificationFiltering { record.filterRules = [] }
+        if !watch.supportsCustomVibePatterns { record.vibePattern = nil }
+        if !watch.supportsNotificationFiltering { record.filterRules = [] }
         return record
+    }
+}
+
+public extension NotificationFilterRule {
+    // Not the synthesized decoder: that reads a field with a default through
+    // `decode`, so a file written before the field existed fails to decode and
+    // `PersistentJSON.loadRecovering` sets the whole file aside.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        pattern = try container.decode(String.self, forKey: .pattern)
+        field = try container.decodeIfPresent(NotificationRuleField.self, forKey: .field) ?? .anywhere
+        isCaseSensitive = try container.decodeIfPresent(Bool.self, forKey: .isCaseSensitive) ?? false
+    }
+}
+
+public extension NotificationSourceApp {
+    // Not the synthesized decoder: that reads a field with a default through
+    // `decode`, so a file written before the field existed fails to decode and
+    // `PersistentJSON.loadRecovering` sets the whole file aside.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        bundleID = try container.decode(String.self, forKey: .bundleID)
+        displayName = try container.decode(String.self, forKey: .displayName)
+        muteState = try container.decodeIfPresent(NotificationAppMuteState.self, forKey: .muteState) ?? .never
+        muteExpiration = try container.decodeIfPresent(Date.self, forKey: .muteExpiration)
+        stateUpdated = try container.decodeIfPresent(Date.self, forKey: .stateUpdated) ?? .now
+        icon = try container.decodeIfPresent(TimelineIcon.self, forKey: .icon)
+        backgroundColor = try container.decodeIfPresent(PebbleColor.self, forKey: .backgroundColor)
+        foregroundColor = try container.decodeIfPresent(PebbleColor.self, forKey: .foregroundColor)
+        vibePattern = try container.decodeIfPresent(NotificationVibePattern.self, forKey: .vibePattern)
+        filterRules = try container.decodeIfPresent([NotificationFilterRule].self, forKey: .filterRules) ?? []
     }
 }
 
@@ -180,8 +212,8 @@ public enum NotificationAppsCodec {
         return value
     }
 
-    public static func insertFrame(app: NotificationSourceApp, token: UInt16) -> PebbleProtocolFrame {
-        BlobDBCodec.insertFrame(
+    public static func insertFrame(app: NotificationSourceApp, token: UInt16) throws -> PebbleProtocolFrame {
+        try BlobDBCodec.insertFrame(
             databaseID: databaseID,
             key: key(for: app),
             value: value(for: app),
@@ -189,8 +221,8 @@ public enum NotificationAppsCodec {
         )
     }
 
-    public static func deleteFrame(bundleID: String, token: UInt16) -> PebbleProtocolFrame {
-        BlobDBCodec.deleteFrame(databaseID: databaseID, key: Array(bundleID.utf8), token: token)
+    public static func deleteFrame(bundleID: String, token: UInt16) throws -> PebbleProtocolFrame {
+        try BlobDBCodec.deleteFrame(databaseID: databaseID, key: Array(bundleID.utf8), token: token)
     }
 
     public static func decodeRecord(
@@ -298,103 +330,4 @@ public enum NotificationAppsCodec {
 
 public enum NotificationAppsCodecError: Error, Equatable, Sendable {
     case invalidRecord
-}
-
-public enum BlobDB2Message: Equatable, Sendable {
-    case write(BlobDB2Write)
-    case writeBack(BlobDB2Write)
-    case syncDone(tokenBytes: [UInt8])
-}
-
-@MemberwiseInit(.public)
-public struct BlobDB2Write: Equatable, Sendable {
-    public var tokenBytes: [UInt8]
-    public var databaseID: UInt8
-    public var timestamp: UInt32
-    public var key: [UInt8]
-    public var value: [UInt8]
-}
-
-/// The watch pushes its own records on this endpoint and expects an
-/// acknowledgement for each.
-public enum BlobDB2Codec {
-    public static var endpoint: UInt16 { 0xB2DB }
-
-    public static func decode(_ frame: PebbleProtocolFrame) throws -> BlobDB2Message {
-        guard frame.endpoint == endpoint else {
-            throw BlobDB2CodecError.unexpectedEndpoint
-        }
-        guard frame.payload.count >= 3 else {
-            throw BlobDB2CodecError.invalidPayload
-        }
-        let tokenBytes = Array(frame.payload[1...2])
-        switch frame.payload[0] {
-        case 0x08:
-            return .write(try decodeWrite(frame.payload, tokenBytes: tokenBytes))
-        case 0x09:
-            return .writeBack(try decodeWrite(frame.payload, tokenBytes: tokenBytes))
-        case 0x0A:
-            return .syncDone(tokenBytes: tokenBytes)
-        default:
-            throw BlobDB2CodecError.unsupportedCommand
-        }
-    }
-
-    public static func responseFrame(
-        to message: BlobDB2Message,
-        succeeded: Bool
-    ) -> PebbleProtocolFrame {
-        let command: UInt8
-        let tokenBytes: [UInt8]
-        switch message {
-        case .write(let write):
-            command = 0x88
-            tokenBytes = write.tokenBytes
-        case .writeBack(let write):
-            command = 0x89
-            tokenBytes = write.tokenBytes
-        case .syncDone(let bytes):
-            command = 0x8A
-            tokenBytes = bytes
-        }
-        let status: UInt8 = succeeded ? 0x01 : 0x05
-        return PebbleProtocolFrame(endpoint: endpoint, payload: [command] + tokenBytes + [status])
-    }
-
-    private static func decodeWrite(_ payload: [UInt8], tokenBytes: [UInt8]) throws -> BlobDB2Write {
-        guard payload.count >= 9 else {
-            throw BlobDB2CodecError.invalidPayload
-        }
-        let databaseID = payload[3]
-        let timestamp = UInt32(payload[4])
-            | UInt32(payload[5]) << 8
-            | UInt32(payload[6]) << 16
-            | UInt32(payload[7]) << 24
-        let keySize = Int(payload[8])
-        var offset = 9
-        guard payload.count >= offset + keySize + 2 else {
-            throw BlobDB2CodecError.invalidPayload
-        }
-        let key = Array(payload[offset..<offset + keySize])
-        offset += keySize
-        let valueSize = Int(payload[offset]) | Int(payload[offset + 1]) << 8
-        offset += 2
-        guard payload.count >= offset + valueSize else {
-            throw BlobDB2CodecError.invalidPayload
-        }
-        let value = Array(payload[offset..<offset + valueSize])
-        return BlobDB2Write(
-            tokenBytes: tokenBytes,
-            databaseID: databaseID,
-            timestamp: timestamp,
-            key: key,
-            value: value
-        )
-    }
-}
-
-public enum BlobDB2CodecError: Error, Equatable, Sendable {
-    case unexpectedEndpoint
-    case invalidPayload
-    case unsupportedCommand
 }

@@ -35,7 +35,7 @@ public enum AppMessageCodec {
             throw AppMessageCodecError.tooManyTuples
         }
         var payload: [UInt8] = [0x01, message.transactionID]
-        payload.append(contentsOf: uuidBytes(message.applicationID))
+        payload.append(contentsOf: message.applicationID.bytes)
         payload.append(UInt8(message.tuples.count))
         for tuple in message.tuples {
             payload.append(contentsOf: try encode(tuple))
@@ -101,7 +101,7 @@ public enum AppMessageCodec {
 
     private static func decodePush(_ payload: [UInt8]) throws -> AppMessageData {
         guard payload.count >= 19,
-              let applicationID = uuid(from: payload[2..<18]) else {
+              let applicationID = UUID(bytes: payload[2..<18]) else {
             throw AppMessageCodecError.invalidPayload
         }
         let count = Int(payload[18])
@@ -174,16 +174,6 @@ public enum AppMessageCodec {
         }
     }
 
-    private static func uuidBytes(_ uuid: UUID) -> [UInt8] {
-        uuid.uuidString.filter { $0 != "-" }.appMessageChunks(ofCount: 2)
-            .compactMap { UInt8($0, radix: 16) }
-    }
-
-    private static func uuid(from bytes: ArraySlice<UInt8>) -> UUID? {
-        let digits = Array("0123456789ABCDEF")
-        let value = String(bytes.flatMap { [digits[Int($0 >> 4)], digits[Int($0 & 0x0F)]] })
-        return UUID(uuidString: "\(value.prefix(8))-\(value.dropFirst(8).prefix(4))-\(value.dropFirst(12).prefix(4))-\(value.dropFirst(16).prefix(4))-\(value.dropFirst(20))")
-    }
 }
 
 public enum AppMessageCodecError: Error, Equatable, Sendable {
@@ -195,17 +185,4 @@ public enum AppMessageCodecError: Error, Equatable, Sendable {
     case unknownTupleType
     case invalidString
     case invalidNumberSize
-}
-
-private extension String {
-    func appMessageChunks(ofCount count: Int) -> [Substring] {
-        var chunks: [Substring] = []
-        var start = startIndex
-        while start < endIndex {
-            let end = index(start, offsetBy: count, limitedBy: endIndex) ?? endIndex
-            chunks.append(self[start..<end])
-            start = end
-        }
-        return chunks
-    }
 }

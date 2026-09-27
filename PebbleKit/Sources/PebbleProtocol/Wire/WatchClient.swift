@@ -107,7 +107,7 @@ public protocol WatchClient: Sendable {
         to target: WatchConnectionTarget,
         reportingPhase: @escaping @MainActor (WatchHandshakePhase) -> Void
     ) async throws -> ConnectedWatch
-    func disconnect(from device: ConnectedWatch) async
+    func disconnect(from watch: ConnectedWatch) async
     func send(_ frame: PebbleProtocolFrame) async throws
     func frames() -> AsyncStream<PebbleProtocolFrame>
     func events() -> AsyncStream<WatchClientEvent>
@@ -164,15 +164,15 @@ public extension WatchClient {
 
     /// The scan-result conveniences, so a test can connect to what it scanned
     /// without spelling the conversion.
-    func connect(to device: DiscoveredWatch) async throws -> ConnectedWatch {
-        try await connect(to: device.connectionTarget, reportingPhase: { _ in })
+    func connect(to watch: DiscoveredWatch) async throws -> ConnectedWatch {
+        try await connect(to: watch.connectionTarget, reportingPhase: { _ in })
     }
 
     func connect(
-        to device: DiscoveredWatch,
+        to watch: DiscoveredWatch,
         reportingPhase: @escaping @MainActor (WatchHandshakePhase) -> Void
     ) async throws -> ConnectedWatch {
-        try await connect(to: device.connectionTarget, reportingPhase: reportingPhase)
+        try await connect(to: watch.connectionTarget, reportingPhase: reportingPhase)
     }
 
     func retrieveKnownWatches(_ hints: [WatchConnectionTarget]) async throws -> [DiscoveredWatch] {
@@ -222,6 +222,11 @@ public enum WatchPullError: Error, Equatable, Sendable {
     /// it, and guessing at it would report one of the watch's answers as
     /// another's.
     case answeredSomethingElse(WatchPullRequest)
+}
+
+public enum PutBytesClientError: Error, Equatable, Sendable {
+    case transferAlreadyInProgress
+    case firmwareUpdateAlreadyInProgress
 }
 
 public enum AppMessageClientError: Error, Equatable, Sendable {

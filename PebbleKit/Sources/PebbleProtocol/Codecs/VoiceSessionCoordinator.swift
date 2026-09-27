@@ -1,5 +1,4 @@
 import Foundation
-import MemberwiseInit
 
 public enum VoiceTranscriptionOutcome: Equatable, Sendable {
     case transcribed([VoiceTranscriptionWord])
