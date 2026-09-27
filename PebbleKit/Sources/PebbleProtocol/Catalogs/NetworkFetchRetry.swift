@@ -8,7 +8,8 @@ extension RetryConfiguration where ClockType == ContinuousClock {
     static var networkFetch: Self {
         RetryConfiguration(
             maxAttempts: 3,
-            backoff: .default(baseDelay: .milliseconds(500), maxDelay: .seconds(4))
+            backoff: .default(baseDelay: .milliseconds(500), maxDelay: .seconds(4)),
+            recoverFromFailure: { $0 is InsecureURLError ? .throw : .retry }
         )
     }
 }

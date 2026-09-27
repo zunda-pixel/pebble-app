@@ -61,7 +61,7 @@ extension ApplicationCatalog {
                 .accept: "application/json",
             ]
         )
-        let (data, response) = try await session.upload(
+        let (data, response) = try await session.httpsUpload(
             for: request,
             from: try JSONEncoder().encode(body)
         )
@@ -106,7 +106,7 @@ extension ApplicationCatalog {
         for board in preferred {
             guard let collection = collections.first(where: { $0.hardwarePlatform == board })
             else { continue }
-            let urls = (collection.screenshots ?? []).compactMap(URL.init(string:))
+            let urls = (collection.screenshots ?? []).compactMap(URL.init(string:)).filter(\.isHTTPS)
             if !urls.isEmpty { return urls }
         }
         return nil
@@ -122,7 +122,7 @@ extension ApplicationCatalog {
             url: (feedURLOverride ?? source.feedURL).appending(path: "v1/apps/bulk"),
             headerFields: [.contentType: "application/json", .accept: "application/json"]
         )
-        let (data, response) = try await session.upload(
+        let (data, response) = try await session.httpsUpload(
             for: request,
             from: try JSONEncoder().encode(BulkLookup(ids: ids))
         )

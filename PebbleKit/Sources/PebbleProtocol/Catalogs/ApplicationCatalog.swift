@@ -412,7 +412,7 @@ public actor ApplicationCatalog {
     private func responseDataAllowingNotFound(from url: URL) async throws -> Data? {
         try await retry(with: .networkFetch) {
             let request = HTTPRequest(method: .get, url: url, headerFields: [.accept: "application/json"])
-            let (data, response) = try await session.data(for: request)
+            let (data, response) = try await session.httpsData(for: request)
             if response.status == .notFound { return nil }
             guard response.status == .ok else {
                 let error = ApplicationCatalogError.invalidResponse
@@ -428,7 +428,7 @@ public actor ApplicationCatalog {
     private func responseData(from url: URL) async throws -> Data {
         try await retry(with: .networkFetch) {
             let request = HTTPRequest(method: .get, url: url, headerFields: [.accept: "application/json"])
-            let (data, response) = try await session.data(for: request)
+            let (data, response) = try await session.httpsData(for: request)
             guard response.status == .ok else {
                 let error = ApplicationCatalogError.invalidResponse
                 throw response.status.isWorthAnotherAttempt ? error : NotRetryable(error)
@@ -566,8 +566,8 @@ struct OfficialCatalogApplication: Decodable {
             category: category?.nilWhenEmpty,
             summary: description?.nilWhenEmpty,
             releaseNotes: release.releaseNotes,
-            iconURL: iconImage?.values.compactMap(URL.init(string:)).first,
-            screenshotURLs: screenshotImages?.flatMap { $0.values }.compactMap(URL.init(string:)) ?? [],
+            iconURL: iconImage?.values.compactMap(URL.init(string:)).first(where: \.isHTTPS),
+            screenshotURLs: screenshotImages?.flatMap { $0.values }.compactMap(URL.init(string:)).filter(\.isHTTPS) ?? [],
             capabilities: capabilities ?? [],
             sourceID: sourceID,
             // Newest first however the store ordered them; an entry that names

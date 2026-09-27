@@ -24,18 +24,16 @@ func downloadFile(
     from url: URL,
     using session: URLSession
 ) async throws -> URL {
-    guard url.scheme?.lowercased() == "https" else {
+    let temporaryURL: URL
+    let response: HTTPResponse
+    do {
+        (temporaryURL, response) = try await session.httpsDownload(for: HTTPRequest(method: .get, url: url))
+    } catch is InsecureURLError {
         throw HTTPFileDownloadError.insecureURL
     }
-    guard let request = URLRequest(httpRequest: HTTPRequest(method: .get, url: url)) else {
-        throw HTTPFileDownloadError.invalidRequest
-    }
-    let (temporaryURL, response) = try await session.download(for: request)
-    guard let status = (response as? HTTPURLResponse)?.httpResponse?.status else {
-        throw HTTPFileDownloadError.invalidRequest
-    }
-    guard status == .ok else {
-        throw HTTPFileDownloadError.unsuccessfulReply(status)
+    guard response.status == .ok else {
+        try? FileManager.default.removeItem(at: temporaryURL)
+        throw HTTPFileDownloadError.unsuccessfulReply(response.status)
     }
     return temporaryURL
 }

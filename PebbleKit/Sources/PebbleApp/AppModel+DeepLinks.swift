@@ -123,7 +123,7 @@ extension AppModel {
                 try? FileManager.default.removeItem(at: source)
             }
         } else {
-            let (downloaded, response) = try await URLSession.shared.download(from: source)
+            let (downloaded, response) = try await URLSession.shared.httpsDownload(from: source)
             guard (response as? HTTPURLResponse)?.statusCode == 200 else {
                 throw DeepLinkPackageError.notFound
             }

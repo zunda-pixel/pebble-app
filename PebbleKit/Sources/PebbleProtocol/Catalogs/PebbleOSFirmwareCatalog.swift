@@ -53,7 +53,7 @@ public struct PebbleOSFirmwareCatalog: Sendable {
                 url: releasesURL,
                 headerFields: [.accept: "application/vnd.github+json"]
             )
-            let (data, response) = try await session.data(for: request)
+            let (data, response) = try await session.httpsData(for: request)
             guard response.status == .ok else {
                 let error = PebbleOSFirmwareCatalogError.releasesUnavailable
                 throw response.status.isWorthAnotherAttempt ? error : NotRetryable(error)
