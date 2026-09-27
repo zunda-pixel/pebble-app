@@ -15,17 +15,14 @@ private final class NotificationObserverStorage: @unchecked Sendable {
 }
 
 /// What is left here is the link: the radio, the handshake, the PPoG session,
-/// the frame dispatch and the health check that decides a link has died. What
-/// the watch is *asked* for lives beside it — `+Records` for the BlobDB writes
-/// and the transfers, `+Pulls` for the three longer answers — and the two
-/// delegate conformances in `+Central` and `+Peripheral`.
+/// and the health check that decides a link has died. What the watch is
+/// *asked* for, and how its answers are read, is `WatchSession`'s, which the
+/// emulator's client shares; `+Records` hands it on. The two delegate
+/// conformances are in `+Central` and `+Peripheral`.
 ///
 /// Swift has no access level for "this type across its files", so everything
-/// those four files touch is `internal` rather than `private`. That is the
-/// price of the split, and it was worth paying only once the twenty typed
-/// BlobDB methods had collapsed into `write(_:)` and `remove(_:)`: before
-/// that, the records and the link were interleaved and there was no seam to
-/// cut along. `internal` reaches no further than this module.
+/// those files touch is `internal` rather than `private`. `internal` reaches no
+/// further than this module.
 @MainActor
 public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     static let ppogService = CBUUID(string: "40000000-328E-0FBB-C642-1AA6699BDADA")
@@ -91,31 +88,24 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     private var healthCheckTimeoutTask: Task<Void, Never>?
     let reconnects = ReconnectPolicy()
     private var isAwaitingHealthCheckReply = false
-    var activeTransferSession: PutBytesTransferSession?
-    /// The token the watch gave the transfer in flight, which an abort has to
-    /// name.
-    var activeTransferCookie: UInt32?
-    let firmwareReply = PendingReply<Void>()
-    var waitingForFirmwareStart = false
-    var isInstallingFirmware = false
-    var pendingInstallCookie: UInt32?
-    let transferReply = PendingReply<UInt32>()
-    /// Whose turn it is to transfer. The same turn-taking as BlobDB's, for the
-    /// same reason.
-    let transferQueue = BlobDBQueue()
-    var nextBlobDBToken: UInt16 = 1
-    var pendingBlobDBToken: UInt16?
-    var acceptedBlobDBStatuses: [BlobDBStatus] = []
-    let blobDBReply = PendingReply<Void>()
-    let blobDBQueue = BlobDBQueue()
-    let appReorderReply = PendingReply<Void>()
-    private let appMessages = AppMessageQueue()
-    private var healthDataLoggingProcessor = HealthDataLoggingProcessor()
-    let screenshot = WatchPull<ScreenshotCollector>(timeout: .seconds(30))
-    let logDump = WatchPull<LogDumpCollector>(timeout: .seconds(30))
-    var nextLogDumpCookie: UInt32 = 1
-    let fileBytes = WatchPull<GetBytesCollector>(timeout: .seconds(60))
-    var nextGetBytesTransactionID: UInt8 = 1
+    /// Lazy so that it can hold on to this client weakly: an initializer
+    /// cannot hand out `self` before every property is set.
+    lazy var session = WatchSession(
+        tag: clientTag,
+        operatingSystem: Self.operatingSystem,
+        isLinked: { [weak self] in (try? self?.linkedPeripheral()) != nil },
+        send: { [weak self] frame in
+            guard let self else { throw WatchConnectionError.disconnected }
+            try self.sendFrame(frame, to: try self.linkedPeripheral())
+        },
+        report: { [weak self] event in self?.eventContinuation?.yield(event) }
+    )
+
+    #if os(macOS)
+    private static let operatingSystem = PhoneOperatingSystem.macOS
+    #else
+    private static let operatingSystem = PhoneOperatingSystem.iOS
+    #endif
 
     let clientTag: String
 
@@ -125,10 +115,6 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         self.restoreIdentifier = restoreIdentifier
         clientTag = String(restoreIdentifier.split(separator: ".").last ?? "central")
         super.init()
-        appMessages.send = { [weak self] data in
-            guard let self else { throw WatchConnectionError.disconnected }
-            try sendFrame(AppMessageCodec.pushFrame(data), to: try linkedPeripheral())
-        }
         observeSystemTimeChanges()
     }
 
@@ -354,8 +340,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     }
 
     public func sendAppMessage(applicationID: UUID, tuples: [AppMessageTuple]) async throws {
-        _ = try linkedPeripheral()
-        try await appMessages.enqueue(applicationID: applicationID, tuples: tuples)
+        try await session.sendAppMessage(applicationID: applicationID, tuples: tuples)
     }
 
     public func respondToAppMessage(transactionID: UInt8, acknowledged: Bool) async throws {
@@ -469,7 +454,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
             eventContinuation?.yield(.watchUpdated(connectedWatch))
         }
         startHealthChecks(on: peripheral)
-        appMessages.startNextIfPossible()
+        session.linkOpened()
     }
 
     /// `step` names what the link was doing. Eleven places report the same
@@ -522,7 +507,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         pendingGattWrites.removeAll()
         acknowledgementTimeoutTask?.cancel()
         acknowledgementTimeoutTask = nil
-        healthDataLoggingProcessor = HealthDataLoggingProcessor()
+        session.forgetDataLoggingSessions()
         stopHealthChecks()
         failWorkInFlight(error)
     }
@@ -633,13 +618,9 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         }
     }
 
-    /// Whether anything in the app was waiting for this frame.
-    ///
-    /// One case an endpoint, so that what a new one does cannot depend on where
-    /// in a list it was written: the two endpoints that answer more than one
-    /// thing choose between them themselves. An answer with nobody waiting is
-    /// not an error — a reply to a request already given up on, or an endpoint
-    /// this app does not implement, is worth a line in the log and no more.
+    /// Whether anything in the app was waiting for this frame. The two
+    /// endpoints this link answers itself — its health check and the version
+    /// exchange that proves it — come first; everything else is the session's.
     private func answer(
         _ frame: PebbleProtocolFrame,
         peripheral: CBPeripheral
@@ -650,100 +631,14 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
             // watch is holding up perfectly well should not be dropped for it.
             guard frame.rejectedEndpoint == WatchVersionCodec.endpoint else { return false }
             clearPendingHealthCheck()
-
-        case PingPongCodec.endpoint:
-            try processPingPong(frame, peripheral: peripheral)
-
-        case PhoneVersionCodec.endpoint:
-            guard PhoneVersionCodec.isRequest(frame) else { return false }
-            #if os(macOS)
-            let operatingSystem = PhoneOperatingSystem.macOS
-            #else
-            let operatingSystem = PhoneOperatingSystem.iOS
-            #endif
-            try sendFrame(
-                PhoneVersionCodec.responseFrame(operatingSystem: operatingSystem),
-                to: peripheral
-            )
+            return true
 
         case WatchVersionCodec.endpoint:
             return try answerWatchVersion(frame, peripheral: peripheral)
 
-        case TimeSynchronizationCodec.endpoint:
-            guard TimeSynchronizationCodec.isTimeRequest(frame) else { return false }
-            try sendFrame(TimeSynchronizationCodec.frame(), to: peripheral)
-
-        case AppFetchCodec.endpoint:
-            eventContinuation?.yield(.appFetchRequested(try AppFetchCodec.decodeRequest(frame)))
-
-        case HealthSyncCodec.endpoint:
-            eventContinuation?.yield(.healthSyncCompleted(try HealthSyncCodec.decode(frame)))
-
-        case HealthDataLoggingCodec.endpoint:
-            let result = try healthDataLoggingProcessor.process(frame)
-            if let response = result.response { try sendFrame(response, to: peripheral) }
-            if !result.samples.isEmpty { eventContinuation?.yield(.healthSamplesReceived(result.samples)) }
-
-        case TimelineActionCodec.endpoint:
-            let invocation = try TimelineActionCodec.decode(frame)
-            eventContinuation?.yield(.timelineActionInvoked(invocation))
-            try sendFrame(
-                TimelineActionCodec.responseFrame(itemID: invocation.itemID, succeeded: true),
-                to: peripheral
-            )
-
-        case AppRunStateCodec.endpoint:
-            eventContinuation?.yield(.appRunStateChanged(try AppRunStateCodec.decode(frame)))
-
-        case ScreenshotCodec.endpoint:
-            return screenshot.take(frame)
-
-        case LogDumpCodec.endpoint:
-            return logDump.take(frame)
-
-        case GetBytesCodec.endpoint:
-            return fileBytes.take(frame)
-
-        case AppLogCodec.endpoint:
-            eventContinuation?.yield(.applicationLogReceived(try AppLogCodec.decode(frame)))
-
-        case ImagingCodec.endpoint:
-            eventContinuation?.yield(.imageRequested(try ImagingCodec.decode(frame)))
-
-        case AppMessageCodec.endpoint:
-            processAppMessage(frame)
-
-        case AppReorderCodec.endpoint:
-            guard appReorderReply.isWaiting else { return false }
-            processAppReorderResponse(frame)
-
-        case PutBytesCodec.endpoint:
-            return try answerPutBytes(frame, peripheral: peripheral)
-
-        case SystemMessageCodec.endpoint:
-            guard waitingForFirmwareStart else { return false }
-            waitingForFirmwareStart = false
-            // Unreadable, it is still the answer being waited for: the start
-            // fails with the reason now rather than timing out as unanswered.
-            let started: Bool
-            do {
-                started = try SystemMessageCodec.decodeFirmwareUpdateStartResponse(frame)
-            } catch {
-                finishFirmwareControl(throwing: error)
-                throw error
-            }
-            started
-                ? finishFirmwareControl()
-                : finishFirmwareControl(throwing: SystemMessageCodecError.updateRejected)
-
-        case BlobDBCodec.endpoint:
-            guard pendingBlobDBToken != nil else { return false }
-            processBlobDBResponse(frame)
-
         default:
-            return false
+            return try session.answer(frame)
         }
-        return true
     }
 
     private func answerWatchVersion(
@@ -798,46 +693,6 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         return true
     }
 
-    private func processAppMessage(_ frame: PebbleProtocolFrame) {
-        do {
-            switch try AppMessageCodec.decode(frame) {
-            case .push(let message):
-                eventContinuation?.yield(.appMessageReceived(message))
-            case .acknowledgement(let transactionID):
-                guard transactionID == appMessages.outstandingTransactionID else { return }
-                appMessages.finishActive()
-            case .negativeAcknowledgement(let transactionID):
-                guard transactionID == appMessages.outstandingTransactionID else { return }
-                appMessages.finishActive(throwing: AppMessageClientError.negativeAcknowledgement)
-            }
-        } catch {
-            Task { [tag = clientTag, reason = String(describing: error)] in
-                await DiagnosticLog.shared.record(
-                    .warning,
-                    category: "appmessage",
-                    message: "[\(tag)] an app message could not be read: \(reason)"
-                )
-            }
-        }
-    }
-
-    private func processPingPong(
-        _ frame: PebbleProtocolFrame,
-        peripheral: CBPeripheral
-    ) throws {
-        switch try PingPongCodec.decode(frame) {
-        case .ping(let cookie):
-            // The watch pings the phone about once an hour and drops a link it
-            // gets no pong on. Nothing is ever sent the other way: the firmware
-            // answers a ping from the phone by pushing a "Ping" dialog in front
-            // of whatever the reader was doing — `prv_push_window` in
-            // `services/ping/service.c`, unconditionally.
-            try sendFrame(PingPongCodec.frame(for: .pong(cookie: cookie)), to: peripheral)
-        case .pong:
-            break
-        }
-    }
-
     private func startHealthChecks(on peripheral: CBPeripheral) {
         stopHealthChecks()
         healthCheckTask = Task { [weak self] in
@@ -860,7 +715,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         }
         // A transfer can keep the watch busy for longer than the pong deadline,
         // and an install has gaps between transfers while the watch commits.
-        guard activeTransferSession == nil, !isInstallingFirmware else {
+        guard !session.isTransferring else {
             return
         }
         // A watch being recovered cannot afford a dropped link, and its own
@@ -962,32 +817,13 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         pendingGattWrites.removeAll()
         acknowledgementTimeoutTask?.cancel()
         acknowledgementTimeoutTask = nil
-        // A session id only means something inside the session that opened it.
-        // After a reconnect the watch reuses low ids freely, and reading new
-        // records with an old session's tag and item size turns them into
-        // nonsense instead of a rejection.
-        healthDataLoggingProcessor = HealthDataLoggingProcessor()
+        session.forgetDataLoggingSessions()
         stopHealthChecks()
         failWorkInFlight(.disconnected)
     }
 
-    /// Fails everything the watch was in the middle of answering.
-    ///
-    /// A BlobDB token, a transfer cookie, a pull, an app reorder and a firmware
-    /// control exchange all mean something only inside the session that started
-    /// them. When it ends the watch will never answer any of them, and saying so
-    /// now beats each one's own deadline blaming itself ten seconds later.
     func failWorkInFlight(_ error: WatchConnectionError) {
-        failTransfer(error)
-        failBlobDBOperation(error)
-        blobDBQueue.failAll(error)
-        transferQueue.failAll(error)
-        failPulls(error)
-        failAppReorder(error)
-        finishFirmwareControl(throwing: error)
-        // `AppModel` queues a message whose link went and flushes it on the
-        // next connection, so a copy held here would be sent twice.
-        appMessages.failAll(error)
+        session.failWorkInFlight(error)
     }
 
     /// Asks iOS for the notification-sharing decision as part of connecting.
