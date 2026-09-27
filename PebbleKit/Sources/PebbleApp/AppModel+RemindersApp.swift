@@ -1,0 +1,148 @@
+import PebbleProtocol
+import Defaults
+import Foundation
+import SwiftUI
+
+extension AppModel {
+    /// The Synchronize button: the reader asking, so the one path here that may
+    /// ask for the Reminders permission.
+    public func synchronizeRemindersApp() async {
+        do {
+            try await remindersAppStore.requestAccess()
+        } catch {
+            timeline.reminderFeedback = .failure("The Reminders app could not be read.")
+            return
+        }
+        await reloadRemindersApp(reportsToReader: true)
+    }
+
+    /// When a reminder with a date and no time buzzes. Changed, the Reminders
+    /// app is read again, so the reminders already on the watch move with it.
+    public func setAllDayReminderTime(minutes: Int) async {
+        let minutes = min(max(minutes, 0), 24 * 60 - 1)
+        guard minutes != timeline.allDayReminderMinutes else { return }
+        timeline.allDayReminderMinutes = minutes
+        Defaults[.allDayReminderMinutes] = minutes
+        await reloadRemindersApp(reportsToReader: false)
+    }
+
+    var allDayReminderTime: DateComponents {
+        DateComponents(hour: timeline.allDayReminderMinutes / 60, minute: timeline.allDayReminderMinutes % 60)
+    }
+
+    /// Brings the phone's Reminders app and the watch to the same reminders,
+    /// under whatever permission already stands — EventKit's change notices
+    /// reach this too, and nobody on this side started those.
+    ///
+    /// What the watch made goes there first, so that the reading which follows
+    /// finds it and does not take it for one the reader has finished with.
+    ///
+    /// - Parameter reportsToReader: False for a change notice, whose failure
+    ///   is the log's to hold rather than a banner nobody asked for.
+    func reloadRemindersApp(reportsToReader: Bool) async {
+        guard await loadReminders() else { return }
+        for reminder in timeline.reminders where reminder.isFromWatch && reminder.timestamp > .now {
+            await mirrorInRemindersApp(reminder)
+        }
+        let items: [RemindersAppItem]
+        do {
+            items = try await remindersAppStore.reminders(allDayAt: allDayReminderTime)
+        } catch RemindersBridgeError.accessDenied {
+            await DiagnosticLog.shared.record(
+                category: "timeline",
+                message: "the Reminders app was not read: access has not been granted"
+            )
+            return
+        } catch {
+            if reportsToReader {
+                timeline.reminderFeedback = .failure("The Reminders app could not be read.")
+            }
+            await DiagnosticLog.shared.record(
+                .error,
+                category: "timeline",
+                message: "the Reminders app could not be read: \(String(reflecting: error))"
+            )
+            return
+        }
+        var mirrored = (try? await reminderStore.mirroredIdentifiers()) ?? [:]
+        let outcome = RemindersAppSync.merged(
+            kept: timeline.reminders,
+            fromApp: items,
+            mirrored: mirrored,
+            now: .now
+        )
+        // Named for both directions: what came from the Reminders app is named
+        // here too, so letting go of it in this app can reach it there.
+        for item in items { mirrored[item.reminder.id] = item.identifier }
+        for reminder in outcome.finished { mirrored[reminder.id] = nil }
+        // Kept, and synchronized, only once both are on disk: the watches'
+        // synchronization reads the reminders back from there, and would undo
+        // a merge that was never saved.
+        do {
+            try await reminderStore.save(outcome.reminders)
+            try await reminderStore.setMirroredIdentifiers(mirrored)
+        } catch {
+            if reportsToReader {
+                timeline.reminderFeedback = .failure("The change could not be saved.")
+            }
+            await DiagnosticLog.shared.record(
+                .error,
+                category: "timeline",
+                message: "the Reminders app's reminders could not be saved: \(String(reflecting: error))"
+            )
+            return
+        }
+        timeline.reminders = outcome.reminders
+        if reportsToReader { timeline.reminderFeedback = nil }
+        for connection in activeConnections {
+            await synchronizeReminders(on: connection)
+        }
+    }
+
+    /// Copies a reminder the watch made into the phone's Reminders app.
+    ///
+    /// A reminder dictated to the watch is only on the watch, and the watch
+    /// keeps a window: once its time has passed it is gone from there and there
+    /// was nowhere else it was written down.
+    func mirrorInRemindersApp(_ reminder: TimelinePin) async {
+        var mirrored = (try? await reminderStore.mirroredIdentifiers()) ?? [:]
+        do {
+            if let identifier = mirrored[reminder.id] {
+                try await remindersAppStore.update(reminder, identifier: identifier)
+                return
+            }
+            mirrored[reminder.id] = try await remindersAppStore.add(reminder)
+            try await reminderStore.setMirroredIdentifiers(mirrored)
+        } catch {
+            await DiagnosticLog.shared.record(
+                .error,
+                category: "timeline",
+                message: "the Reminders app did not take \(reminder.title): \(String(reflecting: error))"
+            )
+        }
+    }
+
+    /// Takes these timeline.reminders out of the phone's Reminders app, if they were ever
+    /// in it.
+    func forgetInRemindersApp(_ identifiers: Set<UUID>) async {
+        var mirrored = (try? await reminderStore.mirroredIdentifiers()) ?? [:]
+        var changed = false
+        for id in identifiers {
+            guard let identifier = mirrored[id] else { continue }
+            do {
+                try await remindersAppStore.remove(identifier: identifier)
+                mirrored[id] = nil
+                changed = true
+            } catch {
+                await DiagnosticLog.shared.record(
+                    .error,
+                    category: "timeline",
+                    message: "the Reminders app kept a reminder that is gone here: "
+                        + String(reflecting: error)
+                )
+            }
+        }
+        guard changed else { return }
+        try? await reminderStore.setMirroredIdentifiers(mirrored)
+    }
+}

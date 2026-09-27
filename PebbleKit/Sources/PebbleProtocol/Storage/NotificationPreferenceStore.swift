@@ -1,0 +1,48 @@
+public import Foundation
+import MemberwiseInit
+
+@MemberwiseInit(.public)
+public struct NotificationDeliveryPreferences: Codable, Equatable, Sendable {
+    public var mutedApplicationIDs: Set<UUID> = []
+    public var areQuietHoursEnabled: Bool = false
+    public var quietHoursStart: Int = 22
+    public var quietHoursEnd: Int = 7
+
+    // The file on disk keeps the name the field was first written under.
+    private enum CodingKeys: String, CodingKey {
+        case mutedApplicationIDs
+        case areQuietHoursEnabled = "quietHoursEnabled"
+        case quietHoursStart, quietHoursEnd
+    }
+
+    public func permits(applicationID: UUID, at date: Date, calendar: Calendar = .current) -> Bool {
+        guard !mutedApplicationIDs.contains(applicationID) else { return false }
+        guard areQuietHoursEnabled else { return true }
+        let hour = calendar.component(.hour, from: date)
+        if quietHoursStart == quietHoursEnd { return false }
+        return quietHoursStart < quietHoursEnd
+            ? !(quietHoursStart..<quietHoursEnd).contains(hour)
+            : !(hour >= quietHoursStart || hour < quietHoursEnd)
+    }
+}
+
+public actor NotificationPreferenceStore {
+    private var fileURL: URL
+
+    public init(directory: StorageDirectory = .applicationSupport) {
+        fileURL = directory.file("notification-preferences.json")
+    }
+
+    public init(fileURL: URL) {
+        self.fileURL = fileURL
+    }
+
+    public func preferences() throws -> NotificationDeliveryPreferences {
+        try PersistentJSON.loadRecovering(NotificationDeliveryPreferences.self, from: fileURL)
+            ?? NotificationDeliveryPreferences()
+    }
+
+    public func save(_ preferences: NotificationDeliveryPreferences) throws {
+        try PersistentJSON.save(preferences, to: fileURL)
+    }
+}

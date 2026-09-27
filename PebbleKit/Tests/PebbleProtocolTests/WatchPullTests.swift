@@ -1,0 +1,247 @@
+import Foundation
+import Testing
+@testable import PebbleProtocol
+@testable import PebbleTransport
+
+/// The three things the app takes off the watch — a screenshot, a generation of
+/// logs, a file — which arrive in pieces and used to be waited for by three
+/// hand-written copies of this.
+@Suite
+@MainActor
+struct WatchPullTests {
+    /// `pull(_:)` answers with a sum type, and the three typed readers on
+    /// `WatchClient` unwrap it by case: a transport that answered with the
+    /// wrong one would have them all throwing rather than one of them lying.
+    @Test
+    func eachPullComesBackAsItsOwnKindOfAnswer() async throws {
+        let client = MockWatchClient()
+        client.logGenerations = [[
+            WatchLogLine(date: Date(timeIntervalSince1970: 0), level: 100, file: "a.c", line: 1, message: "up"),
+        ]]
+        client.bytesToReturn = [0xAB, 0xCD]
+
+        #expect(try await client.takeScreenshot() == client.screenshotToReturn)
+        #expect(try await client.readLogGeneration(0)?.count == 1)
+        #expect(try await client.readLogGeneration(9) == nil)
+        #expect(try await client.getBytes(.unreadCoredump) == [0xAB, 0xCD])
+    }
+
+    @Test
+    func theLastPieceHandsTheWholeThingBack() async throws {
+        let pull = WatchPull<CountingCollector>(timeout: .seconds(30))
+        var sent = false
+        let waiting = Task {
+            try await pull.run(collecting: CountingCollector(total: 3)) { sent = true }
+        }
+        while !pull.isInProgress { await Task.yield() }
+        #expect(sent)
+
+        #expect(pull.take(piece([1])))
+        #expect(pull.take(piece([2])))
+        #expect(pull.take(piece([3])))
+
+        #expect(try await waiting.value == [1, 2, 3])
+        #expect(!pull.isInProgress)
+    }
+
+    @Test
+    func aSecondCallerIsTurnedAwayWhileTheFirstIsWaiting() async throws {
+        let pull = WatchPull<CountingCollector>(timeout: .seconds(30))
+        let waiting = Task { try await pull.run(collecting: CountingCollector(total: 1)) {} }
+        while !pull.isInProgress { await Task.yield() }
+
+        await #expect(throws: WatchPullError.operationAlreadyInProgress) {
+            try await pull.run(collecting: CountingCollector(total: 1)) {}
+        }
+
+        _ = pull.take(piece([1]))
+        _ = try await waiting.value
+    }
+
+    @Test
+    func aFrameArrivingWithNoPullInProgressIsLeftAlone() {
+        let pull = WatchPull<CountingCollector>(timeout: .seconds(30))
+
+        // The watch finishing an answer the app has already given up on is not
+        // an error, but the frame belongs to nobody and the caller of `take`
+        // has to be able to tell.
+        #expect(!pull.take(piece([1])))
+    }
+
+    @Test
+    func aPieceThatCannotBeReadFailsTheCaller() async throws {
+        let pull = WatchPull<CountingCollector>(timeout: .seconds(30))
+        let waiting = Task { try await pull.run(collecting: CountingCollector(total: 3)) {} }
+        while !pull.isInProgress { await Task.yield() }
+
+        #expect(pull.take(piece([])))
+
+        await #expect(throws: CountingError.refused) { try await waiting.value }
+        // Nothing is left half-collected, so the next pull starts from scratch.
+        #expect(!pull.isInProgress)
+    }
+
+    @Test
+    func aLinkThatGoesFailsThePullInProgress() async throws {
+        let pull = WatchPull<CountingCollector>(timeout: .seconds(30))
+        let waiting = Task { try await pull.run(collecting: CountingCollector(total: 3)) {} }
+        while !pull.isInProgress { await Task.yield() }
+        _ = pull.take(piece([1]))
+
+        pull.finish(.failure(WatchConnectionError.disconnected))
+
+        await #expect(throws: WatchConnectionError.disconnected) { try await waiting.value }
+        #expect(!pull.isInProgress)
+    }
+
+    @Test
+    func aPullThatTimesOutLeavesTheNextOneFreeToRun() async throws {
+        let deadlines = OnlyTheFirstDeadlineFallsDue()
+        let pull = WatchPull<CountingCollector>(
+            timeout: .seconds(30),
+            sleep: { await deadlines.sleep(for: $0) }
+        )
+
+        await #expect(throws: WatchConnectionError.connectionTimedOut) {
+            try await pull.run(collecting: CountingCollector(total: 1)) {}
+        }
+        #expect(!pull.isInProgress)
+
+        let waiting = Task { try await pull.run(collecting: CountingCollector(total: 1)) {} }
+        while !pull.isInProgress { await Task.yield() }
+        #expect(pull.take(piece([7])))
+        #expect(try await waiting.value == [7])
+    }
+
+    @Test
+    func aRequestThatCannotBeSentLeavesTheNextPullFreeToRun() async throws {
+        let pull = WatchPull<CountingCollector>(timeout: .seconds(30))
+
+        await #expect(throws: WatchConnectionError.disconnected) {
+            try await pull.run(collecting: CountingCollector(total: 1)) {
+                throw WatchConnectionError.disconnected
+            }
+        }
+        #expect(!pull.isInProgress)
+
+        let waiting = Task { try await pull.run(collecting: CountingCollector(total: 1)) {} }
+        while !pull.isInProgress { await Task.yield() }
+        #expect(pull.take(piece([7])))
+        #expect(try await waiting.value == [7])
+    }
+
+    @Test
+    func aPullStartedStraightAfterAFailedOneKeepsItsCollector() async throws {
+        let pull = WatchPull<CountingCollector>(timeout: .seconds(30))
+        let first = Task { try await pull.run(collecting: CountingCollector(total: 3)) {} }
+        while !pull.isInProgress { await Task.yield() }
+
+        pull.finish(.failure(WatchConnectionError.disconnected))
+        let second = Task { try await pull.run(collecting: CountingCollector(total: 1)) {} }
+        await #expect(throws: WatchConnectionError.disconnected) { try await first.value }
+        while !pull.isInProgress { await Task.yield() }
+
+        #expect(pull.take(piece([7])))
+        #expect(try await second.value == [7])
+    }
+
+    @Test
+    func everyPieceThatArrivesPutsTheDeadlineBack() async throws {
+        let deadlines = DeadlineLog()
+        let pull = WatchPull<CountingCollector>(
+            timeout: .seconds(30),
+            sleep: { duration in
+                await deadlines.note()
+                try? await Task.sleep(for: duration)
+            }
+        )
+        let waiting = Task { try await pull.run(collecting: CountingCollector(total: 3)) {} }
+        // Waiting for the first deadline is waiting for the pull to be under
+        // way: `run` has its collector before it asks for one.
+        await deadlines.reached(1)
+        #expect(pull.isInProgress)
+
+        // A coredump arrives over a minute. Each piece is proof the watch is
+        // still there, so the deadline starts again from it rather than from the
+        // request — measuring the whole transfer would cut off a large but
+        // healthy one.
+        _ = pull.take(piece([1]))
+        await deadlines.reached(2)
+        _ = pull.take(piece([2]))
+        await deadlines.reached(3)
+
+        _ = pull.take(piece([3]))
+        #expect(try await waiting.value == [1, 2, 3])
+    }
+
+    private func piece(_ payload: [UInt8]) -> PebbleProtocolFrame {
+        PebbleProtocolFrame(endpoint: CountingCollector.endpoint, payload: payload)
+    }
+}
+
+private enum CountingError: Error, Equatable {
+    case refused
+}
+
+/// Gathers a fixed number of bytes the way the watch's own collectors do:
+/// `nil` until the last piece lands.
+private struct CountingCollector: WatchPullCollector {
+    static var endpoint: UInt16 { 9_999 }
+
+    let total: Int
+    private var received: [UInt8] = []
+
+    init(total: Int) {
+        self.total = total
+    }
+
+    mutating func accept(_ frame: PebbleProtocolFrame) throws -> [UInt8]? {
+        guard !frame.payload.isEmpty else { throw CountingError.refused }
+        received += frame.payload
+        return received.count >= total ? received : nil
+    }
+}
+
+/// Lets the first deadline fall due at once and holds every later one for as
+/// long as it asks.
+private actor OnlyTheFirstDeadlineFallsDue {
+    private var count = 0
+
+    func sleep(for duration: Duration) async {
+        count += 1
+        guard count > 1 else { return }
+        try? await Task.sleep(for: duration)
+    }
+}
+
+/// Counts the deadlines a pull asks for, so a test can say that a piece put one
+/// back without racing a real one.
+private actor DeadlineLog {
+    private var count = 0
+    private var waiting: [(target: Int, continuation: CheckedContinuation<Void, Never>)] = []
+
+    func note() {
+        count += 1
+        let ready = waiting.filter { $0.target <= count }
+        waiting.removeAll { $0.target <= count }
+        for entry in ready { entry.continuation.resume() }
+    }
+
+    /// Returns once that many deadlines have been asked for.
+    ///
+    /// Woken by `note` rather than counted out in `Task.yield()`s. Yielding a
+    /// fixed number of times only offers the other task a chance to run; it
+    /// does not make it run, and with the suite's tests going at once the
+    /// cooperative pool is busy enough that ten thousand chances were
+    /// occasionally not one. The test then failed having proved nothing.
+    ///
+    /// No timeout of its own either: a pull that never asks for a deadline
+    /// leaves this waiting, and the suite's own deadline is what should say so
+    /// — with the count it was waiting for, rather than a bare false.
+    func reached(_ target: Int) async {
+        guard count < target else { return }
+        await withCheckedContinuation { continuation in
+            waiting.append((target, continuation))
+        }
+    }
+}

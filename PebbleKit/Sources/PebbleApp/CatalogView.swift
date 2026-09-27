@@ -1,0 +1,440 @@
+import SwiftUI
+import PebbleProtocol
+
+/// The app catalog, pushed from the Apps tab's plus button.
+struct CatalogView: View {
+    var model: AppModel
+    var isImportingApplication: Bool = false
+    var isImportDisabled: Bool = false
+    var importApplication: (() -> Void)?
+    /// Passed through to the detail screen. Reachable now that this is pushed
+    /// rather than presented: the launcher line's own editor is a sheet on the
+    /// applications screen, which a sheet could not have opened over.
+    var editGlance: (WatchApplication) -> Void = { _ in }
+
+    var body: some View {
+        CatalogContent(
+            applications: model.catalog.applications,
+            collections: model.catalog.collections,
+            state: { model.catalogInstallationState(for: $0) },
+            isImportingApplication: isImportingApplication,
+            isImportDisabled: isImportDisabled,
+            isUpdating: model.catalog.isUpdating,
+            feedback: model.catalog.feedback,
+            importFeedback: model.applications.importFeedback,
+            selectedSourceID: model.selectedCatalogSource.id,
+            setSource: { id in
+                guard let source = CatalogSource.builtIn.first(where: { $0.id == id }) else { return }
+                await model.setCatalogSource(source)
+            },
+            searchResults: model.catalog.searchResults,
+            searchQuery: model.catalog.searchQuery,
+            hasMoreSearchResults: model.catalog.hasMoreSearchResults,
+            isSearching: model.catalog.isSearching,
+            importApplication: importApplication,
+            // Awaited rather than launched, so that the pull-to-refresh
+            // indicator stays up until the catalogue has actually been fetched.
+            refresh: { await model.refreshCatalog() },
+            search: { query, kind in await model.searchCatalog(query, kind: kind) },
+            loadMoreResults: { await model.loadMoreCatalogSearchResults() },
+            clearSearch: { model.clearCatalogSearch() },
+            destination: { application in
+                CatalogApplicationDetailView(
+                    application: application,
+                    model: model,
+                    editGlance: editGlance
+                )
+            },
+            collectionDestination: { collection in
+                CatalogCollectionView(
+                    collection: collection,
+                    model: model,
+                    editGlance: editGlance
+                )
+            }
+        )
+        .task {
+            await model.loadCatalog()
+            // Refreshed when the shelves are missing too, not only the rows: a
+            // cache written before shelves were kept has rows and no shelves,
+            // and waiting for a pull-to-refresh made the section look like it
+            // did not exist (owner feedback, 2026-09-21). A feed that truly
+            // has no shelves pays one conditional refetch per visit, which is
+            // the price of not being able to tell the two apart.
+            if model.catalog.applications.isEmpty || model.catalog.collections.isEmpty {
+                await model.refreshCatalog()
+            }
+        }
+    }
+}
+
+struct CatalogContent<Destination: View, CollectionDestination: View>: View {
+    var applications: [CatalogApplication]
+    /// The feed's shelves. Empty hides the section — a feed without them, or a
+    /// cache from before they were kept, has nothing to open.
+    var collections: [CatalogCollection] = []
+    var state: (CatalogApplication) -> CatalogInstallationState
+    var isImportingApplication: Bool
+    var isImportDisabled: Bool
+    var isUpdating: Bool
+    var feedback: FeatureFeedback?
+    /// The answer to the `Import` button in this screen's own toolbar. Separate
+    /// from `feedback`, which is the catalogue's: one is about the store, the
+    /// other about a file from this phone.
+    var importFeedback: FeatureFeedback?
+    /// Which store is being browsed, and the way to browse another. The titles
+    /// are the stores' own names, shown verbatim.
+    var selectedSourceID: String = CatalogSource.pebble.id
+    var setSource: @MainActor (String) async -> Void = { _ in }
+    /// What the store's index answered, as against `applications`, the home
+    /// feed the pickers sift. Nil until a search is submitted.
+    var searchResults: [CatalogApplication]?
+    var searchQuery: String = ""
+    var hasMoreSearchResults: Bool = false
+    var isSearching: Bool = false
+    var importApplication: (() -> Void)?
+    var refresh: @MainActor () async -> Void
+    var search: @MainActor (String, WatchApplicationKind?) async -> Void = { _, _ in }
+    var loadMoreResults: @MainActor () async -> Void = {}
+    var clearSearch: @MainActor () -> Void = {}
+    @ViewBuilder var destination: (CatalogApplication) -> Destination
+    @ViewBuilder var collectionDestination: (CatalogCollection) -> CollectionDestination
+
+    @State private var query = ""
+    /// Nil for every category.
+    ///
+    /// A missing value rather than a sentinel string. It was `"All"`, doing
+    /// three jobs at once — the row's label, the initial selection and the
+    /// "do not filter" mark — so it showed in English on a Japanese screen,
+    /// because `Text(_:)` given a `String` is the overload that does not
+    /// localize. And a category actually named All, which the store is free to
+    /// send, would have been the one category impossible to filter by.
+    ///
+    /// The value is always the store's own string; only the pixels are
+    /// translated, by `catalogCategoryText`.
+    @State private var category: String?
+    @State private var kind: CatalogFilter.Kind = .all
+
+    // Pushed onto the applications screen's stack rather than presented, so
+    // there is no stack of its own to start and no size to ask for.
+    var body: some View {
+        catalogList
+    }
+
+    private var catalogList: some View {
+        List {
+            // The catalogue's own answers used to have nowhere to go: a pull
+            // to refresh wrote to `catalog.feedback`, which only an
+            // application's detail screen showed — so the refresh said
+            // nothing here and then spoke up on the next screen opened.
+            FeedbackBanner(feedback: feedback)
+            // The import's own answer, which used to be drawn on the screen
+            // this one is pushed over: the spinner in the toolbar stopped and
+            // a failure was left where the reader was not looking (#110).
+            FeedbackBanner(feedback: importFeedback)
+            // The store's whole inventory, as against the home feed: the feed
+            // is a shop window, and the search box alone only sifts what the
+            // window happens to hold. While a search is on screen the feed is
+            // not — the results are the answer to the question just asked, and
+            // the window would only bury them.
+            if let searchResults {
+                Section("Store Search") {
+                    if searchResults.isEmpty {
+                        Text("The store found nothing for \u{201C}\(searchQuery)\u{201D}.")
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(searchResults) { application in
+                        NavigationLink {
+                            destination(application)
+                        } label: {
+                            CatalogApplicationRow(application: application, state: state(application))
+                        }
+                    }
+                    if isSearching {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                    } else if hasMoreSearchResults {
+                        Button("Load More") {
+                            Task { await loadMoreResults() }
+                        }
+                    }
+                }
+            } else if isSearching {
+                // The first page is still on its way; once it lands the
+                // Store Search section above takes over.
+                Section {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                }
+            } else {
+                Section("Browse") {
+                    Picker("Store", selection: Binding(
+                        get: { selectedSourceID },
+                        set: { id in Task { await setSource(id) } }
+                    )) {
+                        ForEach(CatalogSource.builtIn) { source in
+                            Text(verbatim: source.title).tag(source.id)
+                        }
+                    }
+                    Picker("Type", selection: $kind) {
+                        ForEach(CatalogFilter.Kind.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    Picker("Category", selection: $category) {
+                        // `String?.none` rather than a word standing in for
+                        // "no filter".
+                        Text("All Categories").tag(String?.none)
+                        ForEach(categories, id: \.self) {
+                            catalogCategoryText($0).tag(String?.some($0))
+                        }
+                    }
+                }
+                // The type picker above sifts the shelves like the rows below:
+                // the store keeps one set for apps and one for faces.
+                if !filteredCollections.isEmpty {
+                    Section("Collections") {
+                        ForEach(filteredCollections) { collection in
+                            NavigationLink {
+                                collectionDestination(collection)
+                            } label: {
+                                // Both homes carry a Most Loved, so the
+                                // unfiltered list holds two shelves of one
+                                // name: the icon is what tells them apart
+                                // (owner feedback, 2026-09-21) — the same
+                                // symbols the rest of the app uses for the two
+                                // kinds.
+                                Label {
+                                    catalogCollectionText(collection.name)
+                                } icon: {
+                                    Image(systemName: collection.kind == .watchapp
+                                        ? "square.grid.2x2"
+                                        : "applewatch.watchface")
+                                }
+                            }
+                        }
+                    }
+                }
+                Section("Apps") {
+                    ForEach(filteredApplications) { application in
+                        NavigationLink {
+                            destination(application)
+                        } label: {
+                            CatalogApplicationRow(application: application, state: state(application))
+                        }
+                    }
+                }
+            }
+        }
+        .searchable(text: $query, prompt: Text("Search the Store"))
+        .onSubmit(of: .search) {
+            Task { await search(query, searchKind) }
+        }
+        .onChange(of: query) { _, changed in
+            // An emptied search box is the reader done with the results; typed
+            // words only sift the feed until they are submitted again.
+            if changed.trimmingCharacters(in: .whitespaces).isEmpty { clearSearch() }
+        }
+        // The results outlive this screen in the model, and the box does not:
+        // opened again, the screen showed results for a box that was empty,
+        // with no way back to the feed but typing and deleting. Not cleared on
+        // disappearing instead — pushing a result's own screen is that too.
+        .onAppear {
+            if searchResults != nil, query.isEmpty { query = searchQuery }
+        }
+        // Another store's feed has its own categories, and a choice it does
+        // not have filtered every row out.
+        .onChange(of: categories) { _, available in
+            if let category, !available.contains(category) { self.category = nil }
+        }
+        .navigationTitle(Text("Catalog"))
+        // A second pull while one is running is the model's to ignore, which
+        // it does — `updateCatalog` returns early when it is already updating.
+        .refreshable { await refresh() }
+        .toolbar {
+            // No way out of its own: the back button of the stack it was
+            // pushed onto is the way out.
+            ToolbarItemGroup(placement: .primaryAction) {
+                if let importApplication {
+                    if isImportingApplication {
+                        ProgressView()
+                            .accessibilityLabel(Text("Importing Pebble app"))
+                    } else {
+                        Button("Import", systemImage: "square.and.arrow.down", action: importApplication)
+                            .accessibilityHint(Text("Choose a PBW package from Files"))
+                            .disabled(isImportDisabled)
+                    }
+                }
+            }
+        }
+        #if os(iOS)
+        // Pushed from the Apps tab, and what is on screen is the catalogue
+        // rather than the tabs.
+        .toolbarVisibility(.hidden, for: .tabBar)
+        #endif
+        .overlay {
+            if isUpdating && applications.isEmpty && searchResults == nil && !isSearching {
+                ProgressView()
+                    .accessibilityLabel(Text("Loading the catalog"))
+            } else if filteredApplications.isEmpty && searchResults == nil && !isSearching {
+                // Two causes, and the screen cannot tell them apart: a filter
+                // that excludes everything, or a catalogue that was never
+                // fetched. Saying both beats naming the wrong one — and it
+                // used to name a setting that no longer exists.
+                ContentUnavailableView(
+                    "No Catalog Apps",
+                    systemImage: "bag",
+                    description: Text("Nothing matches, or the catalog could not be fetched.")
+                )
+            }
+        }
+    }
+
+    private var filteredApplications: [CatalogApplication] {
+        CatalogFilter(category: category, kind: kind).applied(to: applications)
+    }
+
+    private var filteredCollections: [CatalogCollection] {
+        guard let searchKind else { return collections }
+        return collections.filter { $0.kind == searchKind }
+    }
+
+    private var categories: [String] {
+        CatalogFilter.categories(in: applications)
+    }
+
+    /// The kind picker's word for the index's tags. "All" is no tag: the index
+    /// is asked for both kinds rather than neither.
+    private var searchKind: WatchApplicationKind? {
+        switch kind {
+        case .all: nil
+        case .watchapps: .watchapp
+        case .watchfaces: .watchface
+        }
+    }
+}
+
+#Preview("Catalog") {
+    NavigationStack {
+        CatalogContent(
+            applications: [PreviewSamples.catalogApplication],
+            collections: PreviewSamples.catalogCollections,
+            state: { _ in .updateAvailable },
+            isImportingApplication: false,
+            isImportDisabled: false,
+            isUpdating: false,
+            feedback: nil,
+            importApplication: {},
+            refresh: {},
+            destination: { application in Text(verbatim: application.name) },
+            collectionDestination: { collection in Text(verbatim: collection.name) }
+        )
+    }
+}
+
+#Preview("First fetch") {
+    NavigationStack {
+        CatalogContent(
+            applications: [],
+            state: { _ in .available },
+            isImportingApplication: false,
+            isImportDisabled: false,
+            isUpdating: true,
+            feedback: nil,
+            importApplication: {},
+            refresh: {},
+            destination: { _ in EmptyView() },
+            collectionDestination: { _ in EmptyView() }
+        )
+    }
+}
+
+#Preview("Search results") {
+    NavigationStack {
+        CatalogContent(
+            applications: [PreviewSamples.catalogApplication],
+            state: { _ in .available },
+            isImportingApplication: false,
+            isImportDisabled: false,
+            isUpdating: false,
+            feedback: nil,
+            searchResults: [PreviewSamples.catalogApplication],
+            searchQuery: "weather",
+            hasMoreSearchResults: true,
+            importApplication: {},
+            refresh: {},
+            destination: { application in Text(verbatim: application.name) },
+            collectionDestination: { _ in EmptyView() }
+        )
+    }
+}
+
+#Preview("Searching") {
+    NavigationStack {
+        CatalogContent(
+            applications: [PreviewSamples.catalogApplication],
+            state: { _ in .available },
+            isImportingApplication: false,
+            isImportDisabled: false,
+            isUpdating: false,
+            feedback: nil,
+            searchQuery: "weather",
+            isSearching: true,
+            importApplication: {},
+            refresh: {},
+            destination: { _ in EmptyView() },
+            collectionDestination: { _ in EmptyView() }
+        )
+    }
+}
+
+#Preview("Nothing found") {
+    NavigationStack {
+        CatalogContent(
+            applications: [PreviewSamples.catalogApplication],
+            state: { _ in .available },
+            isImportingApplication: false,
+            isImportDisabled: false,
+            isUpdating: false,
+            feedback: nil,
+            searchResults: [],
+            searchQuery: "天気",
+            importApplication: {},
+            refresh: {},
+            destination: { _ in EmptyView() },
+            collectionDestination: { _ in EmptyView() }
+        )
+    }
+}
+
+#Preview("Empty catalog") {
+    CatalogContent(
+        applications: [],
+        state: { _ in .available },
+        isImportingApplication: true,
+        isImportDisabled: true,
+        isUpdating: false,
+        feedback: .failure("Catalog refresh failed; showing the offline cache."),
+        importApplication: {},
+        refresh: {},
+        destination: { _ in EmptyView() },
+        collectionDestination: { _ in EmptyView() }
+    )
+}
+
+#Preview("A file that could not be imported") {
+    // The two banners together, because they are two different subjects: the
+    // store could not be reached, and the file the reader picked was refused.
+    CatalogContent(
+        applications: [PreviewSamples.catalogApplication],
+        state: { _ in .available },
+        isImportingApplication: false,
+        isImportDisabled: false,
+        isUpdating: false,
+        feedback: .failure("Catalog refresh failed; showing the offline cache."),
+        importFeedback: .failure("The package is not built for any connected watch."),
+        importApplication: {},
+        refresh: {},
+        destination: { _ in EmptyView() },
+        collectionDestination: { _ in EmptyView() }
+    )
+}

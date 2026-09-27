@@ -1,0 +1,450 @@
+public import Foundation
+import MemberwiseInit
+
+/// Health samples the watch reports, and the file they are kept in.
+@MemberwiseInit(.public)
+public struct WatchHealthSample: Codable, Equatable, Identifiable, Sendable {
+    public var id: UUID = UUID()
+    public var date: Date
+    public var steps: Int
+    /// The minutes the steps were counted in, for the HealthKit export: a
+    /// day's total cannot say when anybody walked. Empty for a day from
+    /// HealthKit, and once the day is older than `WatchHealthStore.minuteDataRetentionDays`.
+    public var stepReadings: [StepReading] = []
+    /// Every minute asleep, counting each one once.
+    public var sleepMinutes: Int
+    /// The restful part of `sleepMinutes`, not extra on top of it.
+    public var deepSleepMinutes: Int = 0
+    /// The night, and any nap, as the watch recorded them. Empty for a day that
+    /// came from HealthKit or an older file, which knew only the total.
+    public var sleepSessions: [SleepSession] = []
+    /// What moving cost, over and above staying still.
+    public var activeKilocalories: Int = 0
+    /// What staying alive cost. Apple Health calls it basal energy.
+    public var restingKilocalories: Int = 0
+    public var distanceMetres: Int = 0
+    /// Apple Health's exercise minutes: the part of the day that counted as
+    /// effort, which is what the watch means by active time.
+    public var activeMinutes: Int = 0
+    /// The day's heart rate as the watch measured it, minute by minute.
+    ///
+    /// Nil where nothing measured it: a day from HealthKit, a file written
+    /// before this existed, a watch with no sensor, or a day the sensor was
+    /// off. Distinct from a day of zeroes, which would read as a heart that
+    /// stopped.
+    public var heartRate: WatchHeartRateSummary? = nil
+    /// The measured minutes themselves, for the HealthKit export: a summary
+    /// cannot honestly become per-moment samples again. Empty wherever
+    /// `heartRate` is nil, and once the day is older than the retention.
+    public var heartRateReadings: [HeartRateReading] = []
+    /// The day's blood oxygen (SpO2) as the watch measured it, minute by minute.
+    /// Nil under the same conditions as `heartRate`: nothing measured it — a day
+    /// from HealthKit, an older file, a watch with no sensor, or the reading off.
+    public var bloodOxygen: WatchBloodOxygenSummary? = nil
+    /// The measured minutes themselves, for the HealthKit export. Empty wherever
+    /// `bloodOxygen` is nil, and once the day is older than the retention.
+    public var bloodOxygenReadings: [BloodOxygenReading] = []
+    /// The walks, runs and open workouts the watch recorded, filed under the
+    /// day they ended in. Empty for a day from HealthKit or an older file.
+    public var workouts: [WatchWorkout] = []
+    public var timeZoneIdentifier: String = TimeZone.current.identifier
+    public var source: WatchHealthDataSource = .watch
+    public var updatedAt: Date = Date()
+
+    private enum CodingKeys: String, CodingKey {
+        case id, date, steps, stepReadings, sleepMinutes, deepSleepMinutes, sleepSessions
+        case activeKilocalories, restingKilocalories, distanceMetres, activeMinutes
+        case heartRate, heartRateReadings, bloodOxygen, bloodOxygenReadings
+        case workouts, timeZoneIdentifier, source, updatedAt
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        date = try container.decode(Date.self, forKey: .date)
+        steps = try container.decode(Int.self, forKey: .steps)
+        stepReadings = try container.decodeIfPresent([StepReading].self, forKey: .stepReadings) ?? []
+        sleepMinutes = try container.decode(Int.self, forKey: .sleepMinutes)
+        deepSleepMinutes = try container.decodeIfPresent(Int.self, forKey: .deepSleepMinutes) ?? 0
+        sleepSessions = try container.decodeIfPresent([SleepSession].self, forKey: .sleepSessions) ?? []
+        activeKilocalories = try container.decodeIfPresent(Int.self, forKey: .activeKilocalories) ?? 0
+        restingKilocalories = try container.decodeIfPresent(Int.self, forKey: .restingKilocalories) ?? 0
+        distanceMetres = try container.decodeIfPresent(Int.self, forKey: .distanceMetres) ?? 0
+        activeMinutes = try container.decodeIfPresent(Int.self, forKey: .activeMinutes) ?? 0
+        heartRate = try container.decodeIfPresent(WatchHeartRateSummary.self, forKey: .heartRate)
+        heartRateReadings = try container.decodeIfPresent([HeartRateReading].self, forKey: .heartRateReadings) ?? []
+        bloodOxygen = try container.decodeIfPresent(WatchBloodOxygenSummary.self, forKey: .bloodOxygen)
+        bloodOxygenReadings = try container.decodeIfPresent([BloodOxygenReading].self, forKey: .bloodOxygenReadings) ?? []
+        workouts = try container.decodeIfPresent([WatchWorkout].self, forKey: .workouts) ?? []
+        timeZoneIdentifier = try container.decodeIfPresent(String.self, forKey: .timeZoneIdentifier)
+            ?? TimeZone.current.identifier
+        source = try container.decodeIfPresent(WatchHealthDataSource.self, forKey: .source) ?? .watch
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? date
+        id = try container.decodeIfPresent(UUID.self, forKey: .id)
+            ?? Self.identifier(forDayAt: date, in: timeZoneIdentifier)
+    }
+
+    /// The identity of a day written before days had one of their own, made
+    /// from the day itself so that every read of the file gives the same one.
+    /// A random one per read was a new HealthKit sync identifier each time,
+    /// and the same minutes were written to Apple Health twice.
+    ///
+    /// FNV-1a rather than a cryptographic digest: this module stays on
+    /// Foundation, and the value only has to be stable, not secret.
+    static func identifier(forDayAt date: Date, in timeZoneIdentifier: String) -> UUID {
+        func fnv1a(_ bytes: some Sequence<UInt8>, seed: UInt64) -> UInt64 {
+            bytes.reduce(seed) { hash, byte in (hash ^ UInt64(byte)) &* 0x0000_0100_0000_01B3 }
+        }
+        let name = "\(Int64(date.timeIntervalSince1970.rounded()))|\(timeZoneIdentifier)"
+        let high = fnv1a(name.utf8, seed: 0xCBF2_9CE4_8422_2325)
+        let low = fnv1a(name.utf8.reversed(), seed: 0x84222325_CBF29CE4)
+        let bytes = high.bigEndianBytes + low.bigEndianBytes
+        return UUID(uuid: (
+            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
+        ))
+    }
+}
+
+/// A day's heart rate, reduced to what a day-granular record can hold honestly.
+///
+/// The watch measures a beat count per minute and only for the minutes its
+/// sensor ran, so a day is a handful of readings scattered through it rather
+/// than a continuous line. `lowest` is the smallest measured minute and not a
+/// resting heart rate: that is a derived figure with a definition of its own,
+/// and calling this by that name would be claiming an algorithm this app does
+/// not have.
+@MemberwiseInit(.public)
+public struct WatchHeartRateSummary: Codable, Equatable, Sendable {
+    public var lowest: Int
+    public var average: Int
+    public var highest: Int
+    /// How many minutes the watch actually measured, so a reader can tell an
+    /// average over four minutes from one over four hours.
+    public var measuredMinutes: Int
+
+    /// Nil for a day with nothing measured, rather than a summary of zeroes.
+    public static func from(_ beatsPerMinute: [Int]) -> Self? {
+        guard let lowest = beatsPerMinute.min(), let highest = beatsPerMinute.max() else {
+            return nil
+        }
+        return Self(
+            lowest: lowest,
+            average: beatsPerMinute.reduce(0, +) / beatsPerMinute.count,
+            highest: highest,
+            measuredMinutes: beatsPerMinute.count
+        )
+    }
+}
+
+/// One minute the sensor ran: when, and what it counted.
+@MemberwiseInit(.public)
+public struct HeartRateReading: Codable, Equatable, Sendable {
+    public var date: Date
+    public var beatsPerMinute: Int
+}
+
+/// A day's blood oxygen, reduced the same way `WatchHeartRateSummary` reduces the
+/// heart rate: the watch measures a saturation percentage only for the minutes
+/// its sensor ran, so a day is a scattered handful of readings, and `lowest` is
+/// the smallest measured minute rather than any clinical figure.
+@MemberwiseInit(.public)
+public struct WatchBloodOxygenSummary: Codable, Equatable, Sendable {
+    public var lowest: Int
+    public var average: Int
+    public var highest: Int
+    /// How many minutes the watch actually measured.
+    public var measuredMinutes: Int
+
+    /// Nil for a day with nothing measured, rather than a summary of zeroes.
+    public static func from(_ percentages: [Int]) -> Self? {
+        guard let lowest = percentages.min(), let highest = percentages.max() else {
+            return nil
+        }
+        return Self(
+            lowest: lowest,
+            average: percentages.reduce(0, +) / percentages.count,
+            highest: highest,
+            measuredMinutes: percentages.count
+        )
+    }
+}
+
+/// One minute the SpO2 sensor ran: when, and the saturation percentage it read.
+@MemberwiseInit(.public)
+public struct BloodOxygenReading: Codable, Equatable, Sendable {
+    public var date: Date
+    public var percent: Int
+}
+
+public enum WatchHealthDataSource: String, Codable, Equatable, Sendable {
+    case watch
+    case healthKit
+    case imported
+}
+
+@MemberwiseInit(.public)
+public struct WatchHealthArchive: Codable, Equatable, Sendable {
+    public var schemaVersion: Int = 1
+    public var exportedAt: Date = Date()
+    public var samples: [WatchHealthSample]
+}
+
+private struct WatchHealthArchiveVersion: Decodable {
+    var schemaVersion: Int
+}
+
+public actor WatchHealthStore {
+    /// How long the minutes behind a day are kept. The day's own totals are
+    /// kept for good; the minutes are only there to be exported, which happens
+    /// as they arrive, and a year of them is tens of megabytes read and
+    /// rewritten on every sync.
+    public static let minuteDataRetentionDays = 30
+
+    private var fileURL: URL
+
+    public init(directory: StorageDirectory = .applicationSupport) {
+        fileURL = directory.file("health.json")
+    }
+
+    public init(fileURL: URL) {
+        self.fileURL = fileURL
+    }
+
+    public func samples() throws -> [WatchHealthSample] { try PersistentJSON.loadRecovering([WatchHealthSample].self, from: fileURL) ?? [] }
+    public func save(_ samples: [WatchHealthSample]) throws { try PersistentJSON.save(samples, to: fileURL) }
+    public func merge(_ incoming: [WatchHealthSample], now: Date = Date()) throws -> [WatchHealthSample] {
+        var merged: [String: WatchHealthSample] = [:]
+        for sample in try samples() + incoming {
+            let normalized = normalized(sample)
+            let key = dayKey(for: normalized)
+            guard let existing = merged[key] else {
+                merged[key] = normalized
+                continue
+            }
+            var resolved = normalized.updatedAt >= existing.updatedAt ? normalized : existing
+            // The day keeps the identity it was first exported under: the
+            // HealthKit sync identifiers are made from it, and a new one on
+            // every sync would write the same minutes again beside the old.
+            resolved.id = existing.id
+            // Kept apart from which record is newer: the source decides what
+            // is exported to Apple Health, and a HealthKit import that
+            // happened to be newer made a day the watch measured a HealthKit
+            // one, whose minutes were then never exported.
+            let sources = [existing.source, normalized.source]
+            if sources.contains(.watch) {
+                resolved.source = .watch
+            } else if sources.contains(.imported) {
+                resolved.source = .imported
+            }
+            // Each sync brings the minutes since the last one, so the day is
+            // the union of them, and taking the newer record's alone would
+            // leave the morning out of the evening's total.
+            var stepsByMinute: [Date: StepReading] = [:]
+            for reading in existing.stepReadings + normalized.stepReadings { stepsByMinute[reading.date] = reading }
+            resolved.stepReadings = stepsByMinute.values.sorted { $0.date < $1.date }
+            resolved.steps = max(
+                existing.steps,
+                normalized.steps,
+                resolved.stepReadings.reduce(0) { $0 + $1.steps }
+            )
+            // Only Apple Health has these, so a record that has them is the
+            // only one that can say anything: the watch's own record for the
+            // same day carries zeroes and must not wipe them.
+            resolved.activeKilocalories = max(existing.activeKilocalories, normalized.activeKilocalories)
+            resolved.restingKilocalories = max(existing.restingKilocalories, normalized.restingKilocalories)
+            resolved.distanceMetres = max(existing.distanceMetres, normalized.distanceMetres)
+            resolved.activeMinutes = max(existing.activeMinutes, normalized.activeMinutes)
+            // The other way round from the calories above: only the watch
+            // measures these, so a HealthKit record for the same day carries
+            // nil — and being the newer of the two would otherwise have wiped
+            // what the watch measured.
+            let incomingIsNewer = normalized.updatedAt >= existing.updatedAt
+            (resolved.heartRate, resolved.heartRateReadings) = Self.mergedMeasurements(
+                existing: (existing.heartRate, existing.heartRateReadings),
+                incoming: (normalized.heartRate, normalized.heartRateReadings),
+                incomingIsNewer: incomingIsNewer,
+                minute: { $0.date },
+                summarize: { WatchHeartRateSummary.from($0.map(\.beatsPerMinute)) }
+            )
+            (resolved.bloodOxygen, resolved.bloodOxygenReadings) = Self.mergedMeasurements(
+                existing: (existing.bloodOxygen, existing.bloodOxygenReadings),
+                incoming: (normalized.bloodOxygen, normalized.bloodOxygenReadings),
+                incomingIsNewer: incomingIsNewer,
+                minute: { $0.date },
+                summarize: { WatchBloodOxygenSummary.from($0.map(\.percent)) }
+            )
+            // Workouts arrive one sync at a time — the morning walk in the
+            // morning, the evening run in the evening — so the day is the
+            // union of both records, keyed by when each workout started, and
+            // the newer record wins only where both tell the same workout.
+            if !existing.workouts.isEmpty || !normalized.workouts.isEmpty {
+                let (older, newer) = normalized.updatedAt >= existing.updatedAt
+                    ? (existing, normalized) : (normalized, existing)
+                var byStart: [Date: WatchWorkout] = [:]
+                for workout in older.workouts + newer.workouts { byStart[workout.start] = workout }
+                resolved.workouts = byStart.values.sorted { $0.start < $1.start }
+            }
+            // The night is taken whole from one record: its total, its
+            // restful part and the sessions it was made of belong together,
+            // and mixing two readings of one night makes a third that nobody
+            // slept. Whichever record has a night keeps it, the same as heart
+            // rate — a record with no sleep in it, like a HealthKit day of
+            // steps, says nothing about the night. Between two nights, the one
+            // with sessions is the watch's and wins: a HealthKit day is only a
+            // total, and it is newer as a rule, dated by the day's last sample,
+            // so letting it win emptied the watch's sessions before they were
+            // exported. Otherwise the newer wins.
+            let takesIncomingNight: Bool
+            if normalized.sleepMinutes == 0 {
+                takesIncomingNight = false
+            } else if existing.sleepMinutes == 0 {
+                takesIncomingNight = true
+            } else if normalized.sleepSessions.isEmpty != existing.sleepSessions.isEmpty {
+                takesIncomingNight = !normalized.sleepSessions.isEmpty
+            } else {
+                takesIncomingNight = normalized.updatedAt >= existing.updatedAt
+            }
+            if takesIncomingNight {
+                resolved.sleepMinutes = normalized.sleepMinutes
+                resolved.deepSleepMinutes = normalized.deepSleepMinutes
+                resolved.sleepSessions = normalized.sleepSessions
+            } else {
+                resolved.sleepMinutes = existing.sleepMinutes
+                resolved.deepSleepMinutes = existing.deepSleepMinutes
+                resolved.sleepSessions = existing.sleepSessions
+            }
+            merged[key] = resolved
+        }
+        var values = merged.values.map { withoutExpiredMinutes($0, now: now) }
+        values.sort { $0.date < $1.date }
+        try save(values)
+        return values
+    }
+    /// One day's measurement from two records of it.
+    ///
+    /// Each sync brings the minutes since the last, so where both records have
+    /// their minutes the day is the union of them — the newer record's reading
+    /// winning a minute both measured — and the summary is worked out again
+    /// from that union, the way the watch's record was made. Taking the newer
+    /// batch whole lost the morning's readings to the evening's.
+    ///
+    /// Where either has only a summary — a day whose minutes are past the
+    /// retention, or a HealthKit day with neither — the minutes cannot be
+    /// joined, so the summary and its readings are taken together from one
+    /// record: whichever has one, the newer when both do.
+    static func mergedMeasurements<Summary, Reading>(
+        existing: (summary: Summary?, readings: [Reading]),
+        incoming: (summary: Summary?, readings: [Reading]),
+        incomingIsNewer: Bool,
+        minute: (Reading) -> Date,
+        summarize: ([Reading]) -> Summary?
+    ) -> (Summary?, [Reading]) {
+        if !existing.readings.isEmpty, !incoming.readings.isEmpty {
+            let (older, newer) = incomingIsNewer ? (existing, incoming) : (incoming, existing)
+            var byMinute: [Date: Reading] = [:]
+            for reading in older.readings + newer.readings { byMinute[minute(reading)] = reading }
+            let union = byMinute.values.sorted { minute($0) < minute($1) }
+            return (summarize(union), union)
+        }
+        switch (existing.summary, incoming.summary) {
+        case (_?, _?):
+            return incomingIsNewer
+                ? (incoming.summary, incoming.readings)
+                : (existing.summary, existing.readings)
+        case (_?, nil):
+            return (existing.summary, existing.readings)
+        case (nil, _?):
+            return (incoming.summary, incoming.readings)
+        case (nil, nil):
+            return (nil, [])
+        }
+    }
+
+    public func deleteAll() throws {
+        do {
+            try FileManager.default.removeItem(at: fileURL)
+        } catch CocoaError.fileNoSuchFile {}
+    }
+    public func export() throws -> URL {
+        let output = FileManager.default.temporaryDirectory.appending(path: "pebble-health.json")
+        let archive = WatchHealthArchive(samples: try samples())
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        try encoder.encode(archive).write(to: output, options: .atomic)
+        return output
+    }
+
+    public func importArchive(from url: URL) throws -> [WatchHealthSample] {
+        let data = try Data(contentsOf: url)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        // The version first, on its own: a later version's samples need not
+        // decode as these, and reading the whole archive first reported that
+        // as a malformed file of the oldest kind.
+        if let version = try? decoder.decode(WatchHealthArchiveVersion.self, from: data) {
+            guard version.schemaVersion == 1 else { throw WatchHealthArchiveError.unsupportedVersion }
+            let archive = try decoder.decode(WatchHealthArchive.self, from: data)
+            return try merge(archive.samples.map { sample in
+                var value = sample
+                value.source = .imported
+                return value
+            })
+        }
+        let legacyDecoder = JSONDecoder()
+        let legacy = try legacyDecoder.decode([WatchHealthSample].self, from: data)
+        return try merge(legacy.map { sample in
+            var value = sample
+            value.source = .imported
+            return value
+        })
+    }
+
+    /// Measured back from now rather than from the newest day on file: a
+    /// watch whose clock once said 2037 would otherwise take every other
+    /// day's minutes with it.
+    private func withoutExpiredMinutes(_ sample: WatchHealthSample, now: Date) -> WatchHealthSample {
+        guard let cutoff = Calendar(identifier: .gregorian)
+            .date(byAdding: .day, value: -Self.minuteDataRetentionDays, to: now) else { return sample }
+        var value = sample
+        value.stepReadings.removeAll { $0.date < cutoff }
+        value.heartRateReadings.removeAll { $0.date < cutoff }
+        value.bloodOxygenReadings.removeAll { $0.date < cutoff }
+        return value
+    }
+
+    private func normalized(_ sample: WatchHealthSample) -> WatchHealthSample {
+        var value = sample
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: sample.timeZoneIdentifier) ?? .current
+        value.date = calendar.startOfDay(for: sample.date)
+        value.steps = max(0, sample.steps)
+        value.sleepMinutes = min(24 * 60, max(0, sample.sleepMinutes))
+        value.deepSleepMinutes = min(value.sleepMinutes, max(0, sample.deepSleepMinutes))
+        value.activeKilocalories = max(0, sample.activeKilocalories)
+        value.restingKilocalories = max(0, sample.restingKilocalories)
+        value.distanceMetres = max(0, sample.distanceMetres)
+        value.activeMinutes = min(24 * 60, max(0, sample.activeMinutes))
+        return value
+    }
+
+    private func dayKey(for sample: WatchHealthSample) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: sample.timeZoneIdentifier) ?? .current
+        let components = calendar.dateComponents([.year, .month, .day], from: sample.date)
+        let year = String(components.year ?? 0)
+        let month = String(components.month ?? 0)
+        let day = String(components.day ?? 0)
+        return "\(String(repeating: "0", count: max(0, 4 - year.count)))\(year)"
+            + "-\(String(repeating: "0", count: max(0, 2 - month.count)))\(month)"
+            + "-\(String(repeating: "0", count: max(0, 2 - day.count)))\(day)"
+    }
+}
+
+public enum WatchHealthArchiveError: Error, Equatable, Sendable { case unsupportedVersion }
+
+public enum HealthAnalysisPeriod: String, CaseIterable, Identifiable, Sendable {
+    case week, month, quarter
+    public var id: Self { self }
+    public var days: Int { self == .week ? 7 : self == .month ? 30 : 90 }
+}

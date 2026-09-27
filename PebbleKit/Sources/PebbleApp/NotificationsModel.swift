@@ -1,0 +1,37 @@
+public import PebbleProtocol
+// The `@Observable` macro writes a public conformance on a public class, so
+// the module that declares the protocol has to be imported publicly too.
+public import Observation
+
+/// What reaches the watch as a notification, and what became of what did.
+@MainActor
+@Observable
+public final class NotificationsModel {
+    public internal(set) var companionEnabled = true
+    public internal(set) var preferences = NotificationDeliveryPreferences()
+    /// Newest first. Only the notifications this app sent: another phone app's
+    /// go to the watch over ANCS, where no app can see them.
+    public internal(set) var sent: [SentNotification] = []
+    public internal(set) var sourceApps: [NotificationSourceApp] = []
+    /// The answer to changing a delivery setting, which is asked for on the
+    /// notification settings screen. A test notification's answer is the
+    /// watch's own, in `DiagnosticsModel`: one field for both put the reply to
+    /// a switch flicked in Settings onto a watch's detail page — the same
+    /// fault as #60, which is what that field was split up to cure.
+    public internal(set) var settingsFeedback: FeatureFeedback?
+
+    /// The answer to changing what the watch does with one of the phone's
+    /// apps, which is asked for on that app's own screens.
+    ///
+    /// Its own field rather than `settingsFeedback`, because those screens are
+    /// pushed from the settings screen — sharing would have put the reply on
+    /// the screen behind, which is the fault this was all split up to cure.
+    public internal(set) var sourceAppFeedback: FeatureFeedback?
+
+    /// The answer to clearing the list of what was sent, which is asked for on
+    /// the history screen and nowhere else.
+    ///
+    /// Its own field for the reason the two above have theirs: that screen is
+    /// pushed from the phone-apps screen, which is pushed from settings.
+    public internal(set) var historyFeedback: FeatureFeedback?
+}
