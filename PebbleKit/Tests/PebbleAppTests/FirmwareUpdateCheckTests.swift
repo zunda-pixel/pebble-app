@@ -63,12 +63,11 @@ struct FirmwareUpdateCheckTests {
     /// Instance state rather than `Defaults`, for the same reason the charge
     /// suite avoids the stored key: it is process-global, and holding it true
     /// here would send every concurrently running suite's model to the real
-    /// firmware catalogue. The announcement memory is still the stored one,
-    /// so it is cleared around each test.
+    /// firmware catalogue. The announcement memory is the model's too, and
+    /// starts empty here whatever the stored copy holds.
     private func withSwitchOn(_ model: AppModel, _ body: () async throws -> Void) async rethrows {
         model.notifyAboutFirmwareUpdatesEnabled = true
-        Defaults[.notifiedFirmwareVersions] = [:]
-        defer { Defaults[.notifiedFirmwareVersions] = [:] }
+        model.notifiedFirmwareVersions = [:]
         try await body()
     }
 
@@ -89,11 +88,41 @@ struct FirmwareUpdateCheckTests {
             #expect(notifier.posted.first?.body.contains("v5.1.0") == true)
             #expect(notifier.posted.first?.body.contains(connection.watch.name) == true)
             // Remembered under the watch's own identifier.
-            #expect(Defaults[.notifiedFirmwareVersions][connection.watch.id] == "v5.1.0")
+            #expect(model.notifiedFirmwareVersions[connection.watch.id] == "v5.1.0")
 
             // The same release again is not news — even past the check cache.
             model.firmwareCheckedAt = [:]
             await model.checkFirmwareUpdateUnattended(on: connection)
+            #expect(notifier.posted.count == 1)
+        }
+    }
+
+    /// Another model forgetting the same watch — in the test process, another
+    /// suite's — is no reason to announce the same release again.
+    @Test func anotherModelForgettingTheWatchDoesNotAnnounceTheReleaseAgain() async throws {
+        let directory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let otherDirectory = URL.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer {
+            try? FileManager.default.removeItem(at: directory)
+            try? FileManager.default.removeItem(at: otherDirectory)
+        }
+        let fixture = Fixture()
+        fixture.publish(version: "v5.1.0")
+        let notifier = SpyNotifier()
+        let model = makeModel(directory: directory, fixture: fixture, notifier: notifier)
+        let other = makeModel(directory: otherDirectory, fixture: fixture, notifier: SpyNotifier())
+
+        try await withSwitchOn(model) {
+            await model.scan()
+            await model.connect(to: try #require(model.discoveredWatches.first))
+            let connection = try #require(model.activeConnections.first)
+            await other.scan()
+            await other.connect(to: try #require(other.discoveredWatches.first))
+            #expect(await other.forgetWatch(id: connection.watch.id))
+
+            model.firmwareCheckedAt = [:]
+            await model.checkFirmwareUpdateUnattended(on: connection)
+
             #expect(notifier.posted.count == 1)
         }
     }

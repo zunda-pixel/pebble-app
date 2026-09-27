@@ -447,10 +447,10 @@ extension AppModel {
         }
         firmwareCheckedAt[cacheKey] = Date()
         guard PebbleOSFirmwareCatalog.isVersion(release.versionTag, newerThan: running) else { return }
-        guard Defaults[.notifiedFirmwareVersions][watch.id] != release.versionTag else {
+        guard notifiedFirmwareVersions[watch.id] != release.versionTag else {
             return
         }
-        Defaults[.notifiedFirmwareVersions][watch.id] = release.versionTag
+        notifiedFirmwareVersions[watch.id] = release.versionTag
         await localNotifier.post(
             identifier: Self.firmwareNotificationIdentifier(for: watch.id),
             title: String(localized: "Firmware Update", bundle: .module),

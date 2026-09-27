@@ -240,6 +240,13 @@ public final class AppModel {
     /// `Defaults` as the stored copy; this is the working one.
     var notifyWhenFullyChargedEnabled = Defaults[.notifyWhenFullyCharged]
     var notifyAboutFirmwareUpdatesEnabled = Defaults[.notifyAboutFirmwareUpdates]
+    /// Which release each watch was last told about, held here for the same
+    /// reason and saved as it changes. Read out of `Defaults` each time, the
+    /// check saw another model forget the same watch — in the test process
+    /// another suite's — and announced the release a second time (#152).
+    @ObservationIgnored var notifiedFirmwareVersions = Defaults[.notifiedFirmwareVersions] {
+        didSet { Defaults[.notifiedFirmwareVersions] = notifiedFirmwareVersions }
+    }
 
     /// The last battery level each watch reported this session, for telling a
     /// climb to 100% from a watch that connected already full. Cleared when the

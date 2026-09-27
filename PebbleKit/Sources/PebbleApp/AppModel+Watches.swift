@@ -110,7 +110,7 @@ extension AppModel {
     private func forgetEverythingKept(for id: WatchID) async {
         applications.installedIDsByWatch[id] = nil
         applications.activeWatchfaceIDs[id] = nil
-        Defaults[.notifiedFirmwareVersions][id] = nil
+        notifiedFirmwareVersions[id] = nil
         watchesAwaitingApplicationSynchronization.remove(id)
         connectionFailures[id] = nil
         chargeLevels[id] = nil
