@@ -12,12 +12,16 @@ targets iOS 27 and macOS 27; the app target also builds for visionOS.
 
 `Info.plist` carries no comments — Xcode rewrites the file and strips them — so
 its one non-obvious entry is explained here instead: `NSAppTransportSecurity`
-allows `NSAllowsArbitraryLoadsInWebContent` because watch applications'
-settings pages are largely plain http — the ones people already own were
-written years ago and are served as they were. It is the `InWebContent` key
-rather than the blanket one, so it reaches the configuration web view and
-nothing the app fetches itself — the application catalogue, the firmware and
-the weather all stay https.
+sets `NSAllowsArbitraryLoads`, because watch applications' settings pages and
+PebbleKit JS scripts largely talk plain http — the ones people already own were
+written years ago and are served as they were. `NSAllowsArbitraryLoadsInWebContent`
+is not enough: a script's requests are answered through `URLSession`, which
+that key never reaches, and ATS cannot be scoped to one session or to arbitrary
+domains. Left beside the blanket key, the `InWebContent` one would make the
+system ignore it, so it is gone. What ATS used to refuse is refused in code instead: everything
+the app fetches for itself — the application catalogue, the firmware, the
+language packs — goes through `PebbleProtocol/Catalogs/HTTPSOnly.swift`, which
+turns away a non-https URL and a redirect to one.
 | `PebbleKit/` | Local Swift package with everything else. Its only product, `PebbleKit`, exports the `PebbleApp` target. |
 | `PebbleKit/Sources/PebbleProtocol` | What the watch says and what the phone says back. **Foundation only** — no CoreBluetooth, no SwiftUI, so it holds anywhere and a test of it needs no radio. Six folders, below. |
 | &nbsp;&nbsp;`Wire/` | The link itself: frames, PPoG, the advertisement, the pairing state, the `WatchClient` protocol every transport implements, and the byte helpers. |
