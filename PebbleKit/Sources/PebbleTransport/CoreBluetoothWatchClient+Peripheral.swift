@@ -41,9 +41,9 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
 
         // A watch that is not bonded yet exposes only this service, so the protocol
         // one is looked for again once pairing finishes.
-        if setup.pairing == .unknown {
+        if link.setup.pairing == .unknown {
             if let pairingService = services.first(where: { $0.uuid == Self.pairingService }) {
-                setup.noteCheckingPairing()
+                link.setup.noteCheckingPairing()
                 Task { [tag = clientTag] in
                     await DiagnosticLog.shared.record(
                         category: "pairing",
@@ -65,7 +65,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
                         message: "[\(tag)] no pairing service; taking the link as bonded"
                     )
                 }
-                setup.noteNoPairingService()
+                link.setup.noteNoPairingService()
             }
         }
 
@@ -105,7 +105,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
                 return
             }
 
-            activeBatteryCharacteristic = characteristic
+            link.activeBatteryCharacteristic = characteristic
             peripheral.readValue(for: characteristic)
             if characteristic.properties.contains(.notify)
                 || characteristic.properties.contains(.indicate) {
@@ -135,11 +135,11 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
                         message: "[\(tag)] no connectivity characteristic; taking the link as bonded"
                     )
                 }
-                setup.noteNoPairingService()
+                link.setup.noteNoPairingService()
                 startProtocolIfReady(on: peripheral)
                 return
             }
-            activePairingTriggerCharacteristic = characteristics.first {
+            link.activePairingTriggerCharacteristic = characteristics.first {
                 $0.uuid == Self.pairingTriggerCharacteristic
             }
             // Older firmware, including recovery, may not offer this at all.
@@ -189,23 +189,23 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
         }
 
         endForwardTransport(on: peripheral)
-        activeWriteCharacteristic = writeCharacteristic
-        ppogNotifyCharacteristicToSubscribe = notifyCharacteristic
+        link.activeWriteCharacteristic = writeCharacteristic
+        link.ppogNotifyCharacteristicToSubscribe = notifyCharacteristic
         startProtocolIfReady(on: peripheral)
     }
 
     // Subscribing before the link is known to be bonded fails on a watch that is
     // not paired yet.
     private func startProtocolIfReady(on peripheral: CBPeripheral) {
-        guard setup.mayStartProtocol, ppogSession == nil else {
+        guard link.setup.mayStartProtocol, link.ppogSession == nil else {
             return
         }
-        switch setup.transport {
+        switch link.setup.transport {
         case .reversed:
-            guard let notifyCharacteristic = ppogNotifyCharacteristicToSubscribe else {
+            guard let notifyCharacteristic = link.ppogNotifyCharacteristicToSubscribe else {
                 return
             }
-            ppogNotifyCharacteristicToSubscribe = nil
+            link.ppogNotifyCharacteristicToSubscribe = nil
             peripheral.setNotifyValue(true, for: notifyCharacteristic)
         case .forward:
             guard GATTServer.shared.isSubscribed(centralID: peripheral.identifier.uuidString) else {
@@ -217,7 +217,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
     }
 
     private func startForwardTransport(on peripheral: CBPeripheral, because reason: String) {
-        guard setup.hostTransportOnPhone() else {
+        guard link.setup.hostTransportOnPhone() else {
             return
         }
         Task { [tag = clientTag] in
@@ -236,7 +236,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
                 self?.handleForwardTransportReady(on: peripheral)
             },
             onUnsubscribe: { [weak self] in
-                guard let self, self.setup.transport == .forward else { return }
+                guard let self, self.link.setup.transport == .forward else { return }
                 self.abortLink(peripheral, error: .disconnected, step: "hosting the transport: the watch unsubscribed")
             }
         )
@@ -246,7 +246,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
     /// callback would otherwise drop the link, and its receive callback would
     /// feed packets in from a transport no longer in use.
     private func endForwardTransport(on peripheral: CBPeripheral) {
-        guard ppogSession == nil, setup.handTransportBackToWatch() else {
+        guard link.ppogSession == nil, link.setup.handTransportBackToWatch() else {
             return
         }
         GATTServer.shared.unregister(centralID: peripheral.identifier.uuidString)
@@ -266,20 +266,20 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
     /// holding a stale cache to look again. Without this the link sits until the
     /// connect deadline and the next attempt does exactly the same, for ever.
     private func waitForTheWatchToSubscribe(on peripheral: CBPeripheral) {
-        guard !hasRepublishedForThisLink, subscriptionWatchdog == nil else {
+        guard !link.hasRepublishedForThisLink, link.subscriptionWatchdog == nil else {
             return
         }
-        subscriptionWatchdog = Task { [weak self, tag = clientTag] in
+        link.subscriptionWatchdog = Task { [weak self, tag = clientTag] in
             try? await Task.sleep(for: .seconds(5))
             guard !Task.isCancelled, let self else { return }
-            self.subscriptionWatchdog = nil
+            self.link.subscriptionWatchdog = nil
             let centralID = peripheral.identifier.uuidString
-            guard self.setup.transport == .forward,
-                  self.ppogSession == nil,
+            guard self.link.setup.transport == .forward,
+                  self.link.ppogSession == nil,
                   !GATTServer.shared.isSubscribed(centralID: centralID) else {
                 return
             }
-            self.hasRepublishedForThisLink = true
+            self.link.hasRepublishedForThisLink = true
             await DiagnosticLog.shared.record(
                 .warning,
                 category: "pairing",
@@ -290,13 +290,13 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
     }
 
     private func handleForwardTransportReady(on peripheral: CBPeripheral) {
-        guard setup.transport == .forward, ppogSession == nil, setup.mayStartProtocol else {
+        guard link.setup.transport == .forward, link.ppogSession == nil, link.setup.mayStartProtocol else {
             return
         }
         // On this transport the watch sends the reset request once it has subscribed;
         // starting one from here too leaves both sides mid-handshake. One it sent
         // before this side could answer is still answered.
-        let steps = setup.stepsToOpenTheSession(askingIfNeeded: false)
+        let steps = link.setup.stepsToOpenTheSession(askingIfNeeded: false)
         guard !steps.isEmpty else {
             Task { [tag = clientTag] in
                 await DiagnosticLog.shared.record(
@@ -333,12 +333,12 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
                     + " error=\(status.pairingError)"
             )
         }
-        switch setup.apply(status) {
+        switch link.setup.apply(status) {
         case .wait:
             return
         case .ready(let wasPairing):
-            pairingTimeoutTask?.cancel()
-            pairingTimeoutTask = nil
+            link.pairingTimeoutTask?.cancel()
+            link.pairingTimeoutTask = nil
             if wasPairing {
                 connectionTimeoutTask?.cancel()
                 connectionTimeoutTask = Task { [weak self] in
@@ -356,7 +356,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
         }
         // Only the watch can start bonding: ask it to send a security request,
         // which is what makes iOS show its pairing prompt.
-        if let trigger = activePairingTriggerCharacteristic {
+        if let trigger = link.activePairingTriggerCharacteristic {
             peripheral.writeValue(
                 Data(PairingTrigger.value()),
                 for: trigger,
@@ -366,8 +366,8 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
         // Pairing waits on the reader accepting a prompt.
         connectionTimeoutTask?.cancel()
         connectionTimeoutTask = nil
-        pairingTimeoutTask?.cancel()
-        pairingTimeoutTask = Task { [weak self] in
+        link.pairingTimeoutTask?.cancel()
+        link.pairingTimeoutTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(60))
             guard !Task.isCancelled else {
                 return
@@ -408,7 +408,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
             // Answering what the watch already asked for, if it got in first,
             // rather than asking again into a watch that is waiting for us.
             try perform(
-                setup.stepsToOpenTheSession(askingIfNeeded: true),
+                link.setup.stepsToOpenTheSession(askingIfNeeded: true),
                 answering: nil,
                 on: peripheral
             )
@@ -468,7 +468,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
         do {
             let packet = try PPoGPacket(decoding: bytes)
             recordPPoGPacket(packet, direction: "in")
-            let steps = setup.steps(for: packet, hasSession: ppogSession != nil)
+            let steps = link.setup.steps(for: packet, hasSession: link.ppogSession != nil)
             if steps.isEmpty {
                 Task { [tag = clientTag] in
                     await DiagnosticLog.shared.record(
@@ -480,7 +480,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
             }
             try perform(steps, answering: packet, on: peripheral)
         } catch {
-            guard ppogSession == nil else {
+            guard link.ppogSession == nil else {
                 // A packet that makes no sense is no reason to drop a working
                 // link: the transport re-sends whatever went unacknowledged.
                 Task { [tag = clientTag, message = error.localizedDescription] in
@@ -528,9 +528,9 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
                 )
 
             case .giveToSession:
-                guard let packet, var session = ppogSession else { return }
+                guard let packet, var session = link.ppogSession else { return }
                 let actions = try session.receive(packet)
-                ppogSession = session
+                link.ppogSession = session
                 try handle(actions, peripheral: peripheral)
                 updateAcknowledgementTimeout(for: peripheral)
             }
@@ -554,7 +554,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
             watchTransmit = watchTransmitWindow,
             receive = session.receiveWindow,
             transmit = session.transmitWindow,
-            packetSize = setup.transport == .forward
+            packetSize = link.setup.transport == .forward
                 ? GATTServer.shared.maximumPacketSize(centralID: peripheral.identifier.uuidString)
                 : peripheral.maximumWriteValueLength(for: .withoutResponse)
         ] in
@@ -564,11 +564,11 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
                     + " ours rx=\(receive) tx=\(transmit), packet size=\(packetSize)"
             )
         }
-        ppogSession = session
-        frameDecoder = PebbleProtocolFrameDecoder()
+        link.ppogSession = session
+        link.frameDecoder = PebbleProtocolFrameDecoder()
         connectedPeripheral = peripheral
-        sessionRestartTimeoutTask?.cancel()
-        sessionRestartTimeoutTask = nil
+        link.sessionRestartTimeoutTask?.cancel()
+        link.sessionRestartTimeoutTask = nil
         handshakePhaseReporter?(.transportOpen)
         try sendFrame(WatchVersionCodec.requestFrame(), to: peripheral)
     }
@@ -591,7 +591,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
     }
 
     public func peripheralIsReady(toSendWriteWithoutResponse peripheral: CBPeripheral) {
-        guard let characteristic = activeWriteCharacteristic else {
+        guard let characteristic = link.activeWriteCharacteristic else {
             return
         }
         flushWrites(to: peripheral, characteristic: characteristic)

@@ -12,12 +12,10 @@ extension CoreBluetoothWatchClient: CBCentralManagerDelegate {
             resumeReconnectAfterPowerOn()
         case .unauthorized:
             waiters.forEach { $0.resume(throwing: WatchConnectionError.permissionDenied) }
-            failScan(.permissionDenied)
-            failConnection(.permissionDenied)
+            loseTheRadio(.permissionDenied)
         case .unsupported:
             waiters.forEach { $0.resume(throwing: WatchConnectionError.bluetoothUnsupported) }
-            failScan(.bluetoothUnsupported)
-            failConnection(.bluetoothUnsupported)
+            loseTheRadio(.bluetoothUnsupported)
         case .poweredOff, .resetting:
             waiters.forEach { $0.resume(throwing: WatchConnectionError.bluetoothUnavailable) }
             failScan(.bluetoothUnavailable)
@@ -37,6 +35,21 @@ extension CoreBluetoothWatchClient: CBCentralManagerDelegate {
             bluetoothWaiters.append(contentsOf: waiters)
         @unknown default:
             waiters.forEach { $0.resume(throwing: WatchConnectionError.bluetoothUnavailable) }
+        }
+    }
+
+    /// Bluetooth refused or absent for good: no reconnect will find the watch,
+    /// so none is left chasing it, and a watch the app was showing as
+    /// connected — or reconnecting — is said to be gone. `failConnection` alone
+    /// cleared the watch without a word, and the disconnect that followed then
+    /// found nothing connected to report.
+    private func loseTheRadio(_ error: WatchConnectionError) {
+        failScan(error)
+        let wasShowingAWatch = connectedWatch != nil || reconnects.isAutomatic
+        reconnects.stop()
+        failConnection(error)
+        if wasShowingAWatch {
+            eventContinuation?.yield(.disconnected(error))
         }
     }
 
@@ -68,7 +81,7 @@ extension CoreBluetoothWatchClient: CBCentralManagerDelegate {
             cancelLink(peripheral, reason: "no connect request was waiting for this link")
             return
         }
-        setup.reset()
+        link.setup.reset()
         if reconnects.isAutomatic, connectionContinuation == nil {
             reconnects.noteLinkUp()
             armReconnectHandshakeDeadline(for: peripheral)

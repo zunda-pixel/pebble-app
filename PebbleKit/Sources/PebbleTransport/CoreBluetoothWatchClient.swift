@@ -45,45 +45,23 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     /// Whoever asked for the connect that is in flight, for the phases between
     /// the link coming up and the watch answering. Nil once it has answered.
     var handshakePhaseReporter: (@MainActor (WatchHandshakePhase) -> Void)?
-    /// Set while a session started over on a live link waits for the watch to
-    /// answer its version request.
-    ///
-    /// That answer is almost always word for word the one before, and the app
-    /// has to hear it anyway: it is the only thing that says the transport is
-    /// usable again and the work interrupted by the restart needs re-doing.
-    var isRestartingSession = false
-    /// Deadline for a session started over on a live link. Without it a watch
-    /// that asks for a reset and then says nothing leaves the link up with no
-    /// transport on it, and nothing notices until the health check fails a
-    /// minute later.
-    var sessionRestartTimeoutTask: Task<Void, Never>?
     var pendingWatch: WatchConnectionTarget?
-    var activeWriteCharacteristic: CBCharacteristic?
-    var activeBatteryCharacteristic: CBCharacteristic?
-    var activePairingTriggerCharacteristic: CBCharacteristic?
-    var ppogNotifyCharacteristicToSubscribe: CBCharacteristic?
-    var setup = LinkSetup()
+    /// Everything that belongs to the link up now, reset in one place when it
+    /// goes. See `endLink()`.
+    var link = LinkState()
     /// Watches whose link was asked for with the notification requirement and
     /// did not come up. See `connectOptions(for:)`.
     var refusedNotificationAccess: Set<UUID> = []
     /// Whether the attempt in flight carried that requirement, so a failure can
     /// be told apart from one that had nothing to do with it.
     var requiredNotificationAccess = false
-    var pairingTimeoutTask: Task<Void, Never>?
-    var subscriptionWatchdog: Task<Void, Never>?
-    var hasRepublishedForThisLink = false
     var connectedPeripheral: CBPeripheral?
     var connectedWatch: ConnectedWatch?
-    private var latestBatteryLevel: Int?
-    var ppogSession: PPoGSession?
-    var frameDecoder = PebbleProtocolFrameDecoder()
     private var frameContinuation: AsyncStream<PebbleProtocolFrame>.Continuation?
     var eventContinuation: AsyncStream<WatchClientEvent>.Continuation?
-    private var pendingGattWrites: Deque<Data> = []
     private var timeChangeObservers = NotificationObserverStorage()
     private var scanTimeoutTask: Task<Void, Never>?
     var connectionTimeoutTask: Task<Void, Never>?
-    private var acknowledgementTimeoutTask: Task<Void, Never>?
     private var healthCheckTask: Task<Void, Never>?
     private var healthCheckTimeoutTask: Task<Void, Never>?
     let reconnects = ReconnectPolicy()
@@ -142,7 +120,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     /// handshake finishes, and anything sent before that is lost rather than
     /// queued.
     func linkedPeripheral() throws -> CBPeripheral {
-        guard let peripheral = connectedPeripheral, ppogSession != nil else {
+        guard let peripheral = connectedPeripheral, link.ppogSession != nil else {
             throw WatchConnectionError.disconnected
         }
         return peripheral
@@ -439,7 +417,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
             // The version's own platform byte wins; the discovered model is
             // the fallback for a platform this app has no table entry for.
             model: WatchModel(hardwarePlatform: information.hardwarePlatform) ?? watch.model,
-            batteryLevel: latestBatteryLevel,
+            batteryLevel: link.latestBatteryLevel,
             version: information
         )
         self.connectedWatch = connectedWatch
@@ -482,11 +460,6 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     func failConnection(_ error: WatchConnectionError) {
         connectionTimeoutTask?.cancel()
         connectionTimeoutTask = nil
-        pairingTimeoutTask?.cancel()
-        pairingTimeoutTask = nil
-        setup.reset()
-        ppogNotifyCharacteristicToSubscribe = nil
-        activePairingTriggerCharacteristic = nil
         connectionContinuation?.resume(throwing: error)
         connectionContinuation = nil
         handshakePhaseReporter = nil
@@ -498,17 +471,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
             cancelLink(peripheral, reason: "the connect attempt failed: \(error.logDescription)")
         }
         pendingWatch = nil
-        activeWriteCharacteristic = nil
-        activeBatteryCharacteristic = nil
-        connectedPeripheral = nil
-        connectedWatch = nil
-        latestBatteryLevel = nil
-        ppogSession = nil
-        pendingGattWrites.removeAll()
-        acknowledgementTimeoutTask?.cancel()
-        acknowledgementTimeoutTask = nil
-        session.forgetDataLoggingSessions()
-        stopHealthChecks()
+        endLink()
         failWorkInFlight(error)
     }
 
@@ -527,23 +490,23 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     func write(_ packet: PPoGPacket, to peripheral: CBPeripheral) throws {
         recordPPoGPacket(packet, direction: "out")
         let bytes = try packet.encoded(for: .one)
-        if setup.transport == .forward {
+        if link.setup.transport == .forward {
             guard GATTServer.shared.send(bytes, to: peripheral.identifier.uuidString) else {
                 throw WatchConnectionError.protocolNegotiationFailed
             }
             return
         }
-        guard let characteristic = activeWriteCharacteristic else {
+        guard let characteristic = link.activeWriteCharacteristic else {
             throw WatchConnectionError.protocolNegotiationFailed
         }
-        pendingGattWrites.append(Data(bytes))
+        link.pendingGattWrites.append(Data(bytes))
         flushWrites(to: peripheral, characteristic: characteristic)
     }
 
     func flushWrites(to peripheral: CBPeripheral, characteristic: CBCharacteristic) {
         while peripheral.canSendWriteWithoutResponse,
-              !pendingGattWrites.isEmpty {
-            let value = pendingGattWrites.removeFirst()
+              !link.pendingGattWrites.isEmpty {
+            let value = link.pendingGattWrites.removeFirst()
             peripheral.writeValue(value, for: characteristic, type: .withoutResponse)
         }
     }
@@ -562,7 +525,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
             case .send(let packet):
                 try write(packet, to: peripheral)
             case .deliver(let bytes):
-                let batch = frameDecoder.append(bytes)
+                let batch = link.frameDecoder.append(bytes)
                 if firstFailure == nil, let failure = batch.failure {
                     firstFailure = failure
                 }
@@ -589,17 +552,17 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         _ frame: PebbleProtocolFrame,
         to peripheral: CBPeripheral
     ) throws {
-        guard var session = ppogSession else {
+        guard var session = link.ppogSession else {
             throw WatchConnectionError.disconnected
         }
 
         Task { await DiagnosticLog.shared.recordFrame(direction: "out", frame: frame) }
         let bytes = try frame.encoded()
-        let maximumPacketSize = setup.transport == .forward
+        let maximumPacketSize = link.setup.transport == .forward
             ? GATTServer.shared.maximumPacketSize(centralID: peripheral.identifier.uuidString)
             : peripheral.maximumWriteValueLength(for: .withoutResponse)
         let actions = try session.enqueue(bytes, maximumPacketSize: maximumPacketSize)
-        ppogSession = session
+        link.ppogSession = session
         try handle(actions, peripheral: peripheral)
         updateAcknowledgementTimeout(for: peripheral)
     }
@@ -667,10 +630,10 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
             // rewriting its watch library every minute. A session started over
             // is the exception: the app is waiting to hear that the transport
             // works before it re-sends anything.
-            if updated != watch || isRestartingSession {
+            if updated != watch || link.isRestartingSession {
                 eventContinuation?.yield(.watchUpdated(updated))
             }
-            isRestartingSession = false
+            link.isRestartingSession = false
             return true
         }
 
@@ -768,26 +731,26 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
                 message: "[\(tag)] starting the session over: \(reason)"
             )
         }
-        ppogSession = nil
-        frameDecoder = PebbleProtocolFrameDecoder()
+        link.ppogSession = nil
+        link.frameDecoder = PebbleProtocolFrameDecoder()
         // What the next handshake owes is `LinkSetup.steps(for:hasSession:)`'s
         // to say: it decided to come here, and it decides what follows.
-        pendingGattWrites.removeAll()
-        acknowledgementTimeoutTask?.cancel()
-        acknowledgementTimeoutTask = nil
+        link.pendingGattWrites.removeAll()
+        link.acknowledgementTimeoutTask?.cancel()
+        link.acknowledgementTimeoutTask = nil
         // A reply to the check sent over the session that has gone is not coming;
         // the periodic check itself keeps running and is what notices if the
         // restart quietly fails.
         clearPendingHealthCheck()
         failWorkInFlight(.disconnected)
-        // Deliberately left alone, unlike `clearTransportState`: the bond, the
+        // Deliberately left alone, unlike `endLink`: the bond, the
         // watch, the health-logging session and the records the watch holds all
         // outlive a transport that was reopened.
-        isRestartingSession = true
-        sessionRestartTimeoutTask?.cancel()
-        sessionRestartTimeoutTask = Task { [weak self] in
+        link.isRestartingSession = true
+        link.sessionRestartTimeoutTask?.cancel()
+        link.sessionRestartTimeoutTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(10))
-            guard !Task.isCancelled, self?.ppogSession == nil else { return }
+            guard !Task.isCancelled, self?.link.ppogSession == nil else { return }
             self?.cancelLink(peripheral, reason: "the session was never started over")
         }
         if let watch = connectedWatch {
@@ -796,30 +759,22 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     }
 
     func clearTransportState() {
-        isRestartingSession = false
-        sessionRestartTimeoutTask?.cancel()
-        sessionRestartTimeoutTask = nil
-        activeWriteCharacteristic = nil
-        activeBatteryCharacteristic = nil
-        activePairingTriggerCharacteristic = nil
-        ppogNotifyCharacteristicToSubscribe = nil
-        setup.reset()
-        subscriptionWatchdog?.cancel()
-        subscriptionWatchdog = nil
-        hasRepublishedForThisLink = false
-        pairingTimeoutTask?.cancel()
-        pairingTimeoutTask = nil
+        endLink()
+        failWorkInFlight(.disconnected)
+    }
+
+    /// What both ends of a link reset — a connect that failed and a link that
+    /// dropped — so that neither can leave something behind for the next one.
+    /// `pendingWatch` is not in it: a dropped link with a reconnect pending is
+    /// still waiting for that watch.
+    func endLink() {
+        link.cancelDeadlines()
+        link = LinkState()
         connectedPeripheral = nil
         connectedWatch = nil
-        latestBatteryLevel = nil
-        ppogSession = nil
-        frameDecoder = PebbleProtocolFrameDecoder()
-        pendingGattWrites.removeAll()
-        acknowledgementTimeoutTask?.cancel()
-        acknowledgementTimeoutTask = nil
+        // A session id only means something inside the link that opened it.
         session.forgetDataLoggingSessions()
         stopHealthChecks()
-        failWorkInFlight(.disconnected)
     }
 
     func failWorkInFlight(_ error: WatchConnectionError) {
@@ -960,7 +915,7 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
             return
         }
 
-        latestBatteryLevel = batteryLevel
+        link.latestBatteryLevel = batteryLevel
         guard var watch = connectedWatch else {
             return
         }
@@ -990,14 +945,14 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     }
 
     func updateAcknowledgementTimeout(for peripheral: CBPeripheral) {
-        acknowledgementTimeoutTask?.cancel()
-        acknowledgementTimeoutTask = nil
+        link.acknowledgementTimeoutTask?.cancel()
+        link.acknowledgementTimeoutTask = nil
 
-        guard ppogSession?.hasPendingAcknowledgements == true else {
+        guard link.ppogSession?.hasPendingAcknowledgements == true else {
             return
         }
 
-        acknowledgementTimeoutTask = Task { [weak self] in
+        link.acknowledgementTimeoutTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(10))
             guard !Task.isCancelled else {
                 return
@@ -1007,13 +962,13 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     }
 
     private func retryUnacknowledgedPackets(on peripheral: CBPeripheral) {
-        guard var session = ppogSession else {
+        guard var session = link.ppogSession else {
             return
         }
 
         do {
             let actions = try session.handleAcknowledgementTimeout()
-            ppogSession = session
+            link.ppogSession = session
             try handle(actions, peripheral: peripheral)
             updateAcknowledgementTimeout(for: peripheral)
         } catch {
