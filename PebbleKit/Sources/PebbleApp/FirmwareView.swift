@@ -165,8 +165,8 @@ struct FirmwareContent: View {
 
     // An install under way beats one that stopped, which beats a watch that
     // cannot run the newest firmware.
-    /// Nil for a watch already on what is published: its version is on the
-    /// General Information screen, and a row saying so said nothing more.
+    /// Nil until the catalogue has answered for a watch whose version is
+    /// known: that version is on the General Information screen already.
     private var status: FirmwareStatus? {
         if let journal, journal.phase == .transferring || journal.phase == .installing {
             return FirmwareStatus(
@@ -212,12 +212,20 @@ struct FirmwareContent: View {
                 tint: .accentColor
             )
         }
-        if let availableRelease, availableRelease.versionTag != installedVersion {
+        if let availableRelease,
+           installedVersion.map({ PebbleOSFirmwareCatalog.isVersion(availableRelease.versionTag, newerThan: $0) }) ?? true {
             return FirmwareStatus(
                 title: "PebbleOS \(availableRelease.versionTag) is published",
                 detail: "Download it, then install it.",
                 systemImage: "arrow.down.circle",
                 tint: .accentColor
+            )
+        }
+        if availableRelease != nil, installedVersion != nil {
+            return FirmwareStatus(
+                title: "PebbleOS is up to date",
+                systemImage: "checkmark.circle.fill",
+                tint: .green
             )
         }
         if installedVersion != nil {
@@ -234,7 +242,7 @@ struct FirmwareContent: View {
 
 private struct FirmwareStatus {
     var title: LocalizedStringKey
-    var detail: LocalizedStringKey
+    var detail: LocalizedStringKey? = nil
     var systemImage: String
     var tint: Color
 }
@@ -251,9 +259,11 @@ private struct FirmwareStatusRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(status.title)
                     .font(.headline)
-                Text(status.detail)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                if let detail = status.detail {
+                    Text(detail)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .padding(.vertical, 4)
@@ -264,10 +274,10 @@ private struct FirmwareStatusRow: View {
 #Preview("Up to date") {
     NavigationStack {
         FirmwareContent(
-            installedVersion: "v4.36.2",
+            installedVersion: PreviewSamples.firmwareRelease.versionTag,
             isConnected: true,
             isRunningRecoveryFirmware: false,
-            availableRelease: nil,
+            availableRelease: PreviewSamples.firmwareRelease,
             downloadedFirmware: nil,
             journal: nil,
             progress: nil,

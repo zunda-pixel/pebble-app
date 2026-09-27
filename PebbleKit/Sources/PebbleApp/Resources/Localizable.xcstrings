@@ -4225,6 +4225,16 @@
         }
       }
     },
+    "PebbleOS is up to date" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PebbleOSは最新です"
+          }
+        }
+      }
+    },
     "Pending firmware update removed." : {
       "localizations" : {
         "ja" : {
