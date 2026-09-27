@@ -1573,7 +1573,7 @@ private actor StaticTranscriptionProvider: VoiceTranscriptionProvider {
         return .transcribed(words)
     }
 
-    func interpretReminder(_ words: [VoiceTranscriptionWord]) async -> VoiceReminderOutcome {
+    func interpretReminder(_ words: [VoiceTranscriptionWord], within budget: Duration) async -> VoiceReminderOutcome {
         reminder
     }
 }

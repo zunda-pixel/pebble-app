@@ -89,8 +89,12 @@ actor SpeechBridge: VoiceTranscriptionProvider {
             }
         }
         self.installation = installation
-        defer { self.installation = nil }
+        // The language may have changed while this waited, and the handle then
+        // belongs to the installation for the new one: neither it nor the flag
+        // is this one's to set.
+        defer { if self.installation == installation { self.installation = nil } }
         try await installation.value
+        guard self.installation == installation else { return }
         hasInstalledAssets = true
     }
 
@@ -103,10 +107,13 @@ actor SpeechBridge: VoiceTranscriptionProvider {
         await readiness() == .ready
     }
 
-    func interpretReminder(_ words: [VoiceTranscriptionWord]) async -> VoiceReminderOutcome {
+    func interpretReminder(
+        _ words: [VoiceTranscriptionWord],
+        within budget: Duration
+    ) async -> VoiceReminderOutcome {
         let spoken = words.map(\.text).joined(separator: " ")
         guard !spoken.isEmpty else { return .failed(.recognizerError) }
-        let reminder = await ReminderReading.readWithModel(spoken)
+        let reminder = await ReminderReading.readWithModel(spoken, within: budget)
         guard !reminder.text.isEmpty else { return .failed(.recognizerError) }
         return .understood(reminder: reminder.text, time: reminder.time)
     }

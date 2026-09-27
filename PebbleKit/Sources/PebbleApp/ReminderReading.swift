@@ -32,7 +32,7 @@ enum ReminderReading {
     /// on 2026-09-02 — was thrown away at the older deadline for nothing.
     static let modelDeadline = Duration.seconds(10)
 
-    private enum ModelAnswer {
+    private enum ModelAnswer: Sendable {
         case read(UnderstoodReminder)
         /// The model was asked and gave nothing back. Why is recorded where it
         /// happened.
@@ -40,7 +40,14 @@ enum ReminderReading {
         case tooSlow
     }
 
-    static func readWithModel(_ spoken: String, now: Date = Date()) async -> SpokenReminder {
+    /// `budget` is what the voice session has left; the model is given the
+    /// smaller of that and `modelDeadline`, so the detector's answer still
+    /// reaches the watch when the transcription took its time.
+    static func readWithModel(
+        _ spoken: String,
+        within budget: Duration = modelDeadline,
+        now: Date = Date()
+    ) async -> SpokenReminder {
         let detected = read(spoken, now: now)
         if case .unavailable(let reason) = SystemLanguageModel.default.availability {
             // Which reader answered is the first thing to know when a reminder
@@ -52,21 +59,15 @@ enum ReminderReading {
             )
             return detected
         }
-        let answer = await withTaskGroup(of: ModelAnswer.self) { group in
-            group.addTask { await understand(spoken, now: now) }
-            group.addTask {
-                try? await Task.sleep(for: modelDeadline)
-                return .tooSlow
-            }
-            let first = await group.next() ?? .nothing
-            group.cancelAll()
-            return first
-        }
+        let deadline = min(modelDeadline, max(budget, .zero))
+        let answer = await firstAnswer(within: deadline) {
+            await understand(spoken, now: now)
+        } ?? .tooSlow
         guard case .read(let understood) = answer else {
             if case .tooSlow = answer {
                 await DiagnosticLog.shared.record(
                     category: "voice",
-                    message: "the model was still reading the reminder after \(modelDeadline);"
+                    message: "the model was still reading the reminder after \(deadline);"
                         + " the date detector answered instead"
                 )
             }

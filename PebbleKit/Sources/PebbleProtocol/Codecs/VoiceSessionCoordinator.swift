@@ -10,11 +10,16 @@ public protocol VoiceTranscriptionProvider: Sendable {
     /// speech into words may still have no way to read a reminder out of them.
     func canServeSession(_ sessionType: VoiceSessionType) async -> Bool
     func transcribe(encoderInfo: SpeexEncoderInfo, audioFrames: [[UInt8]]) async -> VoiceTranscriptionOutcome
-    func interpretReminder(_ words: [VoiceTranscriptionWord]) async -> VoiceReminderOutcome
+    /// `budget` is what is left of the session's deadline once the words are
+    /// in: whatever reads them has to answer inside it.
+    func interpretReminder(_ words: [VoiceTranscriptionWord], within budget: Duration) async -> VoiceReminderOutcome
 }
 
 extension VoiceTranscriptionProvider {
-    public func interpretReminder(_ words: [VoiceTranscriptionWord]) async -> VoiceReminderOutcome {
+    public func interpretReminder(
+        _ words: [VoiceTranscriptionWord],
+        within budget: Duration
+    ) async -> VoiceReminderOutcome {
         .failed(.serviceUnavailable)
     }
 }
@@ -35,12 +40,17 @@ public final class VoiceSessionCoordinator {
     /// recognizer past this gains nothing and holds the next session up.
     static let setupDeadline = Duration.seconds(6)
     static let resultDeadline = Duration.seconds(13)
+    /// Kept back from a reminder's reading for building and sending the frame.
+    static let interpretationMargin = Duration.seconds(1)
 
     private let send: (PebbleProtocolFrame) async throws -> Void
     private let provider: (any VoiceTranscriptionProvider)?
     private let clock: any Clock<Duration>
     private var activeSession: ActiveSession?
     private var transcriptionTask: Task<Void, Never>?
+    /// Moved on by every reset, so a setup that was waiting on the provider
+    /// when the link went finds out and says nothing to the next one.
+    private var generation = 0
 
     public init(
         provider: (any VoiceTranscriptionProvider)?,
@@ -53,6 +63,7 @@ public final class VoiceSessionCoordinator {
     }
 
     public func reset() {
+        generation += 1
         transcriptionTask?.cancel()
         transcriptionTask = nil
         activeSession = nil
@@ -82,7 +93,10 @@ public final class VoiceSessionCoordinator {
             return
         }
         let sessionType = request.sessionType
-        switch await answer(within: Self.setupDeadline, { await provider.canServeSession(sessionType) }) {
+        let setupGeneration = generation
+        let servable = await answer(within: Self.setupDeadline, { await provider.canServeSession(sessionType) })
+        guard generation == setupGeneration else { return }
+        switch servable {
         case true?:
             break
         case false?:
@@ -121,13 +135,21 @@ public final class VoiceSessionCoordinator {
         let audioFrames = session.audioFrames
         transcriptionTask = Task { [send] in
             let answered = await answer(within: Self.resultDeadline) {
+                // Real time, whatever clock the deadline runs on: it is the
+                // model's own time that the budget is spent in.
+                let started = ContinuousClock.now
                 let outcome = await provider.transcribe(
                     encoderInfo: encoderInfo,
                     audioFrames: audioFrames
                 )
                 return switch request.sessionType {
                 case .naturalLanguage:
-                    await Self.reminderFrame(for: outcome, request: request, provider: provider)
+                    await Self.reminderFrame(
+                        for: outcome,
+                        request: request,
+                        provider: provider,
+                        within: Self.resultDeadline - (ContinuousClock.now - started) - Self.interpretationMargin
+                    )
                 case .dictation, .command:
                     Self.dictationFrame(for: outcome, request: request)
                 }
@@ -141,24 +163,11 @@ public final class VoiceSessionCoordinator {
         }
     }
 
-    /// `work`'s answer, or nil if `deadline` passes first.
-    ///
-    /// Not a task group: a group waits for every child before it returns, so a
-    /// recognizer that does not stop when cancelled would hold the answer for
-    /// as long as it liked — which is the one thing the deadline is for. The
-    /// work is cancelled and left to finish on its own.
     private func answer<Value: Sendable>(
         within deadline: Duration,
         _ work: @escaping @MainActor () async -> Value
     ) async -> Value? {
-        let race = DeadlineRace<Value>()
-        return await withTaskCancellationHandler {
-            await withCheckedContinuation { continuation in
-                race.begin(continuation, work: work, deadline: deadline, clock: clock)
-            }
-        } onCancel: {
-            Task { @MainActor in race.finish(nil) }
-        }
+        await firstAnswer(within: deadline, clock: clock, work)
     }
 
     private static func failureFrame(
@@ -203,10 +212,11 @@ public final class VoiceSessionCoordinator {
     private static func reminderFrame(
         for outcome: VoiceTranscriptionOutcome,
         request: VoiceSessionSetupRequest,
-        provider: any VoiceTranscriptionProvider
+        provider: any VoiceTranscriptionProvider,
+        within budget: Duration
     ) async -> PebbleProtocolFrame {
         let interpretation: VoiceReminderOutcome = switch outcome {
-        case .transcribed(let words): await provider.interpretReminder(words)
+        case .transcribed(let words): await provider.interpretReminder(words, within: budget)
         case .failed(let result): .failed(result)
         }
         switch interpretation {
@@ -237,6 +247,28 @@ public final class VoiceSessionCoordinator {
             result: result,
             applicationInitiated: applicationInitiated
         ))
+    }
+}
+
+/// `work`'s answer, or nil if `deadline` passes first.
+///
+/// Not a task group: a group waits for every child before it returns, so a
+/// recognizer or a model that does not stop when cancelled would hold the
+/// answer for as long as it liked — which is the one thing the deadline is
+/// for. The work is cancelled and left to finish on its own.
+@MainActor
+package func firstAnswer<Value: Sendable>(
+    within deadline: Duration,
+    clock: any Clock<Duration> = ContinuousClock(),
+    _ work: @escaping @MainActor () async -> Value
+) async -> Value? {
+    let race = DeadlineRace<Value>()
+    return await withTaskCancellationHandler {
+        await withCheckedContinuation { continuation in
+            race.begin(continuation, work: work, deadline: deadline, clock: clock)
+        }
+    } onCancel: {
+        Task { @MainActor in race.finish(nil) }
     }
 }
 
