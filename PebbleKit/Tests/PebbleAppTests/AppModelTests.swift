@@ -83,16 +83,60 @@ struct AppModelTests {
     }
 
     @Test
-    func tokenNamesSeparateTheAccountFromEachWatch() {
-        // A configuration page sees one token for the user and one per watch;
-        // mixing them up would leak one watch's identity into another's page.
-        #expect(PebbleTokenStore.accountTokenName == "pebbleAccountToken")
-        #expect(PebbleTokenStore.watchTokenName(watchID: WatchID("abc")) == "pebbleWatchToken.abc")
+    func tokensDifferBetweenApplicationsAndRepeatForTheSameOne() {
+        let first = UUID(uuidString: "61B22BC8-1E29-460D-A236-3FE409A439FF")!
+        let second = UUID(uuidString: "0863FC6A-66C5-4F62-AB8A-82ED00A98B5D")!
+
         #expect(
-            PebbleTokenStore.watchTokenName(watchID: WatchID("abc"))
-                != PebbleTokenStore.watchTokenName(watchID: WatchID("def"))
+            PebbleTokenStore.token(seed: "Q402P000000A", applicationID: first, developerID: nil)
+                == PebbleTokenStore.token(seed: "Q402P000000A", applicationID: first, developerID: nil)
         )
-        #expect(PebbleTokenStore.watchTokenName(watchID: WatchID("abc")) != PebbleTokenStore.accountTokenName)
+        #expect(
+            PebbleTokenStore.token(seed: "Q402P000000A", applicationID: first, developerID: nil)
+                != PebbleTokenStore.token(seed: "Q402P000000A", applicationID: second, developerID: nil)
+        )
+        #expect(
+            PebbleTokenStore.token(seed: "Q402P000000A", applicationID: first, developerID: nil)
+                != PebbleTokenStore.token(seed: "Q403P000001B", applicationID: first, developerID: nil)
+        )
+        #expect(
+            PebbleTokenStore.token(seed: "Q402P000000A", applicationID: first, developerID: "deadbeefcafe")
+                == PebbleTokenStore.token(seed: "Q402P000000A", applicationID: second, developerID: "deadbeefcafe")
+        )
+    }
+
+    @Test
+    func tokensUseTheOfficialDerivation() {
+        let application = UUID(uuidString: "61b22bc8-1e29-460d-a236-3fe409a439ff")!
+
+        // md5(seed + (developerId ?? uuid.uppercase()) + ACCOUNT_TOKEN_SALT), lowercase hex:
+        // libpebble3/src/commonMain/kotlin/io/rebble/libpebblecommon/js/JsTokenUtil.kt:18-35,
+        // computed with Python's hashlib.md5.
+        #expect(
+            PebbleTokenStore.token(seed: "Q402P000000A", applicationID: application, developerID: nil)
+                == "4e8c8c6dc194b2a9af3ee2457dd8fe1a"
+        )
+        #expect(
+            PebbleTokenStore.token(seed: "Q402P000000A", applicationID: application, developerID: "deadbeefcafe")
+                == "3361047b54bb565e073b9ecb8874331c"
+        )
+    }
+
+    @Test
+    func watchTokenIsSeededWithTheSerial() throws {
+        let application = UUID(uuidString: "61B22BC8-1E29-460D-A236-3FE409A439FF")!
+        let store = PebbleTokenStore(identifier: "")
+        var watch = PreviewSamples.watch
+        watch.id = WatchID("one-pairing")
+        let first = store.watchToken(applicationID: application, watch: watch)
+        watch.id = WatchID("another-pairing")
+
+        #expect(store.watchToken(applicationID: application, watch: watch) == first)
+        #expect(
+            first == PebbleTokenStore.token(
+                seed: try #require(watch.serialNumber), applicationID: application, developerID: nil
+            )
+        )
     }
 
     @Test

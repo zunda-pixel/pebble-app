@@ -121,10 +121,10 @@ final class PebbleCompanionRuntime: NSObject, WKScriptMessageHandler, WKNavigati
         let identifierLiteral = try javaScriptLiteral(application.id.uuidString)
         let watchInfo = try Self.watchInfoLiteral(for: watch, running: application)
         let accountTokenLiteral = try javaScriptLiteral(
-            tokenStore.token(named: PebbleTokenStore.accountTokenName)
+            tokenStore.accountToken(applicationID: application.id)
         )
         let watchTokenLiteral = try javaScriptLiteral(
-            tokenStore.token(named: PebbleTokenStore.watchTokenName(watchID: watch?.id ?? WatchID("unknown")))
+            tokenStore.watchToken(applicationID: application.id, watch: watch)
         )
         let html = """
         <!doctype html><meta charset="utf-8"><script>
