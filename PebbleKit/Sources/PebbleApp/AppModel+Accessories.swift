@@ -6,9 +6,10 @@ import PebbleProtocol
 #endif
 
 extension AppModel {
-    /// Opens the scanning client's radio, on iOS once AccessorySetupKit has had
-    /// the watches paired before it: a central already open stops that picker
-    /// appearing, and there is no second chance in the same launch.
+    /// Opens the scanning client's radio, on iOS once AccessorySetupKit's
+    /// session is up and any migration picker is showing: a central already
+    /// open stops that picker appearing, and there is no second chance in the
+    /// same launch.
     func openRadio() async {
         #if os(iOS)
         await setUpAccessories()
@@ -20,7 +21,7 @@ extension AppModel {
 #if os(iOS)
 extension AppModel {
     func setUpAccessories() async {
-        await watchAccessories.activate(migrating: watches.saved)
+        await watchAccessories.offerMigration(of: watches.saved)
         offerAccessoriesNotYetAdded()
     }
 

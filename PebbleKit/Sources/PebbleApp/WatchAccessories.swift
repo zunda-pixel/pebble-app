@@ -2,6 +2,7 @@
 import AccessoryNotifications
 import AccessorySetupKit
 internal import CoreBluetooth
+import Defaults
 import Foundation
 import Observation
 public import PebbleProtocol
@@ -32,7 +33,7 @@ public enum NotificationForwarding: Equatable, Sendable {
 /// On iOS a watch is found and paired through the system's picker rather than
 /// by scanning: AccessoryNotifications forwards only to an `ASAccessory`, and a
 /// central made before the session has migrated the watches already paired
-/// makes the picker fail — so the radio waits for `activate(migrating:)`.
+/// makes the picker fail — so the radio waits for `offerMigration(of:)`.
 @MainActor
 @Observable
 final class WatchAccessories {
@@ -55,11 +56,11 @@ final class WatchAccessories {
     @ObservationIgnored private var activation: Task<Void, Never>?
     @ObservationIgnored private var activated: CheckedContinuation<Void, Never>?
     @ObservationIgnored private var picking: CheckedContinuation<[Accessory], any Error>?
+    @ObservationIgnored private var presented: CheckedContinuation<Void, Never>?
     @ObservationIgnored private var addedWhilePicking: [Accessory] = []
 
-    /// Starts the session and, the first time, offers the watches paired
-    /// before it to it. Waits for both; later calls return once the first has.
-    func activate(migrating saved: [SavedWatch]) async {
+    /// Starts the session. Later calls return once the first has.
+    func activate() async {
         if let activation {
             await activation.value
             return
@@ -72,15 +73,38 @@ final class WatchAccessories {
                     MainActor.assumeIsolated { self?.handle(event) }
                 }
             }
-            let unmigrated = saved.filter { watch in !self.accessories.contains { $0.id == watch.id } }
-            guard !unmigrated.isEmpty else { return }
-            // Declined or not shown, the watch still connects as it did: the
-            // app keeps its Bluetooth permission. Only forwarding needs it
-            // migrated, and that section says so.
-            _ = try? await self.pick(unmigrated.compactMap(Self.migrationItem))
         }
         self.activation = activation
         await activation.value
+    }
+
+    /// Offers the watches paired before the session to it, once per install,
+    /// and returns as soon as the picker is up rather than when the reader is
+    /// done with it: a central opened before then stops it appearing, and
+    /// waiting for its dismissal held the whole radio back for as long as the
+    /// reader left it open.
+    ///
+    /// Declined or not shown, the watch still connects as it did: the app keeps
+    /// its Bluetooth permission. Only forwarding needs it migrated, and that
+    /// section says so — offering again on every launch put the same picker in
+    /// front of a reader who had already said no.
+    func offerMigration(of saved: [SavedWatch]) async {
+        await activate()
+        guard !Defaults[.hasOfferedAccessoryMigration], presented == nil, picking == nil else { return }
+        let items = saved
+            .filter { watch in !accessories.contains { $0.id == watch.id } }
+            .compactMap(Self.migrationItem)
+        guard !items.isEmpty else { return }
+        await withCheckedContinuation { continuation in
+            presented = continuation
+            Task { [weak self] in
+                do {
+                    _ = try await self?.pick(items)
+                } catch {
+                    self?.finishPresenting()
+                }
+            }
+        }
     }
 
     /// Shows the system's picker for a new watch and returns the watches added
@@ -161,9 +185,18 @@ final class WatchAccessories {
     /// Both ways the picker ends — dismissed, or never shown — come through
     /// here, and only the first resumes the caller.
     private func finishPicking(with result: Result<[Accessory], any Error>) {
+        finishPresenting()
         guard let picking else { return }
         self.picking = nil
         picking.resume(with: result)
+    }
+
+    /// The picker is up, or is never going to be: either lets the caller of
+    /// `offerMigration` go on.
+    private func finishPresenting() {
+        guard let presented else { return }
+        self.presented = nil
+        presented.resume()
     }
 
     private func handle(_ event: ASAccessoryEvent) {
@@ -179,6 +212,11 @@ final class WatchAccessories {
             }
         case .accessoryChanged, .accessoryRemoved:
             accessories = session.accessories.compactMap(Self.accessory)
+        case .pickerDidPresent:
+            if presented != nil {
+                Defaults[.hasOfferedAccessoryMigration] = true
+            }
+            finishPresenting()
         case .pickerDidDismiss:
             finishPicking(with: .success(addedWhilePicking))
         case .invalidated:
