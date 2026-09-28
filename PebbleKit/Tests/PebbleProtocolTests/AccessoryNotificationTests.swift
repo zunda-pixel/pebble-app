@@ -35,7 +35,7 @@ struct AccessoryNotificationCodecTests {
 
         // Tag 0x09 in `prv_present`, accessory_notifications.c.
         #expect(Array(bytes.suffix(12)) == [0x09, 10, 2] + Array("OK".utf8) + [6] + Array("はい".utf8))
-        #expect(tlvs(bytes).map { $0.tag } ==[0x01, 0x03, 0x04, 0x08, 0x05, 0x06, 0x07, 0x09])
+        #expect(tlvs(bytes).map { $0.tag } == [0x01, 0x03, 0x04, 0x08, 0x05, 0x06, 0x07, 0x09])
     }
 
     @Test

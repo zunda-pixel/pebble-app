@@ -1,4 +1,4 @@
-public import Foundation
+import Foundation
 
 /// The replies the reader keeps for the watch, where the notification
 /// extension — a process of its own, which reads them for each notification
