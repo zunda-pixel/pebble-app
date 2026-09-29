@@ -50,7 +50,7 @@ final class WatchAccessories {
         case couldNotShow(String)
     }
 
-    private static let pairingService = CBUUID(string: "0000FED9-0000-1000-8000-00805F9B34FB")
+    private static let pairingService = CBUUID(string: WatchAdvertisement.pairingServiceUUID)
 
     @ObservationIgnored private let session = ASAccessorySession()
     @ObservationIgnored private var activation: Task<Void, Never>?

@@ -76,9 +76,7 @@ final class WatchAccessoryLink: NSObject {
     private static let service = CBUUID(string: AccessoryTransportFrame.serviceUUID)
     private static let notifyCharacteristic = CBUUID(string: AccessoryTransportFrame.notifyCharacteristicUUID)
     private static let writeCharacteristicUUID = CBUUID(string: AccessoryTransportFrame.writeCharacteristicUUID)
-    /// Advertised by an unbonded watch and published by every watch; what the
-    /// app's AccessorySetupKit declaration names.
-    private static let pairingService = CBUUID(string: "0000FED9-0000-1000-8000-00805F9B34FB")
+    private static let pairingService = CBUUID(string: WatchAdvertisement.pairingServiceUUID)
 
     private override init() {
         super.init()
