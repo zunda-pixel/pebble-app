@@ -40,6 +40,9 @@ final class WatchAccessoryLink: NSObject {
     /// reboots and notifies it only when a subscription starts, so a session
     /// that starts on a link another process already subscribed would otherwise
     /// never hear it; the read in `didDiscoverCharacteristicsFor` asks for it.
+    /// Kept for the current link only: carried over, it was handed to iOS as
+    /// the key of whichever watch the next link reached, or of the same watch
+    /// after a reset gave it a new one.
     private(set) var publicKey: [UInt8]?
 
     private struct PendingWrite {
@@ -176,6 +179,7 @@ final class WatchAccessoryLink: NSObject {
 
     private func dropLink() {
         writeCharacteristic = nil
+        publicKey = nil
         inFlight = nil
         // A message cut off half way is started over from its first frame on the
         // next link: the watch drops a partial one when it sees FIRST again.
@@ -316,7 +320,7 @@ extension WatchAccessoryLink: CBPeripheralDelegate {
     ) {
         guard error == nil, let value = characteristic.value else { return }
         let frame = [UInt8](value)
-        if let key = AccessoryTransportFrame.publicKey(from: frame) {
+        if peripheral == self.peripheral, let key = AccessoryTransportFrame.publicKey(from: frame) {
             publicKey = key
         }
         onNotification?(frame)
