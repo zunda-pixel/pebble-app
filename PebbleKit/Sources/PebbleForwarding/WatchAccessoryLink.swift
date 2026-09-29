@@ -81,9 +81,12 @@ final class WatchAccessoryLink: NSObject {
     private override init() {
         super.init()
         accessories.activate(on: .main) { [weak self] event in
-            guard event.eventType == .activated else { return }
+            let type = event.eventType
+            guard type == .activated || type == .accessoryAdded || type == .accessoryChanged else { return }
             MainActor.assumeIsolated {
-                self?.isAccessorySessionActive = true
+                if type == .activated {
+                    self?.isAccessorySessionActive = true
+                }
                 self?.connectIfPossible()
             }
         }
@@ -148,12 +151,19 @@ final class WatchAccessoryLink: NSObject {
         }
         retry?.cancel()
         retry = nil
+        // Any Pebble in range answers to the pairing service, so falling back
+        // to whichever was found first could send SESSION and DATA to a
+        // stranger's watch. Only this app's accessories are reached; with none
+        // yet, the session's accessoryAdded event asks again.
+        guard !pairedIdentifiers.isEmpty else {
+            forwardingLog.log("no watch paired through the app yet; waiting")
+            return
+        }
         let paired = central.retrievePeripherals(withIdentifiers: pairedIdentifiers)
         let connected = paired.first { $0.state == .connected } ?? connectedPairedWatches(central).first
-        let chosen = connected.map { [$0] }
-            ?? (paired.isEmpty ? central.retrieveConnectedPeripherals(withServices: [Self.pairingService]) : paired)
+        let chosen = connected.map { [$0] } ?? paired
         guard !chosen.isEmpty else {
-            forwardingLog.log("no paired watch yet; scanning")
+            forwardingLog.log("no paired watch known to Bluetooth yet; scanning")
             central.scanForPeripherals(withServices: [Self.pairingService])
             return
         }
@@ -253,6 +263,7 @@ extension WatchAccessoryLink: CBCentralManagerDelegate {
         advertisementData: [String: Any],
         rssi RSSI: NSNumber
     ) {
+        guard pairedIdentifiers.contains(peripheral.identifier) else { return }
         central.stopScan()
         attempt(peripheral)
     }
@@ -260,6 +271,7 @@ extension WatchAccessoryLink: CBCentralManagerDelegate {
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         if self.peripheral == nil, candidates.contains(peripheral) {
             self.peripheral = peripheral
+            central.stopScan()
             for other in candidates where other != peripheral {
                 central.cancelPeripheralConnection(other)
             }
