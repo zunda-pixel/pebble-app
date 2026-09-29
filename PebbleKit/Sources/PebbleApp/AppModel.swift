@@ -587,10 +587,6 @@ public final class AppModel {
         }
         connectingWatchIDs.insert(watch.id)
         connectionFailures[watch.id] = nil
-        #if os(iOS)
-        // Every client opens its own central on the way in.
-        await setUpAccessories()
-        #endif
         let attempt = UUID()
         connectionAttempts[watch.id] = attempt
         Task { [id = watch.id] in
@@ -604,6 +600,12 @@ public final class AppModel {
             negotiatingWatchIDs.remove(watch.id)
             if connectionAttempts[watch.id] == attempt { connectionAttempts[watch.id] = nil }
         }
+        #if os(iOS)
+        // Every client opens its own central on the way in.
+        await setUpAccessories()
+        // Forgotten or disconnected while the migration picker was up.
+        guard connectionAttempts[watch.id] == attempt else { return }
+        #endif
 
         let connectionClient = clientFactory(watch.id)
         do {
