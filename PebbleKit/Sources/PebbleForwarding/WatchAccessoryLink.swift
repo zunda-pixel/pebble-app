@@ -107,9 +107,38 @@ final class WatchAccessoryLink: NSObject {
                 self?.finish(id, with: .failure(LinkError.timedOut))
             }
             writes.append(write)
+            leaveAWatchThatIsAway()
             connectIfPossible()
             writeNext()
         }
+    }
+
+    /// The connect reissued when the watch went away never times out, and
+    /// `connectIfPossible` chooses only while there is no peripheral: left to
+    /// wait, the link stayed on a watch in a drawer while the other paired
+    /// watch was on the reader's wrist and connected to the phone.
+    private func leaveAWatchThatIsAway() {
+        guard let central, central.state == .poweredOn, isAccessorySessionActive,
+              let away = peripheral, away.state != .connected,
+              connectedPairedWatches(central).contains(where: { $0.identifier != away.identifier }) else {
+            return
+        }
+        forwardingLog.log("the watch is still away and another paired watch is connected; moving to it")
+        central.cancelPeripheralConnection(away)
+        dropLink()
+        peripheral = nil
+    }
+
+    private var pairedIdentifiers: [UUID] {
+        accessories.accessories.compactMap(\.bluetoothIdentifier)
+    }
+
+    /// The paired watches the phone is connected to now, whichever process
+    /// connected them.
+    private func connectedPairedWatches(_ central: CBCentralManager) -> [CBPeripheral] {
+        let paired = Set(pairedIdentifiers)
+        return central.retrieveConnectedPeripherals(withServices: [Self.pairingService, Self.service])
+            .filter { paired.contains($0.identifier) }
     }
 
     private func connectIfPossible() {
@@ -119,10 +148,9 @@ final class WatchAccessoryLink: NSObject {
         }
         retry?.cancel()
         retry = nil
-        let paired = central.retrievePeripherals(
-            withIdentifiers: accessories.accessories.compactMap(\.bluetoothIdentifier)
-        )
-        let chosen = paired.first { $0.state == .connected }.map { [$0] }
+        let paired = central.retrievePeripherals(withIdentifiers: pairedIdentifiers)
+        let connected = paired.first { $0.state == .connected } ?? connectedPairedWatches(central).first
+        let chosen = connected.map { [$0] }
             ?? (paired.isEmpty ? central.retrieveConnectedPeripherals(withServices: [Self.pairingService]) : paired)
         guard !chosen.isEmpty else {
             forwardingLog.log("no paired watch yet; scanning")
