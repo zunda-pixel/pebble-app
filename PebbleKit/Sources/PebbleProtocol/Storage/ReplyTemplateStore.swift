@@ -24,4 +24,15 @@ public actor ReplyTemplateStore {
         guard let fileURL else { throw ContainerUnavailable() }
         try PersistentJSON.save(templates, to: fileURL)
     }
+
+    /// Reads, changes and saves the list in one step, and returns what was
+    /// kept. A change built from the caller's copy instead started from the
+    /// same list as another made meanwhile, and whichever saved last lost the
+    /// other's edit.
+    package func modify(_ change: @Sendable ([ReplyTemplate]) -> [ReplyTemplate]) throws -> [ReplyTemplate] {
+        guard let fileURL else { throw ContainerUnavailable() }
+        let changed = change(try PersistentJSON.loadRecovering([ReplyTemplate].self, from: fileURL) ?? [])
+        try PersistentJSON.save(changed, to: fileURL)
+        return changed
+    }
 }

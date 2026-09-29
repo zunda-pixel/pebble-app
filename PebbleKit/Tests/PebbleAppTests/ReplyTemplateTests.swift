@@ -71,6 +71,49 @@ struct ReplyTemplateTests {
     }
 
     @Test
+    func anEditAndAnAddMadeAtOnceAreBothKept() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let shared = StorageDirectory(url: directory.appending(path: "shared"))
+        let first = ReplyTemplate(text: "OK")
+        let second = ReplyTemplate(text: "OK")
+        try await ReplyTemplateStore(directory: shared).save([first, second])
+        let model = model(in: directory, replyTemplates: shared)
+        await model.loadReplyTemplates()
+        var edited = second
+        edited.text = "Sure"
+
+        let edit = Task { await model.updateReplyTemplate(edited) }
+        let add = Task { await model.addReplyTemplate("Later") }
+        await edit.value
+        await add.value
+
+        #expect(model.notifications.replyTemplates?.map(\.text) == ["OK", "Sure", "Later"])
+        #expect(try await ReplyTemplateStore(directory: shared).templates() == model.notifications.replyTemplates)
+    }
+
+    @Test
+    func twoRemovalsMadeAtOnceAreBothKept() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let shared = StorageDirectory(url: directory.appending(path: "shared"))
+        let first = ReplyTemplate(text: "OK")
+        let second = ReplyTemplate(text: "Sure")
+        let third = ReplyTemplate(text: "Later")
+        try await ReplyTemplateStore(directory: shared).save([first, second, third])
+        let model = model(in: directory, replyTemplates: shared)
+        await model.loadReplyTemplates()
+
+        let removeFirst = Task { await model.removeReplyTemplates([first]) }
+        let removeSecond = Task { await model.removeReplyTemplates([second]) }
+        await removeFirst.value
+        await removeSecond.value
+
+        #expect(model.notifications.replyTemplates == [third])
+        #expect(try await ReplyTemplateStore(directory: shared).templates() == [third])
+    }
+
+    @Test
     func withNowhereTheExtensionCanReadNothingIsShownAsKept() async throws {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

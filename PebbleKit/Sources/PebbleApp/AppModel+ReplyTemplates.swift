@@ -32,7 +32,8 @@ extension AppModel {
             return
         }
         let starting = Self.startingReplyTemplates.map { ReplyTemplate(text: $0) }
-        if !(await saveReplyTemplates(starting)) {
+        let isKept = await changeReplyTemplates { _ in starting }
+        if !isKept {
             notifications.replyTemplates = []
         }
     }
@@ -40,44 +41,50 @@ extension AppModel {
     func addReplyTemplate(_ text: String) async {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        await saveReplyTemplates((notifications.replyTemplates ?? []) + [ReplyTemplate(text: trimmed)])
+        let added = ReplyTemplate(text: trimmed)
+        await changeReplyTemplates { $0 + [added] }
     }
 
     func updateReplyTemplate(_ template: ReplyTemplate) async {
         let trimmed = template.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, var templates = notifications.replyTemplates,
-              let index = templates.firstIndex(where: { $0.id == template.id }) else {
-            return
+        guard !trimmed.isEmpty else { return }
+        let id = template.id
+        await changeReplyTemplates { templates in
+            templates.map { $0.id == id ? ReplyTemplate(id: id, text: trimmed) : $0 }
         }
-        templates[index].text = trimmed
-        await saveReplyTemplates(templates)
     }
 
     func removeReplyTemplates(_ removed: [ReplyTemplate]) async {
-        guard var templates = notifications.replyTemplates else { return }
         let ids = Set(removed.map(\.id))
-        templates.removeAll { ids.contains($0.id) }
-        await saveReplyTemplates(templates)
+        await changeReplyTemplates { templates in
+            templates.filter { !ids.contains($0.id) }
+        }
     }
 
     /// Puts `moving` in front of `target`, or at the end for none.
     func moveReplyTemplates(_ moving: [ReplyTemplate], before target: ReplyTemplate?) async {
-        guard var templates = notifications.replyTemplates else { return }
         let ids = Set(moving.map(\.id))
-        let moved = templates.filter { ids.contains($0.id) }
-        templates.removeAll { ids.contains($0.id) }
-        let index = target.flatMap { target in templates.firstIndex { $0.id == target.id } } ?? templates.count
-        templates.insert(contentsOf: moved, at: index)
-        await saveReplyTemplates(templates)
+        let targetID = target?.id
+        await changeReplyTemplates { templates in
+            let moved = templates.filter { ids.contains($0.id) }
+            var remaining = templates.filter { !ids.contains($0.id) }
+            let index = targetID.flatMap { id in remaining.firstIndex { $0.id == id } } ?? remaining.count
+            remaining.insert(contentsOf: moved, at: index)
+            return remaining
+        }
     }
 
     /// The list on screen changes only once it is kept: the extension reads the
     /// file, not this model, so a list shown and not saved is not what the
-    /// watch is offered.
+    /// watch is offered. The change is made to the list the store holds rather
+    /// than to this copy, which lags behind any change still being saved.
     @discardableResult
-    private func saveReplyTemplates(_ templates: [ReplyTemplate]) async -> Bool {
+    private func changeReplyTemplates(
+        _ change: @Sendable ([ReplyTemplate]) -> [ReplyTemplate]
+    ) async -> Bool {
+        let kept: [ReplyTemplate]
         do {
-            try await replyTemplateStore.save(templates)
+            kept = try await replyTemplateStore.modify(change)
         } catch is ReplyTemplateStore.ContainerUnavailable {
             notifications.replyTemplatesFeedback = .failure(
                 "Reply templates cannot be kept here: this app has no storage the notification extension can read."
@@ -87,7 +94,7 @@ extension AppModel {
             notifications.replyTemplatesFeedback = .failure("The reply templates could not be saved.")
             return false
         }
-        notifications.replyTemplates = templates
+        notifications.replyTemplates = kept
         notifications.replyTemplatesFeedback = nil
         return true
     }

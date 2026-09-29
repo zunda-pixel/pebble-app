@@ -28,12 +28,30 @@ struct ReplyTemplateStoreTests {
     }
 
     @Test
+    func changesMadeAtOnceEachStartFromWhatTheOthersKept() async throws {
+        let store = ReplyTemplateStore(directory: directory())
+
+        await withTaskGroup(of: Void.self) { group in
+            for index in 0..<10 {
+                group.addTask {
+                    _ = try? await store.modify { $0 + [ReplyTemplate(text: "\(index)")] }
+                }
+            }
+        }
+
+        #expect(try await store.templates()?.map(\.text).sorted() == (0..<10).map { "\($0)" })
+    }
+
+    @Test
     func withNowhereToKeepThemNoneAreReadAndSavingSaysSo() async throws {
         let store = ReplyTemplateStore(directory: nil)
 
         #expect(try await store.templates() == [])
         await #expect(throws: ReplyTemplateStore.ContainerUnavailable()) {
             try await store.save([ReplyTemplate(text: "OK")])
+        }
+        await #expect(throws: ReplyTemplateStore.ContainerUnavailable()) {
+            try await store.modify { $0 + [ReplyTemplate(text: "OK")] }
         }
     }
 }
