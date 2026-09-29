@@ -30,10 +30,10 @@ public final class NotificationForwardingHandler: NotificationsForwarding.Access
         /// session ended went on popping beside the next session's, and a
         /// removal could then reach the watch before the present it follows.
         var generation = 0
-        var sources = ReplySources()
     }
 
     private let state = Mutex(State())
+    private let sources = ReplySources()
     private let replySuggester: any ReplySuggesting
 
     public convenience init() {
@@ -95,7 +95,7 @@ public final class NotificationForwardingHandler: NotificationsForwarding.Access
     }
 
     public func removeNotification(identifier: AccessoryNotification.Identifier) {
-        state.withLock { $0.sources.forget(identifier) }
+        sources.forget(identifier)
         enqueue(Outgoing(message: .remove(
             sourceIdentifier: identifier.sourceIdentifier,
             notificationIdentifier: identifier.notificationIdentifier
@@ -103,7 +103,7 @@ public final class NotificationForwardingHandler: NotificationsForwarding.Access
     }
 
     public func removeAllNotifications() {
-        state.withLock { $0.sources.forgetAll() }
+        sources.forgetAll()
         enqueue(Outgoing(message: .removeAll))
     }
 
@@ -115,9 +115,8 @@ public final class NotificationForwardingHandler: NotificationsForwarding.Access
             forwardingLog.error("the watch sent a reply that could not be read")
             return
         }
-        let (session, notification) = state.withLock {
-            ($0.session, $0.sources.notification(onTheWatchAs: reply.notificationIdentifier))
-        }
+        let session = state.withLock { $0.session }
+        let notification = sources.notification(onTheWatchAs: reply.notificationIdentifier)
         guard let session, let notification else {
             // The watch has already said "Sent"; iOS has no response to match a
             // notification it no longer lists, or one from before a session.
@@ -140,7 +139,7 @@ public final class NotificationForwardingHandler: NotificationsForwarding.Access
     }
 
     private func remember(_ notification: AccessoryNotification) {
-        state.withLock { $0.sources.remember(notification.identifier) }
+        sources.remember(notification.identifier)
     }
 
     private func enqueue(_ outgoing: Outgoing) {
