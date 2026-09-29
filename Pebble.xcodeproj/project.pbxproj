@@ -552,7 +552,6 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Pebble/Info.plist;
-				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = NO;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Pebble asks the Music app what is playing so your watch can show it and control it.";
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Pebble shows the current song on your watch and lets it control playback.";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Pebble uses Bluetooth to find, connect to, and synchronize with your watch.";
@@ -613,7 +612,6 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Pebble/Info.plist;
-				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = NO;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Pebble asks the Music app what is playing so your watch can show it and control it.";
 				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Pebble shows the current song on your watch and lets it control playback.";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Pebble uses Bluetooth to find, connect to, and synchronize with your watch.";
