@@ -21,6 +21,9 @@ public enum Transport {
     @MainActor
     private static func forwardReplies(to session: AccessoryTransportSession) {
         var reassembler = AccessoryTransportResponseReassembler()
+        WatchAccessoryLink.shared.onLinkDropped = {
+            reassembler.reset()
+        }
         WatchAccessoryLink.shared.onNotification = { frame in
             guard let response = reassembler.receive(frame) else { return }
             do {

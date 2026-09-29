@@ -300,6 +300,31 @@ struct AccessoryTransportFrameTests {
     }
 
     @Test
+    func fragmentsHeardWithoutTheirFirstAreNotAReply() {
+        let logical = [36] + Array(featureID.uuidString.utf8) + [9, 8, 7]
+        var reassembler = AccessoryTransportResponseReassembler()
+
+        #expect(reassembler.receive([0x82, 0x00] + logical) == nil)
+        #expect(reassembler.receive([0x82, 0x01] + logical.prefix(20)) == nil)
+        #expect(reassembler.receive([0x82, 0x00] + logical.dropFirst(20)) == nil)
+    }
+
+    @Test
+    func aReplyHalfHeardWhenTheLinkDroppedIsNotFinishedByTheNextLink() {
+        let logical = [36] + Array(featureID.uuidString.utf8) + [9, 8, 7]
+        var reassembler = AccessoryTransportResponseReassembler()
+
+        #expect(reassembler.receive([0x82, 0x03] + logical.prefix(20)) == nil)
+        reassembler.reset()
+
+        #expect(reassembler.receive([0x82, 0x00] + logical.dropFirst(20)) == nil)
+        #expect(
+            reassembler.receive([0x82, 0x02] + logical)
+                == AccessoryTransportResponse(featureID: featureID, sealed: [9, 8, 7])
+        )
+    }
+
+    @Test
     func aReplyWithNoFeatureIDIsNotOne() {
         var reassembler = AccessoryTransportResponseReassembler()
 

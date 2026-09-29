@@ -36,6 +36,8 @@ final class WatchAccessoryLink: NSObject {
     /// Every notification the watch sends on the service, and the public key it
     /// answers a read with.
     var onNotification: ((_ frame: [UInt8]) -> Void)?
+    /// Told when the link goes, so what was half heard on it is forgotten.
+    var onLinkDropped: (() -> Void)?
     /// What the watch last said its public key is. It keeps the key across
     /// reboots and notifies it only when a subscription starts, so a session
     /// that starts on a link another process already subscribed would otherwise
@@ -219,6 +221,7 @@ final class WatchAccessoryLink: NSObject {
         writeCharacteristic = nil
         publicKey = nil
         inFlight = nil
+        onLinkDropped?()
         // A message cut off half way is started over from its first frame on the
         // next link: the watch drops a partial one when it sees FIRST again.
         for index in writes.indices {

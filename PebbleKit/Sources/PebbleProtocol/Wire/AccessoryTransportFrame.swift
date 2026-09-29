@@ -103,9 +103,17 @@ package struct AccessoryTransportResponse: Equatable, Sendable {
 /// Puts `0x82 | flags | chunk` notifications back together. One per link: the
 /// watch has a single reply in flight to a phone at a time.
 package struct AccessoryTransportResponseReassembler: Sendable {
-    private var pending: [UInt8] = []
+    /// Nil until a FIRST fragment starts a reply. A tail heard without its
+    /// start — the start went out on a link that has since dropped — would
+    /// otherwise be read as a reply of its own.
+    private var pending: [UInt8]?
 
     package init() {}
+
+    /// Forgets a reply half heard, for a link that has dropped.
+    package mutating func reset() {
+        pending = nil
+    }
 
     /// The reply the fragment completes; nil while more is to come, and for
     /// anything that is not a RESPONSE fragment or does not make a reply.
@@ -115,16 +123,15 @@ package struct AccessoryTransportResponseReassembler: Sendable {
         if flags & AccessoryTransportFrame.firstFlag != 0 {
             pending = []
         }
-        pending += frame.dropFirst(2)
+        guard var logical = pending.take() else { return nil }
+        logical += frame.dropFirst(2)
         let maximum = 1 + AccessoryTransportFrame.maximumFeatureIDByteCount
             + AccessoryTransportFrame.maximumSealedByteCount
-        guard pending.count <= maximum else {
-            pending = []
+        guard logical.count <= maximum else { return nil }
+        guard flags & AccessoryTransportFrame.moreFlag == 0 else {
+            pending = logical
             return nil
         }
-        guard flags & AccessoryTransportFrame.moreFlag == 0 else { return nil }
-        let logical = pending
-        pending = []
         guard let length = logical.first.map(Int.init), length > 0, logical.count > length,
               let featureID = UUID(uuidString: String(decoding: logical[1...length], as: UTF8.self)) else {
             return nil
