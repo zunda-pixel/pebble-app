@@ -26,6 +26,10 @@ public final class NotificationForwardingHandler: NotificationsForwarding.Access
         var queue: Deque<Outgoing> = []
         /// Nil outside a session, which is what refuses a message then.
         var wake: AsyncStream<Void>.Continuation?
+        /// Which drain may take from the queue. A drain still sending when its
+        /// session ended went on popping beside the next session's, and a
+        /// removal could then reach the watch before the present it follows.
+        var generation = 0
         var sources = ReplySources()
     }
 
@@ -44,16 +48,17 @@ public final class NotificationForwardingHandler: NotificationsForwarding.Access
         let (wakes, wake) = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
         // One queue has one reader: a second, started beside a first still
         // draining, would take messages off the same front out of order.
-        let isAlreadyDraining = state.withLock { state in
+        let generation: Int? = state.withLock { state in
             state.session = session
-            guard state.wake == nil else { return true }
+            guard state.wake == nil else { return nil }
             state.wake = wake
-            return false
+            state.generation += 1
+            return state.generation
         }
-        guard !isAlreadyDraining else { return }
+        guard let generation else { return }
         Task { [weak self] in
             for await _ in wakes {
-                await self?.drain()
+                await self?.drain(generation)
             }
         }
     }
@@ -64,6 +69,7 @@ public final class NotificationForwardingHandler: NotificationsForwarding.Access
             state.session = nil
             state.queue = []
             state.wake = nil
+            state.generation += 1
             return taken
         }
         wake?.finish()
@@ -152,11 +158,11 @@ public final class NotificationForwardingHandler: NotificationsForwarding.Access
 
     /// Takes each message off the front as it goes, so the one sent is the one
     /// removed whatever was queued behind it meanwhile.
-    private func drain() async {
-        while let outgoing = state.withLock({ $0.queue.popFirst() }) {
+    private func drain(_ generation: Int) async {
+        while let outgoing = state.withLock({ $0.generation == generation ? $0.queue.popFirst() : nil }) {
             let isDelivered: Bool
             do {
-                try await send(await withReplies(outgoing.message))
+                try await send(await withReplies(outgoing.message), generation: generation)
                 isDelivered = true
             } catch {
                 forwardingLog.error("a message did not reach the watch: \(String(describing: error), privacy: .public)")
@@ -177,8 +183,11 @@ public final class NotificationForwardingHandler: NotificationsForwarding.Access
         return .present(notification)
     }
 
-    private func send(_ message: AccessoryNotificationMessage) async throws {
-        guard let session = state.withLock({ $0.session }) else {
+    /// A message taken in an ended session fails rather than going out in the
+    /// next, where that session's own drain may already have sent what came
+    /// after it.
+    private func send(_ message: AccessoryNotificationMessage, generation: Int) async throws {
+        guard let session = state.withLock({ $0.generation == generation ? $0.session : nil }) else {
             throw AccessoryMessage.Error.transportUnavailable
         }
         let payload = Data(AccessoryNotificationCodec.encode(message))
