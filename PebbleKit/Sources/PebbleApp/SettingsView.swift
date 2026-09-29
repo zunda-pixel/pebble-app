@@ -20,6 +20,14 @@ public struct SettingsRootView: View {
 struct SettingsView: View {
     var model: AppModel
 
+    private static var offersReplyTemplates: Bool {
+        #if os(iOS)
+        true
+        #else
+        false
+        #endif
+    }
+
     var body: some View {
         SettingsContent(
             weatherPlaceNames: model.weather.places.map(\.name),
@@ -57,7 +65,9 @@ struct SettingsView: View {
                     setNotificationsEnabled: { enabled, applicationID in
                         Task { await model.setNotificationsEnabled(enabled, applicationID: applicationID) }
                     },
-                    phoneAppsDestination: { NotificationAppsView(model: model) }
+                    offersReplyTemplates: Self.offersReplyTemplates,
+                    phoneAppsDestination: { NotificationAppsView(model: model) },
+                    replyTemplatesDestination: { ReplyTemplatesView(model: model) }
                 )
             }
         )

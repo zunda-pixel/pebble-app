@@ -2389,6 +2389,16 @@
         }
       }
     },
+    "Every watch offers these when you reply to a notification the iPhone forwards to it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhoneから転送された通知に返信するとき、どのウォッチでもこの定型文が表示されます。"
+          }
+        }
+      }
+    },
     "Exercise" : {
       "localizations" : {
         "ja" : {
@@ -8001,12 +8011,12 @@
         }
       }
     },
-    "iOS sends the watch its notifications encrypted, and the watch shows them in place of the ones it reads over Bluetooth itself. When you reply from the watch, it offers your reply templates." : {
+    "iOS sends the watch its notifications encrypted, and the watch shows them in place of the ones it reads over Bluetooth itself. When you reply from the watch, it offers the reply templates in Settings › Notifications." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iOSが通知を暗号化してウォッチに送り、ウォッチは自分でBluetooth経由で読み取る通知の代わりにそれを表示します。ウォッチから返信するときは、返信の定型文が表示されます。"
+            "value" : "iOSが通知を暗号化してウォッチに送り、ウォッチは自分でBluetooth経由で読み取る通知の代わりにそれを表示します。ウォッチから返信するときは、「設定」›「通知」の返信の定型文が表示されます。"
           }
         }
       }

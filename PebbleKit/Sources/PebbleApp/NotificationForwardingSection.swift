@@ -2,12 +2,11 @@ import SwiftUI
 
 /// Whether iOS forwards this watch's notifications to it, and the way to
 /// change that. iOS asks the reader and keeps the choice; this only shows it.
-struct NotificationForwardingSection<ReplyTemplatesDestination: View>: View {
+struct NotificationForwardingSection: View {
     /// Nil until iOS has answered.
     var forwarding: NotificationForwarding?
     var allow: () -> Void
     var openSettings: () -> Void
-    @ViewBuilder var replyTemplatesDestination: () -> ReplyTemplatesDestination
 
     var body: some View {
         Section {
@@ -30,14 +29,6 @@ struct NotificationForwardingSection<ReplyTemplatesDestination: View>: View {
             case .notSetUp, .unsupportedAccessory, .unavailable, nil:
                 EmptyView()
             }
-            switch forwarding {
-            case .on, .someApps, .off:
-                NavigationLink(destination: replyTemplatesDestination) {
-                    Label("Reply Templates", systemImage: "text.bubble")
-                }
-            case .notSetUp, .unsupportedAccessory, .unavailable, nil:
-                EmptyView()
-            }
         } header: {
             Text("iPhone Notifications")
         } footer: {
@@ -49,7 +40,7 @@ struct NotificationForwardingSection<ReplyTemplatesDestination: View>: View {
             case .unavailable:
                 Text("iOS does not forward notifications to this watch. It needs firmware that supports it, and outside development iOS offers this only in the EU.")
             default:
-                Text("iOS sends the watch its notifications encrypted, and the watch shows them in place of the ones it reads over Bluetooth itself. When you reply from the watch, it offers your reply templates.")
+                Text("iOS sends the watch its notifications encrypted, and the watch shows them in place of the ones it reads over Bluetooth itself. When you reply from the watch, it offers the reply templates in Settings › Notifications.")
             }
         }
     }
@@ -58,15 +49,7 @@ struct NotificationForwardingSection<ReplyTemplatesDestination: View>: View {
 #Preview("Off") {
     NavigationStack {
         Form {
-            NotificationForwardingSection(forwarding: .off, allow: {}, openSettings: {}) {
-                ReplyTemplatesContent(
-                    templates: PreviewSamples.replyTemplates,
-                    add: { _ in },
-                    update: { _ in },
-                    remove: { _ in },
-                    move: { _, _ in }
-                )
-            }
+            NotificationForwardingSection(forwarding: .off, allow: {}, openSettings: {})
         }
     }
 }
@@ -74,15 +57,7 @@ struct NotificationForwardingSection<ReplyTemplatesDestination: View>: View {
 #Preview("On") {
     NavigationStack {
         Form {
-            NotificationForwardingSection(forwarding: .on, allow: {}, openSettings: {}) {
-                ReplyTemplatesContent(
-                    templates: PreviewSamples.replyTemplates,
-                    add: { _ in },
-                    update: { _ in },
-                    remove: { _ in },
-                    move: { _, _ in }
-                )
-            }
+            NotificationForwardingSection(forwarding: .on, allow: {}, openSettings: {})
         }
     }
 }
@@ -90,9 +65,7 @@ struct NotificationForwardingSection<ReplyTemplatesDestination: View>: View {
 #Preview("Added before accessory setup") {
     NavigationStack {
         Form {
-            NotificationForwardingSection(forwarding: .notSetUp, allow: {}, openSettings: {}) {
-                EmptyView()
-            }
+            NotificationForwardingSection(forwarding: .notSetUp, allow: {}, openSettings: {})
         }
     }
 }
@@ -100,9 +73,7 @@ struct NotificationForwardingSection<ReplyTemplatesDestination: View>: View {
 #Preview("Not supported") {
     NavigationStack {
         Form {
-            NotificationForwardingSection(forwarding: .unsupportedAccessory, allow: {}, openSettings: {}) {
-                EmptyView()
-            }
+            NotificationForwardingSection(forwarding: .unsupportedAccessory, allow: {}, openSettings: {})
         }
     }
 }
@@ -110,9 +81,7 @@ struct NotificationForwardingSection<ReplyTemplatesDestination: View>: View {
 #Preview("Unavailable") {
     NavigationStack {
         Form {
-            NotificationForwardingSection(forwarding: .unavailable, allow: {}, openSettings: {}) {
-                EmptyView()
-            }
+            NotificationForwardingSection(forwarding: .unavailable, allow: {}, openSettings: {})
         }
     }
 }
@@ -120,9 +89,7 @@ struct NotificationForwardingSection<ReplyTemplatesDestination: View>: View {
 #Preview("Asking iOS") {
     NavigationStack {
         Form {
-            NotificationForwardingSection(forwarding: nil, allow: {}, openSettings: {}) {
-                EmptyView()
-            }
+            NotificationForwardingSection(forwarding: nil, allow: {}, openSettings: {})
         }
     }
 }
