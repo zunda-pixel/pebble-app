@@ -73,15 +73,19 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
         // be unusable, and dropping the phone's one first would leave the link
         // with neither.
         if let service = services.first(where: { $0.uuid == Self.ppogService }) {
+            link.protocolServiceDeadline?.cancel()
+            link.protocolServiceDeadline = nil
             peripheral.discoverCharacteristics(
                 [Self.ppogNotifyCharacteristic, Self.ppogWriteCharacteristic],
                 for: service
             )
-        } else {
+        } else if Self.servesTheProtocolItself {
             // The watch expects the phone to host the service and connects to it as a
             // GATT client. It inspects the phone right after connecting and does not come
             // back for a second look.
             startForwardTransport(on: peripheral, because: "the watch hosts none")
+        } else {
+            expectTheWatchsOwnService(on: peripheral)
         }
 
         if let batteryService = services.first(where: { $0.uuid == Self.batteryService }) {
@@ -137,6 +141,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
                 }
                 link.setup.noteNoPairingService()
                 startProtocolIfReady(on: peripheral)
+                expectTheWatchsOwnServiceIfNeeded(on: peripheral)
                 return
             }
             link.activePairingTriggerCharacteristic = characteristics.first {
@@ -216,7 +221,67 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
         }
     }
 
+    /// Whether the phone may host the protocol service when the watch's own is
+    /// unusable. The iOS app pairs through AccessorySetupKit, which refuses to
+    /// let a process that uses it make a `CBPeripheralManager` (issue #47).
+    static var servesTheProtocolItself: Bool {
+        #if os(iOS)
+        false
+        #else
+        true
+        #endif
+    }
+
+    private func expectTheWatchsOwnServiceIfNeeded(on peripheral: CBPeripheral) {
+        guard !Self.servesTheProtocolItself,
+              !(peripheral.services ?? []).contains(where: { $0.uuid == Self.ppogService }) else {
+            return
+        }
+        expectTheWatchsOwnService(on: peripheral)
+    }
+
+    /// Where the phone cannot host the service, a watch that has none of its
+    /// own once the link is bonded is running firmware from before watches
+    /// served the protocol themselves, and can never connect here.
+    ///
+    /// Not given up on at once: a watch bonding now publishes its service as the
+    /// link is encrypted, and `didModifyServices` reports it a moment after the
+    /// bond is. Not left to the connect deadline either, which says only that
+    /// the watch did not answer, and whose reconnects cycle until the handshake
+    /// is taken to be failing.
+    private func expectTheWatchsOwnService(on peripheral: CBPeripheral) {
+        guard link.setup.mayStartProtocol else {
+            Task { [tag = clientTag] in
+                await DiagnosticLog.shared.record(
+                    category: "pairing",
+                    message: "[\(tag)] no protocol service yet; waiting for the watch to publish it"
+                )
+            }
+            return
+        }
+        guard link.protocolServiceDeadline == nil, !link.hasGivenUpOnTheWatchsServices else { return }
+        link.protocolServiceDeadline = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled, let self else { return }
+            self.link.protocolServiceDeadline = nil
+            guard !(peripheral.services ?? []).contains(where: { $0.uuid == Self.ppogService }) else { return }
+            self.giveUp(
+                on: peripheral,
+                with: .watchFirmwareTooOldForiOS,
+                because: "the watch is bonded and still hosts no protocol service of its own"
+            )
+        }
+    }
+
     private func startForwardTransport(on peripheral: CBPeripheral, because reason: String) {
+        guard Self.servesTheProtocolItself else {
+            giveUp(
+                on: peripheral,
+                with: .watchServicesOutOfDate,
+                because: "iOS's copy of the watch's services is out of date: \(reason)"
+            )
+            return
+        }
         guard link.setup.hostTransportOnPhone() else {
             return
         }
@@ -240,6 +305,34 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
                 self.abortLink(peripheral, error: .disconnected, step: "hosting the transport: the watch unsubscribed")
             }
         )
+    }
+
+    /// What is left on iOS when the watch's services cannot carry the protocol
+    /// and the phone may not host it instead. Another attempt would find the same
+    /// services, so a reconnect in progress stops too.
+    private func giveUp(on peripheral: CBPeripheral, with error: WatchConnectionError, because reason: String) {
+        guard !link.hasGivenUpOnTheWatchsServices else { return }
+        link.hasGivenUpOnTheWatchsServices = true
+        link.protocolServiceDeadline?.cancel()
+        link.protocolServiceDeadline = nil
+        Task { [tag = clientTag] in
+            await DiagnosticLog.shared.record(
+                .error,
+                category: "pairing",
+                message: "[\(tag)] \(reason)"
+            )
+        }
+        guard connectionContinuation == nil else {
+            failConnection(error)
+            return
+        }
+        reconnects.stop()
+        connectionTimeoutTask?.cancel()
+        connectionTimeoutTask = nil
+        pendingWatch = nil
+        reconnects.expectDisconnect(of: peripheral.watchID)
+        eventContinuation?.yield(.disconnected(error))
+        cancelLink(peripheral, reason: error.logDescription)
     }
 
     /// Torn down rather than merely deselected: the registration's unsubscribe
@@ -350,6 +443,7 @@ extension CoreBluetoothWatchClient: CBPeripheralDelegate {
                 }
             }
             startProtocolIfReady(on: peripheral)
+            expectTheWatchsOwnServiceIfNeeded(on: peripheral)
             return
         case .askWatchToPair:
             break

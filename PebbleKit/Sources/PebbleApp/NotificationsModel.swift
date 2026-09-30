@@ -34,4 +34,10 @@ public final class NotificationsModel {
     /// Its own field for the reason the two above have theirs: that screen is
     /// pushed from the phone-apps screen, which is pushed from settings.
     public internal(set) var historyFeedback: FeatureFeedback?
+
+    /// What the watch offers when the reader replies to an iPhone notification
+    /// from it. Nil until the screen that lists them has first read them.
+    public internal(set) var replyTemplates: [ReplyTemplate]?
+    /// The answer to changing them, which is asked for on their own screen.
+    public internal(set) var replyTemplatesFeedback: FeatureFeedback?
 }

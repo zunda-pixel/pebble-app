@@ -54,6 +54,18 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSAccessorySetupBluetoothNames</key>
+	<array>
+		<string>Pebble</string>
+	</array>
+	<key>NSAccessorySetupBluetoothServices</key>
+	<array>
+		<string>0000FED9-0000-1000-8000-00805F9B34FB</string>
+	</array>
+	<key>NSAccessorySetupKitSupports</key>
+	<array>
+		<string>Bluetooth</string>
+	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
@@ -62,7 +74,6 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-central</string>
-		<string>bluetooth-peripheral</string>
 	</array>
 	<key>UTImportedTypeDeclarations</key>
 	<array>

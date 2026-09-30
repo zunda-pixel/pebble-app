@@ -95,6 +95,9 @@ extension Defaults.Keys {
     /// A new key rather than the launch-time welcome's: an install that saw that
     /// one has still never been asked for anything.
     static let hasCompletedWatchSetup = Key<Bool>("hasCompletedPebbleWatchSetup", default: false)
+    /// Set once AccessorySetupKit's migration picker has been put in front of
+    /// the reader, whatever they chose in it.
+    static let hasOfferedAccessoryMigration = Key<Bool>("hasOfferedAccessoryMigration", default: false)
 
     /// The watchface each watch last said it was running. Per watch, because
     /// two watches can be showing different ones.

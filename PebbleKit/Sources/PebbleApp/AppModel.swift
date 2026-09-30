@@ -203,6 +203,9 @@ public final class AppModel {
 
     let scannerClient: any WatchClient
     let clientFactory: @MainActor (WatchID) -> any WatchClient
+    #if os(iOS)
+    let watchAccessories = WatchAccessories()
+    #endif
     let applicationLibrary: WatchApplicationLibrary
     let watchStore: SavedWatchStore
     let timelineStore: TimelinePinStore
@@ -280,6 +283,7 @@ public final class AppModel {
     let notificationSourceAppStore: NotificationSourceAppStore
     let appGlanceStore: AppGlanceStore
     let writtenRecordStore: WrittenRecordStore
+    let replyTemplateStore: ReplyTemplateStore
     let speechBridge = SpeechBridge()
     var voiceTranscriptionReadiness = VoiceTranscriptionReadiness.turnedOff
     /// Every language the phone's recognizer can be asked for, for the
@@ -399,7 +403,8 @@ public final class AppModel {
         appCatalog: ApplicationCatalog? = nil,
         clientFactory: (@MainActor (WatchID) -> any WatchClient)? = nil,
         localNotifier: (any LocalNotifying)? = nil,
-        firmwareCatalog: PebbleOSFirmwareCatalog? = nil
+        firmwareCatalog: PebbleOSFirmwareCatalog? = nil,
+        replyTemplateDirectory: StorageDirectory? = .sharedWithExtensions
     ) {
         // The real one only touches the system centre inside its methods, so a
         // test that never turns a notifying feature on never reaches it.
@@ -433,6 +438,9 @@ public final class AppModel {
         firmwarePackageStore = FirmwarePackageStore(directory: storageDirectory)
         notificationSourceAppStore = NotificationSourceAppStore(directory: storageDirectory)
         writtenRecordStore = WrittenRecordStore(directory: storageDirectory)
+        // Not under `storageDirectory`: the notification extension, which
+        // reads these, cannot see the app's own files.
+        replyTemplateStore = ReplyTemplateStore(directory: replyTemplateDirectory)
         notifications.companionEnabled = Defaults[.companionNotificationsEnabled]
         timeline.allDayReminderMinutes = Defaults[.allDayReminderMinutes]
         catalog.source = Defaults[.catalogSource]
@@ -475,7 +483,7 @@ public final class AppModel {
         // install with no watch yet would be asked for permission before it had
         // asked for anything.
         if !watches.saved.isEmpty {
-            scannerClient.startBluetooth()
+            await openRadio()
         }
         observeEventKitChanges()
         // The weather's clock, for as long as the app is running. Five minutes
@@ -524,7 +532,7 @@ public final class AppModel {
         do {
             await loadSavedWatches()
             // Asking for a watch is the moment the radio is worth its dialog.
-            scannerClient.startBluetooth()
+            await openRadio()
             var scanned = try await scannerClient.scan()
             let connectedIDs = Set(connections.map(\.watch.id))
             let missingSavedWatches = watches.saved
@@ -592,6 +600,12 @@ public final class AppModel {
             negotiatingWatchIDs.remove(watch.id)
             if connectionAttempts[watch.id] == attempt { connectionAttempts[watch.id] = nil }
         }
+        #if os(iOS)
+        // Every client opens its own central on the way in.
+        await setUpAccessories()
+        // Forgotten or disconnected while the migration picker was up.
+        guard connectionAttempts[watch.id] == attempt else { return }
+        #endif
 
         let connectionClient = clientFactory(watch.id)
         do {

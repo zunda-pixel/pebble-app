@@ -157,6 +157,13 @@ enum PreviewSamples {
         NotificationSourceApp(bundleID: "com.apple.mobilecal", displayName: "カレンダー", muteState: .weekends),
     ]
 
+    static let replyTemplates: [ReplyTemplate] = [
+        ReplyTemplate(text: "Got it."),
+        ReplyTemplate(text: "On my way!"),
+        ReplyTemplate(text: "今向かっています！"),
+        ReplyTemplate(text: "Running about ten minutes late — start without me and I'll catch up."),
+    ]
+
     static let sentNotifications: [SentNotification] = [
         SentNotification(
             appName: "Pebble",
