@@ -28,6 +28,11 @@ extension AppModel {
     /// An accessory the system has for this app and the app has no record of —
     /// added through the picker, then never connected — is offered the way a
     /// bonded watch reaching the app by itself is elsewhere.
+    ///
+    /// Replaces the list rather than merging into it. On iOS nothing else fills
+    /// it — `noteWatchThatReconnectedItself` is reached only from the
+    /// phone-hosted GATT server, which iOS does not start — and a merge would go
+    /// on offering an accessory the reader has removed in Settings.
     func offerAccessoriesNotYetAdded() {
         let savedIDs = Set(watches.saved.map(\.id))
         let connectedIDs = Set(connections.map(\.watch.id))
