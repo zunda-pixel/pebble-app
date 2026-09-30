@@ -82,10 +82,14 @@ final class WatchAccessoryLink: NSObject {
         super.init()
         accessories.activate(on: .main) { [weak self] event in
             let type = event.eventType
-            guard type == .activated || type == .accessoryAdded || type == .accessoryChanged else { return }
+            guard type == .activated || type == .accessoryAdded || type == .accessoryChanged
+                || type == .accessoryRemoved else { return }
             MainActor.assumeIsolated {
                 if type == .activated {
                     self?.isAccessorySessionActive = true
+                }
+                if type == .accessoryRemoved {
+                    self?.leaveAWatchNoLongerPaired()
                 }
                 self?.connectIfPossible()
             }
@@ -128,6 +132,16 @@ final class WatchAccessoryLink: NSObject {
         }
         forwardingLog.log("the watch is still away and another paired watch is connected; moving to it")
         central.cancelPeripheralConnection(away)
+        dropLink()
+        peripheral = nil
+    }
+
+    /// A watch forgotten in the app stays connected to this process until the
+    /// link drops by itself, and every write in the meantime goes to it.
+    private func leaveAWatchNoLongerPaired() {
+        guard let central, let kept = peripheral, !pairedIdentifiers.contains(kept.identifier) else { return }
+        forwardingLog.log("the watch is no longer one of this app's accessories; letting it go")
+        central.cancelPeripheralConnection(kept)
         dropLink()
         peripheral = nil
     }
