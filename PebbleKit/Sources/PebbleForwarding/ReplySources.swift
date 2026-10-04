@@ -2,6 +2,7 @@
 import AccessoryNotifications
 import Foundation
 import PebbleProtocol
+import Synchronization
 
 /// Which forwarded notification a reply from the watch is about.
 ///
@@ -12,9 +13,14 @@ import PebbleProtocol
 /// defaults rather than in memory, and read from them afresh every time: a
 /// copy read once when the handler was made never saw what another process
 /// remembered.
-struct ReplySources: Sendable {
+final class ReplySources: Sendable {
     /// Well past what a watch keeps: `AN_MAX_TRACKED` forgets beyond 64.
     static let limit = 256
+    /// How many are remembered between two counts of what is stored. Counting
+    /// copies every defaults domain, the global one included, so it is not done
+    /// for each notification; it is done on the first, though, because an
+    /// extension's process may not live to see a second.
+    private static let trimInterval = 64
     /// One key per notification rather than one list: two processes
     /// remembering at once each read the list, added their own, and the later
     /// write took the earlier one's entry away with it.
@@ -26,6 +32,8 @@ struct ReplySources: Sendable {
         var remembered: Date
     }
 
+    private let rememberedSinceStart = Mutex(0)
+
     func notification(onTheWatchAs identifier: String) -> AccessoryNotification.Identifier? {
         Self.entry(forKey: Self.prefix + identifier)?.identifier
     }
@@ -33,7 +41,13 @@ struct ReplySources: Sendable {
     func remember(_ identifier: AccessoryNotification.Identifier) {
         let entry = Entry(identifier: identifier, remembered: .now)
         UserDefaults.standard.set(try? JSONEncoder().encode(entry), forKey: Self.key(for: identifier))
-        Self.keepWithinLimit()
+        let count = rememberedSinceStart.withLock { count in
+            defer { count += 1 }
+            return count
+        }
+        if count.isMultiple(of: Self.trimInterval) {
+            Self.keepWithinLimit()
+        }
     }
 
     func forget(_ identifier: AccessoryNotification.Identifier) {
