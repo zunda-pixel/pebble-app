@@ -7,7 +7,7 @@ targets iOS 27 and macOS 27; the app target also builds for visionOS.
 
 | Path | What lives there |
 | --- | --- |
-| `Pebble.xcodeproj` | The app project. One shared scheme, `Pebble`. |
+| `Pebble.xcodeproj` | The app project, in Xcode 27's JSON format (`project.xcproj`, not `project.pbxproj`), so it needs Xcode 27 or later. One shared scheme, `Pebble`. |
 | `Pebble/` | App target: `MainApp.swift`, `Info.plist`, entitlements, app-level strings. |
 
 `Info.plist` carries no comments — Xcode rewrites the file and strips them — so
@@ -103,9 +103,11 @@ ships, so a green SwiftPM run says little about the app.
 Anything that touches Bluetooth has to be verified on a real iPhone against a
 real watch. The simulator has no CoreBluetooth peripheral or GATT server.
 
-Do not edit `Pebble.xcodeproj/project.pbxproj` by hand. Change build settings
-with `UpdateTargetBuildSetting`, and add or move files with the `xcode-tools`
-file commands.
+Edit `Pebble.xcodeproj/project.xcproj` directly: it is JSON, and a build
+setting is one line keyed by its name. Keep each change to one concern, run
+`xcrun xcprojformatter --update Pebble.xcodeproj` afterwards so the file stays
+in the layout Xcode writes, and build before committing. Add or move files
+with the `xcode-tools` file commands.
 
 ## Swift settings
 
