@@ -54,6 +54,7 @@ struct AddWatchSheet: View {
                 watchBeingAdded = watch.id
                 Task { await model.connect(to: watch) }
             },
+            choose: choose,
             close: { dismiss() }
         )
         .onChange(of: model.connections.map(\.watch.id)) { _, connectedIDs in
@@ -61,6 +62,9 @@ struct AddWatchSheet: View {
             dismiss()
         }
         .task {
+            #if os(iOS)
+            await model.setUpAccessories()
+            #else
             // Every pass has to suspend, including the failing one, or a transport that
             // refuses immediately spins.
             while !Task.isCancelled {
@@ -71,7 +75,24 @@ struct AddWatchSheet: View {
                     return
                 }
             }
+            #endif
         }
+    }
+
+    /// On iOS a watch is found by the system's picker, which pairs it with the
+    /// app as an accessory; elsewhere by the scan above.
+    private var choose: (() -> Void)? {
+        #if os(iOS)
+        {
+            Task {
+                guard let watch = await model.chooseWatch() else { return }
+                watchBeingAdded = watch.id
+                await model.connect(to: watch)
+            }
+        }
+        #else
+        nil
+        #endif
     }
 }
 
@@ -83,6 +104,8 @@ struct AddWatchContent: View {
     var isConnecting: Bool
     var connectUnknown: (UnknownBondedWatch) -> Void
     var connectDiscovered: (DiscoveredWatch) -> Void
+    /// Set where watches are found by the system's picker instead of a scan.
+    var choose: (() -> Void)? = nil
     var close: () -> Void
 
     var body: some View {
@@ -104,22 +127,35 @@ struct AddWatchContent: View {
                     } header: {
                         Text("Already Paired")
                     } footer: {
-                        Text("A watch that is already paired but has not been added here. It cannot be found by scanning; it appears when it reaches the app by itself.")
+                        if choose == nil {
+                            Text("A watch that is already paired but has not been added here. It cannot be found by scanning; it appears when it reaches the app by itself.")
+                        } else {
+                            Text("A watch iOS has paired with this app that has not been added here yet.")
+                        }
                     }
                 }
 
-                Section {
-                    ForEach(discoveredWatches) { watch in
-                        DiscoveredWatchRow(watch: watch) {
-                            connectDiscovered(watch)
-                        }
-                        .disabled(isConnecting)
+                if let choose {
+                    Section {
+                        Button("Find a Watch", systemImage: "applewatch.radiowaves.left.and.right", action: choose)
+                            .disabled(isConnecting)
+                    } footer: {
+                        Text("Put the watch in pairing mode. iOS lists the watches it finds and pairs the one you choose with this app.")
                     }
-                } header: {
-                    HStack {
-                        Text("Nearby")
-                        ProgressView()
-                            .controlSize(.small)
+                } else {
+                    Section {
+                        ForEach(discoveredWatches) { watch in
+                            DiscoveredWatchRow(watch: watch) {
+                                connectDiscovered(watch)
+                            }
+                            .disabled(isConnecting)
+                        }
+                    } header: {
+                        HStack {
+                            Text("Nearby")
+                            ProgressView()
+                                .controlSize(.small)
+                        }
                     }
                 }
             }
@@ -173,6 +209,22 @@ struct AddWatchContent: View {
         isConnecting: false,
         connectUnknown: { _ in },
         connectDiscovered: { _ in },
+        close: {}
+    )
+}
+
+#Preview("Found by the system's picker") {
+    AddWatchContent(
+        connectionFeedback: nil,
+        managementFeedback: nil,
+        unknownBondedWatches: [
+            UnknownBondedWatch(id: WatchID("accessory-watch"), name: "Pebble Time 2 5209"),
+        ],
+        discoveredWatches: [],
+        isConnecting: false,
+        connectUnknown: { _ in },
+        connectDiscovered: { _ in },
+        choose: {},
         close: {}
     )
 }

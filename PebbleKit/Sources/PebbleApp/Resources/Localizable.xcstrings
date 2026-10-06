@@ -529,6 +529,16 @@
         }
       }
     },
+    "A watch iOS has paired with this app that has not been added here yet." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOSがこのアプリとペアリング済みで、まだここに追加されていないウォッチです。"
+          }
+        }
+      }
+    },
     "A watch in recovery firmware disconnects often. The install picks itself up again on the next connection, so a drop part-way through is not a lost update." : {
       "localizations" : {
         "ja" : {
@@ -845,6 +855,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "終日のリマインダー"
+          }
+        }
+      }
+    },
+    "Allow Forwarding" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "転送を許可"
           }
         }
       }
@@ -1475,6 +1495,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アップデートを確認中…"
+          }
+        }
+      }
+    },
+    "Choose Apps" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appを選択"
           }
         }
       }
@@ -2359,6 +2389,16 @@
         }
       }
     },
+    "Every watch offers these when you reply to a notification the iPhone forwards to it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhoneから転送された通知に返信するとき、どのウォッチでもこの定型文が表示されます。"
+          }
+        }
+      }
+    },
     "Exercise" : {
       "localizations" : {
         "ja" : {
@@ -2475,6 +2515,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ファイル"
+          }
+        }
+      }
+    },
+    "Find a Watch" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ウォッチを探す"
           }
         }
       }
@@ -2759,6 +2809,16 @@
         }
       }
     },
+    "Got it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "了解です。"
+          }
+        }
+      }
+    },
     "Hardware Revision" : {
       "localizations" : {
         "ja" : {
@@ -2975,6 +3035,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "文字盤の表示中にボタンを長押しすると、そのボタンに割り当てたアプリが開きます。"
+          }
+        }
+      }
+    },
+    "I'll call you later." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あとで電話します。"
           }
         }
       }
@@ -3789,6 +3859,16 @@
         }
       }
     },
+    "New Reply" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しい返信"
+          }
+        }
+      }
+    },
     "New Rule" : {
       "localizations" : {
         "ja" : {
@@ -3805,6 +3885,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ニュース"
+          }
+        }
+      }
+    },
+    "No" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "いいえ"
           }
         }
       }
@@ -3935,6 +4025,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未ダウンロード"
+          }
+        }
+      }
+    },
+    "Not Set Up" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未設定"
+          }
+        }
+      }
+    },
+    "Not Supported" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "非対応"
           }
         }
       }
@@ -4115,6 +4225,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "オン"
+          }
+        }
+      }
+    },
+    "On my way!" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今向かっています！"
           }
         }
       }
@@ -4495,6 +4615,16 @@
         }
       }
     },
+    "Put the watch in pairing mode. iOS lists the watches it finds and pairs the one you choose with this app." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ウォッチをペアリングモードにしてください。iOSが見つけたウォッチを一覧に表示し、選んだウォッチをこのアプリとペアリングします。"
+          }
+        }
+      }
+    },
     "Put the watch on its charger and keep it next to this device." : {
       "localizations" : {
         "ja" : {
@@ -4851,6 +4981,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "置き換え前"
+          }
+        }
+      }
+    },
+    "Reply" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返信"
+          }
+        }
+      }
+    },
+    "Reply Templates" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返信の定型文"
+          }
+        }
+      }
+    },
+    "Reply templates cannot be kept here: this app has no storage the notification extension can read." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返信の定型文を保存できません。このアプリには、通知の機能拡張が読み取れる保存場所がありません。"
           }
         }
       }
@@ -5285,6 +5445,16 @@
         }
       }
     },
+    "Some Apps" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一部のApp"
+          }
+        }
+      }
+    },
     "Spoken Language" : {
       "localizations" : {
         "ja" : {
@@ -5561,6 +5731,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "文字サイズ"
+          }
+        }
+      }
+    },
+    "Thank you!" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ありがとう！"
           }
         }
       }
@@ -5991,6 +6171,26 @@
         }
       }
     },
+    "The reply templates could not be read." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返信の定型文を読み込めませんでした。"
+          }
+        }
+      }
+    },
+    "The reply templates could not be saved." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返信の定型文を保存できませんでした。"
+          }
+        }
+      }
+    },
     "The reset command could not be sent." : {
       "localizations" : {
         "ja" : {
@@ -6077,6 +6277,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "“%@”の保存済みパッケージが見つかりません。もう一度読み込んでください。"
+          }
+        }
+      }
+    },
+    "The system's accessory picker could not be shown." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システムのアクセサリ選択画面を表示できませんでした。"
           }
         }
       }
@@ -6511,6 +6721,16 @@
         }
       }
     },
+    "The watch offers its own replies until you add one here." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ここで追加するまで、ウォッチは内蔵の返信候補を表示します。"
+          }
+        }
+      }
+    },
     "The watch records what you say and this app turns it into words here on the phone, without sending the sound anywhere. Turning this on downloads the recognizer for the chosen language." : {
       "localizations" : {
         "ja" : {
@@ -6607,6 +6827,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ファームウェアの転送を止めるためにウォッチの接続を切り、保留中のアップデートを削除しました。ウォッチの画面からもう一度接続してください。"
+          }
+        }
+      }
+    },
+    "The watch was forgotten here, but iOS still lists it. Remove it in Settings > Bluetooth." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリではウォッチの登録を解除しましたが、iOSにはまだ残っています。設定 > Bluetooth で削除してください。"
           }
         }
       }
@@ -6831,6 +7061,16 @@
         }
       }
     },
+    "This iPhone is holding an out-of-date copy of the watch's Bluetooth services. Forget the watch in Settings > Bluetooth, then add it again here." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このiPhoneが保持しているウォッチのBluetoothサービス情報が古くなっています。設定 > Bluetooth でウォッチの登録を解除してから、ここでもう一度追加してください。"
+          }
+        }
+      }
+    },
     "This link belongs to a settings page and only means something there." : {
       "localizations" : {
         "ja" : {
@@ -6901,12 +7141,32 @@
         }
       }
     },
+    "This watch was added before the app paired watches through iOS. Forget it and add it again to forward notifications to it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このウォッチは、アプリがiOS経由でウォッチをペアリングするようになる前に追加されました。通知を転送するには、登録を解除してからもう一度追加してください。"
+          }
+        }
+      }
+    },
     "This watch's firmware does not filter notifications, so these are kept here until one that does connects." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "このウォッチのファームウェアは通知をフィルタできないため、対応したウォッチが接続するまでルールはここに保存されます。"
+          }
+        }
+      }
+    },
+    "This watch's firmware is too old to connect to the iPhone app. Update its firmware from the Pebble app on a Mac, then connect it here again." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このウォッチのファームウェアは古いため、iPhoneアプリには接続できません。MacのPebbleアプリでファームウェアをアップデートしてから、ここでもう一度接続してください。"
           }
         }
       }
@@ -7641,6 +7901,16 @@
         }
       }
     },
+    "When you reply to an iPhone notification from the watch, it offers these in this order, as many as fit." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ウォッチでiPhoneの通知に返信するとき、ここにある定型文が収まる分だけこの順番で表示されます。"
+          }
+        }
+      }
+    },
     "While Focus is on, clear an arriving notification and return to the watchface instead of showing its popup." : {
       "localizations" : {
         "ja" : {
@@ -7681,6 +7951,16 @@
         }
       }
     },
+    "Yes" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "はい"
+          }
+        }
+      }
+    },
     "Zone 1" : {
       "localizations" : {
         "ja" : {
@@ -7707,6 +7987,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ゾーン3"
+          }
+        }
+      }
+    },
+    "iOS does not forward notifications to this watch. It needs firmware that supports it, and outside development iOS offers this only in the EU." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOSはこのウォッチに通知を転送しません。対応したファームウェアが必要で、開発時を除き、iOSはこの機能をEU内でのみ提供しています。"
+          }
+        }
+      }
+    },
+    "iOS does not take this watch as one it can forward notifications to." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOSはこのウォッチを通知の転送先として扱っていません。"
+          }
+        }
+      }
+    },
+    "iOS sends the watch its notifications encrypted, and the watch shows them in place of the ones it reads over Bluetooth itself. When you reply from the watch, it offers the reply templates in Settings › Notifications." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOSが通知を暗号化してウォッチに送り、ウォッチは自分でBluetooth経由で読み取る通知の代わりにそれを表示します。ウォッチから返信するときは、「設定」›「通知」の返信の定型文が表示されます。"
+          }
+        }
+      }
+    },
+    "iPhone Notifications" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhoneの通知"
           }
         }
       }

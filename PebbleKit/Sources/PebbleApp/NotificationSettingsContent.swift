@@ -9,7 +9,7 @@ import PebbleProtocol
 /// writes to the watch — while the phone's apps reach the watch over ANCS
 /// without passing through here at all, so that row leads to the watch's own
 /// settings for them.
-struct NotificationSettingsContent<PhoneAppsDestination: View>: View {
+struct NotificationSettingsContent<PhoneAppsDestination: View, ReplyTemplatesDestination: View>: View {
     var areCompanionNotificationsEnabled: Bool
     var notificationPreferences: NotificationDeliveryPreferences
     var applications: [WatchApplication]
@@ -18,7 +18,11 @@ struct NotificationSettingsContent<PhoneAppsDestination: View>: View {
     var setCompanionNotificationsEnabled: (Bool) -> Void
     var setQuietHours: (_ enabled: Bool, _ start: Int?, _ end: Int?) -> Void
     var setNotificationsEnabled: (Bool, UUID) -> Void
+    /// False where the watch is not sent the phone's notifications to reply
+    /// to: only iOS forwards them.
+    var offersReplyTemplates: Bool
     @ViewBuilder var phoneAppsDestination: () -> PhoneAppsDestination
+    @ViewBuilder var replyTemplatesDestination: () -> ReplyTemplatesDestination
 
     var body: some View {
         Form {
@@ -83,6 +87,17 @@ struct NotificationSettingsContent<PhoneAppsDestination: View>: View {
             } footer: {
                 Text("Apps the watch has seen sending notifications, and what it does with each one.")
             }
+            if offersReplyTemplates {
+                Section {
+                    NavigationLink {
+                        replyTemplatesDestination()
+                    } label: {
+                        Label("Reply Templates", systemImage: "text.bubble")
+                    }
+                } footer: {
+                    Text("Every watch offers these when you reply to a notification the iPhone forwards to it.")
+                }
+            }
         }
         .formStyle(.grouped)
         .navigationTitle(Text("Notifications"))
@@ -106,7 +121,17 @@ struct NotificationSettingsContent<PhoneAppsDestination: View>: View {
             setCompanionNotificationsEnabled: { _ in },
             setQuietHours: { _, _, _ in },
             setNotificationsEnabled: { _, _ in },
-            phoneAppsDestination: { EmptyView() }
+            offersReplyTemplates: true,
+            phoneAppsDestination: { EmptyView() },
+            replyTemplatesDestination: {
+                ReplyTemplatesContent(
+                    templates: PreviewSamples.replyTemplates,
+                    add: { _ in },
+                    update: { _ in },
+                    remove: { _ in },
+                    move: { _, _ in }
+                )
+            }
         )
     }
 }
@@ -126,7 +151,9 @@ struct NotificationSettingsContent<PhoneAppsDestination: View>: View {
             setCompanionNotificationsEnabled: { _ in },
             setQuietHours: { _, _, _ in },
             setNotificationsEnabled: { _, _ in },
-            phoneAppsDestination: { EmptyView() }
+            offersReplyTemplates: false,
+            phoneAppsDestination: { EmptyView() },
+            replyTemplatesDestination: { EmptyView() }
         )
     }
 }

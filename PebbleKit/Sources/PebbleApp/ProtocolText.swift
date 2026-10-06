@@ -31,6 +31,10 @@ public extension WatchConnectionError {
             "This watch connects but does not answer. Restart it, or forget it here and add it again."
         case .pairingRemovedByWatch:
             "The connection failed: the watch has thrown away its pairing with this device. A Pebble keeps one, so pairing it with another phone or computer does this. Forget the watch in the system Bluetooth settings, then pair it again here."
+        case .watchServicesOutOfDate:
+            "This iPhone is holding an out-of-date copy of the watch's Bluetooth services. Forget the watch in Settings > Bluetooth, then add it again here."
+        case .watchFirmwareTooOldForiOS:
+            "This watch's firmware is too old to connect to the iPhone app. Update its firmware from the Pebble app on a Mac, then connect it here again."
         }
     }
 

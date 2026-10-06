@@ -1,5 +1,9 @@
 package enum WatchAdvertisement {
     package static var vendorIdentifiers: Set<UInt16> { [0x0154, 0x0EEA] }
+    /// Advertised by a watch that is not bonded yet, including after a reset,
+    /// and published by every watch. The app's Info.plist names it again for
+    /// AccessorySetupKit, which reads the declaration rather than this.
+    package static let pairingServiceUUID = "0000FED9-0000-1000-8000-00805F9B34FB"
 
     /// What an advertisement says about the watch behind it.
     package struct AdvertisedWatch: Equatable, Sendable {

@@ -26,8 +26,7 @@ private final class NotificationObserverStorage: @unchecked Sendable {
 @MainActor
 public final class CoreBluetoothWatchClient: NSObject, WatchClient {
     static let ppogService = CBUUID(string: "40000000-328E-0FBB-C642-1AA6699BDADA")
-    /// Advertised by watches that are not bonded yet, including after a reset.
-    static let pairingService = CBUUID(string: "0000FED9-0000-1000-8000-00805F9B34FB")
+    static let pairingService = CBUUID(string: WatchAdvertisement.pairingServiceUUID)
     static let connectivityCharacteristic = CBUUID(string: "00000001-328E-0FBB-C642-1AA6699BDADA")
     static let pairingTriggerCharacteristic = CBUUID(string: "00000002-328E-0FBB-C642-1AA6699BDADA")
     static let connectionParametersCharacteristic = CBUUID(string: "00000005-328E-0FBB-C642-1AA6699BDADA")
@@ -112,7 +111,9 @@ public final class CoreBluetoothWatchClient: NSObject, WatchClient {
         )
         // Watches inspect the phone's GATT database right after connecting, so
         // the phone-hosted protocol service has to exist before that.
-        GATTServer.shared.start()
+        if Self.servesTheProtocolItself {
+            GATTServer.shared.start()
+        }
     }
 
     /// The watch to write to, once there is a session to write into. A connected

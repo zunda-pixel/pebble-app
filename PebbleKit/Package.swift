@@ -26,6 +26,12 @@ let package = Package(
       name: "PebbleKit",
       targets: ["PebbleApp"]
     ),
+    // For the app's three AccessoryNotifications extensions, which must not
+    // carry the whole app with them.
+    .library(
+      name: "PebbleForwarding",
+      targets: ["PebbleForwarding"]
+    ),
   ],
   dependencies: [
     .package(url: "https://github.com/apple/swift-algorithms.git", from: "1.2.0"),
@@ -86,6 +92,17 @@ let package = Package(
     // socket, and the mock a test or a preview stands in.
     .target(
       name: "PebbleTransport",
+      dependencies: [
+        .target(name: "PebbleProtocol"),
+        .product(name: "DequeModule", package: "swift-collections"),
+      ],
+      swiftSettings: swiftSettings
+    ),
+    // What iOS forwards through AccessoryNotifications, carried to the watch by
+    // the extensions iOS runs for it. Only iOS has the frameworks, so on any
+    // other platform this builds empty.
+    .target(
+      name: "PebbleForwarding",
       dependencies: [
         .target(name: "PebbleProtocol"),
         .product(name: "DequeModule", package: "swift-collections"),

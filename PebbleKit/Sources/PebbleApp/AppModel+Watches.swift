@@ -101,6 +101,12 @@ extension AppModel {
         }
         await forgetEverythingKept(for: id)
         watches.feedback = nil
+        #if os(iOS)
+        // The watch is gone from the app either way; iOS still listing it is
+        // said on the list the reader lands on.
+        _ = await forgetAccessory(id)
+        offerAccessoriesNotYetAdded()
+        #endif
         return true
     }
 
